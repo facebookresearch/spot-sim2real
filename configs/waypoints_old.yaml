@@ -1,0 +1,86 @@
+dock: [1.5, 0.0, 0.0]
+place_targets:
+  hall_table:
+  - 6.149335479736328
+  - 3.4870479106903076
+  - 0.9472300410270691
+  room_table:
+  - 1.0093035697937012
+  - 5.835827827453613
+  - 0.8794772624969482
+  couch:
+  - 2.231672525405884
+  - 2.2340340614318848
+  - 0.5729464888572693
+  kitchen_counter:
+  - 3.932156753540039
+  - -4.322710037231445
+  - 1.0271177291870117
+  hamper:
+  - 6.020458221435547
+  - 4.3451695442199707
+  - 1.1152537822723389
+  living_table:
+  - 1.746833086013794
+  - 5.299206256866455
+  - 0.9472300410270691
+  kitchen_drawer:
+  - 3.105817174911499
+  - -2.4059647178649902
+  - 1.0271177291870117
+
+clutter:
+- room_table
+- bedroom_stand
+- kitchen_counter
+clutter_amounts:
+  kitchen_counter: 2
+  room_table: 4
+  bedroom_stand: 4
+object_targets: # i.e., where an object belongs / needs to be placed
+  # <Class_id>: [<object's name>, <which place_target it belongs to>]
+  0: [ball, living_table]
+  1: [penguin, hamper]
+  2: [caterpillar, hamper]
+  3: [rubiks_cube, living_table]
+  4: [lion, hamper]
+  5: [toy_car, kitchen_drawer]
+  6: [toy_car, kitchen_drawer]
+  7: [yellow_truck, kitchen_drawer]
+
+hall_table:
+- 5.0992034191357964
+- 3.399404665916489
+- 5.258597772876546
+dining_table:
+- 1.5407002536143195
+- -2.3681384359380155
+- -177.4937292255793
+couch:
+- 2.2091526960218664
+- 3.3891095451617637
+- -88.92619160406124
+room_table:
+- 1.0551122184714352
+- 6.834721314684145
+- -93.89034868324015
+bedroom_stand:
+- 8.125681741133462
+- 5.115600937684185
+- 83.7025166946472
+kitchen_counter:
+- 3.952168424141969
+- -3.3332041436566295
+- -81.14265513786233
+hamper:
+- 5.162169116005478
+- 4.19507387235291
+- -6.156937862763343
+living_table:
+- 1.7491451501846313
+- 4.506260871887207
+- 85.54759342984362
+kitchen_drawer:
+- 3.0550888442993163
+- -3.42427396774292
+- -269.96117788800296
