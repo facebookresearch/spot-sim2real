@@ -11,18 +11,11 @@ from spot_wrapper.spot import (
     image_response_to_cv2,
     scale_depth_img,
 )
-from spot_wrapper.utils.utils import color_bbox, resize_to_tallest_old_version
+from spot_wrapper.utils import color_bbox, resize_to_tallest
 
 MAX_HAND_DEPTH = 3.0
 MAX_HEAD_DEPTH = 10.0
 DETECT_LARGEST_WHITE_OBJECT = False
-
-
-def height_fy_to_hfov(source_rows_height, fy):
-    """Use camera parameter to get height field of view (hFOV)"""
-    # We compute this using 
-    # https://stackoverflow.com/questions/39992968/how-to-calculate-field-of-view-of-the-camera-from-camera-intrinsic-matrix
-    return np.degrees(2 * np.arctan(source_rows_height/(2.0 * fy)))
 
 
 def main(spot: Spot):
@@ -47,8 +40,6 @@ def main(spot: Spot):
             imgs = []
             for image_response, source in zip(image_responses, sources):
                 img = image_response_to_cv2(image_response, reorient=True)
-                fy = image_response.source.pinhole.intrinsics.focal_length.y 
-                print("source:", source, img.shape, height_fy_to_hfov(img.shape[0], fy))
                 if "depth" in source:
                     max_depth = MAX_HAND_DEPTH if "hand" in source else MAX_HEAD_DEPTH
                     img = scale_depth_img(img, max_depth=max_depth, as_img=True)
@@ -57,12 +48,11 @@ def main(spot: Spot):
                     if DETECT_LARGEST_WHITE_OBJECT:
                         x, y, w, h = color_bbox(img, just_get_bbox=True)
                         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-                cv2.imshow(source, img)
+
                 imgs.append(img)
-                
 
             # Make sure all imgs are same height
-            img, width_list = resize_to_tallest_old_version(imgs, hstack=True)
+            img = resize_to_tallest(imgs, hstack=True)
 
             if not args.no_display:
                 cv2.imshow(window_name, img)

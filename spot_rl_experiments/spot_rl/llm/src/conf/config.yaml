@@ -1,0 +1,5 @@
+defaults:
+  - llm: openai
+  - prompt: rearrange_easy_few_shot
+
+verbose: false

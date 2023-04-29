@@ -1,0 +1,8 @@
+ball
+penguin
+caterpillar
+rubiks_cube
+lion
+toy_car
+toy_car
+yellow_truck

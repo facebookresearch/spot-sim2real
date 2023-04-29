@@ -1,4 +1,3 @@
-import argparse
 import curses
 import os
 import signal
@@ -16,8 +15,7 @@ UPDATE_PERIOD = 0.2
 
 # Where the gripper goes to upon initialization
 INITIAL_POINT = np.array([0.5, 0.0, 0.35])
-#INITIAL_POINT = np.array([0.06, -0.02, 0.55])
-INITIAL_RPY = np.deg2rad([0.0, 0.0, 0.0])
+INITIAL_RPY = np.deg2rad([0.0, 45.0, 0.0])
 KEY2GRIPPERMOVEMENT = {
     "w": np.array([0.0, 0.0, MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move up
     "s": np.array([0.0, 0.0, -MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move down
@@ -69,7 +67,7 @@ def raise_error(sig, frame):
     raise RuntimeError
 
 
-def main(spot: Spot, disable_oa=False):
+def main(spot: Spot):
     """Uses IK to move the arm by setting hand poses"""
     spot.power_on()
     spot.blocking_stand()
@@ -121,9 +119,6 @@ def main(spot: Spot, disable_oa=False):
             elif pressed_key == "r":
                 # Open gripper
                 spot.open_gripper()
-            elif pressed_key == "b":
-                # Open gripper
-                spot.close_gripper()
             elif pressed_key == "n":
                 try:
                     spot.dock(DOCK_ID)
@@ -152,10 +147,7 @@ def main(spot: Spot, disable_oa=False):
                         y_vel=y_vel,
                         ang_vel=ang_vel,
                         vel_time=UPDATE_PERIOD * 2,
-                        disable_obstacle_avoidance=disable_oa,
                     )
-                    cur_x, cur_y, cur_yaw = spot.get_xy_yaw(use_boot_origin=True)
-                    print("Current pose:", cur_x, cur_y, cur_yaw)
                 else:
                     key_not_applicable = True
 
@@ -170,11 +162,6 @@ def main(spot: Spot, disable_oa=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--disable-oa", "-d", action="store_true")
-    args = parser.parse_args()
-    if args.disable_oa:
-        print("OBSTACLE AVOIDANCE HAS BEEN DISABLED!!!")
     spot = Spot("ArmKeyboardTeleop")
     with spot.get_lease(hijack=True) as lease:
-        main(spot, args.disable_oa)
+        main(spot)

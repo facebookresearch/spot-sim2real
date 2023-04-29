@@ -1,0 +1,6 @@
+README.md
+setup.py
+mask_rcnn_detectron2.egg-info/PKG-INFO
+mask_rcnn_detectron2.egg-info/SOURCES.txt
+mask_rcnn_detectron2.egg-info/dependency_links.txt
+mask_rcnn_detectron2.egg-info/top_level.txt

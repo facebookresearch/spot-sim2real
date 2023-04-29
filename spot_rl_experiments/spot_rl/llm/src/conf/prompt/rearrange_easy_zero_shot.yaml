@@ -1,0 +1,10 @@
+main_prompt: |-
+        You will solve a simple rearrangement task that requires you to Navigate to a given object
+        and Pick it up, and then Navigate to a given location and Place it there. Given an open instruction
+        that could be similar to "Go to the table and find the mug, and return the mug to box", you need to 
+        return the solution sequence of actions: Nav(Table), Pick(Mug), Nav(Box), Place(Mug, Box).
+suffix: |-
+        Let's go!
+        Instruction: <rearrange_instruction>
+        Solution:
+input_variable: rearrange_instruction

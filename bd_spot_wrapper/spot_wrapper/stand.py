@@ -9,6 +9,8 @@ def main(spot: Spot):
     spot.blocking_stand()
 
     # Wait 3 seconds to before powering down...
+    while True:
+        pass
     time.sleep(3)
     spot.power_off()
 

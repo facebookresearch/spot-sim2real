@@ -1,0 +1,38 @@
+Collecting albumentations
+  Downloading albumentations-1.1.0-py3-none-any.whl (102 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 102.4/102.4 KB 11.1 MB/s eta 0:00:00
+Collecting opencv-python-headless>=4.1.1
+  Downloading opencv_python_headless-4.5.5.64-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (47.8 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 47.8/47.8 MB 52.5 MB/s eta 0:00:00
+Collecting scikit-image>=0.16.1
+  Downloading scikit_image-0.19.2-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (14.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 14.0/14.0 MB 79.3 MB/s eta 0:00:00
+Requirement already satisfied: scipy in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from albumentations) (1.8.0)
+Requirement already satisfied: numpy>=1.11.1 in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from albumentations) (1.22.3)
+Requirement already satisfied: PyYAML in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from albumentations) (6.0)
+Collecting qudida>=0.0.4
+  Downloading qudida-0.0.4-py3-none-any.whl (3.5 kB)
+Requirement already satisfied: typing-extensions in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from qudida>=0.0.4->albumentations) (4.2.0)
+Collecting scikit-learn>=0.19.1
+  Downloading scikit_learn-1.0.2-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (26.7 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 26.7/26.7 MB 67.3 MB/s eta 0:00:00
+Collecting tifffile>=2019.7.26
+  Downloading tifffile-2022.4.8-py3-none-any.whl (180 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 180.6/180.6 KB 32.1 MB/s eta 0:00:00
+Collecting networkx>=2.2
+  Downloading networkx-2.8-py3-none-any.whl (2.0 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.0/2.0 MB 82.0 MB/s eta 0:00:00
+Requirement already satisfied: pillow!=7.1.0,!=7.1.1,!=8.3.0,>=6.1.0 in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from scikit-image>=0.16.1->albumentations) (9.1.0)
+Collecting PyWavelets>=1.1.1
+  Downloading PyWavelets-1.3.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (6.9 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.9/6.9 MB 87.6 MB/s eta 0:00:00
+Requirement already satisfied: imageio>=2.4.1 in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from scikit-image>=0.16.1->albumentations) (2.17.0)
+Requirement already satisfied: packaging>=20.0 in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from scikit-image>=0.16.1->albumentations) (21.3)
+Requirement already satisfied: pyparsing!=3.0.5,>=2.0.2 in /home/akshara/anaconda3/envs/spot_ros/lib/python3.8/site-packages (from packaging>=20.0->scikit-image>=0.16.1->albumentations) (3.0.8)
+Collecting threadpoolctl>=2.0.0
+  Downloading threadpoolctl-3.1.0-py3-none-any.whl (14 kB)
+Collecting joblib>=0.11
+  Downloading joblib-1.1.0-py2.py3-none-any.whl (306 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 307.0/307.0 KB 41.6 MB/s eta 0:00:00
+Installing collected packages: tifffile, threadpoolctl, PyWavelets, opencv-python-headless, networkx, joblib, scikit-learn, scikit-image, qudida, albumentations
+Successfully installed PyWavelets-1.3.0 albumentations-1.1.0 joblib-1.1.0 networkx-2.8 opencv-python-headless-4.5.5.64 qudida-0.0.4 scikit-image-0.19.2 scikit-learn-1.0.2 threadpoolctl-3.1.0 tifffile-2022.4.8

@@ -47,14 +47,6 @@ from bosdyn.client.robot_command import (
 )
 from bosdyn.client.robot_state import RobotStateClient
 from google.protobuf import wrappers_pb2
-# For openning the door
-import sys
-sys.path.append("/Users/jimmytyyang/spot_exp/bd_spot_wrapper/spot_wrapper")
-from spot_open_door import get_images_as_cv2
-from spot_open_door import RequestManager
-from spot_open_door import walk_to_object_in_image
-from spot_open_door import open_door
-from spot_open_door import pitch_up
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -64,6 +56,14 @@ env_err_msg = (
     "echo 'export {var_name}=<YOUR_{var_name}>' >> ~/.bash_profile\n"
     "Then:\nsource ~/.bashrc\nor\nsource ~/.bash_profile"
 )
+try:
+    SPOT_ADMIN_PW = os.environ["SPOT_ADMIN_PW"]
+except KeyError:
+    raise RuntimeError(env_err_msg.format(var_name="SPOT_ADMIN_PW"))
+try:
+    SPOT_IP = os.environ["SPOT_IP"]
+except KeyError:
+    raise RuntimeError(env_err_msg.format(var_name="SPOT_IP"))
 
 ARM_6DOF_NAMES = [
     "arm0.sh0",
@@ -113,25 +113,10 @@ SHOULD_ROTATE = [
 
 class Spot:
     def __init__(self, client_name_prefix):
-        try:
-            spot_admin_pw = os.environ["SPOT_ADMIN_PW"]
-            spot_user_name = "admin"
-        except KeyError:
-            spot_admin_pw = "he9k5uqfsmvf"
-            spot_user_name = "user"
-
         bosdyn.client.util.setup_logging()
         sdk = bosdyn.client.create_standard_sdk(client_name_prefix)
-        try:
-            # wifi
-            spot_ip = "192.168.80.3"
-            robot = sdk.create_robot(spot_ip)
-            robot.authenticate(spot_user_name, spot_admin_pw)
-        except:
-            # ethernet
-            spot_ip = "10.0.0.3"
-            robot = sdk.create_robot(spot_ip)
-            robot.authenticate(spot_user_name, spot_admin_pw)
+        robot = sdk.create_robot(SPOT_IP)
+        robot.authenticate("admin", SPOT_ADMIN_PW)
         robot.time_sync.wait_for_sync()
         self.robot = robot
         self.command_client = None
@@ -234,7 +219,6 @@ class Spot:
             )
 
         hand_pose = math_helpers.SE3Pose(*point, quat)
-        print("hand_pose:", hand_pose)
         hand_trajectory = trajectory_pb2.SE3Trajectory(
             points=[trajectory_pb2.SE3TrajectoryPoint(pose=hand_pose.to_proto())]
         )
@@ -301,7 +285,7 @@ class Spot:
             transforms_snapshot_for_camera=image_response.shot.transforms_snapshot,
             frame_name_image_sensor=image_response.shot.frame_name_image_sensor,
             camera_model=image_response.source.pinhole,
-            walk_gaze_mode=1,  # PICK_NO_AUTO_WALK_OR_GAZE
+            walk_gaze_mode=3,
         )
         if top_down_grasp or horizontal_grasp:
             if top_down_grasp:
@@ -336,10 +320,8 @@ class Spot:
                 axis_to_align_with_ewrt_vo
             )
 
-            # Take anything within 30 degrees for top-down or horizontal grasps.
-            constraint.vector_alignment_with_tolerance.threshold_radians = np.deg2rad(
-                30 * 2
-            )
+            # Take anything within about 10 degrees for top-down or horizontal grasps.
+            constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
@@ -429,61 +411,6 @@ class Spot:
         cmd_id = self.command_client.robot_command(
             command, end_time_secs=time.time() + vel_time
         )
-
-        return cmd_id
-
-    def set_abs_base_position(
-        self,
-        x_pos,
-        y_pos,
-        yaw,
-        end_time,
-        max_fwd_vel=2,
-        max_hor_vel=2,
-        max_ang_vel=np.pi / 2,
-        disable_obstacle_avoidance=False,
-        blocking=False,
-    ):
-        vel_limit = SE2VelocityLimit(
-            max_vel=SE2Velocity(
-                linear=Vec2(x=max_fwd_vel, y=max_hor_vel), angular=max_ang_vel
-            ),
-            min_vel=SE2Velocity(
-                linear=Vec2(x=-max_fwd_vel, y=-max_hor_vel), angular=-max_ang_vel
-            ),
-        )
-        params = spot_command_pb2.MobilityParams(
-            vel_limit=vel_limit,
-            obstacle_params=spot_command_pb2.ObstacleParams(
-                disable_vision_body_obstacle_avoidance=disable_obstacle_avoidance,
-                disable_vision_foot_obstacle_avoidance=False,
-                disable_vision_foot_constraint_avoidance=False,
-                obstacle_avoidance_padding=0.05,  # in meters
-            ),
-        )
-
-        global_x_pos, global_y_pos, global_yaw = x_pos, y_pos, yaw
-
-        robot_cmd = RobotCommandBuilder.synchro_se2_trajectory_point_command(
-            goal_x=global_x_pos,
-            goal_y=global_y_pos,
-            goal_heading=global_yaw,
-            frame_name=VISION_FRAME_NAME,
-            params=params,
-        )
-        cmd_id = self.command_client.robot_command(
-            robot_cmd, end_time_secs=time.time() + end_time
-        )
-
-        if blocking:
-            cmd_status = None
-            while cmd_status != 1:
-                time.sleep(0.1)
-                feedback_resp = self.get_cmd_feedback(cmd_id)
-                cmd_status = (
-                    feedback_resp.feedback.synchronized_feedback
-                ).mobility_command_feedback.se2_trajectory_feedback.status
-            return None
 
         return cmd_id
 
@@ -665,16 +592,12 @@ class Spot:
         return self.xy_yaw_global_to_home(robot_tform.x, robot_tform.y, yaw)
 
     def xy_yaw_global_to_home(self, x, y, yaw):
-        if self.global_T_home is None:
-            return x, y, yaw
         x, y, w = self.global_T_home.dot(np.array([x, y, 1.0]))
         x, y = x / w, y / w
 
         return x, y, wrap_heading(yaw - self.robot_recenter_yaw)
 
     def xy_yaw_home_to_global(self, x, y, yaw):
-        if self.global_T_home is None:
-            return x, y, yaw
         local_T_global = np.linalg.inv(self.global_T_home)
         x, y, w = local_T_global.dot(np.array([x, y, 1.0]))
         x, y = x / w, y / w
@@ -721,43 +644,6 @@ class Spot:
     def undock(self):
         blocking_undock(self.robot)
 
-    def execute_open_door(self):
-        """High level behavior sequence for commanding the robot to open a door."""
-
-        # Pitch the robot up. This helps ensure that the door is in the field of view of the front
-        # cameras.
-        pitch_up(self.robot)
-
-        # Capture images from the two from cameras.
-        sources = ['frontleft_fisheye_image', 'frontright_fisheye_image']
-        rgb_image_dict = get_images_as_cv2(self.robot, sources, True)
-        image_dict = get_images_as_cv2(self.robot, sources, False)
-
-        # Get handle and hinge locations from user input.
-        window_name = "Open Door Example"
-        request_manager = RequestManager(rgb_image_dict, image_dict, window_name)
-        #request_manager.get_user_input_handle_and_hinge()
-        request_manager.get_model_input_handle_and_hinge()
-
-        assert request_manager.user_input_set(), "Failed to get user input for handle and hinge."
-
-        # Tell the robot to walk toward the door.
-        manipulation_feedback = walk_to_object_in_image(self.robot, request_manager, debug=False)
-        time.sleep(3.0)
-        print("Done manipulation_feedback")
-
-        # The ManipulationApiResponse for the WalkToObjectInImage command returns a transform snapshot
-        # that contains where user clicked door handle point intersects the world. We use this
-        # intersection point to execute the door command.
-        snapshot = manipulation_feedback.transforms_snapshot_manipulation_data
-        print("Done snapshot")
-
-        # Execute the door command.
-        open_door(self.robot, request_manager, snapshot)
-        print("Done open_door")
-
-        return
-
 
 class SpotLease:
     """
@@ -779,18 +665,17 @@ class SpotLease:
     def __enter__(self):
         return self.lease
 
-    def __exit__(self, *args, **kwargs):
-        self.return_lease()
-
-    def return_lease(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         # Exit the LeaseKeepAlive object
-        self.lease_keep_alive.shutdown()
+        self.lease_keep_alive.__exit__(exc_type, exc_val, exc_tb)
         # Return the lease
         self.lease_client.return_lease(self.lease)
         self.spot.loginfo("Returned the lease.")
         # Clear lease from Spot object
         self.spot.spot_lease = None
 
+    def create_sublease(self):
+        return self.lease.create_sublease()
 
 def make_robot_command(arm_joint_traj):
     """Helper function to create a RobotCommand from an ArmJointTrajectory.
@@ -836,13 +721,6 @@ def scale_depth_img(img, min_depth=0.0, max_depth=10.0, as_img=False):
     img_copy = (img_copy - min_depth) / (max_depth - min_depth)
     if as_img:
         img_copy = cv2.cvtColor((255.0 * img_copy).astype(np.uint8), cv2.COLOR_GRAY2BGR)
-
-    return img_copy
-
-
-def clip_depth_img(img, min_depth=0.0, max_depth=10.0):
-    min_depth, max_depth = min_depth * 1000, max_depth * 1000
-    img_copy = np.clip(img.astype(np.float32), a_min=min_depth, a_max=max_depth)
 
     return img_copy
 
