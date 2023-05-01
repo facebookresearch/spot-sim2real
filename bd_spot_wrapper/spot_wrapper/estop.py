@@ -29,6 +29,17 @@ except KeyError:
         "Then:\nsource ~/.bashrc\nor\nsource ~/.bash_profile"
     )
 
+try:
+    SPOT_IP = os.environ["SPOT_IP"]
+except KeyError:
+    raise RuntimeError(
+        "\nSPOT_IP not found as an environment variable!\n"
+        "Please run:\n"
+        "echo 'export SPOT_IP=<YOUR_SPOT_IP>'>> ~/.bashrc\n or for MacOS,\n"
+        "echo 'export SPOT_IP=<YOUR_SPOT_IP>'>> ~/.bash_profile\n"
+        "Then:\nsource ~/.bashrc\nor\nsource ~/.bash_profile"
+    )
+
 class EstopNoGui():
     """Provides a software estop without a GUI.
 
@@ -208,6 +219,6 @@ def main(argv):
 if __name__ == '__main__':
     # Open terminal interface and hold estop until user exits with SIGINT
     if len(sys.argv) == 1:
-        sys.argv.append("10.0.0.3")
+        sys.argv.append(SPOT_IP)
     if not main(sys.argv[1:]):
         sys.exit(1)
