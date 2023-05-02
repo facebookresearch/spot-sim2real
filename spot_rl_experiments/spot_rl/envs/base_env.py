@@ -137,17 +137,17 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if config.PARALLEL_INFERENCE_MODE:
             if config.USE_MRCNN:
                 rospy.Subscriber(rt.DETECTIONS_TOPIC, String, self.detections_cb)
-                print("Parallel inference selected: Waiting for Mask R-CNN msgs...")
+                rospy.loginfo(f"[{self.node_name}]: Parallel inference selected: Waiting for Mask R-CNN msgs...")
                 st = time.time()
                 while (
                     len(self.detections_buffer["detections"]) == 0
-                    and time.time() < st + 5
+                    and time.time() < st + 25
                 ):
                     pass
                 assert (
                     len(self.detections_buffer["detections"]) > 0
                 ), "Mask R-CNN msgs not found!"
-                print("...msgs received.")
+                rospy.loginfo(f"[{self.node_name}]: ...msgs received.")
                 scale_pub = rospy.Publisher(rt.IMAGE_SCALE, Float32, queue_size=1)
                 scale_pub.publish(config.IMAGE_SCALE)
         elif config.USE_MRCNN:
