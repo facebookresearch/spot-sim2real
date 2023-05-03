@@ -7,9 +7,9 @@ import yaml
 from yacs.config import CfgNode as CN
 
 this_dir = osp.dirname(osp.abspath(__file__))
-spot_rl_dir = osp.join(osp.dirname(osp.dirname(this_dir)))
-configs_dir = osp.join(spot_rl_dir, "configs")
-
+spot_rl_dir = osp.join(osp.dirname(this_dir))
+spot_rl_experiments_dir = osp.join(osp.dirname(spot_rl_dir))
+configs_dir = osp.join(spot_rl_experiments_dir, "configs")
 DEFAULT_CONFIG = osp.join(configs_dir, "config.yaml")
 WAYPOINTS_YAML = osp.join(configs_dir, "waypoints.yaml")
 with open(WAYPOINTS_YAML) as f:
@@ -38,7 +38,7 @@ def construct_config(opts=None):
     new_weights = {}
     for k, v in config.WEIGHTS.items():
         if not osp.isfile(v):
-            new_v = osp.join(spot_rl_dir, v)
+            new_v = osp.join(spot_rl_experiments_dir, v)
             if not osp.isfile(new_v):
                 raise KeyError(f"Neither {v} nor {new_v} exist!")
             new_weights[k] = new_v
