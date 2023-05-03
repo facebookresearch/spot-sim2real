@@ -1,0 +1,1 @@
+from spot_rl.models.owlvit import OwlVit
