@@ -32,6 +32,10 @@ try:
     )
 except ModuleNotFoundError:
     pass
+
+# owlvit
+from spot_rl.models import OwlVit
+
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
@@ -274,29 +278,69 @@ class SpotFilteredHandDepthImagesPublisher(SpotFilteredDepthImagesPublisher):
     publisher_topics = [rt.FILTERED_HAND_DEPTH]
 
 
-class SpotMRCNNPublisher(SpotProcessedImagesPublisher):
-    name = "spot_mrcnn_publisher"
+class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
+
+    # TODO: We eventually want to change this name as well as the publisher topic
+    name = 'spot_mrcnn_publisher' 
     subscriber_topic = rt.HAND_RGB
     publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
+    
+    def __init__(self, model):
+        self.model = model
+        self.detection_topic = DETECTIONS_TOPIC
+        self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        super().__init__()
 
+    def _publish(self):
+        stopwatch = Stopwatch()
+        header = self.img_msg.header
+        timestamp = header.stamp
+        hand_rgb = self.msg_to_cv2(self.img_msg)
+
+        # Internal model
+        bbox_data, viz_img = self.model.process_image(hand_rgb, timestamp, stopwatch)
+        
+        # publish data
+        self.publish_bbox_data(bbox_data)
+        self.publish_viz_img(viz_img, header)
+
+        stopwatch.print_stats()
+
+    def publish_bbox_data(self, bbox_data):
+        self.pubs[self.detection_topic].publish(bbox_data)
+
+    def publish_viz_img(self, viz_img, header):
+        viz_img_msg = self.cv2_to_msg(viz_img)
+        viz_img_msg.header = header
+        self.pubs[self.viz_topic].publish(viz_img_msg)
+
+class OWLVITModel:
+    def __init__(self, owlvit_label, score_threshold=.05, show_img=False):
+        self.config = config = construct_config()
+        self.owlvit = OwlVit([[owlvit_label]], confidence, show_img)
+        self.image_scale = config.IMAGE_SCALE
+        rospy.loginfo(f"[{self.name}]: Models loaded.")
+
+    def process_image(self, hand_rgb, timestamp, stopwatch):
+        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
+
+        if bbox_xy is not None:
+            bbox_xy_string = ','.join(str(x) for x in bbox_xy)
+        else:
+            bbox_xy_string = "None"
+        detections_str = f"{int(timestamp.nsecs)}|{bbox_xy_string}"
+
+        return detections_str, viz_img
+
+class MRCNNModel:
     def __init__(self):
         self.config = config = construct_config()
         self.mrcnn = get_mrcnn_model(config)
         self.deblur_gan = get_deblurgan_model(config)
         self.image_scale = config.IMAGE_SCALE
         rospy.loginfo(f"[{self.name}]: Models loaded.")
-        super().__init__()
-        self.pubs[rt.DETECTIONS_TOPIC] = rospy.Publisher(
-            rt.DETECTIONS_TOPIC, String, queue_size=1, tcp_nodelay=True
-        )
 
-    def _publish(self):
-        stopwatch = Stopwatch()
-
-        # Publish the Mask RCNN detections
-        header = self.img_msg.header
-        timestamp = header.stamp
-        hand_rgb = self.msg_to_cv2(self.img_msg)
+    def process_image(self, hand_rgb, timestamp, stopwatch):
         pred, viz_img = generate_mrcnn_detections(
             hand_rgb,
             scale=self.image_scale,
@@ -307,33 +351,31 @@ class SpotMRCNNPublisher(SpotProcessedImagesPublisher):
             stopwatch=stopwatch,
         )
         detections_str = f"{int(timestamp.nsecs)}|{pred2string(pred)}"
-
         viz_img = self.mrcnn.visualize_inference(viz_img, pred)
-        if not detections_str.endswith("None"):
-            print(detections_str)
-        viz_img_msg = self.cv2_to_msg(viz_img)
-        viz_img_msg.header = header
-        stopwatch.record("vis_secs")
-
-        stopwatch.print_stats()
-
-        self.pubs[rt.DETECTIONS_TOPIC].publish(detections_str)
-        self.pubs[rt.MASK_RCNN_VIZ_TOPIC].publish(viz_img_msg)
+        return detections_str, viz_img
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--filter-head-depth", action="store_true")
     parser.add_argument("--filter-hand-depth", action="store_true")
-    parser.add_argument("--mrcnn", action="store_true")
     parser.add_argument("--decompress", action="store_true")
     parser.add_argument("--raw", action="store_true")
     parser.add_argument("--compress", action="store_true")
+    parser.add_argument("--owlvit",  action="store_true")
+    parser.add_argument("--mrcnn",  action="store_true")
     parser.add_argument("--core", action="store_true", help="running on the Core")
     parser.add_argument("--listen", action="store_true", help="listening to Core")
     parser.add_argument(
         "--local", action="store_true", help="fully local robot connection"
     )
+    parser.add_argument(
+        "--bounding_box_detector",
+        choices=["owlvit", "mrcnn"],
+        default="owlvit",
+        help="bounding box detector model to use (owlvit or maskrcnn)",
+    )
+
     args = parser.parse_args()
     assert (
         len([i[1] for i in args._get_kwargs() if i[1]]) == 1
@@ -341,13 +383,15 @@ if __name__ == "__main__":
 
     filter_head_depth = args.filter_head_depth
     filter_hand_depth = args.filter_hand_depth
-    mrcnn = args.mrcnn
     decompress = args.decompress
     raw = args.raw
     compress = args.compress
     core = args.core
     listen = args.listen
     local = args.local
+    bounding_box_detector = args.bounding_box_detector
+    mrcnn = args.mrcnn
+    owlvit = args.owlvit
 
     node = None
     if filter_head_depth:
@@ -355,7 +399,12 @@ if __name__ == "__main__":
     elif filter_hand_depth:
         node = SpotFilteredHandDepthImagesPublisher()
     elif mrcnn:
-        node = SpotMRCNNPublisher()
+        model = MRCNNModel()
+        node = SpotBoundingBoxPublisher(model)
+    elif owlvit:
+        # TODO dynamic label
+        model = OWLVITModel([['cup']])
+        node = SpotBoundingBoxPublisher(model)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()
     elif raw or compress:
@@ -372,7 +421,7 @@ if __name__ == "__main__":
         if core:
             flags = ["--compress"]
         else:
-            flags = ["--filter-head-depth", "--filter-hand-depth", "--mrcnn"]
+            flags = ["--filter-head-depth", "--filter-hand-depth", f"--{bounding_box_detector}"]
             if listen:
                 flags.append("--decompress")
             elif local:
