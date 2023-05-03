@@ -286,11 +286,14 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
     publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
     
     def __init__(self, model):
-        self.model = model
-        self.detection_topic = DETECTIONS_TOPIC
-        self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
         super().__init__()
-
+        self.model = model
+        self.detection_topic = rt.DETECTIONS_TOPIC
+        self.pubs[self.detection_topic] = rospy.Publisher(
+            self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        )
+        self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        
     def _publish(self):
         stopwatch = Stopwatch()
         header = self.img_msg.header
@@ -317,9 +320,9 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 class OWLVITModel:
     def __init__(self, owlvit_label, score_threshold=.05, show_img=False):
         self.config = config = construct_config()
-        self.owlvit = OwlVit([[owlvit_label]], confidence, show_img)
+        self.owlvit = OwlVit([[owlvit_label]], score_threshold, show_img)
         self.image_scale = config.IMAGE_SCALE
-        rospy.loginfo(f"[{self.name}]: Models loaded.")
+        rospy.loginfo("[OWLVIT]: Models loaded.")
 
     def process_image(self, hand_rgb, timestamp, stopwatch):
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
@@ -338,7 +341,7 @@ class MRCNNModel:
         self.mrcnn = get_mrcnn_model(config)
         self.deblur_gan = get_deblurgan_model(config)
         self.image_scale = config.IMAGE_SCALE
-        rospy.loginfo(f"[{self.name}]: Models loaded.")
+        rospy.loginfo("[MRCNN]: Models loaded.")
 
     def process_image(self, hand_rgb, timestamp, stopwatch):
         pred, viz_img = generate_mrcnn_detections(
@@ -377,9 +380,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    assert (
-        len([i[1] for i in args._get_kwargs() if i[1]]) == 1
-    ), "One and only one arg must be provided."
+    #assert (
+    #    len([i[1] for i in args._get_kwargs() if i[1]]) == 1
+    #), "One and only one arg must be provided."
 
     filter_head_depth = args.filter_head_depth
     filter_hand_depth = args.filter_hand_depth
@@ -403,7 +406,7 @@ if __name__ == "__main__":
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
         # TODO dynamic label
-        model = OWLVITModel([['cup']])
+        model = OWLVITModel('ball')
         node = SpotBoundingBoxPublisher(model)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()

@@ -522,6 +522,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             )
             detections_str = pred2string(pred)
 
+        print('DETECTIONS STR')
+        print(detections_str)
+        # 0,0.9983996748924255,80.09086608886719,228.12628173828125,171.05816650390625,312.3734130859375 mrcnn
+        # 303,243,397,332 owlvit
+
+
         # If we haven't seen the current target object in a while, look for new ones
         if self.curr_forget_steps >= self.forget_target_object_steps:
             self.target_obj_name = None
