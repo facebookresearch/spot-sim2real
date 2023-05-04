@@ -45,13 +45,13 @@ clutter:
 
 clutter_amounts:
   room_table: 1
-#   bedroom_stand: 1
-#  kitchen_counter: 1
-#  hall_table: 1
+  # bedroom_stand: 1
+  # kitchen_counter: 1
+  # hall_table: 1
   # dining_table: 1
-#  couch: 1
-#  couch: 1
-#  kitchen_island: 1
+  # couch: 1
+  # couch: 1
+  # kitchen_island: 1
 
 object_targets: # i.e., where an object belongs / needs to be placed
   # <Class_id>: [<object's name>, <which place_target it belongs to>]
