@@ -98,7 +98,7 @@ pip install -e detectron2
 # If you see gcc errors with detectron2 installation, follow following steps and rerun
 # the above command to install detectron2
 sudo apt install build-essential
-udo apt -y install gcc-7 g++-7 ## confirm the versions
+sudo apt -y install gcc-7 g++-7 ## confirm the versions
 
 # get requirements for DeblurGANv2
 cd ../DeblurGANv2/
