@@ -318,13 +318,14 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
 class OWLVITModel:
-    def __init__(self, owlvit_label, score_threshold=.05, show_img=False):
+    def __init__(self, score_threshold=.05, show_img=False):
         self.config = config = construct_config()
-        self.owlvit = OwlVit([[owlvit_label]], score_threshold, show_img)
+        self.owlvit = OwlVit("ball", score_threshold, show_img)
         self.image_scale = config.IMAGE_SCALE
         rospy.loginfo("[OWLVIT]: Models loaded.")
 
     def process_image(self, hand_rgb, timestamp, stopwatch):
+        self.owlvit.update_label(rospy.get_param("/object_target", "ball"))
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
 
         if bbox_xy is not None:
@@ -406,7 +407,8 @@ if __name__ == "__main__":
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
         # TODO dynamic label
-        model = OWLVITModel('ball')
+        rospy.set_param("object_target", "ball")
+        model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()
