@@ -533,53 +533,63 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             self.target_obj_name = None
 
         if detections_str != "None":
-            pass
-            #detected_classes = [
-            #    object_id_to_object_name(int(i.split(",")[0]))
-            #    for i in detections_str.split(";")
-            #]
-            #print("[mask_rcnn]: Detected:", ", ".join(detected_classes))
+            detected_classes = []
+            for i in detections_str.split(";"):
+                label = i.split(',')[0]
 
-            #if self.target_obj_name is None:
-                #most_confident_class_id = None
-                #most_confident_score = 0.0
-                #good_detections = []
-                #for det in detections_str.split(";"):
-                    #class_id, score = det.split(",")[:2]
-                    #class_id, score = int(class_id), float(score)
-                    #dist = get_obj_dist_and_bbox(self.get_det_bbox(det), arm_depth)[0]f score > 0.8 and
-                    #if score > 0.8 and dist < MAX_HAND_DEPTH:
-                    #if dist < MAX_HAND_DEPTH
-                    #    good_detections.append(object_id_to_object_name(class_id))
-                        #if score > most_confident_score:
-                        #    most_confident_score = score
-                        #    most_confident_class_id = class_id
-                #if most_confident_score == 0.0:
-                #    return None
-                #most_confident_name = object_id_to_object_name(most_confident_class_id)
-                #if most_confident_name in self.last_seen_objs:
-                #    self.target_obj_name = most_confident_name
-                #    if self.target_obj_name != self.last_target_obj:
-                #        self.say("Now targeting " + self.target_obj_name)
-                #    self.last_target_obj = self.target_obj_name
-               # self.last_seen_objs = good_detections
-            #else:
-            #    self.last_seen_objs = []
+                # Maskrnn return ids but other object detectors return already the string class
+                if label.isdigit():
+                    label = object_id_to_object_name(int(label))
+                detected_classes.append(label)
+
+            print("[bounding_box]: Detected:", ", ".join(detected_classes))
+
+            if self.target_obj_name is None:
+                most_confident_score = 0.0
+                good_detections = []
+                for det in detections_str.split(";"):
+                    class_detected, score = det.split(",")[:2]
+                    score = float(score)
+                    if class_detected.isdigit():
+                        label = object_id_to_object_name(int(class_detected))
+                    else:
+                        label = class_detected
+                    dist = get_obj_dist_and_bbox(self.get_det_bbox(det), arm_depth)[0]
+                    
+                    if score > 0.001 and dist < MAX_HAND_DEPTH:
+                        good_detections.append(label)
+                        if score > most_confident_score:
+                            most_confident_score = score
+                            most_confident_name = label
+                if most_confident_score == 0.0:
+                    return None
+                
+                if most_confident_name in self.last_seen_objs:
+                    self.target_obj_name = most_confident_name
+                    if self.target_obj_name != self.last_target_obj:
+                        self.say("Now targeting " + self.target_obj_name)
+                    self.last_target_obj = self.target_obj_name
+                self.last_seen_objs = good_detections
+            else:
+                self.last_seen_objs = []
         else:
             return None
 
         # Check if desired object is in view of camera
         targ_obj_name = self.target_obj_name
-        self.target_obj_name = 'ball'
 
         def correct_class(detection):
-            return (
-                object_id_to_object_name(int(detection.split(",")[0])) == targ_obj_name
-            )
+            class_detected = detection.split(",")[0]
+            if class_detected.isdigit():
+                return object_id_to_object_name(int(class_detected)) == targ_obj_name
+            else:
+                return class_detected == targ_obj_name
 
-        #matching_detections = [d for d in detections_str.split(";") if correct_class(d)]
-        #if not matching_detections:
-        #    return None
+        matching_detections = [d for d in detections_str.split(";") if correct_class(d)]
+
+        if not matching_detections:
+            return None
+        
 
         self.curr_forget_steps = 0
 
@@ -587,7 +597,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         def get_score(detection):
             return float(detection.split(",")[1])
 
-        #best_detection = sorted(matching_detections, key=get_score)[-1]
+        best_detection = sorted(matching_detections, key=get_score)[-1]
         x1, y1, x2, y2 = self.get_det_bbox(detections_str)
 
         # Create bbox mask from selected detection
