@@ -1,6 +1,5 @@
 import os
 import os
-os.environ["OPENAI_API_KEY"] = "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"
 import time
 from collections import Counter
 
@@ -22,10 +21,10 @@ from spot_rl.utils.utils import (
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
-#from spot_rl.models.whisper import WhisperTranslator
+from spot_rl.utils.whisper_translator import WhisperTranslator
 from spot_rl.models.sentence_similarity import SentenceSimilarity
 
-#from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
+from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
 
 from hydra import compose, initialize
 import subprocess
@@ -34,25 +33,25 @@ DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 
 def main(spot, config, out_path=None):
-
-
-    #audio_to_text = WhisperTranslator()
+    audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
-    #with initialize(config_path='../llm/src/conf'):
-    #    llm_config = compose(config_name='config')
-    #llm = RearrangeEasyChain(llm_config)
-    #print('Give instruction!')
-    #audio_to_text.record()
-    #instruction = audio_to_text.translate()
-    #instruction = 'take the rubik cube from the sining table to the hamper'
-    #print(instruction)
+    with initialize(config_path='../llm/src/conf'):
+       llm_config = compose(config_name='config')
+    llm = RearrangeEasyChain(llm_config)
 
-    nav_1, pick, nav_2 = 'kitchen_counter', 'ball', 'hamper'
+    print('I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper')
+    audio_to_text.record()
+    instruction = audio_to_text.translate()
+    print('Transcribed instructions : ', instruction)
+
+    # Use LLM to convert user input to an instructions set
+    nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
     print('PARSED', nav_1, pick, nav_2)
 
+    # Find closest nav_targets to the ones robot knows locations of
     nav_1 = sentence_similarity.get_most_similar_in_list(nav_1, list(WAYPOINTS['nav_targets'].keys()))
     nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
-    print('Most Similar', nav_1, pick, nav_2)
+    print('MOST SIMILAR: ', nav_1, pick, nav_2)
 
     policy = SequentialExperts(
             config.WEIGHTS.NAV,

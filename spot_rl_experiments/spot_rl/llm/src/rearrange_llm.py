@@ -15,7 +15,7 @@ class OpenAI:
 
     def _validate_conf(self):
         try:
-            openai.api_key = os.getenv("OPENAI_API_KEY")
+            openai.api_key = os.environ["OPENAI_API_KEY"]
         except Exception:
             raise ValueError("No API keys provided")
         if self.llm_conf.stream:
@@ -59,8 +59,6 @@ class RearrangeEasyChain:
         nav_1, pick, nav_2, place = matches
         place, nav_2 = place.split(',')
         return nav_1, pick, nav_2, place
-
-
 
 
 @hydra.main(config_name="config", config_path="conf")

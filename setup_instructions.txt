@@ -126,6 +126,16 @@ pip install transformers
 pip uninstall tensorflow
 pip install openai
 
+# for speech to text
+pip uninstall sounddevice
+mamba install -c conda-forge python_sounddevice
+sudo apt-get install --reinstall alsa-utils alsa-tools
+
+# get OpenAI API key from Sergio & add it as an environment variable inside .bashrc file as "$OPENAI_API_KEY"
+pip install -U openai-whisper
+sudo apt update && sudo apt install ffmpeg
+pip install setuptools-rust
+
 
 # add aliases for python & pip to find the ones inside conda env
 
