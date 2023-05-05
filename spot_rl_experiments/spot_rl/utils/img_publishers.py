@@ -289,10 +289,36 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         super().__init__()
         self.model = model
         self.detection_topic = rt.DETECTIONS_TOPIC
+
+        self.config = config = construct_config()
+        self.image_scale = config.IMAGE_SCALE
+        self.deblur_gan = get_deblurgan_model(config)
+        self.grayscale = self.config.GRAYSCALE_MASK_RCNN
+
         self.pubs[self.detection_topic] = rospy.Publisher(
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+
+    def preprocess_image(self, img):
+        if self.image_scale != 1.0:
+            img = cv2.resize(
+                img,
+                (0, 0),
+                fx=self.image_scale,
+                fy=self.image_scale,
+                interpolation=cv2.INTER_AREA,
+            )
+
+        if self.deblur_gan is not None:
+            img = self.deblur_gan(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        if self.grayscale:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        
+        return img
         
     def _publish(self):
         stopwatch = Stopwatch()
@@ -301,7 +327,8 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         hand_rgb = self.msg_to_cv2(self.img_msg)
 
         # Internal model
-        bbox_data, viz_img = self.model.process_image(hand_rgb, timestamp, stopwatch)
+        hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
+        bbox_data, viz_img = self.model.inference(hand_rgb_preprocessed, timestamp, stopwatch)
         
         # publish data
         self.publish_bbox_data(bbox_data)
@@ -324,12 +351,16 @@ class OWLVITModel:
         self.image_scale = config.IMAGE_SCALE
         rospy.loginfo("[OWLVIT]: Models loaded.")
 
-    def process_image(self, hand_rgb, timestamp, stopwatch):
+    def inference(self, hand_rgb, timestamp, stopwatch):
         self.owlvit.update_label([[rospy.get_param("/object_target")]])
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
 
-        if bbox_xy is not None:
-            bbox_xy_string = ','.join(str(x) for x in bbox_xy)
+        if bbox_xy is not None and bbox_xy != []:
+            detections = []
+            for detection in bbox_xy:
+                str_det = f'{detection[0]},{detection[1]},{",".join([str(i) for i in detection[2]])}'
+                detections.append(str_det)
+            bbox_xy_string = ';'.join(detections)
         else:
             bbox_xy_string = "None"
         detections_str = f"{int(timestamp.nsecs)}|{bbox_xy_string}"
@@ -340,22 +371,15 @@ class MRCNNModel:
     def __init__(self):
         self.config = config = construct_config()
         self.mrcnn = get_mrcnn_model(config)
-        self.deblur_gan = get_deblurgan_model(config)
-        self.image_scale = config.IMAGE_SCALE
         rospy.loginfo("[MRCNN]: Models loaded.")
 
-    def process_image(self, hand_rgb, timestamp, stopwatch):
-        pred, viz_img = generate_mrcnn_detections(
-            hand_rgb,
-            scale=self.image_scale,
-            mrcnn=self.mrcnn,
-            grayscale=self.config.GRAYSCALE_MASK_RCNN,
-            deblurgan=self.deblur_gan,
-            return_img=True,
-            stopwatch=stopwatch,
-        )
+    def inference(self, hand_rgb, timestamp, stopwatch):
+        img = hand_rgb
+        pred = self.mrcnn.inference(img)
+        if stopwatch is not None:
+            stopwatch.record("mrcnn_secs")
         detections_str = f"{int(timestamp.nsecs)}|{pred2string(pred)}"
-        viz_img = self.mrcnn.visualize_inference(viz_img, pred)
+        viz_img = self.mrcnn.visualize_inference(img, pred)
         return detections_str, viz_img
 
 
