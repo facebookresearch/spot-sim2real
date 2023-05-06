@@ -29,12 +29,30 @@ from spot_rl.models.sentence_similarity import SentenceSimilarity
 
 from hydra import compose, initialize
 import subprocess
+import rospy
 import time
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 
-def main(spot, config, out_path=None):
+def main(spot, use_mixer, config, out_path=None):
 
+    if use_mixer:
+        policy = MixerPolicy(
+            config.WEIGHTS.MIXER,
+            config.WEIGHTS.NAV,
+            config.WEIGHTS.GAZE,
+            config.WEIGHTS.PLACE,
+            device=config.DEVICE,
+        )
+        env_class = SpotMobileManipulationBaseEnv
+    else:
+        policy = SequentialExperts(
+            config.WEIGHTS.NAV,
+            config.WEIGHTS.GAZE,
+            config.WEIGHTS.PLACE,
+            device=config.DEVICE,
+        )
+        env_class = SpotMobileManipulationSeqEnv
 
     #audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
@@ -45,22 +63,19 @@ def main(spot, config, out_path=None):
     #audio_to_text.record()
     #instruction = audio_to_text.translate()
     #instruction = 'take the rubik cube from the sining table to the hamper'
+    #llm.parese()
     #print(instruction)
 
-    nav_1, pick, nav_2 = 'kitchen_counter', 'ball', 'hamper'
+    nav_1, pick, nav_2 = 'couch', 'bottle', 'living table'
     print('PARSED', nav_1, pick, nav_2)
 
     nav_1 = sentence_similarity.get_most_similar_in_list(nav_1, list(WAYPOINTS['nav_targets'].keys()))
     nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
     print('Most Similar', nav_1, pick, nav_2)
 
-    policy = SequentialExperts(
-            config.WEIGHTS.NAV,
-            config.WEIGHTS.GAZE,
-            config.WEIGHTS.PLACE,
-            device=config.DEVICE,
-        )
-    env_class = SpotMobileManipulationSeqEnv
+    rospy.set_param("object_target", pick)
+    rospy.set_param('place_target', nav_2)
+
     env = env_class(config, spot)
     env.power_robot()
     time.sleep(1)
@@ -72,11 +87,13 @@ def main(spot, config, out_path=None):
 
     policy.reset()
     done = False
-    expert = Tasks.NAV
+    if use_mixer:
+        expert = None
+    else:
+        expert = Tasks.NAV
     env.stopwatch.reset()
     while not done:
         out_data.append((time.time(), env.x, env.y, env.yaw))
-
         base_action, arm_action = policy.act(observations, expert=expert)
         nav_silence_only = True
         env.stopwatch.record("policy_inference")
@@ -86,16 +103,15 @@ def main(spot, config, out_path=None):
             nav_silence_only=nav_silence_only,
         )
         
-        expert = info["correct_skill"]
+        if use_mixer and info.get("grasp_success", False):
+            policy.policy.prev_nav_masks *= 0
+
+        if not use_mixer:
+            expert = info["correct_skill"]
         print("Expert:", expert)
 
-        if done:
-            env.say("Finished object rearrangement. Heading to dock.")
-            waypoint = nav_target_from_waypoints("dock")
-            observations = env.reset(waypoint=waypoint)
-
         # We reuse nav, so we have to reset it before we use it again.
-        if expert != Tasks.NAV:
+        if not use_mixer and expert != Tasks.NAV:
             policy.nav_policy.reset()
 
         env.stopwatch.print_stats(latest=True)
@@ -105,9 +121,8 @@ def main(spot, config, out_path=None):
     waypoint = nav_target_from_waypoints("dock")
     observations = env.reset(waypoint=waypoint)
     expert = Tasks.NAV
-    policy.nav_policy.reset()
-    while True:
 
+    while True:
         base_action, arm_action = policy.act(observations, expert=expert)
         nav_silence_only = True
         env.stopwatch.record("policy_inference")
@@ -271,7 +286,9 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
-            waypoint_name, waypoint = object_id_to_nav_waypoint(self.target_obj_name)
+            waypoint_name = rospy.get_param('/place_target')
+            waypoint = nav_target_from_waypoints(waypoint_name)
+
             self.say("Navigating to " + waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)
             self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
@@ -354,18 +371,19 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
 
 if __name__ == "__main__":
     parser = get_default_parser()
+    parser.add_argument("-m", "--use-mixer", action="store_true")
     parser.add_argument("--output")
     args = parser.parse_args()
     config = construct_config(args.opts)
     spot = (RemoteSpot if config.USE_REMOTE_SPOT else Spot)("RealSeqEnv")
     if config.USE_REMOTE_SPOT:
         try:
-            main(spot, config, args.output)
+            main(spot, args.use_mixer, config, args.output)
         finally:
             spot.power_off()
     else:
         with spot.get_lease(hijack=True):
             try:
-                main(spot, config, args.output)
+                main(spot, args.use_mixer, config, args.output)
             finally:
                 spot.power_off()
