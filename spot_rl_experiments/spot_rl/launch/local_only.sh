@@ -12,3 +12,6 @@ tmux new -s propio_pub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.helper_node
 tmux new -s tts_sub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.helper_nodes --text-to-speech'
 sleep 3
 tmux ls
+
+# This for running mask rcnn in img_publishers, which needs input images to be in grayscale
+#tmux new -s img_pub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.img_publishers --local --bounding_box_detector mrcnn'
