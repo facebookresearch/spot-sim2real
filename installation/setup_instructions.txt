@@ -1,13 +1,28 @@
+# clone all required repos
+## using SSH
+# git clone git@github.com:naokiyokoyama/spot_rl_experiments.git
+# git clone git@github.com:naokiyokoyama/bd_spot_wrapper.git
+# git clone git@github.com:naokiyokoyama/DeblurGANv2.git
+# git clone --branch pvp git@github.com:naokiyokoyama/habitat-lab.git
+# git clone git@github.com:naokiyokoyama/mask_rcnn_detectron2.git
+## using HTTPS
+# git clone https://github.com/naokiyokoyama/spot_rl_experiments.git
+# git clone https://github.com/naokiyokoyama/bd_spot_wrapper.git
+# git clone https://github.com/naokiyokoyama/DeblurGANv2.git
+# git clone --branch pvp https://github.com/naokiyokoyama/habitat-lab.git
+# git clone https://github.com/naokiyokoyama/mask_rcnn_detectron2.git
+
+# We do not need all individual repos at the moment. Just get this repo
+git clone -b working_branch_from_akshara git@github.com:facebookresearch/spot-sim2real.git
+
+
 sudo apt-get update
 
-
-# for Python 3.9
-# wget https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh
-# refer : https://www.youtube.com/watch?v=28PzHzGLtHk
+# for Python 3.8
 wget https://repo.anaconda.com/miniconda/Miniconda3-py39_23.3.1-0-Linux-x86_64.sh 
-# bash ~/software_deb/Anaconda3-2022.05-Linux-x86_64.sh
 bash Miniconda3-py39_23.3.1-0-Linux-x86_64.sh
 
+## Follow these instructions while installing Miniconda
 # Do you accept the license terms? [yes|no]
 # [no] >>>
 # Please answer 'yes' or 'no':' -- type yes
@@ -19,56 +34,41 @@ bash Miniconda3-py39_23.3.1-0-Linux-x86_64.sh
 # by running conda init? [yes|no]
 # [no] -- yes
 
+# Initialize conda for installing mamba
 conda init
 source ~/.bashrc
 conda install -c conda-forge mamba
 export PATH=/home/kavitshah/miniconda3/bin:$PATH
 
-
-# only once
-mamba create -n spot_sim2real python=3.9 numpy=1.23.5 numba
+# Install env using mamba
+# mamba create -n spot_sim2real python=3.9 numpy=1.23.5 numba
+cd spot-sim2real/installation/
+mamba env create -f environment.yml
 source ~/.bashrc
 mamba init
 
 # every new terminal
 # conda activate spot_sim2real
-echo 'mamba activate spot_sim2real' >> ~/.bashrc
+# echo 'mamba activate spot_sim2real' >> ~/.bashrc
+echo 'mamba activate spot_ros' >> ~/.bashrc
 source ~/.bashrc
-mamba activate spot_sim2real
+# mamba activate spot_sim2real
+mamba activate spot_ros
 
 # mamba install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia -y
-mamba install pytorch==1.10.1 torchvision==0.11.2 cudatoolkit=11.3 torchaudio -c pytorch -c conda-forge
+# mamba install pytorch==1.12.1 torchvision==0.13.0 cudatoolkit=11.6 torchaudio -c conda-forge -c pytorch
+mamba install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch
 
 conda config --env --add channels conda-forge
 conda config --env --add channels robostack-experimental
 conda config --env --add channels robostack
 conda config --env --set channel_priority strict
 
-mamba install ros-noetic-desktop -y
-
-# clone all required repos
-# git clone git@github.com:naokiyokoyama/spot_rl_experiments.git
-# git clone git@github.com:naokiyokoyama/bd_spot_wrapper.git
-
-git clone git@github.com:naokiyokoyama/DeblurGANv2.git
-git clone --branch pvp git@github.com:naokiyokoyama/habitat-lab.git
-git clone git@github.com:naokiyokoyama/mask_rcnn_detectron2.git
-
-# git clone https://github.com/naokiyokoyama/spot_rl_experiments.git
-# git clone https://github.com/naokiyokoyama/bd_spot_wrapper.git
-# git clone https://github.com/naokiyokoyama/DeblurGANv2.git
-# git clone --branch pvp https://github.com/naokiyokoyama/habitat-lab.git
-# git clone https://github.com/naokiyokoyama/mask_rcnn_detectron2.git
-
-
-# We do not need all individual repos at the moment. Just get this repo
-git clone -b working_branch_from_akshara git@github.com:facebookresearch/spot-sim2real.git
+# mamba install ros-noetic-desktop -y
 
 # get requirements for bd_spot_wrapper
 cd bd_spot_wrapper/
-pip install -r requirements.txt
-
-
+# pip install -r requirements.txt
 python generate_executables.py
 # also mentions to install grpcio ?? Why is this needed?
 # mamba install grpcio -y
@@ -78,45 +78,45 @@ pip install -e .
 
 # get requirements for spot_rl_experiments
 cd ./../spot_rl_experiments/
-pip install -r requirements.txt
+# pip install -r requirements.txt
 python generate_executables.py
 pip install -e .
-# need to download weights
+# need to download weights (need only once)
 pip install gdown
 gdown --fuzzy https://drive.google.com/file/d/1bZqRLCDv3_E9ijbKuqroWHCBt-jvjjvc/view
 unzip weights.zip && rm weights.zip
 
 # get requirements for mask_rcnn_detectron2
 cd ./../mask_rcnn_detectron2/
-mamba install -c conda-forge imgaug -y
-mamba install -c conda-forge albumentations -y
+# mamba install -c conda-forge imgaug -y
+# mamba install -c conda-forge albumentations -y
 pip install -e .
 git clone git@github.com:facebookresearch/detectron2.git
 # git clone https://github.com/facebookresearch/detectron2.git
-mamba install -c conda-forge cudatoolkit-dev  # ONLY if DETECTRON2 fails to setup
+# mamba install -c conda-forge cudatoolkit-dev  # ONLY if DETECTRON2 fails to setup
 pip install -e detectron2
 # If you see gcc errors with detectron2 installation, follow following steps and rerun
 # the above command to install detectron2
-sudo apt install build-essential
-udo apt -y install gcc-7 g++-7 ## confirm the versions
+# sudo apt install build-essential
+# sudo apt -y install gcc-7 g++-7 ## confirm the versions
 
 # get requirements for DeblurGANv2
 cd ../DeblurGANv2/
-pip install pretrainedmodels
-pip install torchsummary
+# pip install pretrainedmodels
+# pip install torchsummary
 pip install -e .
 
 # get requiremetns for habitat-lab
 cd ../habitat-lab/
-pip install typing-extensions>=4.4.0
-pip install google-auth==1.6.3
-pip install simplejson
-pip install branceexpand  ... MAY OR MAYNOT WORK
-pip install pybullet
-pip install -r requirements.txt
-pip uninstall opencv-python-headless
-pip install magnum
-mamba install -c aihabitat-nightly habitat-sim -y 
+# pip install typing-extensions>=4.4.0
+# pip install google-auth==1.6.3
+# pip install simplejson
+# pip install branceexpand  ... MAY OR MAYNOT WORK
+# pip install pybullet
+# pip install -r requirements.txt
+# pip uninstall opencv-python-headless
+# pip install magnum
+mamba install -c aihabitat habitat-sim==0.2.1 -y
 python setup.py develop --all
 
 # ASC is installed. Run basic ASC commands. 
@@ -125,29 +125,7 @@ python setup.py develop --all
 pip install transformers
 pip uninstall tensorflow
 pip install openai
-
-
-# add aliases for python & pip to find the ones inside conda env
-
-# all requirements
-# bosdyn-client
-# bosdyn-api
-# opencv-python			????? VERSION?
-# six
-# ruamel.yaml			?? What does this do
-# blosc
-# numpy				?????? VERSION?
-# gym
-# cv2				??? Probably not needed due to opencv-python already being there
-# torch
-# torchvision			??? Do we need these?
-# torchaudio			??? Do we need these?
-# transformers
-
-# @Todo
-# installing the package??
-# pip install -e .
-
+pip install whisper
 
 # Adding spot's details
 #	purple spot
