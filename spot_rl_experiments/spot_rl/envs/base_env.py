@@ -598,7 +598,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             return float(detection.split(",")[1])
 
         best_detection = sorted(matching_detections, key=get_score)[-1]
-        x1, y1, x2, y2 = self.get_det_bbox(detections_str)
+        x1, y1, x2, y2 = self.get_det_bbox(best_detection)
 
         # Create bbox mask from selected detection
         cx = int(np.mean([x1, x2]))
