@@ -5,6 +5,7 @@
 # Development Kit License (20191101-BDSDK-SL).
 
 """ Easy-to-use wrapper for properly controlling Spot """
+from operator import add
 import os
 import os.path as osp
 import time
@@ -198,6 +199,20 @@ class Spot:
         """Does not block, be careful!"""
         gripper_command = RobotCommandBuilder.claw_gripper_close_command()
         self.command_client.robot_command(gripper_command)
+
+    def rotate_joints(self, relative_joint_rotations):
+        """Does not block, be careful!"""
+        print("Manually rotating the joints with the following relative rotations : ",relative_joint_rotations)
+        arm_proprioception = self.get_arm_proprioception()
+        if len(relative_joint_rotations) != len(arm_proprioception):
+            print("Size of list containing relative rotations does not match number of arm joints")
+            return False
+
+        joint_positions = [arm_proprioception[joint].position.value for joint in arm_proprioception]
+        n = list(map(add, joint_positions, relative_joint_rotations))
+        gripper_command = RobotCommandBuilder.arm_joint_command(n[0],n[1],n[2],n[3],n[4],n[5])
+        self.command_client.robot_command(gripper_command)
+        return True
 
     def move_gripper_to_point(self, point, rotation):
         """

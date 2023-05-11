@@ -345,6 +345,9 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
         if self.current_task == Tasks.PLACE and time.time() > self.timeout_start + 10:
             # call place after 10s of trying
             print("Place failed to reach target")
+            self.spot.rotate_joints([0.0,0.0,0.0,0.0,0.0,1.57])
+            # adding sleep as rotate_joints is not a blocking call
+            time.sleep(0.5)
             spot.open_gripper()
             time.sleep(0.75)
             done = True
