@@ -38,7 +38,7 @@ class RearrangeEasyChain:
         self.conf = conf
         self._build_prompt()
         self.llm = OpenAI(conf)
-        self.input_variable = f"<{self.conf.prompt.input_variable}>"
+        self.input_variables = [f"<{variable}>" for variable in self.conf.prompt.input_variables]
 
     def _build_prompt(self):
         self.prompt = self.conf.prompt.main_prompt
@@ -47,8 +47,12 @@ class RearrangeEasyChain:
         if "suffix" in self.conf.prompt:
             self.prompt += f"\n{self.conf.prompt.suffix}"
 
-    def generate(self, input):
-        prompt = self.prompt.replace(self.input_variable, input)
+    def generate(self, inputs):
+        print(inputs)
+        for input in inputs:
+            assert f'<{input}>' in self.input_variables, f'inputs should be a dictionary with the following keys {self.input_variables}'
+            prompt = self.prompt.replace(f'<{input}>', inputs[input])
+        print(prompt)
         ans = self.llm.generate(prompt)
         return ans
 
@@ -58,10 +62,6 @@ class RearrangeEasyChain:
         matches = [match.replace('(','').replace(')','') for match in matches]
         nav_1, pick, nav_2, place = matches
         place, nav_2 = place.split(',')
-        nav_1 = nav_1.strip()
-        pick = pick.strip()
-        nav_2 = nav_2.strip()
-        place = place.strip()
         return nav_1, pick, nav_2, place
 
 

@@ -38,7 +38,7 @@ class SentenceSimilarity:
         return cosine_scores
 
     def get_most_similar_in_list(self, word, list):
-        sentences = [word] + [word.replace('_',' ') for word in list]
+        sentences = [word] + [w.replace('_',' ') for w in list]
         encoded_input = self.tokenizer(sentences, padding=True, truncation=True, return_tensors='pt')
         with torch.no_grad():
             model_output = self.model(**encoded_input)
@@ -51,4 +51,6 @@ class SentenceSimilarity:
 
         # compute cosine similarity between embeddings
         cosine_scores = sentence_embeddings[0] @ sentence_embeddings[1:].T
+        print(word, list, cosine_scores)
+
         return list[torch.argmax(cosine_scores).item()]
