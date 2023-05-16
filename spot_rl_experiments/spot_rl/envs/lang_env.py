@@ -52,6 +52,14 @@ def main(spot, use_mixer, config, out_path=None):
             device=config.DEVICE,
         )
         env_class = SpotMobileManipulationSeqEnv
+
+    env = env_class(config, spot)
+
+    # Reset the viz params
+    rospy.set_param('/viz_pick', 'None')
+    rospy.set_param('/viz_object', 'None')
+    rospy.set_param('/viz_place', 'None')
+
     audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
     with initialize(config_path='../llm/src/conf'):
@@ -75,10 +83,14 @@ def main(spot, use_mixer, config, out_path=None):
     nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
     print('MOST SIMILAR: ', nav_1, pick, nav_2)
 
-    rospy.set_param("object_target", pick)
-    rospy.set_param('place_target', nav_2)
+    # Used for Owlvit
+    rospy.set_param('object_target', pick)
 
-    env = env_class(config, spot)
+    # Used for Visualizations
+    rospy.set_param('viz_pick', nav_1)
+    rospy.set_param('viz_object', pick)
+    rospy.set_param('viz_place', nav_2)
+
     env.power_robot()
     time.sleep(1)
     count = Counter()
@@ -288,7 +300,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
-            waypoint_name = rospy.get_param('/place_target')
+            waypoint_name = rospy.get_param('/viz_place')
             waypoint = nav_target_from_waypoints(waypoint_name)
 
             self.say("Navigating to " + waypoint_name)

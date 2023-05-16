@@ -58,6 +58,10 @@ class RearrangeEasyChain:
         matches = [match.replace('(','').replace(')','') for match in matches]
         nav_1, pick, nav_2, place = matches
         place, nav_2 = place.split(',')
+        nav_1 = nav_1.strip()
+        pick = pick.strip()
+        nav_2 = nav_2.strip()
+        place = place.strip()
         return nav_1, pick, nav_2, place
 
 
