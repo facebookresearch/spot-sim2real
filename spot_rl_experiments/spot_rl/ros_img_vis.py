@@ -208,7 +208,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         if self.instruction_display:
             labeled_img = 255 * np.ones((img.shape[0], int(img.shape[1]/4), img.shape[2]), dtype=np.uint8)
 
-            information_string = "Pick Target:\n" + self.pick_target + "\nObject Target:\n" + self.pick_object + "\nPlace Target:\n" + self.place_target
+            information_string = "Pick from:\n" + self.pick_target + "\n---\nObject Target:\n" + self.pick_object + "\n---\nPlace to:\n" + self.place_target
             labeled_img = self.overlay_text(labeled_img, information_string, size=1.5, thickness=4)
             # print("LABELED IMG SIZE : ", labeled_img.shape)
             img_with_info = resize_to_tallest([img, labeled_img], hstack=True)
