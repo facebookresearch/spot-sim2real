@@ -21,6 +21,7 @@ from spot_rl.utils.utils import (
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
+from spot_rl.utils.utils import ros_topics as rt
 from spot_rl.utils.whisper_translator import WhisperTranslator
 from spot_rl.models.sentence_similarity import SentenceSimilarity
 
@@ -29,6 +30,7 @@ from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
 from hydra import compose, initialize
 import subprocess
 import rospy
+from std_msgs.msg import String
 import time
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
@@ -80,6 +82,12 @@ def main(spot, use_mixer, config, out_path=None):
 
     env = env_class(config, spot)
     env.power_robot()
+
+    #pub = rospy.Publisher(rt.INSTRUCTIONS_TOPIC, String, queue_size=1)
+    instruction = f"{nav_1},{pick},{nav_2}"
+    #pub.publish(instruction)
+    subprocess.call(["rostopic", "pub", rt.INSTRUCTIONS_TOPIC, "std_msgs/String", instruction, "--once"])
+
     time.sleep(1)
     count = Counter()
     out_data = []

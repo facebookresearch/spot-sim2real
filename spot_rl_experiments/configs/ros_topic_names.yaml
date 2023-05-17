@@ -14,6 +14,7 @@ IMAGE_SCALE: "/image_scale"
 ROBOT_STATE: "/robot_state"
 TEXT_TO_SPEECH: "/text_to_speech"
 
+INSTRUCTIONS_TOPIC: "/robot_instructions"
 
 # Remote robot topics
 ROBOT_CMD_TOPIC: "/remote_robot_cmd"

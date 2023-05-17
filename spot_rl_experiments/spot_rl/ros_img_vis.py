@@ -36,31 +36,49 @@ class VisualizerMixin:
         self.video = None
         self.dim = None
         self.new_video_started = False
+        self.named_window = "ROS Spot Images"
+        self.img_scale = 1.7
+        self.img_width = int(1639 * self.img_scale)
+        self.img_height = int(968 * self.img_scale)
+        # Monitor width (rough) = 3442
+        # Monitor height (rough) = 1966
 
     def generate_composite(self):
         raise NotImplementedError
 
     @staticmethod
-    def overlay_text(img, text, color=(0, 0, 255)):
+    def overlay_text(img, text, color=(0, 0, 255), size=2.0, thickness=4):
         viz_img = img.copy()
-        line, font, font_size, font_thickness = (text, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
-        text_width, text_height = cv2.getTextSize(
-            line, font, font_size, font_thickness
-        )[0][:2]
+        line, font, font_size, font_thickness = (text, cv2.FONT_HERSHEY_SIMPLEX, size, thickness)
+
         height, width = img.shape[:2]
-        x = (width - text_width) // 2
-        y = (height - text_height) // 2
-        cv2.putText(
-            viz_img,
-            line,
-            (x, y),
-            font,
-            font_size,
-            color,
-            font_thickness,
-            lineType=cv2.LINE_AA,
-        )
+        y0, dy = 100,100
+        for i, line in enumerate(text.split('\n')):
+            text_width, text_height = cv2.getTextSize(
+                line, font, font_size, font_thickness
+            )[0][:2]
+
+            x = (width - text_width) // 2
+            # y = (height - text_height) // 2
+            y = y0 + i * dy
+            cv2.putText(
+                viz_img,
+                line,
+                (x, y),
+                font,
+                font_size,
+                color,
+                font_thickness,
+                lineType=cv2.LINE_AA,
+            )
         return viz_img
+
+    def initializeWindow(self):
+        cv2.namedWindow(self.named_window, cv2.WINDOW_NORMAL)
+        # cv2.setWindowProperty(self.named_window, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        # cv2.resizeWindow(self.named_window, self.img_width, self.img_height)
+        # cv2.resizeWindow(self.named_window, 1639, 968)
+        print(cv2.getWindowImageRect(self.named_window))
 
     def vis_imgs(self):
         # Skip if no messages were updated
@@ -70,9 +88,10 @@ class VisualizerMixin:
             if img is not None:
                 if self.recording:
                     viz_img = self.overlay_text(img, "RECORDING IS ON!")
-                    cv2.imshow("ROS Spot Images", viz_img)
+                    cv2.imshow(self.named_window, viz_img)
                 else:
-                    cv2.imshow("ROS Spot Images", img)
+                    cv2.imshow(self.named_window, img)
+                # print(cv2.getWindowImageRect(self.named_window)) 
 
             key = cv2.waitKey(1)
             if key != -1:
@@ -185,6 +204,16 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 for i in [raw_imgs, processed_imgs]
             ]
         )
+        # print("IMG SIZE : ", img.shape)
+        if self.instruction_display:
+            labeled_img = 255 * np.ones((img.shape[0], int(img.shape[1]/4), img.shape[2]), dtype=np.uint8)
+
+            information_string = "Pick Target:\n" + self.pick_target + "\nObject Target:\n" + self.pick_object + "\nPlace Target:\n" + self.place_target
+            labeled_img = self.overlay_text(labeled_img, information_string, size=1.5, thickness=4)
+            # print("LABELED IMG SIZE : ", labeled_img.shape)
+            img_with_info = resize_to_tallest([img, labeled_img], hstack=True)
+            # print("IMG WITH INFO SIZE : ", img_with_info.shape)
+            img = img_with_info
 
         for topic in refreshed_topics:
             curr_time = time.time()
@@ -214,6 +243,7 @@ def main():
     srv = None
     try:
         srv = SpotRosVisualizer(headless=args.headless)
+        srv.initializeWindow()
         if args.record:
             srv.recording = True
         while not rospy.is_shutdown():
