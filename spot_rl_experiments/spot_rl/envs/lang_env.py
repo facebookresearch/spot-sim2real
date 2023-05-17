@@ -77,8 +77,13 @@ def main(spot, use_mixer, config, out_path=None):
     nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
     print('MOST SIMILAR: ', nav_1, pick, nav_2)
 
-    rospy.set_param("object_target", pick)
-    rospy.set_param('place_target', nav_2)
+    # Used for Owlvit
+    rospy.set_param('object_target', pick)
+
+    # Used for Visualizations
+    rospy.set_param('viz_pick', nav_1)
+    rospy.set_param('viz_object', pick)
+    rospy.set_param('viz_place', nav_2)
 
     env = env_class(config, spot)
     env.power_robot()

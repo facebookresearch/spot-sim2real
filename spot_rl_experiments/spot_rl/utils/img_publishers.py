@@ -80,12 +80,12 @@ class SpotImagePublisher:
 
 class SpotLocalRawImagesPublisher(SpotImagePublisher):
     name = "spot_local_raw_images_publisher"
-    publisher_topics = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
+    publisher_topics = [rt.HEAD_DEPTH]#, rt.HAND_DEPTH, rt.HAND_RGB]
     sources = [
         Cam.FRONTRIGHT_DEPTH,
         Cam.FRONTLEFT_DEPTH,
-        Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
-        Cam.HAND_COLOR,
+        #Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        #Cam.HAND_COLOR,
     ]
 
     def __init__(self, spot):
@@ -100,25 +100,25 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         head_depth = np.hstack([imgs[Cam.FRONTRIGHT_DEPTH], imgs[Cam.FRONTLEFT_DEPTH]])
 
         head_depth = self._scale_depth(head_depth, head_depth=True)
-        hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
-        hand_rgb = imgs[Cam.HAND_COLOR]
+        #hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
+        #hand_rgb = imgs[Cam.HAND_COLOR]
 
-        msgs = self.imgs_to_msgs(head_depth, hand_depth, hand_rgb)
+        msgs = self.imgs_to_msgs(head_depth)
 
         for topic, msg in zip(self.pubs.keys(), msgs):
             self.pubs[topic].publish(msg)
 
-    def imgs_to_msgs(self, head_depth, hand_depth, hand_rgb):
+    def imgs_to_msgs(self, head_depth, hand_depth=None, hand_rgb=None):
         head_depth_msg = self.cv2_to_msg(head_depth, "mono8")
-        hand_depth_msg = self.cv2_to_msg(hand_depth, "mono8")
-        hand_rgb_msg = self.cv2_to_msg(hand_rgb, "bgr8")
+        #hand_depth_msg = self.cv2_to_msg(hand_depth, "mono8")
+        #hand_rgb_msg = self.cv2_to_msg(hand_rgb, "bgr8")
 
         timestamp = rospy.Time.now()
         head_depth_msg.header = Header(stamp=timestamp)
-        hand_depth_msg.header = Header(stamp=timestamp)
-        hand_rgb_msg.header = Header(stamp=timestamp)
+        #hand_depth_msg.header = Header(stamp=timestamp)
+        #hand_rgb_msg.header = Header(stamp=timestamp)
 
-        return head_depth_msg, hand_depth_msg, hand_rgb_msg
+        return head_depth_msg, None, None
 
     @staticmethod
     def _scale_depth(img, head_depth=False):
@@ -451,7 +451,8 @@ if __name__ == "__main__":
         if core:
             flags = ["--compress"]
         else:
-            flags = ["--filter-head-depth", "--filter-hand-depth", f"--{bounding_box_detector}"]
+            # flags = ["--filter-head-depth", "--filter-hand-depth", f"--{bounding_box_detector}"]
+            flags = ["--filter-head-depth"]
             if listen:
                 flags.append("--decompress")
             elif local:
@@ -471,4 +472,5 @@ if __name__ == "__main__":
                     pass
     else:
         while not rospy.is_shutdown():
+            #print(node)
             node.publish()

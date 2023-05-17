@@ -38,7 +38,7 @@ from bosdyn.client.frame_helpers import (
     get_vision_tform_body,
 )
 from bosdyn.client.image import ImageClient, build_image_request
-from bosdyn.client.manipulation_api_client import ManipulationApiClient
+# from bosdyn.client.manipulation_api_client import ManipulationApiClient
 from bosdyn.client.robot_command import (
     RobotCommandBuilder,
     RobotCommandClient,
@@ -128,9 +128,9 @@ class Spot:
             RobotCommandClient.default_service_name
         )
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
-        self.manipulation_api_client = robot.ensure_client(
-            ManipulationApiClient.default_service_name
-        )
+        # self.manipulation_api_client = robot.ensure_client(
+        #     ManipulationApiClient.default_service_name
+        # )
         self.robot_state_client = robot.ensure_client(
             RobotStateClient.default_service_name
         )

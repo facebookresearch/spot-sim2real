@@ -44,6 +44,7 @@ def main(spot):
         while not done:
             action = policy.act(observations)
             observations, _, done, _ = env.step(base_action=action)
+            env.print_nav_stats(observations)
         if args.dock:
             env.say("Executing automatic docking")
             dock_start_time = time.time()

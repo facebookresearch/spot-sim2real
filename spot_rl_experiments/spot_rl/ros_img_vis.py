@@ -47,7 +47,7 @@ class VisualizerMixin:
         raise NotImplementedError
 
     @staticmethod
-    def overlay_text(img, text, color=(0, 0, 255), size=2.0, thickness=4):
+    def overlay_text(img, text, color=(255, 0, 0), size=2.0, thickness=4):
         viz_img = img.copy()
         line, font, font_size, font_thickness = (text, cv2.FONT_HERSHEY_SIMPLEX, size, thickness)
 
@@ -208,8 +208,13 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         if self.instruction_display:
             labeled_img = 255 * np.ones((img.shape[0], int(img.shape[1]/4), img.shape[2]), dtype=np.uint8)
 
-            information_string = "Pick from:\n" + self.pick_target + "\n---\nObject Target:\n" + self.pick_object + "\n---\nPlace to:\n" + self.place_target
-            labeled_img = self.overlay_text(labeled_img, information_string, size=1.5, thickness=4)
+            pck = rospy.get_param('/viz_pick', 'None')
+            obj = rospy.get_param('/viz_object', 'None')
+            plc = rospy.get_param('/viz_place', 'None')
+
+            # information_string = "Pick from:\n" + self.pick_target + "\n---\nObject Target:\n" + self.pick_object + "\n---\nPlace to:\n" + self.place_target
+            information_string = "1. Pick from:\n" + pck + "\n\n2. Object Target:\n" + obj + "\n\n3. Place to:\n" + plc
+            labeled_img = self.overlay_text(labeled_img, information_string, size=1.25, thickness=4)
             # print("LABELED IMG SIZE : ", labeled_img.shape)
             img_with_info = resize_to_tallest([img, labeled_img], hstack=True)
             # print("IMG WITH INFO SIZE : ", img_with_info.shape)
