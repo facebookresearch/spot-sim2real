@@ -37,20 +37,21 @@ class SpotRosProprioceptionPublisher:
         self.buff_idx = (self.buff_idx + 1) % NAV_POSE_BUFFER_LEN
         xy_yaw = np.mean(self.nav_pose_buff, axis=0)
 
-        joints = self.spot.get_arm_proprioception(robot_state=robot_state).values()
+        #joints = self.spot.get_arm_proprioception(robot_state=robot_state).values()
 
-        position, rotation = self.spot.get_base_transform_to("link_wr1")
-        gripper_transform = [position.x, position.y, position.z] + [
-            rotation.x,
-            rotation.y,
-            rotation.z,
-            rotation.w,
-        ]
+        #position, rotation = self.spot.get_base_transform_to("link_wr1")
+        #gripper_transform = [position.x, position.y, position.z] + [
+        #    rotation.x,
+        #    rotation.y,
+        #    rotation.z,
+        #    rotation.w,
+        #]
 
-        msg.data = np.array(
-            list(xy_yaw) + [j.position.value for j in joints] + gripper_transform,
-            dtype=np.float32,
-        )
+        #msg.data = np.array(
+        #    list(xy_yaw) + [j.position.value for j in joints] + gripper_transform,
+        #    dtype=np.float32,
+        #)
+        msg.data = np.array(list(xy_yaw))
 
         # Limit publishing to 10 Hz max
         if time.time() - self.last_publish > 1 / 10:

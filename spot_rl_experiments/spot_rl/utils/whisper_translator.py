@@ -63,6 +63,9 @@ class WhisperTranslator():
                             print('Recording Ended - no voice activity in 1.5 seconds')
                             break
                     
+                    if iters > 300:
+                        break
+                    
                     f.write(data)
                     iters += 1
  
@@ -72,6 +75,7 @@ class WhisperTranslator():
             with open(self.filename, 'rb') as f:
                 result = openai.Audio.transcribe('whisper-1', f)
                 transcript = result["text"]
+                raise
         except Exception as e_cloud:
             print('Error occured while inferencing Whisper from OpenAI CLOUD client: \n', e_cloud)
 
