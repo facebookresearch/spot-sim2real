@@ -5,6 +5,7 @@ from collections import Counter
 import magnum as mn
 import numpy as np
 from spot_wrapper.spot import Spot
+import rospy
 
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.envs.gaze_env import SpotGazeEnv
@@ -49,6 +50,11 @@ def main(spot, use_mixer, config, out_path=None):
         env_class = SpotMobileManipulationSeqEnv
 
     env = env_class(config, spot)
+    objects_to_look = []
+    for waypoint in WAYPOINTS['object_targets']:
+        objects_to_look.append(WAYPOINTS['object_targets'][waypoint][0])
+    rospy.set_param("object_target", ','.join(objects_to_look))
+
     env.power_robot()
     time.sleep(1)
     count = Counter()
@@ -339,6 +345,8 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
         if self.current_task == Tasks.PLACE and time.time() > self.timeout_start + 10:
             # call place after 10s of trying
             print("Place failed to reach target")
+            spot.open_gripper()
+            time.sleep(0.75)
             done = True
 
 

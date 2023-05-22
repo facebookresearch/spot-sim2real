@@ -352,7 +352,8 @@ class OWLVITModel:
         rospy.loginfo("[OWLVIT]: Models loaded.")
 
     def inference(self, hand_rgb, timestamp, stopwatch):
-        self.owlvit.update_label([[rospy.get_param("/object_target")]])
+        params = rospy.get_param("/object_target").split(',')
+        self.owlvit.update_label([params])
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
 
         if bbox_xy is not None and bbox_xy != []:

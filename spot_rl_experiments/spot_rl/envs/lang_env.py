@@ -59,11 +59,14 @@ def main(spot, use_mixer, config, out_path=None):
     llm = RearrangeEasyChain(llm_config)
 
     print('I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper')
+    print('-'*100)
+    input('Are you ready?')
     audio_to_text.record()
     instruction = audio_to_text.translate()
     print('Transcribed instructions : ', instruction)
 
     # Use LLM to convert user input to an instructions set
+    # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
     nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
     print('PARSED', nav_1, pick, nav_2)
 
@@ -351,6 +354,8 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
         if self.current_task == Tasks.PLACE and time.time() > self.timeout_start + 10:
             # call place after 10s of trying
             print("Place failed to reach target")
+            spot.open_gripper()
+            time.sleep(.75)
             done = True
 
 
