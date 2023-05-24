@@ -199,6 +199,23 @@ class Spot:
         gripper_command = RobotCommandBuilder.claw_gripper_close_command()
         self.command_client.robot_command(gripper_command)
 
+    def rotate_gripper_with_delta(self, wrist_yaw=0.0, wrist_roll=0.0):
+        """
+        Takes in relative wrist rotations targets and moves each wrist joint to the corresponding target.
+        Waits for 0.5 sec after issuing motion command
+        :param wrist_yaw: relative yaw for wrist in radians
+        :param wrist_roll: relative roll for wrist in radians
+        """
+        print(f"Rotating the wrist with the following relative rotations: yaw={wrist_yaw}, roll={wrist_roll}")
+
+        arm_joint_positions = self.get_arm_joint_positions(as_array=True)
+        # Maybe also wrap angles?
+        # Ordering: sh0, sh1, el0, el1, wr0, wr1
+        joint_rotation_delta=np.array([0.0, 0.0, 0.0, 0.0, wrist_yaw, wrist_roll])
+        new_arm_joint_states = np.add(arm_joint_positions, joint_rotation_delta)
+        self.set_arm_joint_positions(new_arm_joint_states)
+        time.sleep(0.5)
+
     def move_gripper_to_point(self, point, rotation):
         """
         Moves EE to a point relative to body frame
@@ -520,6 +537,20 @@ class Spot:
         )
 
         return joint_states
+
+    def get_arm_joint_positions(self, as_array=True):
+        """
+        Gives in joint positions of the arm in radians in the following order
+        Ordering: sh0, sh1, el0, el1, wr0, wr1
+        :param as_array: bool, True for output as an np.array, False for list
+        :return: 6 element data structure (np.array or list) of joint positions as radians
+        """
+        arm_joint_states = self.get_arm_proprioception()
+        arm_joint_positions = np.fromiter((arm_joint_states[joint].position.value for joint in arm_joint_states), float)
+
+        if as_array:
+            return arm_joint_positions
+        return arm_joint_positions.tolist()
 
     def set_arm_joint_positions(
         self, positions, travel_time=1.0, max_vel=2.5, max_acc=15, return_cmd=False
