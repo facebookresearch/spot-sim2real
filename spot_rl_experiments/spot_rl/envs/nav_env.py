@@ -206,6 +206,22 @@ class SpotNavEnv(SpotBaseEnv):
 
         return observations
 
+    # def reset(self, waypoint=None):
+    # # def reset(self, goal_xy, goal_heading):
+    #     # Nav
+    #     if waypoint is None:
+    #         self.goal_xy = None
+    #         self.goal_heading = None
+    #     else:
+    #         self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
+
+    #     self.goal_xy = np.array(self.goal_xy, dtype=np.float32)
+    #     self.goal_heading = self.goal_heading
+    #     observations = super().reset()
+    #     assert len(self.goal_xy) == 2
+
+    #     return observations
+
     def get_success(self, observations):
         succ = self.get_nav_success(observations, self.succ_distance, self.succ_angle)
         if succ:

@@ -851,6 +851,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=0.3)
         time.sleep(0.6)
 
+    # TODO: Move this to spot.py
     def power_robot(self):
         self.spot.power_on()
         # self.say("Standing up")

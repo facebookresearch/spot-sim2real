@@ -161,6 +161,7 @@ def main(spot, use_mixer, config, out_path=None):
             )
             try:
                 spot.dock(dock_id=DOCK_ID, home_robot=True)
+                # Why do we need to do this if that is happening in the dock function?
                 spot.home_robot()
                 break
             except Exception:
