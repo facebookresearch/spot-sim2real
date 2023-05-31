@@ -3,7 +3,9 @@ from spot_wrapper.spot import Spot
 
 # SpotSkillManager? SpotSkillExecutor? SpotSkillController?
 class SpotSkillManager():
-    def __init__(self, ):
+    def __init__(self):
+        # We will probably receive a config as part of the constructor
+        # And eventually that specifies the set of skills that we can instantiate and execute
         self.spot = Spot("RealSeqEnv")
         self.__init_spot()
         self.__initiate_policies()
@@ -23,19 +25,19 @@ class SpotSkillManager():
     def reset(self):
         # Reset the the policies
     
-    def nav(self, nav_target):
+    def nav(self, nav_target: str): -> str:
         # use the logic of current skill to get nav_target (nav_target_from_waypoints)
         # reset the nav environment with the current target (or use the ros param)
         # run the nav policy until success
         # reset (policies and nav environment)
 
-    def place(self, place_target):
+    def place(self, place_target: str): -> str:
         # use the logic of current skill to get place_target (place_target_from_waypoints)
         # reset the nav environment with the current target (or use the ros param)
         # run the nav policy until success
         # reset (policies and place environment)
 
-    def pick(self, pick_target):
+    def pick(self, pick_target: str): -> str:
         # The current pick target is simply a string (received on the variable pick_target)
         # Reset the gaze Set the ros param so that the gaze environment looks for the pick target
         # run the gaze policy until success
