@@ -50,6 +50,12 @@ def main(spot, use_mixer, config, out_path=None):
         env_class = SpotMobileManipulationSeqEnv
 
     env = env_class(config, spot)
+
+    # Reset the viz params
+    rospy.set_param('/viz_pick', 'None')
+    rospy.set_param('/viz_object', 'None')
+    rospy.set_param('/viz_place', 'None')
+
     objects_to_look = []
     for waypoint in WAYPOINTS['object_targets']:
         objects_to_look.append(WAYPOINTS['object_targets'][waypoint][0])
@@ -59,6 +65,7 @@ def main(spot, use_mixer, config, out_path=None):
     time.sleep(1)
     count = Counter()
     out_data = []
+
     for trip_idx in range(NUM_OBJECTS + 1):
         if trip_idx < NUM_OBJECTS:
             # 2 objects per receptacle
@@ -70,6 +77,9 @@ def main(spot, use_mixer, config, out_path=None):
             )
             count[waypoint_name] += 1
             env.say("Going to " + waypoint_name + " to search for objects")
+            rospy.set_param('viz_pick', waypoint_name)
+            rospy.set_param("viz_object", ','.join(objects_to_look))
+            rospy.set_param("viz_place", "None")
         else:
             env.say("Finished object rearrangement. Heading to dock.")
             waypoint = nav_target_from_waypoints("dock")
@@ -283,6 +293,8 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
             # Determine where to go based on what object we've just grasped
             waypoint_name, waypoint = object_id_to_nav_waypoint(self.target_obj_name)
             self.say("Navigating to " + waypoint_name)
+            rospy.set_param('viz_object', self.target_obj_name)
+            rospy.set_param('viz_place', waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)
             self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
             self.navigating_to_place = True
