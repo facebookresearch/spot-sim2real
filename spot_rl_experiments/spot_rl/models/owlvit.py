@@ -28,7 +28,8 @@ class OwlVit:
 
         self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
 
-        self.labels = labels
+        self.prefix = "an image of a"
+        self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.score_threshold = score_threshold
         self.show_img = show_img
 
@@ -181,8 +182,10 @@ class OwlVit:
             x2 = int(box[2])
             y2 = int(box[3])
 
+            # Strip the prefix from the label
+            label_without_prefix = self.labels[0][label][len(self.prefix) + 1 :]
             result.append(
-                [self.labels[0][label], target_scores[label], [x1, y1, x2, y2]]
+                [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
             )
 
         return result
@@ -208,7 +211,8 @@ class OwlVit:
         return img
 
     def update_label(self, labels):
-        self.labels = labels
+        labels_with_prefix = [[f"{self.prefix} {label}" for label in labels[0]]]
+        self.labels = labels_with_prefix
 
 
 if __name__ == "__main__":

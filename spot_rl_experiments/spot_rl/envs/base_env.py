@@ -220,6 +220,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         observations = self.get_observations()
         return observations
 
+    def reset_arm(self):
+        # Move arm to initial configuration
+        self.spot.close_gripper()
+        cmd_id = self.spot.set_arm_joint_positions(
+            positions=self.initial_arm_joint_angles, travel_time=0.75
+        )
+        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=2)
+
     def step(  # noqa
         self,
         base_action=None,
@@ -758,21 +766,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
         return base_frame_place_target_hab
 
-    # THIS METHOD IS DEPRECATED!!
-    # def get_place_distance(self):
-    #     gripper_T_base = self.get_in_gripper_tf()
-    #     base_frame_gripper_pos = np.array(gripper_T_base.translation)
-    #     base_frame_place_target = self.get_base_frame_place_target_spot()
-    #     hab_place_target = self.spot2habitat_translation(base_frame_place_target)
-    #     hab_place_target = np.array(hab_place_target)
-
-    #     place_dist = np.linalg.norm(hab_place_target - base_frame_gripper_pos)
-    #     xy_dist = np.linalg.norm(
-    #         hab_place_target[[0, 2]] - base_frame_gripper_pos[[0, 2]]
-    #     )
-    #     z_dist = abs(hab_place_target[1] - base_frame_gripper_pos[1])
-    #     return place_dist, xy_dist, z_dist
-
     def get_in_gripper_tf(self):
         wrist_T_base = self.spot2habitat_transform(
             self.link_wr1_position, self.link_wr1_rotation
@@ -850,15 +843,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         arm_positions[-1] = np.deg2rad(90)
         self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=0.3)
         time.sleep(0.6)
-
-    def power_robot(self):
-        self.spot.power_on()
-        # self.say("Standing up")
-        try:
-            self.spot.undock()
-        except Exception:
-            print("Undocking failed: just standing up instead...")
-            self.spot.blocking_stand()
 
 
 def get_obj_dist_and_bbox(obj_bbox, arm_depth):

@@ -199,6 +199,9 @@ class PlaceController:
             # Add sleep as open_gripper() is a non-blocking call
             time.sleep(1)
 
+            # Reset the arm here
+            self.place_env.reset_arm()
+
         return success_list
 
 
@@ -216,12 +219,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.place_target = np.array(place_target)
         self.place_target_is_local = target_is_local
 
-        # Move arm to initial configuration
-        self.spot.close_gripper()
-        cmd_id = self.spot.set_arm_joint_positions(
-            positions=self.initial_arm_joint_angles, travel_time=0.75
-        )
-        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=2)
+        self.reset_arm()
 
         observations = super().reset()
         self.placed = False

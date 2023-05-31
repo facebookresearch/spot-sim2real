@@ -702,7 +702,6 @@ class Spot:
         ).parent_tform_child
         return kin_state.position, kin_state.rotation
 
-    # WHY IS DEFAUULT HOME_ROBOT=FALSE???
     def dock(self, dock_id: int = DOCK_ID, home_robot: bool = False) -> None:
         """
         Dock the robot to the specified dock
