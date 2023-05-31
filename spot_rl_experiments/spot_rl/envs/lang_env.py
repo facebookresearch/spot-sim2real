@@ -1,11 +1,11 @@
 import os
+import os
 import time
 from collections import Counter
 
 import magnum as mn
 import numpy as np
 from spot_wrapper.spot import Spot
-import rospy
 
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.envs.gaze_env import SpotGazeEnv
@@ -21,16 +21,20 @@ from spot_rl.utils.utils import (
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
+from spot_rl.utils.whisper_translator import WhisperTranslator
+from spot_rl.models.sentence_similarity import SentenceSimilarity
 
-CLUTTER_AMOUNTS = Counter()
-CLUTTER_AMOUNTS.update(get_clutter_amounts())
-NUM_OBJECTS = np.sum(list(CLUTTER_AMOUNTS.values()))
+from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
+
+from hydra import compose, initialize
+import subprocess
+import rospy
+import time
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-
-DEBUGGING = False
 
 
 def main(spot, use_mixer, config, out_path=None):
+
     if use_mixer:
         policy = MixerPolicy(
             config.WEIGHTS.MIXER,
@@ -56,105 +60,110 @@ def main(spot, use_mixer, config, out_path=None):
     rospy.set_param('/viz_object', 'None')
     rospy.set_param('/viz_place', 'None')
 
-    objects_to_look = []
-    for waypoint in WAYPOINTS['object_targets']:
-        objects_to_look.append(WAYPOINTS['object_targets'][waypoint][0])
-    rospy.set_param("object_target", ','.join(objects_to_look))
+    audio_to_text = WhisperTranslator()
+    sentence_similarity = SentenceSimilarity()
+    with initialize(config_path='../llm/src/conf'):
+       llm_config = compose(config_name='config')
+    llm = RearrangeEasyChain(llm_config)
+
+    print('I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper')
+    print('-'*100)
+    input('Are you ready?')
+    audio_to_text.record()
+    instruction = audio_to_text.translate()
+    print('Transcribed instructions : ', instruction)
+
+    # Use LLM to convert user input to an instructions set
+    # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
+    nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
+    print('PARSED', nav_1, pick, nav_2)
+
+    # Find closest nav_targets to the ones robot knows locations of
+    nav_1 = sentence_similarity.get_most_similar_in_list(nav_1, list(WAYPOINTS['nav_targets'].keys()))
+    nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
+    print('MOST SIMILAR: ', nav_1, pick, nav_2)
+
+    # Used for Owlvit
+    rospy.set_param('object_target', pick)
+
+    # Used for Visualizations
+    rospy.set_param('viz_pick', nav_1)
+    rospy.set_param('viz_object', pick)
+    rospy.set_param('viz_place', nav_2)
 
     env.power_robot()
     time.sleep(1)
     count = Counter()
     out_data = []
 
-    for trip_idx in range(NUM_OBJECTS + 1):
-        if trip_idx < NUM_OBJECTS:
-            # 2 objects per receptacle
-            clutter_blacklist = [
-                i for i in WAYPOINTS["clutter"] if count[i] >= CLUTTER_AMOUNTS[i]
-            ]
-            waypoint_name, waypoint = closest_clutter(
-                env.x, env.y, clutter_blacklist=clutter_blacklist
-            )
-            count[waypoint_name] += 1
-            env.say("Going to " + waypoint_name + " to search for objects")
-            rospy.set_param('viz_pick', waypoint_name)
-            rospy.set_param("viz_object", ','.join(objects_to_look))
-            rospy.set_param("viz_place", "None")
-        else:
-            env.say("Finished object rearrangement. Heading to dock.")
-            waypoint = nav_target_from_waypoints("dock")
-        observations = env.reset(waypoint=waypoint)
-        policy.reset()
-        done = False
-        if use_mixer:
-            expert = None
-        else:
-            expert = Tasks.NAV
-        env.stopwatch.reset()
-        while not done:
-            out_data.append((time.time(), env.x, env.y, env.yaw))
+    waypoint = nav_target_from_waypoints(nav_1)
+    observations = env.reset(waypoint=waypoint)
 
-            if use_mixer:
-                base_action, arm_action = policy.act(observations)
-                nav_silence_only = policy.nav_silence_only
-            else:
-                base_action, arm_action = policy.act(observations, expert=expert)
-                nav_silence_only = True
-            env.stopwatch.record("policy_inference")
-            observations, _, done, info = env.step(
-                base_action=base_action,
-                arm_action=arm_action,
-                nav_silence_only=nav_silence_only,
-            )
-            # if done:
-            #     import pdb; pdb.set_trace()
+    policy.reset()
+    done = False
+    if use_mixer:
+        expert = None
+    else:
+        expert = Tasks.NAV
+    env.stopwatch.reset()
+    while not done:
+        out_data.append((time.time(), env.x, env.y, env.yaw))
+        base_action, arm_action = policy.act(observations, expert=expert)
+        nav_silence_only = True
+        env.stopwatch.record("policy_inference")
+        observations, _, done, info = env.step(
+            base_action=base_action,
+            arm_action=arm_action,
+            nav_silence_only=nav_silence_only,
+        )
+        
+        if use_mixer and info.get("grasp_success", False):
+            policy.policy.prev_nav_masks *= 0
 
-            if use_mixer and info.get("grasp_success", False):
-                policy.policy.prev_nav_masks *= 0
+        if not use_mixer:
+            expert = info["correct_skill"]
+        print("Expert:", expert)
 
-            if not use_mixer:
-                expert = info["correct_skill"]
+        # We reuse nav, so we have to reset it before we use it again.
+        if not use_mixer and expert != Tasks.NAV:
+            policy.nav_policy.reset()
 
-            if trip_idx >= NUM_OBJECTS and env.get_nav_success(
-                observations, 0.3, np.deg2rad(10)
-            ):
-                # The robot has arrived back at the dock
-                break
+        env.stopwatch.print_stats(latest=True)
 
-            # Print info
-            # stats = [f"{k}: {v}" for k, v in info.items()]
-            # print(" ".join(stats))
+    # Go to the dock
+    env.say("Finished object rearrangement. Heading to dock.")
+    waypoint = nav_target_from_waypoints("dock")
+    observations = env.reset(waypoint=waypoint)
+    expert = Tasks.NAV
 
-            # We reuse nav, so we have to reset it before we use it again.
-            if not use_mixer and expert != Tasks.NAV:
-                policy.nav_policy.reset()
+    while True:
+        base_action, arm_action = policy.act(observations, expert=expert)
+        nav_silence_only = True
+        env.stopwatch.record("policy_inference")
+        observations, _, done, info = env.step(
+            base_action=base_action,
+            arm_action=arm_action,
+            nav_silence_only=nav_silence_only,
+        )
+        try:
+            spot.dock(dock_id=DOCK_ID, home_robot=True)
+            spot.home_robot()
+            break
+        except:
+            print("Dock not found... trying again")
+            time.sleep(0.1)
 
-            env.stopwatch.print_stats(latest=True)
-
-        # Ensure gripper is open (place may have timed out)
-        # if not env.place_attempted:
-        #     print("open gripper in place attempted")
-        #     env.spot.open_gripper()
-        #     time.sleep(2)
+    print("Done!")
 
     out_data.append((time.time(), env.x, env.y, env.yaw))
 
     if out_path is not None:
         data = (
-            "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
-            + "\n"
+                "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
+                + "\n"
         )
         with open(out_path, "w") as f:
             f.write(data)
-
-    env.say("Executing automatic docking")
-    dock_start_time = time.time()
-    while time.time() - dock_start_time < 2:
-        try:
-            spot.dock(dock_id=DOCK_ID, home_robot=True)
-        except:
-            print("Dock not found... trying again")
-            time.sleep(0.1)
 
 
 class Tasks:
@@ -291,10 +300,10 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
-            waypoint_name, waypoint = object_id_to_nav_waypoint(self.target_obj_name)
+            waypoint_name = rospy.get_param('/viz_place')
+            waypoint = nav_target_from_waypoints(waypoint_name)
+
             self.say("Navigating to " + waypoint_name)
-            rospy.set_param('viz_object', self.target_obj_name)
-            rospy.set_param('viz_place', waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)
             self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
             self.navigating_to_place = True
@@ -359,7 +368,7 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
             print("Place failed to reach target")
             self.spot.rotate_gripper_with_delta(wrist_roll=1.57)
             spot.open_gripper()
-            time.sleep(0.75)
+            time.sleep(.75)
             done = True
 
 

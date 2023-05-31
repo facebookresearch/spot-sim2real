@@ -24,7 +24,6 @@ NO_RAW_IMG_TOPICS = [
     rt.FILTERED_HAND_DEPTH,
 ]
 
-
 class SpotRobotSubscriberMixin:
     node_name = "SpotRobotSubscriber"
     no_raw = False
@@ -70,6 +69,10 @@ class SpotRobotSubscriberMixin:
             self.spot = spot
         else:
             self.spot = None
+
+        self.pick_target = "None"
+        self.pick_object = "None"
+        self.place_target = "None"
 
         rospy.loginfo(f"[{self.node_name}]: Robot subscribing has started.")
 

@@ -36,31 +36,40 @@ class VisualizerMixin:
         self.video = None
         self.dim = None
         self.new_video_started = False
+        self.named_window = "ROS Spot Images"
 
     def generate_composite(self):
         raise NotImplementedError
 
     @staticmethod
-    def overlay_text(img, text, color=(0, 0, 255)):
+    def overlay_text(img, text, color=(0, 0, 255), size=2.0, thickness=4):
         viz_img = img.copy()
-        line, font, font_size, font_thickness = (text, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
-        text_width, text_height = cv2.getTextSize(
-            line, font, font_size, font_thickness
-        )[0][:2]
+        line, font, font_size, font_thickness = (text, cv2.FONT_HERSHEY_SIMPLEX, size, thickness)
+
         height, width = img.shape[:2]
-        x = (width - text_width) // 2
-        y = (height - text_height) // 2
-        cv2.putText(
-            viz_img,
-            line,
-            (x, y),
-            font,
-            font_size,
-            color,
-            font_thickness,
-            lineType=cv2.LINE_AA,
-        )
+        y0, dy = 100,100
+        for i, line in enumerate(text.split('\n')):
+            text_width, text_height = cv2.getTextSize(
+                line, font, font_size, font_thickness
+            )[0][:2]
+
+            x = (width - text_width) // 2
+            # y = (height - text_height) // 2
+            y = y0 + i * dy
+            cv2.putText(
+                viz_img,
+                line,
+                (x, y),
+                font,
+                font_size,
+                color,
+                font_thickness,
+                lineType=cv2.LINE_AA,
+            )
         return viz_img
+
+    def initializeWindow(self):
+        cv2.namedWindow(self.named_window, cv2.WINDOW_NORMAL)
 
     def vis_imgs(self):
         # Skip if no messages were updated
@@ -70,9 +79,9 @@ class VisualizerMixin:
             if img is not None:
                 if self.recording:
                     viz_img = self.overlay_text(img, "RECORDING IS ON!")
-                    cv2.imshow("ROS Spot Images", viz_img)
+                    cv2.imshow(self.named_window, viz_img)
                 else:
-                    cv2.imshow("ROS Spot Images", img)
+                    cv2.imshow(self.named_window, img)
 
             key = cv2.waitKey(1)
             if key != -1:
@@ -186,6 +195,15 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             ]
         )
 
+        # Add Pick receptacle, Object, Place receptacle information on the side
+        pck = rospy.get_param('/viz_pick', 'None')
+        obj = rospy.get_param('/viz_object', 'None')
+        plc = rospy.get_param('/viz_place', 'None')
+        information_string = "Pick from:\n" + pck + "\n\nObject Target:\n" + obj + "\n\nPlace to:\n" + plc
+        display_img = 255 * np.ones((img.shape[0], int(img.shape[1]/4), img.shape[2]), dtype=np.uint8)
+        display_img = self.overlay_text(display_img, information_string,color=(255,0,0), size=1.5, thickness=4)
+        img = resize_to_tallest([img, display_img], hstack=True)
+
         for topic in refreshed_topics:
             curr_time = time.time()
             self.updated[topic] = False
@@ -214,6 +232,7 @@ def main():
     srv = None
     try:
         srv = SpotRosVisualizer(headless=args.headless)
+        srv.initializeWindow()
         if args.record:
             srv.recording = True
         while not rospy.is_shutdown():
