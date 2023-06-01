@@ -12,13 +12,15 @@ openai.api_key = os.environ["OPENAI_API_KEY"]
 
 class WhisperTranslator():
     def __init__(self):
+        print("\n=====================================")
+        print("Initializing Whisper Translator")
         self.filename = "data/temp_recordings/output.wav"
         if not os.path.exists(os.path.dirname(self.filename)):
             os.makedirs(os.path.dirname(self.filename))
 
         self.sample_rate = 48000
         self.channels = 1
-        self.device = 0
+        self.device = self.identify_device('USB Microphone')
 
         # We record 30 ms of audio at a time
         self.block_duration = 30 
@@ -40,8 +42,12 @@ class WhisperTranslator():
         # Voice Activity Detection
         self.vad = webrtcvad.Vad()
         self.vad.set_mode(3)
+        print("=====================================\n")
 
     def record(self):
+        """
+        Records audio from the microphone, translates it to text and returns the text
+        """
         def callback(indata, frames, time, status):
             self.q.put(indata.copy())
 
@@ -65,8 +71,12 @@ class WhisperTranslator():
                     
                     f.write(data)
                     iters += 1
+        print('Done Recording')
  
     def translate(self):
+        """
+        Translates the audio to text using Whisper first from OPENAI CLOUD client and if it fails, then from locally downloaded model
+        """
         transcript = 'default'
         try:
             with open(self.filename, 'rb') as f:
@@ -97,9 +107,24 @@ class WhisperTranslator():
                 print('Error occured while inferencing Whisper from OpenAI LOCAL client: \n', e_local)
         return transcript
 
+    def identify_device(self, device_name = 'USB Microphone'):
+        """
+        Identify the device number of the USB Microphone and returns it
+        """
+        device_list = sd.query_devices()
+        devices = [(i,x['name']) for i,x in enumerate(device_list) if device_name in x['name']]
+        if len(devices) == 0:
+            print('USB Microphone not found. Using default device')
+            device_id = 0
+        else:
+            print('Found following devices with name USB Microphone:\n', devices)
+            if len(devices) > 1:
+                print('Using first device from the list')
+            device_id = devices[0][0]
+        return device_id
+
 if __name__ == "__main__":
     wt = WhisperTranslator()
     wt.record()
-    print("Done recording")
     translation = wt.translate()
     print(translation)

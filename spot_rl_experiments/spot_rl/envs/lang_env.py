@@ -60,6 +60,9 @@ def main(spot, use_mixer, config, out_path=None):
     rospy.set_param('/viz_object', 'None')
     rospy.set_param('/viz_place', 'None')
 
+    # Check if robot should return to base
+    return_to_base = config.RETURN_TO_BASE
+
     audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
     with initialize(config_path='../llm/src/conf'):
@@ -131,27 +134,32 @@ def main(spot, use_mixer, config, out_path=None):
         env.stopwatch.print_stats(latest=True)
 
     # Go to the dock
-    env.say("Finished object rearrangement. Heading to dock.")
-    waypoint = nav_target_from_waypoints("dock")
-    observations = env.reset(waypoint=waypoint)
-    expert = Tasks.NAV
+    env.say(f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}.")
+    if return_to_base:
+        waypoint = nav_target_from_waypoints("dock")
+        observations = env.reset(waypoint=waypoint)
+        expert = Tasks.NAV
 
-    while True:
-        base_action, arm_action = policy.act(observations, expert=expert)
-        nav_silence_only = True
-        env.stopwatch.record("policy_inference")
-        observations, _, done, info = env.step(
-            base_action=base_action,
-            arm_action=arm_action,
-            nav_silence_only=nav_silence_only,
-        )
-        try:
-            spot.dock(dock_id=DOCK_ID, home_robot=True)
-            spot.home_robot()
-            break
-        except:
-            print("Dock not found... trying again")
-            time.sleep(0.1)
+        while True:
+            base_action, arm_action = policy.act(observations, expert=expert)
+            nav_silence_only = True
+            env.stopwatch.record("policy_inference")
+            observations, _, done, info = env.step(
+                base_action=base_action,
+                arm_action=arm_action,
+                nav_silence_only=nav_silence_only,
+            )
+            try:
+                spot.dock(dock_id=DOCK_ID, home_robot=True)
+                spot.home_robot()
+                break
+            except:
+                print("Dock not found... trying again")
+                time.sleep(0.1)
+    else:
+        env.say("Since RETURN_TO_BASE was set to false in config.yaml, will sit down.")
+        time.sleep(2)
+        spot.sit()
 
     print("Done!")
 
