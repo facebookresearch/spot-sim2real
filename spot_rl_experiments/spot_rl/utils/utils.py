@@ -48,7 +48,13 @@ def construct_config(opts=None):
 
 
 def nav_target_from_waypoints(waypoint):
-    goal_x, goal_y, goal_heading = WAYPOINTS[waypoint]
+    # Extract nav_targets safely from waypoints.yaml
+    nav_target = WAYPOINTS.get(waypoint)
+    if nav_target is None:
+        raise KeyError(f"{waypoint} not a valid waypoint!")
+
+    # Extract goal_(x, y, heading) from nav_target
+    goal_x, goal_y, goal_heading = nav_target
     return goal_x, goal_y, np.deg2rad(goal_heading)
 
 
