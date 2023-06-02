@@ -59,7 +59,15 @@ def nav_target_from_waypoints(waypoint):
 
 
 def place_target_from_waypoints(waypoint):
-    return np.array(WAYPOINTS["place_targets"][waypoint])
+    # Extract place_targets safely from waypoints.yaml
+    place_targets_dict = WAYPOINTS.get("place_targets")
+    if place_targets_dict is None:
+        raise KeyError("`place_targets` not defined in waypoints.yaml!")
+
+    place_target = place_targets_dict.get(waypoint)
+    if place_target is None:
+        raise KeyError(f"{waypoint} not a valid place target!")
+    return place_target
 
 
 def closest_clutter(x, y, clutter_blacklist=None):

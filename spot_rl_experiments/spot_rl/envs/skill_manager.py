@@ -1,3 +1,4 @@
+import numpy as np
 import os
 import rospy
 import time
@@ -14,6 +15,7 @@ from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
     nav_target_from_waypoints,
+    place_target_from_waypoints,
 )
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
@@ -52,6 +54,7 @@ class SpotSkillManager():
         args = parser.parse_args()
         self.nav_config = construct_config(args.opts) # TODO: Get config from constructor
         self.pick_config = construct_config(args.opts) # TODO: Get config from constructor
+        self.place_config = construct_config(args.opts) # TODO: Get config from constructor
 
         # TODO: The way configs are handled in the original code is a bit messy ... fix this
         # Example:
@@ -62,23 +65,26 @@ class SpotSkillManager():
         self.pick_config.USE_HEAD_CAMERA = False
 
         # Don't need cameras for Place
-        # self.place_config.USE_HEAD_CAMERA = False
-        # self.place_config.USE_MRCNN = False
+        self.place_config.USE_HEAD_CAMERA = False
+        self.place_config.USE_MRCNN = False
 
     def __initiate_policies(self):
         # Initialize the nav, place, and pick policies (NavPolicy, PlacePolicy, GazePolicy)
         self.nav_policy = NavPolicy(self.nav_config.WEIGHTS.NAV, device=self.nav_config.DEVICE)
         self.pick_policy = GazePolicy(self.pick_config.WEIGHTS.GAZE, device=self.pick_config.DEVICE)
+        self.place_policy = PlacePolicy(self.place_config.WEIGHTS.PLACE, device=self.place_config.DEVICE)
 
     def __initialize_environments(self):
         # Initialize the nav, place, and pick environments (SpotNavEnv, SpotPlaceEnv, SpotGazeEnv)
         self.nav_env = SpotNavEnv(self.nav_config, self.spot)
         self.pick_env = SpotGazeEnv(self.pick_config, self.spot)
+        self.place_env = SpotPlaceEnv(self.place_config, self.spot)
 
     def reset(self):
         # Reset the the policies
         self.nav_policy.reset()
         self.pick_policy.reset()
+        self.place_policy.reset()
 
     def nav(self, nav_target: str=None) -> bool:
         # use the logic of current skill to get nav_target (nav_target_from_waypoints)
@@ -139,19 +145,68 @@ class SpotSkillManager():
 
                 # Execute action
                 observations, _, done, _ = self.pick_env.step(arm_action=action)
+
+            if done:
+                # WHY DOES gaze_env.py & place_env.py RESET BASE VELOCITY INSIDE A WHILE LOOP?
+                self.spot.set_base_velocity(0, 0, 0, 1.0)
         except KeyboardInterrupt:
             raise KeyboardInterrupt(f"Keyboard interrupt detected, stopping picking")
 
         return True
 
-    def place(self, place_target: str) -> str:
+    def place(self, place_target: str=None) -> str:
         # use the logic of current skill to get place_target (place_target_from_waypoints)
-        # reset the nav environment with the current target (or use the ros param)
-        # run the nav policy until success
+        # reset the nav environment with the current target (or use the ros param)  ---->>>>>> This is probably not needed
+        # run the nav policy until success ???????? @Sergio Why run NAV here? Isn't NAV a skill in itself?
         # reset (policies and place environment)
-        return None
+        if place_target is not None:
+            # Navigate to the place target
+            try:
+                self.nav(place_target)
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation for place")
+            except KeyError:
+                raise Exception(f"Place target: {place_target} does not exist in waypoints.yaml")
+            except Exception as e:
+                raise Exception(f"Error while navigating to place target: {e}")
+
+            # Get the place target coordinates
+            try:
+                goal_place = place_target_from_waypoints(place_target)
+            except KeyError:
+                raise Exception(f"Place target: {place_target} does not exist in waypoints.yaml")
+
+        else:
+            print("No place target specified, skipping place")
+            # We should put the arm back here in the stow position if it is not already there, otherwise docking fails
+            return False
+
+        self.place_env.say(f"Place target object at {place_target} i.e. {goal_place}")
+
+        # TODO: Figure out if we want target close to the robot or not (i.e. target_is_local=True or False)
+        observations = self.place_env.reset(goal_place)
+        done = False
+        time.sleep(1)
+        try:
+            while not done:
+                # Get best action using place policy
+                action = self.place_policy.act(observations)
+
+                # Execute action
+                observations, _, done, _ = self.place_env.step(arm_action=action)
+
+            if done:
+                # WHY DOES gaze_env.py & place_env.py RESET BASE VELOCITY INSIDE A WHILE LOOP?
+                self.spot.set_base_velocity(0, 0, 0, 1.0)
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
+
+        # TODO: Reset arm back to gaze/stow position
+        return True
 
     def dock(self):
+        # TODO: Stow back the arm
+
         # Navigate to the dock
         self.nav('dock')
 
@@ -166,6 +221,8 @@ class SpotSkillManager():
             except:
                 print("Dock not found... trying again")
                 time.sleep(0.1)
+
+        self.reset()
         return None
 
     def power_off(self):
@@ -177,10 +234,17 @@ if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
     try:
         spotskillmanager.nav('chair1')
+        rospy.set_param('object_target', 'penguin')
+        spotskillmanager.pick('penguin')
+        spotskillmanager.place('door')
+
+
+        spotskillmanager.nav('counter')
         rospy.set_param('object_target', 'ball')
         spotskillmanager.pick('ball')
-        spotskillmanager.nav('chair2')
-        # spotskillmanager.place('hall_table')
+        spotskillmanager.place('chair2')
+
+
     except KeyboardInterrupt as e:
         print(f"Received keyboard interrupt - {e}. Going to dock")
     except Exception as e:
