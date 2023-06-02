@@ -1,4 +1,5 @@
 import os
+import rospy
 import time
 
 from spot_wrapper.spot import Spot
@@ -31,7 +32,7 @@ class SpotSkillManager():
         # TODO: Check if this can be moved outside of env
         self.nav_env.power_robot()
         #...
-    
+
     # def __del__(self):
     #     # Power off the robot
     #     self.power_off()
@@ -49,31 +50,35 @@ class SpotSkillManager():
         # Get configs
         parser = get_default_parser()
         args = parser.parse_args()
-        self.config = construct_config(args.opts) # TODO: Get config from constructor
+        self.nav_config = construct_config(args.opts) # TODO: Get config from constructor
+        self.pick_config = construct_config(args.opts) # TODO: Get config from constructor
 
         # TODO: The way configs are handled in the original code is a bit messy ... fix this
         # Example:
         # Don't need gripper camera for Nav
-        self.config.USE_MRCNN = False
+        self.nav_config.USE_MRCNN = False
 
         # Don't need head cameras for Gaze
-        # self.config.USE_HEAD_CAMERA = False
+        self.pick_config.USE_HEAD_CAMERA = False
 
         # Don't need cameras for Place
-        # self.config.USE_HEAD_CAMERA = False
-        # self.config.USE_MRCNN = False
+        # self.place_config.USE_HEAD_CAMERA = False
+        # self.place_config.USE_MRCNN = False
 
     def __initiate_policies(self):
         # Initialize the nav, place, and pick policies (NavPolicy, PlacePolicy, GazePolicy)
-        self.nav_policy = NavPolicy(self.config.WEIGHTS.NAV, device=self.config.DEVICE)
+        self.nav_policy = NavPolicy(self.nav_config.WEIGHTS.NAV, device=self.nav_config.DEVICE)
+        self.pick_policy = GazePolicy(self.pick_config.WEIGHTS.GAZE, device=self.pick_config.DEVICE)
 
     def __initialize_environments(self):
         # Initialize the nav, place, and pick environments (SpotNavEnv, SpotPlaceEnv, SpotGazeEnv)
-        self.nav_env = SpotNavEnv(self.config, self.spot)
+        self.nav_env = SpotNavEnv(self.nav_config, self.spot)
+        self.pick_env = SpotGazeEnv(self.pick_config, self.spot)
 
     def reset(self):
         # Reset the the policies
         self.nav_policy.reset()
+        self.pick_policy.reset()
 
     def nav(self, nav_target: str=None) -> bool:
         # use the logic of current skill to get nav_target (nav_target_from_waypoints)
@@ -84,14 +89,13 @@ class SpotSkillManager():
             try:
                 goal_x, goal_y, goal_heading = nav_target_from_waypoints(nav_target)
             except KeyError:
-                print(f"Nav target: {nav_target} does not exist in waypoints.yaml")
-                return False
+                raise Exception(f"Nav target: {nav_target} does not exist in waypoints.yaml")
         else:
             print("No nav target specified, skipping nav")
             return False
 
         self.nav_env.say(f"Navigating to {nav_target}")
-        
+
         observations = self.nav_env.reset((goal_x, goal_y), goal_heading)
         done = False
         time.sleep(1)
@@ -103,9 +107,41 @@ class SpotSkillManager():
                 # Execute action
                 observations, _, done, _ = self.nav_env.step(base_action=action)
         except KeyboardInterrupt:
-            print("Keyboard interrupt detected, stopping navigation")
+            raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
+
+        return True
+
+    def pick(self, pick_target: str=None) -> bool:
+        # The current pick target is simply a string (received on the variable pick_target)
+        # Reset the gaze Set the ros param so that the gaze environment looks for the pick target
+        # run the gaze policy until success
+        # reset (policies and gaze environment)
+
+        # if pick_target is not None:
+        #     try:
+        #         goal_x, goal_y, goal_heading = nav_target_from_waypoints(nav_target)
+        #     except KeyError:
+        #         print(f"Nav target: {nav_target} does not exist in waypoints.yaml")
+        #         return False
+        if pick_target is None:
+            print("No pick target specified, skipping pick")
             return False
-        
+
+        self.pick_env.say(f"Picking {pick_target}")
+
+        observations = self.pick_env.reset(target_obj_id=pick_target)
+        done = False
+        time.sleep(1)
+        try:
+            while not done:
+                # Get best action using pick policy
+                action = self.pick_policy.act(observations)
+
+                # Execute action
+                observations, _, done, _ = self.pick_env.step(arm_action=action)
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt(f"Keyboard interrupt detected, stopping picking")
+
         return True
 
     def place(self, place_target: str) -> str:
@@ -113,13 +149,6 @@ class SpotSkillManager():
         # reset the nav environment with the current target (or use the ros param)
         # run the nav policy until success
         # reset (policies and place environment)
-        return None
-
-    def pick(self, pick_target: str) -> str:
-        # The current pick target is simply a string (received on the variable pick_target)
-        # Reset the gaze Set the ros param so that the gaze environment looks for the pick target
-        # run the gaze policy until success
-        # reset (policies and gaze environment)
         return None
 
     def dock(self):
@@ -146,8 +175,15 @@ class SpotSkillManager():
 
 if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
-    spotskillmanager.nav('sofa')
-    # spotskillmanager.pick('ball')
-    spotskillmanager.nav('coffee_table')
-    # spotskillmanager.place('hall_table')
-    spotskillmanager.dock()
+    try:
+        spotskillmanager.nav('chair1')
+        rospy.set_param('object_target', 'ball')
+        spotskillmanager.pick('ball')
+        spotskillmanager.nav('chair2')
+        # spotskillmanager.place('hall_table')
+    except KeyboardInterrupt as e:
+        print(f"Received keyboard interrupt - {e}. Going to dock")
+    except Exception as e:
+        print(f"Encountered exception - {e}. Going to dock")
+    finally:
+        spotskillmanager.dock()
