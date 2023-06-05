@@ -33,7 +33,8 @@ def main(spot):
     env.power_robot()
     policy = PlacePolicy(config.WEIGHTS.PLACE, device=config.DEVICE)
     policy.reset()
-    observations = env.reset(place_target, args.target_is_local)
+    # observations = env.reset(place_target, args.target_is_local)
+    observations = env.reset(None, args.target_is_local)
     done = False
     env.say("Starting episode")
     while not done:
@@ -53,17 +54,22 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
         self.placed = False
 
-    def reset(self, place_target, target_is_local=False, *args, **kwargs):
+    def reset(self, place_target=None, target_is_local=False, *args, **kwargs):
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=0.75
         )
         self.spot.block_until_arm_arrives(cmd_id, timeout_sec=2)
 
-        self.place_target = np.array(place_target)
+        if place_target is not None:
+            self.place_target = np.array(place_target)
+        else:
+            self.place_target = mn.Vector3(-1.0, -1.0, -1.0)
+        
         self.place_target_is_local = target_is_local
         self.placed = False
 
+        # TODO: Make it similar to Nav & Pick envs
         observations = super(SpotPlaceEnv, self).reset()
         self.placed = False
         return observations

@@ -28,11 +28,11 @@ class SpotSkillManager():
         self.__init_spot()
         self.__initiate_policies()
         self.__initialize_environments()
-        self.reset()
-
         # Power on the robot
         # TODO: Check if this can be moved outside of env
         self.nav_env.power_robot()
+        self.reset()
+        
         #...
 
     # def __del__(self):
@@ -81,10 +81,15 @@ class SpotSkillManager():
         self.place_env = SpotPlaceEnv(self.place_config, self.spot)
 
     def reset(self):
-        # Reset the the policies
+        # Reset the the policies the environments 
         self.nav_policy.reset()
         self.pick_policy.reset()
         self.place_policy.reset()
+
+        # Reset the environments
+        # self.nav_env.reset()
+        self.pick_env.reset()
+        self.place_env.reset()
 
     def nav(self, nav_target: str=None) -> bool:
         # use the logic of current skill to get nav_target (nav_target_from_waypoints)
@@ -115,6 +120,8 @@ class SpotSkillManager():
         except KeyboardInterrupt:
             raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
 
+        # do we need a reset here? of nav policy
+        # policy.nav_policy
         return True
 
     def pick(self, pick_target: str=None) -> bool:
@@ -135,6 +142,7 @@ class SpotSkillManager():
 
         self.pick_env.say(f"Picking {pick_target}")
 
+        rospy.set_param('object_target', pick_target)
         observations = self.pick_env.reset(target_obj_id=pick_target)
         done = False
         time.sleep(1)
@@ -201,7 +209,8 @@ class SpotSkillManager():
         except KeyboardInterrupt:
             raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
 
-        # TODO: Reset arm back to gaze/stow position
+        # TODO: We only reset after a navipicknavplace
+        self.reset()
         return True
 
     def dock(self):
@@ -234,13 +243,10 @@ if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
     try:
         spotskillmanager.nav('chair1')
-        rospy.set_param('object_target', 'penguin')
         spotskillmanager.pick('penguin')
         spotskillmanager.place('door')
 
-
         spotskillmanager.nav('counter')
-        rospy.set_param('object_target', 'ball')
         spotskillmanager.pick('ball')
         spotskillmanager.place('chair2')
 
