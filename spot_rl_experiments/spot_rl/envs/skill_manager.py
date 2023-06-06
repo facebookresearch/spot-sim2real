@@ -50,11 +50,11 @@ class SpotSkillManager():
             exit(1)
 
         # Get configs
-        parser = get_default_parser()
-        args = parser.parse_args()
-        self.nav_config = construct_config(args.opts) # TODO: Get config from constructor
-        self.pick_config = construct_config(args.opts) # TODO: Get config from constructor
-        self.place_config = construct_config(args.opts) # TODO: Get config from constructor
+        # parser = get_default_parser()
+        # args = parser.parse_args()
+        self.nav_config = construct_config(None) # TODO: Get config from constructor
+        self.pick_config = construct_config(None) # TODO: Get config from constructor
+        self.place_config = construct_config(None) # TODO: Get config from constructor
 
         # TODO: The way configs are handled in the original code is a bit messy ... fix this
         # Example:
@@ -100,9 +100,10 @@ class SpotSkillManager():
             try:
                 goal_x, goal_y, goal_heading = nav_target_from_waypoints(nav_target)
             except KeyError:
+                return False, f'Failed - place target {nav_target} not found - use the exact name'
                 raise Exception(f"Nav target: {nav_target} does not exist in waypoints.yaml")
         else:
-            print("No nav target specified, skipping nav")
+            return False, "No nav target specified, skipping nav"
             return False
 
         self.nav_env.say(f"Navigating to {nav_target}")
@@ -122,7 +123,7 @@ class SpotSkillManager():
 
         # do we need a reset here? of nav policy
         # policy.nav_policy
-        return True
+        return True, 'Sucess'
 
     def pick(self, pick_target: str=None) -> bool:
         # The current pick target is simply a string (received on the variable pick_target)
@@ -138,7 +139,7 @@ class SpotSkillManager():
         #         return False
         if pick_target is None:
             print("No pick target specified, skipping pick")
-            return False
+            return False, 'No pick target specified, skipping pick'
 
         self.pick_env.say(f"Picking {pick_target}")
 
@@ -146,13 +147,15 @@ class SpotSkillManager():
         observations = self.pick_env.reset(target_obj_id=pick_target)
         done = False
         time.sleep(1)
+        k = 0
         try:
-            while not done:
+            while (not done) and (k < 100):
                 # Get best action using pick policy
                 action = self.pick_policy.act(observations)
 
                 # Execute action
                 observations, _, done, _ = self.pick_env.step(arm_action=action)
+                k += 1  
 
             if done:
                 # WHY DOES gaze_env.py & place_env.py RESET BASE VELOCITY INSIDE A WHILE LOOP?
@@ -160,7 +163,10 @@ class SpotSkillManager():
         except KeyboardInterrupt:
             raise KeyboardInterrupt(f"Keyboard interrupt detected, stopping picking")
 
-        return True
+        if done:
+            return True, 'Success'
+        else:
+            return False, 'Failure - object not found'
 
     def place(self, place_target: str=None) -> str:
         # use the logic of current skill to get place_target (place_target_from_waypoints)
@@ -182,10 +188,11 @@ class SpotSkillManager():
             try:
                 goal_place = place_target_from_waypoints(place_target)
             except KeyError:
+                return False, f'Failed - place target {place_target} not found'
                 raise Exception(f"Place target: {place_target} does not exist in waypoints.yaml")
 
         else:
-            print("No place target specified, skipping place")
+            return "No place target specified, skipping place"
             # We should put the arm back here in the stow position if it is not already there, otherwise docking fails
             return False
 
@@ -195,23 +202,28 @@ class SpotSkillManager():
         observations = self.place_env.reset(goal_place)
         done = False
         time.sleep(1)
+        k = 0
         try:
-            while not done:
+            while not done and k < 100:
                 # Get best action using place policy
                 action = self.place_policy.act(observations)
 
                 # Execute action
                 observations, _, done, _ = self.place_env.step(arm_action=action)
+                k+=1
 
             if done:
                 # WHY DOES gaze_env.py & place_env.py RESET BASE VELOCITY INSIDE A WHILE LOOP?
                 self.spot.set_base_velocity(0, 0, 0, 1.0)
         except KeyboardInterrupt:
             raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
-
+        if not done:
+            self.spot.rotate_gripper_with_delta(wrist_roll=1.57)
+            self.spot.open_gripper()
+            time.sleep(0.75)
         # TODO: We only reset after a navipicknavplace
         self.reset()
-        return True
+        return True, 'Success'
 
     def dock(self):
         # TODO: Stow back the arm
@@ -242,13 +254,13 @@ class SpotSkillManager():
 if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
     try:
-        spotskillmanager.nav('chair1')
+        spotskillmanager.nav('hall_table')
         spotskillmanager.pick('penguin')
-        spotskillmanager.place('door')
+        spotskillmanager.place('room_table')
 
-        spotskillmanager.nav('counter')
-        spotskillmanager.pick('ball')
-        spotskillmanager.place('chair2')
+        # spotskillmanager.nav('counter')
+        # spotskillmanager.pick('ball')
+        # spotskillmanager.place('chair2')
 
 
     except KeyboardInterrupt as e:
