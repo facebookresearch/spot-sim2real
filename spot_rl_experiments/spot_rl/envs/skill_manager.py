@@ -35,8 +35,8 @@ class SpotSkillManager():
         
         #...
 
-    # def __del__(self):
-    #     # Power off the robot
+    def __del__(self):
+        self.dock()
     #     self.power_off()
 
     def __init_spot(self):
@@ -149,7 +149,7 @@ class SpotSkillManager():
         time.sleep(1)
         k = 0
         try:
-            while (not done) and (k < 100):
+            while (not done) and (k < 35):
                 # Get best action using pick policy
                 action = self.pick_policy.act(observations)
 
@@ -204,7 +204,7 @@ class SpotSkillManager():
         time.sleep(1)
         k = 0
         try:
-            while not done and k < 100:
+            while not done and k < 35:
                 # Get best action using place policy
                 action = self.place_policy.act(observations)
 
@@ -238,6 +238,8 @@ class SpotSkillManager():
         dock_start_time = time.time()
         while time.time() - dock_start_time < 2:
             try:
+                print("Trying to dock")
+                print("DOCK_ID", DOCK_ID)
                 self.spot.dock(dock_id=DOCK_ID, home_robot=True)
             except:
                 print("Dock not found... trying again")
@@ -253,19 +255,23 @@ class SpotSkillManager():
 
 if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
-    try:
-        spotskillmanager.nav('hall_table')
-        spotskillmanager.pick('penguin')
-        spotskillmanager.place('room_table')
+    #try:
+    spotskillmanager.nav('living_table')
+    spotskillmanager.pick('penguin')
+    spotskillmanager.place('couch')
 
-        # spotskillmanager.nav('counter')
-        # spotskillmanager.pick('ball')
-        # spotskillmanager.place('chair2')
+    spotskillmanager.nav('living_table')
+    spotskillmanager.pick('ball')
+    spotskillmanager.place('couch')
+
+    # spotskillmanager.nav('counter')
+    # spotskillmanager.pick('ball')
+    # spotskillmanager.place('chair2')
 
 
-    except KeyboardInterrupt as e:
-        print(f"Received keyboard interrupt - {e}. Going to dock")
-    except Exception as e:
-        print(f"Encountered exception - {e}. Going to dock")
-    finally:
-        spotskillmanager.dock()
+    # except KeyboardInterrupt as e:
+    #     print(f"Received keyboard interrupt - {e}. Going to dock")
+    # except Exception as e:
+    #     print(f"Encountered exception - {e}. Going to dock")
+    # finally:
+    #     spotskillmanager.dock()

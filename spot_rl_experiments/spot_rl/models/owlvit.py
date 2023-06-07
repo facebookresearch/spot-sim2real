@@ -8,7 +8,7 @@ import argparse
 class OwlVit():
     def __init__(self, labels, score_threshold, show_img):
         #self.device = torch.device('cpu')
-        labels = [[f'an image of a {label}' for label in labels]]
+        labels = [[f'an image of a {label}' for label in labels[0]]]
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
         self.model = OwlViTForObjectDetection.from_pretrained('google/owlvit-base-patch32')
@@ -174,6 +174,7 @@ class OwlVit():
         return img
 
     def update_label(self, labels):
+        labels = [[f'an image of a {label}' for label in labels[0]]]
         self.labels = labels
 
 
