@@ -1,5 +1,7 @@
 # Repo: spot_sim2real
 
+## Setup instructions - Please refer [here](/installation/SETUP_INSTRUCTIONS.md) for information on how to setup the repo.
+
 ## Connecting to the robot
 Computer can be connected to the robot in one of the following modes
 1. Ethernet\
@@ -9,10 +11,10 @@ This is a wireless mode where robot creates its wifi network. Connect robot to t
 3. Client Mode (To be used for CVPR demos)\
 This is a wireless mode where robot is connected to an external wifi network (from a nearby router). Computer should be connected to this same network, wired connection between router and computer will be faster than wireless connection.
 
-### Ensure that the robot is in client mode
+### Ensure that the robot's IP is correct in Client mode
 This can be checked by going into wifi settings on the computer and making sure you do not see any wifi with name `spot-BD-********` (where * is a number)
 
-Once you have connected to the correct wifi, ensure you can ping spot properly
+Once you have **connected to the correct wifi**, ensure you can ping spot properly
 ```bash
 ping $SPOT_IP
 ```
@@ -25,9 +27,9 @@ PING 192.168.1.5 (192.168.1.5) 56(84) bytes of data.
 64 bytes from 192.168.1.5: icmp_seq=2 ttl=64 time=7.36 ms
 ```
 
-## $TODO : ADD WHAT TO DO IF spot_ip is incorrect
+If you don't get a responce however then probably the IP in client mode is incorrect. Follow the "Connect to Spot via Direct Ethernet" instructions [here](https://support.bostondynamics.com/s/article/Spot-network-setup) to open Spot's network manager, select "Client Mode" and check robot's ip address from that page
 
-### Ensure the local IPs used in bashrc are correct.
+### Ensure that the local computer's IP is correct
 
 Find local ip of the computer using `ifconfig`. Try to find the profile with flags `<UP,BROADCAST,RUNNING,MULTICAST>`, the *inet* corresponding to that profile is the ip of your computer.
 
@@ -100,7 +102,7 @@ git checkout main
 
 ## Running Instructions
 ### Perform the following steps
-#### Step1. Run executable command
+#### Step1. Run executable command **In a New Terminal**
 - Run the executable as
     ```bash
     spot_rl_launch_local
@@ -180,7 +182,7 @@ git checkout main
     raw_head_depth: 4.11 raw_hand_depth: 4.12 hand_rgb: 4.10 filtered_head_depth: 4.15 filtered_hand_depth: 4.12 mask_rcnn_visualizations: 4.03
     ```
 
-### Step3. Reset Home
+### Step3. Reset Home **In a New Terminal**
 - This is an important step. Ensure robot is at its start location and sitting, then run the following command in a new terminal
     ```bash
     spot_reset_home
@@ -197,7 +199,7 @@ git checkout main
 - Keep this window open at all the times, if the robot starts misbehaving you should be able to quickly press `s` or `space_bar` to kill the robot
 
 
-### Step5. Main Demo code
+### Step5. Main Demo code **In a New Terminal**
 - In a new window you can now run the code of your choice
 
     1. To run Sequencial experts
