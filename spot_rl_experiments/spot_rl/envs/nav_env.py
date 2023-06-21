@@ -31,9 +31,13 @@ def main(spot):
 
     env = SpotNavEnv(config, spot)
     env.power_robot()
+    
+    should_dock = args.dock
     if args.waypoint is not None:
         goal_x, goal_y, goal_heading = nav_target_from_waypoints(args.waypoint)
         env.say(f"Navigating to {args.waypoint}")
+        if 'dock' == args.waypoint:
+            should_dock=True
     else:
         assert args.goal is not None
         goal_x, goal_y, goal_heading = [float(i) for i in args.goal.split(",")]
@@ -44,18 +48,22 @@ def main(spot):
         while not done:
             action = policy.act(observations)
             observations, _, done, _ = env.step(base_action=action)
-        if args.dock:
-            env.say("Executing automatic docking")
-            dock_start_time = time.time()
-            while time.time() - dock_start_time < 2:
-                try:
-                    spot.dock(dock_id=DOCK_ID, home_robot=True)
-                except:
-                    print("Dock not found... trying again")
-                    time.sleep(0.1)
+            if should_dock:
+                result = try_docking(spot)
+                if result:
+                    print("Docked successfully, homing robot")
+                    spot.home_robot()
+                    break
+
     finally:
         spot.power_off()
 
+def try_docking(spot):
+    try:
+        spot.dock(dock_id=DOCK_ID, home_robot=True)
+        return True
+    except:
+        return False
 
 class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
@@ -64,14 +72,27 @@ class SpotNavEnv(SpotBaseEnv):
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
+        self.docking = False
 
-    def reset(self, goal_xy, goal_heading):
+    def reset(self, goal_xy, goal_heading, docking=False):
         self.goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading
+        self.docking = docking
         observations = super().reset()
         assert len(self.goal_xy) == 2
 
         return observations
+    
+    # def step(self, *args, **kwargs):
+    #     ret = self.step(*args, **kwargs)
+    #     if self.docking:
+    #         try:
+    #             self.spot.dock(dock_id=DOCK_ID, home_robot=True)
+    #             ret[2] = True  # done
+    #         except:
+    #             pass
+    #     return ret
+
     
     # def reset(self, waypoint=None):
     # # def reset(self, goal_xy, goal_heading):

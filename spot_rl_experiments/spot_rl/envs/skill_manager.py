@@ -108,7 +108,8 @@ class SpotSkillManager():
 
         self.nav_env.say(f"Navigating to {nav_target}")
 
-        observations = self.nav_env.reset((goal_x, goal_y), goal_heading)
+            
+        observations = self.nav_env.reset((goal_x, goal_y), goal_heading, docking=nav_target=="dock")
         done = False
         time.sleep(1)
         try:
@@ -137,6 +138,7 @@ class SpotSkillManager():
         #     except KeyError:
         #         print(f"Nav target: {nav_target} does not exist in waypoints.yaml")
         #         return False
+        os.environ["NOW_PICKING"] = "1"
         if pick_target is None:
             print("No pick target specified, skipping pick")
             return False, 'No pick target specified, skipping pick'
@@ -149,7 +151,7 @@ class SpotSkillManager():
         time.sleep(1)
         k = 0
         try:
-            while (not done) and (k < 35):
+            while (not done) and (k < 500):
                 # Get best action using pick policy
                 action = self.pick_policy.act(observations)
 
@@ -163,6 +165,7 @@ class SpotSkillManager():
         except KeyboardInterrupt:
             raise KeyboardInterrupt(f"Keyboard interrupt detected, stopping picking")
 
+        os.environ["NOW_PICKING"] = "0"
         if done:
             return True, 'Success'
         else:
@@ -204,7 +207,7 @@ class SpotSkillManager():
         time.sleep(1)
         k = 0
         try:
-            while not done and k < 35:
+            while not done and k < 50:
                 # Get best action using place policy
                 action = self.place_policy.act(observations)
 
@@ -234,35 +237,69 @@ class SpotSkillManager():
         # Reset observation????
 
         # Dock
-        self.nav_env.say("Executing automatic docking")
-        dock_start_time = time.time()
-        while time.time() - dock_start_time < 2:
-            try:
-                print("Trying to dock")
-                print("DOCK_ID", DOCK_ID)
-                self.spot.dock(dock_id=DOCK_ID, home_robot=True)
-            except:
-                print("Dock not found... trying again")
-                time.sleep(0.1)
+        # self.nav_env.say("Executing automatic docking")
+        # dock_start_time = time.time()
+        # while time.time() - dock_start_time < 2:
+        #     try:
+        #         print("Trying to dock")
+        #         print("DOCK_ID", DOCK_ID)
+        #         self.spot.dock(dock_id=DOCK_ID, home_robot=True)
+        #     except:
+        #         print("Dock not found... trying again")
+        #         time.sleep(0.1)
 
         self.reset()
         return None
 
-    def power_off(self):
-        # Power off spot
+       # Power off spot
         self.spot.power_off()
 
 
 if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
     #try:
-    spotskillmanager.nav('living_table')
-    spotskillmanager.pick('penguin')
-    spotskillmanager.place('couch')
+    # spotskillmanager.nav('sofa_2')
+    # spotskillmanager.pick('plush')
 
-    spotskillmanager.nav('living_table')
-    spotskillmanager.pick('ball')
-    spotskillmanager.place('couch')
+    # spotskillmanager.nav('sofa_1')
+    # spotskillmanager.place('sofa_1')
+    # spotskillmanager.pick('plush')
+
+    rospy.set_param('/viz_pick', 'chair by guitar')
+    rospy.set_param('/viz_object', 'plush toy')
+    rospy.set_param('/viz_place', 'basket')
+
+    spotskillmanager.nav('chair_by_guitar')
+    spotskillmanager.pick('plush toy')
+    spotskillmanager.nav('basket')
+    spotskillmanager.place('basket')
+    spotskillmanager.nav('coffee_table')
+
+    # spotskillmanager.dock()
+
+
+    # spotskillmanager.nav('sofa_2')
+    # spotskillmanager.pick('plush')
+    # spotskillmanager.nav('coffee_table')
+    # spotskillmanager.place('coffee_table')
+
+    
+    # spotskillmanager.pick('plush')
+    # spotskillmanager.nav('hamper')
+    # spotskillmanager.place('hamper')
+
+    # spotskillmanager.nav('tv_stand')
+    # spotskillmanager.pick('plush')
+    # spotskillmanager.place('tv_stand')
+
+    # spotskillmanager.nav('sofa_2')
+    # spotskillmanager.pick('plush')
+    # spotskillmanager.place('sofa_2')
+
+    # spotskillmanager.nav('sofa_1')
+    # spotskillmanager.pick('plush')
+    # spotskillmanager.place('sofa_1')
+    
 
     # spotskillmanager.nav('counter')
     # spotskillmanager.pick('ball')

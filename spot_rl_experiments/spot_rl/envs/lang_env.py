@@ -59,29 +59,40 @@ def main(spot, use_mixer, config, out_path=None):
     rospy.set_param('/viz_pick', 'None')
     rospy.set_param('/viz_object', 'None')
     rospy.set_param('/viz_place', 'None')
-
-    audio_to_text = WhisperTranslator()
-    sentence_similarity = SentenceSimilarity()
+   
     with initialize(config_path='../llm/src/conf'):
        llm_config = compose(config_name='config')
     llm = RearrangeEasyChain(llm_config)
 
     print('I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper')
     print('-'*100)
-    input('Are you ready?')
-    audio_to_text.record()
-    instruction = audio_to_text.translate()
-    print('Transcribed instructions : ', instruction)
 
-    # Use LLM to convert user input to an instructions set
-    # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
-    nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
-    print('PARSED', nav_1, pick, nav_2)
+    looking_nice = 'n'
+    while looking_nice == 'n':
+        input('Are you ready?')
+        audio_to_text = WhisperTranslator()
+        audio_to_text.record()
+        instruction = audio_to_text.translate()
+        print('Transcribed instructions : ', instruction)
 
-    # Find closest nav_targets to the ones robot knows locations of
-    nav_1 = sentence_similarity.get_most_similar_in_list(nav_1, list(WAYPOINTS['nav_targets'].keys()))
-    nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
-    print('MOST SIMILAR: ', nav_1, pick, nav_2)
+        # Use LLM to convert user input to an instructions set
+        # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
+        nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
+        print('PARSED', nav_1, pick, nav_2)
+
+        # Find closest nav_targets to the ones robot knows locations of
+        sentence_similarity = SentenceSimilarity()
+        nav_1 = sentence_similarity.get_most_similar_in_list(nav_1, list(WAYPOINTS['nav_targets'].keys()))
+        nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
+        print('MOST SIMILAR: ', nav_1, pick, nav_2)
+        looking_nice = input('Looking nice? (y/n)')
+
+    
+    # if looking_nice == 'n':
+    #     print('Options')
+    #     print(list(WAYPOINTS['nav_targets'].keys()))
+    #     nav_1 = input('Nav 1 input')
+    #     nav_2 = input('Nav 2 input')
 
     # Used for Owlvit
     rospy.set_param('object_target', pick)

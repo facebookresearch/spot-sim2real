@@ -54,3 +54,6 @@ class SentenceSimilarity:
         print(f"word queried : {query_word} | word list : {list} | cosine scores : {cosine_scores}")
 
         return list[torch.argmax(cosine_scores).item()]
+
+s = SentenceSimilarity()
+print(s.get_most_similar_in_list('sofa', ['house', 'chair']))

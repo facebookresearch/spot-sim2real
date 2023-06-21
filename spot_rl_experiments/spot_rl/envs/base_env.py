@@ -128,6 +128,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.slowdown_base = -1
         self.prev_base_moved = False
         self.should_end = False
+        self.last_target_sighting = -1
 
         # Text-to-speech
         self.tts_pub = rospy.Publisher(rt.TEXT_TO_SPEECH, String, queue_size=1)
@@ -211,6 +212,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.slowdown_base = -1
         self.prev_base_moved = False
         self.should_end = False
+        self.last_target_sighting = -1
 
         observations = self.get_observations()
         return observations
@@ -243,7 +245,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         print(f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}")
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
-            time.sleep(0.5)
+            time.sleep(1)
             self.get_gripper_images(save_image=True)
 
             if self.curr_forget_steps == 0:
@@ -259,6 +261,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                         self.spot.open_gripper()
                     self.grasp_attempted = True
                     arm_positions = np.deg2rad(self.config.PLACE_ARM_JOINT_ANGLES)
+                    self.last_target_sighting = -1
                 else:
                     self.say("BD grasp API failed.")
                     self.spot.open_gripper()
@@ -337,6 +340,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.spot.set_arm_joint_positions(
                     positions=arm_action, travel_time=1 / self.ctrl_hz * 0.9
                 )
+                if os.environ.get("NOW_PICKING", "0") == "1":
+                    time.sleep(0.25)
 
         if self.prev_base_moved and base_action is None:
             self.spot.stand()
@@ -506,6 +511,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return det
 
     def get_mrcnn_det(self, arm_depth, save_image=False):
+        if (
+            self.last_target_sighting != -1
+            and time.time() - self.last_target_sighting > 3
+        ):
+            # Return arm to nominal position if we haven't seen the target object in a
+            # while (3 seconds)
+            self.spot.set_arm_joint_positions(
+                positions=np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES), travel_time=1.0
+            )
+
         marked_img = None
         if self.parallel_inference_mode:
             detections_str = str(self.detections_str_synced)
@@ -543,6 +558,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 detected_classes.append(label)
 
             print("[bounding_box]: Detected:", ", ".join(detected_classes))
+            print('Target object name', str(self.target_obj_name))
 
             if self.target_obj_name is None:
                 most_confident_score = 0.0
@@ -555,15 +571,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     else:
                         label = class_detected
                     dist = get_obj_dist_and_bbox(self.get_det_bbox(det), arm_depth)[0]
-                    
+
                     if score > 0.001 and dist < MAX_HAND_DEPTH:
                         good_detections.append(label)
                         if score > most_confident_score:
                             most_confident_score = score
                             most_confident_name = label
                 if most_confident_score == 0.0:
+                    print("NO DETECTIONS WERE RECEIVED")
                     return None
-                
+
                 if most_confident_name in self.last_seen_objs:
                     self.target_obj_name = most_confident_name
                     if self.target_obj_name != self.last_target_obj:
@@ -573,6 +590,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             else:
                 self.last_seen_objs = []
         else:
+            print("'detections_str' WAS NONE")
             return None
 
         # Check if desired object is in view of camera
@@ -588,16 +606,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         matching_detections = [d for d in detections_str.split(";") if correct_class(d)]
 
         if not matching_detections:
+            print(detections_str)
+            print(98379874398543)
+            print("NO matching_detections")
             return None
-        
+
 
         self.curr_forget_steps = 0
+        self.last_target_sighting = time.time()
 
         # Get object match with the highest score
         def get_score(detection):
             return float(detection.split(",")[1])
 
         best_detection = sorted(matching_detections, key=get_score)[-1]
+        print(1234124, best_detection)
         x1, y1, x2, y2 = self.get_det_bbox(best_detection)
 
         # Create bbox mask from selected detection
@@ -820,8 +843,13 @@ def get_obj_dist_and_bbox(obj_bbox, arm_depth):
 
     # Estimate distance from the gripper to the object
     depth_box = arm_depth[y1:y2, x1:x2]
+    object_distance = np.median(depth_box) * MAX_HAND_DEPTH
 
-    return np.median(depth_box) * MAX_HAND_DEPTH, arm_depth_bbox
+    # Don't give the object bbox if it's far for the depth camera to even see
+    if object_distance == MAX_HAND_DEPTH:
+        arm_depth_bbox = np.zeros_like(arm_depth, dtype=np.float32)
+
+    return object_distance, arm_depth_bbox
 
 
 def angle_between(v1, v2):

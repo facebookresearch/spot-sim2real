@@ -115,11 +115,13 @@ def main(spot, use_mixer, config, out_path=None):
             if not use_mixer:
                 expert = info["correct_skill"]
 
-            if trip_idx >= NUM_OBJECTS and env.get_nav_success(
-                observations, 0.3, np.deg2rad(10)
-            ):
-                # The robot has arrived back at the dock
-                break
+            if trip_idx >= NUM_OBJECTS:
+                try:
+                    spot.dock(dock_id=DOCK_ID, home_robot=True)
+                    spot.home_robot()
+                    break
+                except:
+                    pass
 
             # Print info
             # stats = [f"{k}: {v}" for k, v in info.items()]

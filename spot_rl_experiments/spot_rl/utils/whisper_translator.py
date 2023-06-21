@@ -30,7 +30,8 @@ class WhisperTranslator():
         self.speech_chunk_size = 50
 
         # We record at least 4.5 seconds of audio at the beginning
-        self.minimum_recorded_time = 150 # (150 * 30 ms = 4.5 seconds)
+        self.minimum_recorded_time = 120 # (120 * 30 ms = 4 seconds)
+        self.max_recording_time = 500
 
         # If the rolling mean of the speech queue is below this threshold, we stop recording
         self.silence_threshold = .15
@@ -69,6 +70,9 @@ class WhisperTranslator():
                             print('Recording Ended - no voice activity in 1.5 seconds')
                             break
                     
+                    if iters > self.max_recording_time:
+                        break
+                    
                     f.write(data)
                     iters += 1
         print('Done Recording')
@@ -80,7 +84,7 @@ class WhisperTranslator():
         transcript = 'default'
         try:
             with open(self.filename, 'rb') as f:
-                result = openai.Audio.transcribe('whisper-1', f)
+                result = openai.Audio.transcribe('whisper-1', f, language='en')
                 transcript = result["text"]
         except Exception as e_cloud:
             print('Error occured while inferencing Whisper from OpenAI CLOUD client: \n', e_cloud)

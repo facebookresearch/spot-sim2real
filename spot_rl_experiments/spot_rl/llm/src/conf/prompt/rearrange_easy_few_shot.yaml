@@ -9,6 +9,8 @@ examples: |-
         Solution: Nav(table), Pick(mug), Nav(box), Place(mug, box)
         Instruction: Bring the apple from the kitchen counter to the table
         Solution: Nav(kitchen counter), Pick(apple), Nav(table), Place(apple, table)
+        Instruction: Bring the book from the kitchen counter to the table next to the guitar
+        Solution: Nav(kitchen counter), Pick(book), Nav(table next to the guitar), Place(book, table next to the guitar)
 suffix: |-
         Let's go!
         Instruction: <rearrange_instruction>
