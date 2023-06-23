@@ -25,9 +25,8 @@ from spot_rl.utils.utils import (
 CLUTTER_AMOUNTS = Counter()
 CLUTTER_AMOUNTS.update(get_clutter_amounts())
 NUM_OBJECTS = np.sum(list(CLUTTER_AMOUNTS.values()))
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
-DEBUGGING = False
+DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 
 def main(spot, use_mixer, config, out_path=None):
@@ -105,6 +104,7 @@ def main(spot, use_mixer, config, out_path=None):
                 base_action=base_action,
                 arm_action=arm_action,
                 nav_silence_only=nav_silence_only,
+                use_default_target_obj_destination=True,
             )
             # if done:
             #     import pdb; pdb.set_trace()
@@ -114,7 +114,7 @@ def main(spot, use_mixer, config, out_path=None):
 
             if not use_mixer:
                 expert = info["correct_skill"]
-
+            print("Expert:", expert)
             if trip_idx >= NUM_OBJECTS and env.get_nav_success(
                 observations, 0.3, np.deg2rad(10)
             ):
@@ -137,15 +137,6 @@ def main(spot, use_mixer, config, out_path=None):
         #     env.spot.open_gripper()
         #     time.sleep(2)
 
-    out_data.append((time.time(), env.x, env.y, env.yaw))
-
-    if out_path is not None:
-        data = (
-            "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
-            + "\n"
-        )
-        with open(out_path, "w") as f:
-            f.write(data)
 
     env.say("Executing automatic docking")
     dock_start_time = time.time()
@@ -156,6 +147,17 @@ def main(spot, use_mixer, config, out_path=None):
             print("Dock not found... trying again")
             time.sleep(0.1)
 
+    print("Done!")
+
+    out_data.append((time.time(), env.x, env.y, env.yaw))
+
+    if out_path is not None:
+        data = (
+            "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
+            + "\n"
+        )
+        with open(out_path, "w") as f:
+            f.write(data)
 
 class Tasks:
     r"""Enumeration of types of tasks."""
@@ -247,7 +249,8 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         return SpotBaseEnv.reset(self)
 
-    def step(self, base_action, arm_action, *args, **kwargs):
+    # HOW TO ENSURE `use_default_target_obj_destination` does not get passed to base class in call `super.step()`?
+    def step(self, base_action, arm_action, use_default_target_obj_destination=True, *args, **kwargs):
         # import pdb; pdb.set_trace()
         _, xy_dist, z_dist = self.get_place_distance()
         place = xy_dist < self.config.SUCC_XY_DIST and z_dist < self.config.SUCC_Z_DIST
@@ -291,10 +294,16 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
-            waypoint_name, waypoint = object_id_to_nav_waypoint(self.target_obj_name)
+            waypoint_name, waypoint = None, None
+
+            if use_default_target_obj_destination:
+                waypoint_name, waypoint = object_id_to_nav_waypoint(self.target_obj_name)
+                rospy.set_param('viz_object', self.target_obj_name)
+                rospy.set_param('viz_place', waypoint_name)
+            else:
+                waypoint_name = rospy.get_param('/viz_place')
+                waypoint = nav_target_from_waypoints(waypoint_name)
             self.say("Navigating to " + waypoint_name)
-            rospy.set_param('viz_object', self.target_obj_name)
-            rospy.set_param('viz_place', waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)
             self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
             self.navigating_to_place = True
