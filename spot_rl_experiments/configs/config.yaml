@@ -1,3 +1,4 @@
+# Config
 WEIGHTS:
   NAV: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
   # GAZE: "weights/gaze_normal_32_seed300_1649708927_ckpt.49.pth"
