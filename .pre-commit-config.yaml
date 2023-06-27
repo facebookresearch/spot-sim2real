@@ -14,9 +14,21 @@ repos:
     rev: 5.0.4
     hooks:
       - id: flake8
+        exclude: |
+            (?x)^(
+                mask_rcnn_detectron2/
+                | habitat-lab/
+                | DeblurGANv2/
+            )
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v0.981
     hooks:
       - id: mypy
         args: [--install-types, --non-interactive, --no-strict-optional, --ignore-missing-imports]
+        exclude: |
+            (?x)^(
+                mask_rcnn_detectron2/
+                | habitat-lab/
+                | DeblurGANv2/
+            )
