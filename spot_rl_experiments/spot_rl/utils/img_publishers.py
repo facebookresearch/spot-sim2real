@@ -3,6 +3,7 @@ import os.path as osp
 import subprocess
 import time
 from copy import deepcopy
+from typing import Any, List
 
 import blosc
 import cv2
@@ -10,6 +11,7 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+from spot_rl.utils.depth_map_utils import filter_depth
 from spot_wrapper.spot import Spot
 from spot_wrapper.spot import SpotCamIds as Cam
 from spot_wrapper.spot import image_response_to_cv2, scale_depth_img
@@ -20,8 +22,6 @@ from std_msgs.msg import (
     MultiArrayLayout,
     String,
 )
-
-from spot_rl.utils.depth_map_utils import filter_depth
 
 try:
     from spot_rl.utils.mask_rcnn_utils import (
@@ -35,7 +35,6 @@ except ModuleNotFoundError:
 
 # owlvit
 from spot_rl.models import OwlVit
-
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
@@ -47,7 +46,7 @@ MAX_HAND_DEPTH = 1.7
 
 class SpotImagePublisher:
     name = ""
-    publisher_topics = []
+    publisher_topics = List[str]
     publish_msg_type = Image
 
     def __init__(self):
@@ -61,7 +60,6 @@ class SpotImagePublisher:
         rospy.loginfo(f"[{self.name}]: Publisher initialized.")
 
     def publish(self):
-        st = time.time()
         # if st < self.last_publish + 1 / MAX_PUBLISH_FREQ:
         #     time.sleep(0.01)
         #     return
@@ -281,10 +279,10 @@ class SpotFilteredHandDepthImagesPublisher(SpotFilteredDepthImagesPublisher):
 class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
     # TODO: We eventually want to change this name as well as the publisher topic
-    name = 'spot_mrcnn_publisher' 
+    name = "spot_mrcnn_publisher"
     subscriber_topic = rt.HAND_RGB
     publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
-    
+
     def __init__(self, model):
         super().__init__()
         self.model = model
@@ -317,9 +315,9 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         if self.grayscale:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        
+
         return img
-        
+
     def _publish(self):
         stopwatch = Stopwatch()
         header = self.img_msg.header
@@ -328,8 +326,10 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         # Internal model
         hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
-        bbox_data, viz_img = self.model.inference(hand_rgb_preprocessed, timestamp, stopwatch)
-        
+        bbox_data, viz_img = self.model.inference(
+            hand_rgb_preprocessed, timestamp, stopwatch
+        )
+
         # publish data
         self.publish_bbox_data(bbox_data)
         self.publish_viz_img(viz_img, header)
@@ -344,15 +344,16 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         viz_img_msg.header = header
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
+
 class OWLVITModel:
-    def __init__(self, score_threshold=.05, show_img=False):
+    def __init__(self, score_threshold=0.05, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img)
         self.image_scale = config.IMAGE_SCALE
         rospy.loginfo("[OWLVIT]: Models loaded.")
 
     def inference(self, hand_rgb, timestamp, stopwatch):
-        params = rospy.get_param("/object_target").split(',')
+        params = rospy.get_param("/object_target").split(",")
         self.owlvit.update_label([params])
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
 
@@ -361,12 +362,13 @@ class OWLVITModel:
             for detection in bbox_xy:
                 str_det = f'{detection[0]},{detection[1]},{",".join([str(i) for i in detection[2]])}'
                 detections.append(str_det)
-            bbox_xy_string = ';'.join(detections)
+            bbox_xy_string = ";".join(detections)
         else:
             bbox_xy_string = "None"
         detections_str = f"{int(timestamp.nsecs)}|{bbox_xy_string}"
 
         return detections_str, viz_img
+
 
 class MRCNNModel:
     def __init__(self):
@@ -391,8 +393,8 @@ if __name__ == "__main__":
     parser.add_argument("--decompress", action="store_true")
     parser.add_argument("--raw", action="store_true")
     parser.add_argument("--compress", action="store_true")
-    parser.add_argument("--owlvit",  action="store_true")
-    parser.add_argument("--mrcnn",  action="store_true")
+    parser.add_argument("--owlvit", action="store_true")
+    parser.add_argument("--mrcnn", action="store_true")
     parser.add_argument("--core", action="store_true", help="running on the Core")
     parser.add_argument("--listen", action="store_true", help="listening to Core")
     parser.add_argument(
@@ -406,9 +408,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    #assert (
+    # assert (
     #    len([i[1] for i in args._get_kwargs() if i[1]]) == 1
-    #), "One and only one arg must be provided."
+    # ), "One and only one arg must be provided."
 
     filter_head_depth = args.filter_head_depth
     filter_hand_depth = args.filter_hand_depth
@@ -422,7 +424,8 @@ if __name__ == "__main__":
     mrcnn = args.mrcnn
     owlvit = args.owlvit
 
-    node = None
+    node = None  # type: Any
+    model = None  # type: Any
     if filter_head_depth:
         node = SpotFilteredHeadDepthImagesPublisher()
     elif filter_hand_depth:
@@ -451,7 +454,11 @@ if __name__ == "__main__":
         if core:
             flags = ["--compress"]
         else:
-            flags = ["--filter-head-depth", "--filter-hand-depth", f"--{bounding_box_detector}"]
+            flags = [
+                "--filter-head-depth",
+                "--filter-hand-depth",
+                f"--{bounding_box_detector}",
+            ]
             if listen:
                 flags.append("--decompress")
             elif local:
@@ -467,7 +474,7 @@ if __name__ == "__main__":
             for p in processes:
                 try:
                     p.kill()
-                except:
+                except Exception:
                     pass
     else:
         while not rospy.is_shutdown():

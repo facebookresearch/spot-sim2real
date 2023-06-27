@@ -1,16 +1,18 @@
-import openai
-from collections import deque
-import soundfile as sf
-import sounddevice as sd
-import queue
-import numpy as np
 import os
+import queue
+from collections import deque
+
+import numpy as np
+import openai
+import sounddevice as sd
+import soundfile as sf
 import webrtcvad
 import whisper
 
 openai.api_key = os.environ["OPENAI_API_KEY"]
 
-class WhisperTranslator():
+
+class WhisperTranslator:
     def __init__(self):
         print("\n=====================================")
         print("Initializing Whisper Translator")
@@ -20,23 +22,23 @@ class WhisperTranslator():
 
         self.sample_rate = 48000
         self.channels = 1
-        self.device = self.identify_device('USB Microphone')
+        self.device = self.identify_device("USB Microphone")
 
         # We record 30 ms of audio at a time
-        self.block_duration = 30 
+        self.block_duration = 30
         self.blocksize = int(self.sample_rate * self.block_duration / 1000)
 
         # We process 50 chunks of 30 ms each to determine if someone is talking
         self.speech_chunk_size = 50
 
         # We record at least 4.5 seconds of audio at the beginning
-        self.minimum_recorded_time = 150 # (150 * 30 ms = 4.5 seconds)
+        self.minimum_recorded_time = 150  # (150 * 30 ms = 4.5 seconds)
 
         # If the rolling mean of the speech queue is below this threshold, we stop recording
-        self.silence_threshold = .15
+        self.silence_threshold = 0.15
 
         # Queue to store speech chunks
-        self.speech_queue = deque(maxlen = int(self.speech_chunk_size))
+        self.speech_queue = deque(maxlen=int(self.speech_chunk_size))
         self.q = queue.Queue()
 
         # Voice Activity Detection
@@ -48,13 +50,22 @@ class WhisperTranslator():
         """
         Records audio from the microphone, translates it to text and returns the text
         """
+
         def callback(indata, frames, time, status):
             self.q.put(indata.copy())
 
-        print('Starting Recording')
+        print("Starting Recording")
         iters = 0
-        with sf.SoundFile(self.filename, mode='w', samplerate=self.sample_rate, channels = self.channels) as f:
-            with sd.InputStream(samplerate=self.sample_rate, channels=self.channels, device=self.device, blocksize=self.blocksize, callback=callback):
+        with sf.SoundFile(
+            self.filename, mode="w", samplerate=self.sample_rate, channels=self.channels
+        ) as f:
+            with sd.InputStream(
+                samplerate=self.sample_rate,
+                channels=self.channels,
+                device=self.device,
+                blocksize=self.blocksize,
+                callback=callback,
+            ):
                 while True:
                     data = self.q.get()
                     data = np.array(data * 32767, dtype=np.int16)
@@ -66,24 +77,27 @@ class WhisperTranslator():
 
                     if iters > self.minimum_recorded_time:
                         if rolling_mean < self.silence_threshold:
-                            print('Recording Ended - no voice activity in 1.5 seconds')
+                            print("Recording Ended - no voice activity in 1.5 seconds")
                             break
-                    
+
                     f.write(data)
                     iters += 1
-        print('Done Recording')
- 
+        print("Done Recording")
+
     def translate(self):
         """
         Translates the audio to text using Whisper first from OPENAI CLOUD client and if it fails, then from locally downloaded model
         """
-        transcript = 'default'
+        transcript = "default"
         try:
-            with open(self.filename, 'rb') as f:
-                result = openai.Audio.transcribe('whisper-1', f)
+            with open(self.filename, "rb") as f:
+                result = openai.Audio.transcribe("whisper-1", f)
                 transcript = result["text"]
         except Exception as e_cloud:
-            print('Error occured while inferencing Whisper from OpenAI CLOUD client: \n', e_cloud)
+            print(
+                "Error occured while inferencing Whisper from OpenAI CLOUD client: \n",
+                e_cloud,
+            )
 
             try:
                 whisper_model = whisper.load_model("base", device="cuda")
@@ -104,24 +118,32 @@ class WhisperTranslator():
                 # get the transcript out of whisper's decoded result
                 transcript = result.text
             except Exception as e_local:
-                print('Error occured while inferencing Whisper from OpenAI LOCAL client: \n', e_local)
+                print(
+                    "Error occured while inferencing Whisper from OpenAI LOCAL client: \n",
+                    e_local,
+                )
         return transcript
 
-    def identify_device(self, device_name = 'USB Microphone'):
+    def identify_device(self, device_name="USB Microphone"):
         """
         Identify the device number of the USB Microphone and returns it
         """
         device_list = sd.query_devices()
-        devices = [(i,x['name']) for i,x in enumerate(device_list) if device_name in x['name']]
+        devices = [
+            (i, x["name"])
+            for i, x in enumerate(device_list)
+            if device_name in x["name"]
+        ]
         if len(devices) == 0:
-            print('USB Microphone not found. Using default device')
+            print("USB Microphone not found. Using default device")
             device_id = 0
         else:
-            print('Found following devices with name USB Microphone:\n', devices)
+            print("Found following devices with name USB Microphone:\n", devices)
             if len(devices) > 1:
-                print('Using first device from the list')
+                print("Using first device from the list")
             device_id = devices[0][0]
         return device_id
+
 
 if __name__ == "__main__":
     wt = WhisperTranslator()

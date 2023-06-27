@@ -3,12 +3,24 @@ repos:
     rev: 22.3.0
     hooks:
       - id: black
-
+        exclude: |
+            (?x)^(
+                mask_rcnn_detectron2/
+                | habitat-lab/
+                | DeblurGANv2/
+            )
+            
   - repo: https://github.com/pycqa/isort
     rev: 5.11.5
     hooks:
       - id: isort
         args: ["--profile", "black", "--filter-files"]
+        exclude: |
+            (?x)^(
+                mask_rcnn_detectron2/
+                | habitat-lab/
+                | DeblurGANv2/
+            )
 
   - repo: https://github.com/pycqa/flake8
     rev: 5.0.4

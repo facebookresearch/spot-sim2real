@@ -1,11 +1,10 @@
 import argparse
 import time
 
-from spot_wrapper.spot import Spot
-from spot_wrapper.utils import say
-
 from spot_rl.envs.gaze_env import run_env
 from spot_rl.utils.utils import construct_config
+from spot_wrapper.spot import Spot
+from spot_wrapper.utils import say
 
 names = ["ball", "penguin", "rubiks_cube", "lion", "toy_car", "yellow_truck"]
 

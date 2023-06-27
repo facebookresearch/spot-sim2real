@@ -238,7 +238,7 @@ class MixerPolicy(RealPolicy):
             device=self.device,
         )
 
-    def act(self, observations, expert = None):
+    def act(self, observations, expert=None):
         transformed_obs = self.policy.transform_obs([observations], self.not_done)
         batch = batch_obs(transformed_obs, device=self.device)
         with torch.no_grad():

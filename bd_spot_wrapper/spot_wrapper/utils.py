@@ -10,7 +10,7 @@ def say(text):
         text = f'"{text}"'
         cmd = f"/usr/bin/festival -b '(voice_cmu_us_slt_arctic_hts)' '(SayText {text})'"
         subprocess.Popen(cmd, shell=True)
-    except:
+    except Exception:
         pass
     print(f'Saying: "{text}"')
 

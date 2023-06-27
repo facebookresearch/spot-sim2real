@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import curses
 import os
 import signal
@@ -123,7 +124,7 @@ def main(spot: Spot):
                 try:
                     spot.dock(DOCK_ID)
                     spot.home_robot()
-                except:
+                except Exception:
                     print("Dock was not found!")
             elif pressed_key == "i":
                 point, rpy = move_to_initial(spot)

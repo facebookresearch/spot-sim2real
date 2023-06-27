@@ -9,7 +9,7 @@ gpu: &gpu
 
 jobs:
   pre-commit:
-    working_directory: ~/repo/
+    working_directory: ~/spot-sim2real
     resource_class: small
     docker:
       - image: cimg/python:3.8
@@ -18,7 +18,8 @@ jobs:
       - run:
           name: Running precommit checks
           command: |
-            pip install pre-commit
+            mkdir .mypy_cache
+            pip install pre-commit==3.1.1
             pre-commit install-hooks
             pre-commit run --all-files
 

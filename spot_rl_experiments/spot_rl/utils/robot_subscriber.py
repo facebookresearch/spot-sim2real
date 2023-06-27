@@ -4,10 +4,9 @@ import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
+from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
 from std_msgs.msg import Float32MultiArray
-
-from spot_rl.utils.utils import ros_topics as rt
 
 IMG_TOPICS = [
     rt.MASK_RCNN_VIZ_TOPIC,
@@ -23,6 +22,7 @@ NO_RAW_IMG_TOPICS = [
     rt.FILTERED_HEAD_DEPTH,
     rt.FILTERED_HAND_DEPTH,
 ]
+
 
 class SpotRobotSubscriberMixin:
     node_name = "SpotRobotSubscriber"
@@ -46,7 +46,7 @@ class SpotRobotSubscriberMixin:
                 Image,
                 partial(self.img_callback, img_topic),
                 queue_size=1,
-                buff_size=2 ** 30,
+                buff_size=2**30,
             )
         rospy.loginfo(f"[{self.node_name}]: Waiting for images...")
         while not all([self.msgs[s] is not None for s in subscriptions]):

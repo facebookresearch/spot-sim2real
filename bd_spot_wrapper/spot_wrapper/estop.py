@@ -6,17 +6,18 @@
 
 """Provides a programmatic estop to stop the robot."""
 from __future__ import print_function
+
 import argparse
-import sys
-import os
-import signal
-import time
 import curses
 import logging
+import os
+import signal
+import sys
+import time
 
-from bosdyn.client.estop import EstopEndpoint, EstopKeepAlive, EstopClient
-from bosdyn.client.robot_state import RobotStateClient
 import bosdyn.client.util
+from bosdyn.client.estop import EstopClient, EstopEndpoint, EstopKeepAlive
+from bosdyn.client.robot_state import RobotStateClient
 
 try:
     SPOT_ADMIN_PW = os.environ["SPOT_ADMIN_PW"]
@@ -40,7 +41,8 @@ except KeyError:
         "Then:\nsource ~/.bashrc\nor\nsource ~/.bash_profile"
     )
 
-class EstopNoGui():
+
+class EstopNoGui:
     """Provides a software estop without a GUI.
 
     To use this estop, create an instance of the EstopNoGui class and use the stop() and allow()
@@ -83,8 +85,9 @@ def main(argv):
     """
     parser = argparse.ArgumentParser()
     bosdyn.client.util.add_common_arguments(parser)
-    parser.add_argument('-t', '--timeout', type=float, default=5,
-                        help='Timeout in seconds')
+    parser.add_argument(
+        "-t", "--timeout", type=float, default=5, help="Timeout in seconds"
+    )
     options = parser.parse_args(argv)
 
     # Set username to admin and read PW from os variables
@@ -92,7 +95,7 @@ def main(argv):
     options.password = SPOT_ADMIN_PW
 
     # Create robot object
-    sdk = bosdyn.client.create_standard_sdk('estop_nogui')
+    sdk = bosdyn.client.create_standard_sdk("estop_nogui")
     robot = sdk.create_robot(options.hostname)
     robot.authenticate(options.username, options.password)
 
@@ -110,7 +113,7 @@ def main(argv):
 
     def cleanup_example(msg):
         """Shut down curses and exit the program."""
-        print('Exiting')
+        print("Exiting")
         # pylint: disable=unused-argument
         estop_nogui.estop_keep_alive.shutdown()
 
@@ -121,7 +124,7 @@ def main(argv):
         curses.endwin()
         print(msg)
 
-    def clean_exit(msg=''):
+    def clean_exit(msg=""):
         cleanup_example(msg)
         exit(0)
 
@@ -151,12 +154,12 @@ def main(argv):
         stdscr.clear()
 
         # Display usage instructions in terminal
-        stdscr.addstr('Estop w/o GUI running.\n')
-        stdscr.addstr('\n')
-        stdscr.addstr('[q] or [Ctrl-C]: Quit\n', curses.color_pair(2))
-        stdscr.addstr('[SPACE]: Trigger estop\n', curses.color_pair(2))
-        stdscr.addstr('[r]: Release estop\n', curses.color_pair(2))
-        stdscr.addstr('[s]: Settle then cut estop\n', curses.color_pair(2))
+        stdscr.addstr("Estop w/o GUI running.\n")
+        stdscr.addstr("\n")
+        stdscr.addstr("[q] or [Ctrl-C]: Quit\n", curses.color_pair(2))
+        stdscr.addstr("[SPACE]: Trigger estop\n", curses.color_pair(2))
+        stdscr.addstr("[r]: Release estop\n", curses.color_pair(2))
+        stdscr.addstr("[s]: Settle then cut estop\n", curses.color_pair(2))
 
         # Monitor estop until user exits
         while True:
@@ -164,33 +167,33 @@ def main(argv):
             c = stdscr.getch()
 
             try:
-                if c == ord(' '):
+                if c == ord(" "):
                     estop_nogui.stop()
-                if c == ord('r'):
+                if c == ord("r"):
                     estop_nogui.allow()
-                if c == ord('q') or c == 3:
-                    clean_exit('Exit on user input')
-                if c == ord('s'):
+                if c == ord("q") or c == 3:
+                    clean_exit("Exit on user input")
+                if c == ord("s"):
                     estop_nogui.settle_then_cut()
             # If the user attempts to toggle estop without valid endpoint
             except bosdyn.client.estop.EndpointUnknownError:
                 clean_exit("This estop endpoint no longer valid. Exiting...")
 
             # Check if robot is estopped by any estops
-            estop_status = 'NOT_STOPPED\n'
+            estop_status = "NOT_STOPPED\n"
             estop_status_color = curses.color_pair(1)
             state = state_client.get_robot_state()
             estop_states = state.estop_states
             for estop_state in estop_states:
                 state_str = estop_state.State.Name(estop_state.state)
-                if state_str == 'STATE_ESTOPPED':
-                    estop_status = 'STOPPED\n'
+                if state_str == "STATE_ESTOPPED":
+                    estop_status = "STOPPED\n"
                     estop_status_color = curses.color_pair(3)
                     break
-                elif state_str == 'STATE_UNKNOWN':
-                    estop_status = 'ERROR\n'
+                elif state_str == "STATE_UNKNOWN":
+                    estop_status = "ERROR\n"
                     estop_status_color = curses.color_pair(3)
-                elif state_str == 'STATE_NOT_ESTOPPED':
+                elif state_str == "STATE_NOT_ESTOPPED":
                     pass
                 else:
                     # Unknown estop status
@@ -199,8 +202,9 @@ def main(argv):
             # Display current estop status
             if not estop_nogui.estop_keep_alive.status_queue.empty():
                 latest_status = estop_nogui.estop_keep_alive.status_queue.get()[
-                    1].strip()
-                if latest_status != '':
+                    1
+                ].strip()
+                if latest_status != "":
                     # If you lose this estop endpoint, report it to user
                     stdscr.addstr(7, 0, latest_status, curses.color_pair(3))
             stdscr.addstr(6, 0, estop_status, estop_status_color)
@@ -216,7 +220,7 @@ def main(argv):
         raise e
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Open terminal interface and hold estop until user exits with SIGINT
     if len(sys.argv) == 1:
         sys.argv.append(SPOT_IP)

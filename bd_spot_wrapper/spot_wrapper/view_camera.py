@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import argparse
 import time
 from collections import deque

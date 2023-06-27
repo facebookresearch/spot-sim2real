@@ -1,7 +1,5 @@
 import time
 
-from spot_wrapper.spot import Spot
-
 from spot_rl.envs.gaze_env import SpotGazeEnv
 from spot_rl.real_policy import GazePolicy
 from spot_rl.utils.utils import (
@@ -10,6 +8,7 @@ from spot_rl.utils.utils import (
     nav_target_from_waypoints,
     object_id_to_object_name,
 )
+from spot_wrapper.spot import Spot
 
 
 def main(spot):

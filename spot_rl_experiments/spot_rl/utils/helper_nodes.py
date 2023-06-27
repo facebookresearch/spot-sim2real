@@ -3,11 +3,10 @@ import time
 
 import numpy as np
 import rospy
+from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import say
 from std_msgs.msg import Float32MultiArray, String
-
-from spot_rl.utils.utils import ros_topics as rt
 
 NAV_POSE_BUFFER_LEN = 1
 
@@ -71,7 +70,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.text_to_speech:
-        tts_callback = lambda msg: say(msg.data)
+        tts_callback = lambda msg: say(msg.data)  # noqa
         rospy.init_node("spot_ros_tts_node", disable_signals=True)
         rospy.Subscriber(rt.TEXT_TO_SPEECH, String, tts_callback, queue_size=1)
         rospy.loginfo("[spot_ros_tts_node]: Listening for text to dictate.")

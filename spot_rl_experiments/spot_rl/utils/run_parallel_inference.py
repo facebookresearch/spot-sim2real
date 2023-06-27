@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import os.path as osp
 import subprocess
 

@@ -1,9 +1,10 @@
-import openai
-import os
-import hydra
-from omegaconf import DictConfig
 import copy
+import os
+
+import hydra
+import openai
 import regex as re
+from omegaconf import DictConfig
 
 
 class OpenAI:
@@ -53,11 +54,11 @@ class RearrangeEasyChain:
         return ans
 
     def parse_instructions(self, input):
-        text = self.generate(input)['choices'][0]['text']
-        matches =  re.findall('\(.*?\)', text)
-        matches = [match.replace('(','').replace(')','') for match in matches]
+        text = self.generate(input)["choices"][0]["text"]
+        matches = re.findall("\(.*?\)", text)  # noqa
+        matches = [match.replace("(", "").replace(")", "") for match in matches]
         nav_1, pick, nav_2, place = matches
-        place, nav_2 = place.split(',')
+        place, nav_2 = place.split(",")
         nav_1 = nav_1.strip()
         pick = pick.strip()
         nav_2 = nav_2.strip()

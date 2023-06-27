@@ -44,7 +44,7 @@ class MyKeyEventClass2(object):
                 t.daemon = True
                 t.start()
 
-        while not self.done:  #  Wait for Ctrl+C
+        while not self.done:  # Wait for Ctrl+C
             time.sleep(0.5)
 
     def cleanup(self, signum, frame):
@@ -64,19 +64,19 @@ class MyKeyEventClass2(object):
                 return
         while True:
             event_bin_format = (
-                "llHHI"  #  See kernel documentation for 'struct input_event'
+                "llHHI"  # See kernel documentation for 'struct input_event'
             )
-            #  For details, read section 5 of this document:
-            #  https://www.kernel.org/doc/Documentation/input/input.txt
+            # For details, read section 5 of this document:
+            # https://www.kernel.org/doc/Documentation/input/input.txt
             data = of.read(struct.calcsize(event_bin_format))
             seconds, microseconds, e_type, code, value = struct.unpack(
                 event_bin_format, data
             )
             full_time = seconds + microseconds / 1000000
-            if e_type == 0x1:  #  0x1 == EV_KEY means key press or release.
+            if e_type == 0x1:  # 0x1 == EV_KEY means key press or release.
                 d = (
                     "RELEASE" if value == 0 else "PRESS"
-                )  #  value == 0 release, value == 1 press
+                )  # value == 0 release, value == 1 press
                 print(
                     "Got key "
                     + d
@@ -92,7 +92,7 @@ class MyKeyEventClass2(object):
 
                 # Spot-related code
                 if d == "PRESS":
-                    if 0: #str(code) == "108":  # down
+                    if 0:  # str(code) == "108":  # down
                         self.estop_nogui.settle_then_cut()
                         say("Activating e-stop")
                     elif str(code) == "103":  # up

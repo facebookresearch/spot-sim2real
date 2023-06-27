@@ -8,10 +8,9 @@ import cv2
 import numpy as np
 import rospy
 import tqdm
-from spot_wrapper.utils import resize_to_tallest
-
 from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
+from spot_wrapper.utils import resize_to_tallest
 
 RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
 
@@ -44,11 +43,16 @@ class VisualizerMixin:
     @staticmethod
     def overlay_text(img, text, color=(0, 0, 255), size=2.0, thickness=4):
         viz_img = img.copy()
-        line, font, font_size, font_thickness = (text, cv2.FONT_HERSHEY_SIMPLEX, size, thickness)
+        line, font, font_size, font_thickness = (
+            text,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            size,
+            thickness,
+        )
 
         height, width = img.shape[:2]
-        y0, dy = 100,100
-        for i, line in enumerate(text.split('\n')):
+        y0, dy = 100, 100
+        for i, line in enumerate(text.split("\n")):
             text_width, text_height = cv2.getTextSize(
                 line, font, font_size, font_thickness
             )[0][:2]
@@ -196,12 +200,23 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         )
 
         # Add Pick receptacle, Object, Place receptacle information on the side
-        pck = rospy.get_param('/viz_pick', 'None')
-        obj = rospy.get_param('/viz_object', 'None')
-        plc = rospy.get_param('/viz_place', 'None')
-        information_string = "Pick from:\n" + pck + "\n\nObject Target:\n" + obj + "\n\nPlace to:\n" + plc
-        display_img = 255 * np.ones((img.shape[0], int(img.shape[1]/4), img.shape[2]), dtype=np.uint8)
-        display_img = self.overlay_text(display_img, information_string,color=(255,0,0), size=1.5, thickness=4)
+        pck = rospy.get_param("/viz_pick", "None")
+        obj = rospy.get_param("/viz_object", "None")
+        plc = rospy.get_param("/viz_place", "None")
+        information_string = (
+            "Pick from:\n"
+            + pck
+            + "\n\nObject Target:\n"
+            + obj
+            + "\n\nPlace to:\n"
+            + plc
+        )
+        display_img = 255 * np.ones(
+            (img.shape[0], int(img.shape[1] / 4), img.shape[2]), dtype=np.uint8
+        )
+        display_img = self.overlay_text(
+            display_img, information_string, color=(255, 0, 0), size=1.5, thickness=4
+        )
         img = resize_to_tallest([img, display_img], hstack=True)
 
         for topic in refreshed_topics:
@@ -248,7 +263,7 @@ def main():
                     srv.delete_videos()
                 else:
                     srv.save_video()
-            except:
+            except Exception:
                 print("Deleting unfinished videos")
                 srv.delete_videos()
                 exit()
