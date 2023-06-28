@@ -24,7 +24,7 @@ from spot_rl.utils.utils import (
     get_clutter_amounts,
     get_default_parser,
     get_waypoint_yaml,
-    nav_target_from_waypoints,
+    nav_target_from_waypoint,
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
@@ -108,7 +108,7 @@ def main(spot, use_mixer, config, out_path=None):
     time.sleep(1)
     out_data = []
 
-    waypoint = nav_target_from_waypoints(nav_1)
+    waypoint = nav_target_from_waypoint(nav_1, waypoints=waypoints)
     observations = env.reset(waypoint=waypoint)
 
     policy.reset()
@@ -145,7 +145,7 @@ def main(spot, use_mixer, config, out_path=None):
     # Go to the dock
     env.say(f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}.")
     if return_to_base:
-        waypoint = nav_target_from_waypoints("dock")
+        waypoint = nav_target_from_waypoint("dock")
         observations = env.reset(waypoint=waypoint)
         expert = Tasks.NAV
 
@@ -318,7 +318,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
             waypoint_name = rospy.get_param("/viz_place")
-            waypoint = nav_target_from_waypoints(waypoint_name)
+            waypoint = nav_target_from_waypoint(waypoint_name)
 
             self.say("Navigating to " + waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)

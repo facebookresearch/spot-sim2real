@@ -7,7 +7,7 @@ import os
 import time
 
 import numpy as np
-from spot_rl.utils.utils import get_default_parser, nav_target_from_waypoints
+from spot_rl.utils.utils import get_default_parser, nav_target_from_waypoint
 from spot_wrapper.spot import Spot
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
@@ -21,7 +21,7 @@ def main(spot):
     parser.add_argument("-l", "--limit", action="store_true")
     args = parser.parse_args()
     if args.waypoint is not None:
-        goal_x, goal_y, goal_heading = nav_target_from_waypoints(args.waypoint)
+        goal_x, goal_y, goal_heading = nav_target_from_waypoint(args.waypoint)
     else:
         assert args.goal is not None
         goal_x, goal_y, goal_heading = [float(i) for i in args.goal.split(",")]

@@ -20,7 +20,7 @@ from spot_rl.utils.utils import (
     get_clutter_amounts,
     get_default_parser,
     get_waypoint_yaml,
-    nav_target_from_waypoints,
+    nav_target_from_waypoint,
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
@@ -95,7 +95,7 @@ def main(spot, use_mixer, config, out_path=None):
                 f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}."
             )
             if return_to_base:
-                waypoint = nav_target_from_waypoints("dock")
+                waypoint = nav_target_from_waypoint("dock", waypoints=waypoints)
             else:
                 waypoint = None
                 break

@@ -55,9 +55,19 @@ def construct_config(opts=None):
     return config
 
 
-def nav_target_from_waypoints(waypoint):
-    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
-    goal_x, goal_y, goal_heading = waypoints_yaml["nav_targets"][waypoint]
+def nav_target_from_waypoint(waypoint, waypoints_yaml):
+    
+    waypoints_yaml_nav_target_dict = waypoints_yaml.get("nav_targets")
+    if waypoints_yaml_nav_target_dict is None:
+        raise Exception("No `nav_targets` found in waypoints.yaml. Please construct waypoints.yaml correctly as per the README.md")
+    
+    nav_target = waypoints_yaml_nav_target_dict.get(waypoint)
+    if nav_target is None:
+        raise Exception(
+            f"Requested waypoint - {waypoint} does not exist inside `nav_targets` in file waypoints.yaml. Please construct waypoints.yaml correctly as per the README.md"
+        )
+
+    goal_x, goal_y, goal_heading = nav_target
     return goal_x, goal_y, np.deg2rad(goal_heading)
 
 
@@ -71,14 +81,14 @@ def closest_clutter(x, y, clutter_blacklist=None):
     if clutter_blacklist is None:
         clutter_blacklist = []
     clutter_locations = [
-        (np.array(nav_target_from_waypoints(w)[:2]), w)
+        (np.array(nav_target_from_waypoint(w, waypoints_yaml)[:2]), w)
         for w in waypoints_yaml["clutter"]
         if w not in clutter_blacklist
     ]
     xy = np.array([x, y])
     dist_to_clutter = lambda i: np.linalg.norm(i[0] - xy)  # noqa
     _, waypoint_name = sorted(clutter_locations, key=dist_to_clutter)[0]
-    return waypoint_name, nav_target_from_waypoints(waypoint_name)
+    return waypoint_name, nav_target_from_waypoint(waypoint_name)
 
 
 def object_id_to_nav_waypoint(object_id):
@@ -91,7 +101,7 @@ def object_id_to_nav_waypoint(object_id):
         if isinstance(object_id, str):
             KeyError(f"{object_id} not a valid class name!")
     place_nav_target_name = waypoints_yaml["object_targets"][object_id][1]
-    return place_nav_target_name, nav_target_from_waypoints(place_nav_target_name)
+    return place_nav_target_name, nav_target_from_waypoint(place_nav_target_name, waypoints_yaml)
 
 
 def object_id_to_object_name(object_id):
