@@ -1,14 +1,16 @@
 import os
-import os
+import subprocess
 import time
 from collections import Counter
 
 import magnum as mn
 import numpy as np
-from spot_wrapper.spot import Spot
-
+import rospy
+from hydra import compose, initialize
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.envs.gaze_env import SpotGazeEnv
+from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
+from spot_rl.models.sentence_similarity import SentenceSimilarity
 from spot_rl.real_policy import GazePolicy, MixerPolicy, NavPolicy, PlacePolicy
 from spot_rl.utils.remote_spot import RemoteSpot
 from spot_rl.utils.utils import (
@@ -22,14 +24,8 @@ from spot_rl.utils.utils import (
     place_target_from_waypoints,
 )
 from spot_rl.utils.whisper_translator import WhisperTranslator
-from spot_rl.models.sentence_similarity import SentenceSimilarity
+from spot_wrapper.spot import Spot
 
-from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
-
-from hydra import compose, initialize
-import subprocess
-import rospy
-import time
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 
@@ -56,44 +52,49 @@ def main(spot, use_mixer, config, out_path=None):
     env = env_class(config, spot)
 
     # Reset the viz params
-    rospy.set_param('/viz_pick', 'None')
-    rospy.set_param('/viz_object', 'None')
-    rospy.set_param('/viz_place', 'None')
+    rospy.set_param("/viz_pick", "None")
+    rospy.set_param("/viz_object", "None")
+    rospy.set_param("/viz_place", "None")
 
     audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
-    with initialize(config_path='../llm/src/conf'):
-       llm_config = compose(config_name='config')
+    with initialize(config_path="../llm/src/conf"):
+        llm_config = compose(config_name="config")
     llm = RearrangeEasyChain(llm_config)
 
-    print('I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper')
-    print('-'*100)
-    input('Are you ready?')
+    print(
+        "I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper"
+    )
+    print("-" * 100)
+    input("Are you ready?")
     audio_to_text.record()
     instruction = audio_to_text.translate()
-    print('Transcribed instructions : ', instruction)
+    print("Transcribed instructions : ", instruction)
 
     # Use LLM to convert user input to an instructions set
     # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
     nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
-    print('PARSED', nav_1, pick, nav_2)
+    print("PARSED", nav_1, pick, nav_2)
 
     # Find closest nav_targets to the ones robot knows locations of
-    nav_1 = sentence_similarity.get_most_similar_in_list(nav_1, list(WAYPOINTS['nav_targets'].keys()))
-    nav_2 = sentence_similarity.get_most_similar_in_list(nav_2, list(WAYPOINTS['nav_targets'].keys()))
-    print('MOST SIMILAR: ', nav_1, pick, nav_2)
+    nav_1 = sentence_similarity.get_most_similar_in_list(
+        nav_1, list(WAYPOINTS["nav_targets"].keys())
+    )
+    nav_2 = sentence_similarity.get_most_similar_in_list(
+        nav_2, list(WAYPOINTS["nav_targets"].keys())
+    )
+    print("MOST SIMILAR: ", nav_1, pick, nav_2)
 
     # Used for Owlvit
-    rospy.set_param('object_target', pick)
+    rospy.set_param("object_target", pick)
 
     # Used for Visualizations
-    rospy.set_param('viz_pick', nav_1)
-    rospy.set_param('viz_object', pick)
-    rospy.set_param('viz_place', nav_2)
+    rospy.set_param("viz_pick", nav_1)
+    rospy.set_param("viz_object", pick)
+    rospy.set_param("viz_place", nav_2)
 
     env.power_robot()
     time.sleep(1)
-    count = Counter()
     out_data = []
 
     waypoint = nav_target_from_waypoints(nav_1)
@@ -116,7 +117,7 @@ def main(spot, use_mixer, config, out_path=None):
             arm_action=arm_action,
             nav_silence_only=nav_silence_only,
         )
-        
+
         if use_mixer and info.get("grasp_success", False):
             policy.policy.prev_nav_masks *= 0
 
@@ -149,7 +150,7 @@ def main(spot, use_mixer, config, out_path=None):
             spot.dock(dock_id=DOCK_ID, home_robot=True)
             spot.home_robot()
             break
-        except:
+        except Exception:
             print("Dock not found... trying again")
             time.sleep(0.1)
 
@@ -159,8 +160,8 @@ def main(spot, use_mixer, config, out_path=None):
 
     if out_path is not None:
         data = (
-                "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
-                + "\n"
+            "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
+            + "\n"
         )
         with open(out_path, "w") as f:
             f.write(data)
@@ -300,7 +301,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
-            waypoint_name = rospy.get_param('/viz_place')
+            waypoint_name = rospy.get_param("/viz_place")
             waypoint = nav_target_from_waypoints(waypoint_name)
 
             self.say("Navigating to " + waypoint_name)
@@ -368,14 +369,12 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
             print("Place failed to reach target")
             self.spot.rotate_gripper_with_delta(wrist_roll=1.57)
             spot.open_gripper()
-            time.sleep(.75)
+            time.sleep(0.75)
             done = True
-
 
         if not pre_step_navigating_to_place and self.navigating_to_place:
             # This means that the Gaze task has just ended
             self.current_task = Tasks.NAV
-
 
         info["correct_skill"] = self.current_task
 

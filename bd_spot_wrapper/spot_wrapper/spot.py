@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 # Copyright (c) 2021 Boston Dynamics, Inc.  All rights reserved.
 #
 # Downloading, reproducing, distributing or otherwise using the SDK Software
@@ -206,12 +207,14 @@ class Spot:
         :param wrist_yaw: relative yaw for wrist in radians
         :param wrist_roll: relative roll for wrist in radians
         """
-        print(f"Rotating the wrist with the following relative rotations: yaw={wrist_yaw}, roll={wrist_roll}")
+        print(
+            f"Rotating the wrist with the following relative rotations: yaw={wrist_yaw}, roll={wrist_roll}"
+        )
 
         arm_joint_positions = self.get_arm_joint_positions(as_array=True)
         # Maybe also wrap angles?
         # Ordering: sh0, sh1, el0, el1, wr0, wr1
-        joint_rotation_delta=np.array([0.0, 0.0, 0.0, 0.0, wrist_yaw, wrist_roll])
+        joint_rotation_delta = np.array([0.0, 0.0, 0.0, 0.0, wrist_yaw, wrist_roll])
         new_arm_joint_states = np.add(arm_joint_positions, joint_rotation_delta)
         self.set_arm_joint_positions(new_arm_joint_states)
         time.sleep(0.5)
@@ -546,7 +549,10 @@ class Spot:
         :return: 6 element data structure (np.array or list) of joint positions as radians
         """
         arm_joint_states = self.get_arm_proprioception()
-        arm_joint_positions = np.fromiter((arm_joint_states[joint].position.value for joint in arm_joint_states), float)
+        arm_joint_positions = np.fromiter(
+            (arm_joint_states[joint].position.value for joint in arm_joint_states),
+            float,
+        )
 
         if as_array:
             return arm_joint_positions
@@ -707,6 +713,7 @@ class SpotLease:
 
     def create_sublease(self):
         return self.lease.create_sublease()
+
 
 def make_robot_command(arm_joint_traj):
     """Helper function to create a RobotCommand from an ArmJointTrajectory.

@@ -1,7 +1,5 @@
 import magnum as mn
 import numpy as np
-from spot_wrapper.spot import Spot
-
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.real_policy import PlacePolicy
 from spot_rl.utils.utils import (
@@ -9,6 +7,7 @@ from spot_rl.utils.utils import (
     get_default_parser,
     place_target_from_waypoints,
 )
+from spot_wrapper.spot import Spot
 
 
 def main(spot):

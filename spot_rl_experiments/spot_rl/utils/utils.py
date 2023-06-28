@@ -65,7 +65,7 @@ def closest_clutter(x, y, clutter_blacklist=None):
         if w not in clutter_blacklist
     ]
     xy = np.array([x, y])
-    dist_to_clutter = lambda i: np.linalg.norm(i[0] - xy)
+    dist_to_clutter = lambda i: np.linalg.norm(i[0] - xy)  # noqa
     _, waypoint_name = sorted(clutter_locations, key=dist_to_clutter)[0]
     return waypoint_name, nav_target_from_waypoints(waypoint_name)
 

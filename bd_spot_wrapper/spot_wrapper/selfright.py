@@ -1,3 +1,5 @@
+import time
+
 from spot_wrapper.spot import Spot
 
 

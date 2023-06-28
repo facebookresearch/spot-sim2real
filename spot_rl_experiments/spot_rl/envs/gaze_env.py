@@ -2,11 +2,10 @@ import time
 
 import cv2
 import numpy as np
-from spot_wrapper.spot import Spot, wrap_heading
-
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.real_policy import GazePolicy
 from spot_rl.utils.utils import construct_config, get_default_parser
+from spot_wrapper.spot import Spot, wrap_heading
 
 DEBUG = False
 

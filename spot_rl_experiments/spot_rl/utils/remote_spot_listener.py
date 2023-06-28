@@ -5,10 +5,9 @@ to the robot from the Core via Ethernet.
 
 import numpy as np  # DON'T REMOVE IMPORT
 import rospy
+from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
 from std_msgs.msg import Bool, String
-
-from spot_rl.utils.utils import ros_topics as rt
 
 
 class RemoteSpotListener:
@@ -52,7 +51,7 @@ class RemoteSpotListener:
         self.pub.publish(True)
 
     def kill_remote_robot(self, msg):
-        rospy.loginfo(f"[RemoteSpotListener]: Powering robot off...")
+        rospy.loginfo("[RemoteSpotListener]: Powering robot off...")
         self.spot.power_off()
         self.off = True
         rospy.signal_shutdown("Robot was powered off.")

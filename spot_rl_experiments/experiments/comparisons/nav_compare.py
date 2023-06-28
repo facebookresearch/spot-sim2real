@@ -3,12 +3,11 @@ import time
 from collections import defaultdict
 
 import numpy as np
-from spot_wrapper.spot import Spot, wrap_heading
-from spot_wrapper.utils import say
-
 from spot_rl.envs.nav_env import SpotNavEnv
 from spot_rl.real_policy import NavPolicy
 from spot_rl.utils.utils import construct_config
+from spot_wrapper.spot import Spot, wrap_heading
+from spot_wrapper.utils import say
 
 ROUTES = [
     ((6.0, 2.0, 0.0), (6.0, -1.0, 0.0)),

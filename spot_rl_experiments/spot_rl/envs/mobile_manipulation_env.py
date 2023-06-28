@@ -1,12 +1,11 @@
+# mypy: ignore-errors
 import os
 import time
 from collections import Counter
 
 import magnum as mn
 import numpy as np
-from spot_wrapper.spot import Spot
 import rospy
-
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.envs.gaze_env import SpotGazeEnv
 from spot_rl.real_policy import GazePolicy, MixerPolicy, NavPolicy, PlacePolicy
@@ -21,6 +20,7 @@ from spot_rl.utils.utils import (
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
+from spot_wrapper.spot import Spot
 
 CLUTTER_AMOUNTS = Counter()
 CLUTTER_AMOUNTS.update(get_clutter_amounts())
@@ -52,14 +52,14 @@ def main(spot, use_mixer, config, out_path=None):
     env = env_class(config, spot)
 
     # Reset the viz params
-    rospy.set_param('/viz_pick', 'None')
-    rospy.set_param('/viz_object', 'None')
-    rospy.set_param('/viz_place', 'None')
+    rospy.set_param("/viz_pick", "None")
+    rospy.set_param("/viz_object", "None")
+    rospy.set_param("/viz_place", "None")
 
     objects_to_look = []
-    for waypoint in WAYPOINTS['object_targets']:
-        objects_to_look.append(WAYPOINTS['object_targets'][waypoint][0])
-    rospy.set_param("object_target", ','.join(objects_to_look))
+    for waypoint in WAYPOINTS["object_targets"]:
+        objects_to_look.append(WAYPOINTS["object_targets"][waypoint][0])
+    rospy.set_param("object_target", ",".join(objects_to_look))
 
     env.power_robot()
     time.sleep(1)
@@ -77,8 +77,8 @@ def main(spot, use_mixer, config, out_path=None):
             )
             count[waypoint_name] += 1
             env.say("Going to " + waypoint_name + " to search for objects")
-            rospy.set_param('viz_pick', waypoint_name)
-            rospy.set_param("viz_object", ','.join(objects_to_look))
+            rospy.set_param("viz_pick", waypoint_name)
+            rospy.set_param("viz_object", ",".join(objects_to_look))
             rospy.set_param("viz_place", "None")
         else:
             env.say("Finished object rearrangement. Heading to dock.")
@@ -152,7 +152,7 @@ def main(spot, use_mixer, config, out_path=None):
     while time.time() - dock_start_time < 2:
         try:
             spot.dock(dock_id=DOCK_ID, home_robot=True)
-        except:
+        except Exception:
             print("Dock not found... trying again")
             time.sleep(0.1)
 
@@ -293,8 +293,8 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
             # Determine where to go based on what object we've just grasped
             waypoint_name, waypoint = object_id_to_nav_waypoint(self.target_obj_name)
             self.say("Navigating to " + waypoint_name)
-            rospy.set_param('viz_object', self.target_obj_name)
-            rospy.set_param('viz_place', waypoint_name)
+            rospy.set_param("viz_object", self.target_obj_name)
+            rospy.set_param("viz_place", waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)
             self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
             self.navigating_to_place = True
@@ -362,11 +362,9 @@ class SpotMobileManipulationSeqEnv(SpotMobileManipulationBaseEnv):
             time.sleep(0.75)
             done = True
 
-
         if not pre_step_navigating_to_place and self.navigating_to_place:
             # This means that the Gaze task has just ended
             self.current_task = Tasks.NAV
-
 
         info["correct_skill"] = self.current_task
 

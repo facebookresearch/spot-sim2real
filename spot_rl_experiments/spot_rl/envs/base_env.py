@@ -1,10 +1,10 @@
+# mypy: ignore-errors
 import os
 import os.path as osp
 import time
 
 import cv2
 import gym
-
 from spot_rl.utils.img_publishers import MAX_HAND_DEPTH
 from spot_rl.utils.mask_rcnn_utils import (
     generate_mrcnn_detections,
@@ -17,7 +17,7 @@ from spot_rl.utils.stopwatch import Stopwatch
 
 try:
     import magnum as mn
-except:
+except Exception:
     pass
 
 import numpy as np
@@ -26,16 +26,16 @@ import rospy
 
 try:
     from deblur_gan.predictor import DeblurGANv2
+
     from mask_rcnn_detectron2.inference import MaskRcnnInference
-except:
+except Exception:
     pass
 
 from sensor_msgs.msg import Image
-from spot_wrapper.spot import Spot, wrap_heading
-from std_msgs.msg import Float32, String
-
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
+from spot_wrapper.spot import Spot, wrap_heading
+from std_msgs.msg import Float32, String
 
 MAX_CMD_DURATION = 5
 GRASP_VIS_DIR = osp.join(
@@ -137,7 +137,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if config.PARALLEL_INFERENCE_MODE:
             if config.USE_MRCNN:
                 rospy.Subscriber(rt.DETECTIONS_TOPIC, String, self.detections_cb)
-                rospy.loginfo(f"[{self.node_name}]: Parallel inference selected: Waiting for Mask R-CNN msgs...")
+                rospy.loginfo(
+                    f"[{self.node_name}]: Parallel inference selected: Waiting for Mask R-CNN msgs..."
+                )
                 st = time.time()
                 while (
                     len(self.detections_buffer["detections"]) == 0
@@ -215,7 +217,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         observations = self.get_observations()
         return observations
 
-    def step(
+    def step(  # noqa
         self,
         base_action=None,
         arm_action=None,
@@ -319,7 +321,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if not (grasp or place):
             if self.slowdown_base > -1 and base_action is not None:
                 # self.ctrl_hz = self.slowdown_base
-                base_action = np.array(base_action) * self.slowdown_base # / self.ctrl_hz
+                base_action = (
+                    np.array(base_action) * self.slowdown_base
+                )  # / self.ctrl_hz
             if base_action is not None and arm_action is not None:
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
@@ -522,11 +526,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             )
             detections_str = pred2string(pred)
 
-        print('DETECTIONS STR')
+        print("DETECTIONS STR")
         print(detections_str)
         # 0,0.9983996748924255,80.09086608886719,228.12628173828125,171.05816650390625,312.3734130859375 mrcnn
         # 303,243,397,332 owlvit
-
 
         # If we haven't seen the current target object in a while, look for new ones
         if self.curr_forget_steps >= self.forget_target_object_steps:
@@ -535,7 +538,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if detections_str != "None":
             detected_classes = []
             for i in detections_str.split(";"):
-                label = i.split(',')[0]
+                label = i.split(",")[0]
 
                 # Maskrnn return ids but other object detectors return already the string class
                 if label.isdigit():
@@ -555,7 +558,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     else:
                         label = class_detected
                     dist = get_obj_dist_and_bbox(self.get_det_bbox(det), arm_depth)[0]
-                    
+
                     if score > 0.001 and dist < MAX_HAND_DEPTH:
                         good_detections.append(label)
                         if score > most_confident_score:
@@ -563,7 +566,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                             most_confident_name = label
                 if most_confident_score == 0.0:
                     return None
-                
+
                 if most_confident_name in self.last_seen_objs:
                     self.target_obj_name = most_confident_name
                     if self.target_obj_name != self.last_target_obj:
@@ -589,7 +592,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         if not matching_detections:
             return None
-        
 
         self.curr_forget_steps = 0
 
@@ -655,7 +657,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Stack Overflow question ID #5254838
         dx = np.max([x1 - cx, 0, cx - x2])
         dy = np.max([y1 - cy, 0, cy - y2])
-        bbox_dist = np.sqrt(dx ** 2 + dy ** 2)
+        bbox_dist = np.sqrt(dx**2 + dy**2)
         locked_on = bbox_dist < pixel_radius
 
         return locked_on
@@ -804,7 +806,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # self.say("Standing up")
         try:
             self.spot.undock()
-        except:
+        except Exception:
             print("Undocking failed: just standing up instead...")
             self.spot.blocking_stand()
 

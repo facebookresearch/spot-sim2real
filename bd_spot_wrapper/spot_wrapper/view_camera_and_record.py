@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import argparse
 import time
 from collections import deque
@@ -20,6 +21,7 @@ DETECT_LARGEST_WHITE_OBJECT = False
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
 FPS = 30
 
+
 def main(spot: Spot):
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--no-display", action="store_true")
@@ -28,15 +30,14 @@ def main(spot: Spot):
     window_name = "Spot Camera Viewer"
     time_buffer = deque(maxlen=10)
     sources = [
-        #SpotCamIds.FRONTRIGHT_DEPTH,
-        #SpotCamIds.FRONTLEFT_DEPTH,
-        #SpotCamIds.HAND_DEPTH,
+        # SpotCamIds.FRONTRIGHT_DEPTH,
+        # SpotCamIds.FRONTLEFT_DEPTH,
+        # SpotCamIds.HAND_DEPTH,
         SpotCamIds.HAND_COLOR,
     ]
     try:
         all_imgs = []
         k = 0
-        video_index = 0
         while True:
             start_time = time.time()
 
@@ -49,14 +50,14 @@ def main(spot: Spot):
                     max_depth = MAX_HAND_DEPTH if "hand" in source else MAX_HEAD_DEPTH
                     img = scale_depth_img(img, max_depth=max_depth, as_img=True)
                 elif source is SpotCamIds.HAND_COLOR:
-                    #img = draw_crosshair(img)
+                    # img = draw_crosshair(img)
                     if DETECT_LARGEST_WHITE_OBJECT:
                         x, y, w, h = color_bbox(img, just_get_bbox=True)
                         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
                 imgs.append(img)
                 all_imgs.append(img)
-                w,h = img.shape[:2]
+                w, h = img.shape[:2]
 
             # Make sure all imgs are same height
             img = resize_to_tallest(imgs, hstack=True)
@@ -66,9 +67,9 @@ def main(spot: Spot):
                 cv2.waitKey(1)
 
             if k % 10 == 0:
-                cv2.imwrite(f'videos_april/img_{k}.jpg', img)
+                cv2.imwrite(f"videos_april/img_{k}.jpg", img)
 
-            #if k % 50 == 0 and k > 0:
+            # if k % 50 == 0 and k > 0:
             #    new_video = cv2.VideoWriter(
             #        f'videos_april/video_{video_index}.mp4',
             #        -1,

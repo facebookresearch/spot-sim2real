@@ -3,9 +3,8 @@ import os.path as osp
 
 import numpy as np
 import ruamel.yaml
-from spot_wrapper.spot import Spot
-
 from spot_rl.utils.generate_place_goal import get_global_place_target
+from spot_wrapper.spot import Spot
 
 spot_rl_dir = osp.abspath(__file__)
 for _ in range(3):
@@ -43,7 +42,7 @@ def main(spot: Spot):
     # Erase existing waypoint data if present
     if args.waypoint_name in yaml_dict:
         print(f"Following existing info for {args.waypoint_name} will be overwritten:")
-        print(f"\twaypoint:", yaml_dict[args.waypoint_name])
+        print("\twaypoint:", yaml_dict[args.waypoint_name])
         if args.waypoint_name in yaml_dict["place_targets"]:
             print(
                 f"\tplace_targets[{args.waypoint_name}]:",
@@ -72,7 +71,7 @@ def main(spot: Spot):
         yaml.dump(yaml_dict, f)
 
     print(f"Successfully saved waypoint {args.waypoint_name}:")
-    print(f"\twaypoint:", yaml_dict[args.waypoint_name])
+    print("\twaypoint:", yaml_dict[args.waypoint_name])
     if args.clutter:
         print("\tMarked as clutter.")
     elif args.place_target:
