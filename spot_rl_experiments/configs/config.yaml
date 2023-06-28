@@ -65,3 +65,6 @@ USE_DEBLURGAN: True
 IMAGE_SCALE: 0.7
 # After this many time steps of not seeing the current target object, we become open to looking for new ones
 FORGET_TARGET_OBJECT_STEPS: 15
+
+# Docking (currently only used by ASC, Seq Exp and Language env)
+RETURN_TO_BASE: True
