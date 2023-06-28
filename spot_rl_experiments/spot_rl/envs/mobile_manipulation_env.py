@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 import os
 import time
 from collections import Counter
@@ -22,7 +21,7 @@ from spot_rl.utils.utils import (
 )
 from spot_wrapper.spot import Spot
 
-CLUTTER_AMOUNTS = Counter()
+CLUTTER_AMOUNTS = Counter()  # type: Counter
 CLUTTER_AMOUNTS.update(get_clutter_amounts())
 NUM_OBJECTS = np.sum(list(CLUTTER_AMOUNTS.values()))
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
@@ -56,6 +55,9 @@ def main(spot, use_mixer, config, out_path=None):
     rospy.set_param("/viz_object", "None")
     rospy.set_param("/viz_place", "None")
 
+    # Check if robot should return to base
+    return_to_base = config.RETURN_TO_BASE
+
     objects_to_look = []
     for waypoint in WAYPOINTS["object_targets"]:
         objects_to_look.append(WAYPOINTS["object_targets"][waypoint][0])
@@ -81,8 +83,14 @@ def main(spot, use_mixer, config, out_path=None):
             rospy.set_param("viz_object", ",".join(objects_to_look))
             rospy.set_param("viz_place", "None")
         else:
-            env.say("Finished object rearrangement. Heading to dock.")
-            waypoint = nav_target_from_waypoints("dock")
+            env.say(
+                f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}."
+            )
+            if return_to_base:
+                waypoint = nav_target_from_waypoints("dock")
+            else:
+                waypoint = None
+                break
         observations = env.reset(waypoint=waypoint)
         policy.reset()
         done = False
@@ -115,8 +123,9 @@ def main(spot, use_mixer, config, out_path=None):
             if not use_mixer:
                 expert = info["correct_skill"]
 
+            # Check if the robot has arrived back at the dock
             if trip_idx >= NUM_OBJECTS and env.get_nav_success(
-                observations, 0.3, np.deg2rad(10)
+                observations, config.SUCCESS_DISTANCE, np.deg2rad(10)
             ):
                 # The robot has arrived back at the dock
                 break
@@ -147,14 +156,21 @@ def main(spot, use_mixer, config, out_path=None):
         with open(out_path, "w") as f:
             f.write(data)
 
-    env.say("Executing automatic docking")
-    dock_start_time = time.time()
-    while time.time() - dock_start_time < 2:
-        try:
-            spot.dock(dock_id=DOCK_ID, home_robot=True)
-        except Exception:
-            print("Dock not found... trying again")
-            time.sleep(0.1)
+    if return_to_base:
+        env.say("Executing automatic docking")
+        dock_start_time = time.time()
+        while time.time() - dock_start_time < 2:
+            try:
+                spot.dock(dock_id=DOCK_ID, home_robot=True)
+            except Exception:
+                print("Dock not found... trying again")
+                time.sleep(0.1)
+    else:
+        env.say("Since RETURN_TO_BASE was set to false in config.yaml, will sit down.")
+        time.sleep(2)
+        spot.sit()
+
+    print("Done!")
 
 
 class Tasks:
