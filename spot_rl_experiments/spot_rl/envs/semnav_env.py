@@ -1,5 +1,6 @@
 import os
 import time
+from cv2 import cv2
 
 import numpy as np
 from spot_wrapper.spot import Spot
@@ -25,26 +26,38 @@ def main(spot):
     config = construct_config(args.opts)
 
     # Don't need gripper camera for Nav
-    config.USE_MRCNN = False
+    # config.USE_MRCNN = False
 
-    policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
-    policy.reset()
+    # policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
+    # policy.reset()
 
-    env = SpotNavEnv(config, spot)
+    env = SpotSemanticNavEnv(config, spot)
     env.power_robot()
-    if args.waypoint is not None:
-        goal_x, goal_y, goal_heading = nav_target_from_waypoints(args.waypoint)
-        env.say(f"Navigating to {args.waypoint}")
-    else:
-        assert args.goal is not None
-        goal_x, goal_y, goal_heading = [float(i) for i in args.goal.split(",")]
-    observations = env.reset((goal_x, goal_y), goal_heading)
+    # if args.waypoint is not None:
+        # goal_x, goal_y, goal_heading = nav_target_from_waypoints(args.waypoint)
+        # env.say(f"Navigating to {args.waypoint}")
+    # else:
+        # assert args.goal is not None
+        # goal_x, goal_y, goal_heading = [float(i) for i in args.goal.split(",")]
+    observations = env.reset()
     done = False
     time.sleep(1)
+    action = [0,0]
     try:
         while not done:
-            action = policy.act(observations)
+            # action = policy.act(observations)
+            # lin_dist, ang_dist = base_action
+            # this is from [-1,1] which scales based on MAX_LIN_DIST and MAX_ANG_DIST in the config
+            # it computes speed assuming based on this distance and a control frequence of config.CTRL_HZ (default 2hz)
             observations, _, done, _ = env.step(base_action=action)
+            for k,v in observations.items():
+                print(k,v.__class__)
+            if cv2.waitKey(0) == ord('w'):
+                action = [1,0]
+            if cv2.waitKey(0) == ord('s'):
+                action = [-1,0]
+            else:
+                action = [0,0]
         if args.dock:
             env.say("Executing automatic docking")
             dock_start_time = time.time()
@@ -58,7 +71,7 @@ def main(spot):
         spot.power_off()
 
 
-class SpotNavEnv(SpotBaseEnv):
+class SpotSemanticNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
         super().__init__(config, spot)
         self.goal_xy = None
@@ -66,18 +79,12 @@ class SpotNavEnv(SpotBaseEnv):
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
 
-    def reset(self, goal_xy, goal_heading):
-        self.goal_xy = np.array(goal_xy, dtype=np.float32)
-        self.goal_heading = goal_heading
+    def reset(self):
         observations = super().reset()
-        assert len(self.goal_xy) == 2
         return observations
 
     def get_success(self, observations):
-        succ = self.get_nav_success(observations, self.succ_distance, self.succ_angle)
-        if succ:
-            self.spot.set_base_velocity(0.0, 0.0, 0.0, 1 / self.ctrl_hz)
-        return succ
+        return False
 
     def get_observations(self):
         observations = self.get_nav_observation(self.goal_xy, self.goal_heading)
