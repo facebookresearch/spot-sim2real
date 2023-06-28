@@ -150,6 +150,6 @@ if __name__ == "__main__":
     parser = get_default_parser()
     parser.add_argument("--target-object", "-t")
     args = parser.parse_args()
-    config = construct_config(args.opts)
+    config = construct_config(opts=args.opts)
     with spot.get_lease(hijack=True):
         run_env(spot, config, target_obj_id=args.target_object)

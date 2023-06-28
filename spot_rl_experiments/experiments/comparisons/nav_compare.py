@@ -22,7 +22,7 @@ ROUTES = [
 
 
 def main(spot, idx):
-    config = construct_config([])
+    config = construct_config(opts=[])
     policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
 
     env = SpotNavEnv(config, spot)

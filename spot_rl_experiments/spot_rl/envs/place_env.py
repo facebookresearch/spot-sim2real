@@ -21,7 +21,7 @@ def main(spot):
     parser.add_argument("-w", "--waypoint")
     parser.add_argument("-l", "--target_is_local", action="store_true")
     args = parser.parse_args()
-    config = construct_config(args.opts)
+    config = construct_config(opts=args.opts)
 
     # Don't need cameras for Place
     config.USE_HEAD_CAMERA = False

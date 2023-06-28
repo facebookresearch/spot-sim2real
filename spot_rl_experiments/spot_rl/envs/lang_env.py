@@ -24,7 +24,7 @@ from spot_rl.utils.utils import (
     get_clutter_amounts,
     get_default_parser,
     get_waypoint_yaml,
-    nav_target_from_waypoints,
+    nav_target_from_waypoint,
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
@@ -65,7 +65,7 @@ def main(spot, use_mixer, config, out_path=None):
     return_to_base = config.RETURN_TO_BASE
 
     # Get the waypoints from waypoints.yaml
-    waypoints = get_waypoint_yaml()
+    waypoints_yaml_dict = get_waypoint_yaml()
 
     audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
@@ -89,10 +89,10 @@ def main(spot, use_mixer, config, out_path=None):
 
     # Find closest nav_targets to the ones robot knows locations of
     nav_1 = sentence_similarity.get_most_similar_in_list(
-        nav_1, list(waypoints["nav_targets"].keys())
+        nav_1, list(waypoints_yaml_dict["nav_targets"].keys())
     )
     nav_2 = sentence_similarity.get_most_similar_in_list(
-        nav_2, list(waypoints["nav_targets"].keys())
+        nav_2, list(waypoints_yaml_dict["nav_targets"].keys())
     )
     print("MOST SIMILAR: ", nav_1, pick, nav_2)
 
@@ -108,7 +108,7 @@ def main(spot, use_mixer, config, out_path=None):
     time.sleep(1)
     out_data = []
 
-    waypoint = nav_target_from_waypoints(nav_1)
+    waypoint = nav_target_from_waypoint(nav_1, waypoints_yaml=waypoints_yaml_dict)
     observations = env.reset(waypoint=waypoint)
 
     policy.reset()
@@ -145,7 +145,7 @@ def main(spot, use_mixer, config, out_path=None):
     # Go to the dock
     env.say(f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}.")
     if return_to_base:
-        waypoint = nav_target_from_waypoints("dock")
+        waypoint = nav_target_from_waypoint("dock", waypoints_yaml=waypoints_yaml_dict)
         observations = env.reset(waypoint=waypoint)
         expert = Tasks.NAV
 
@@ -318,7 +318,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
         if self.grasp_attempted and not self.navigating_to_place:
             # Determine where to go based on what object we've just grasped
             waypoint_name = rospy.get_param("/viz_place")
-            waypoint = nav_target_from_waypoints(waypoint_name)
+            waypoint = nav_target_from_waypoint(waypoint_name, get_waypoint_yaml())
 
             self.say("Navigating to " + waypoint_name)
             self.place_target = place_target_from_waypoints(waypoint_name)
@@ -406,7 +406,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--use-mixer", action="store_true")
     parser.add_argument("--output")
     args = parser.parse_args()
-    config = construct_config(args.opts)
+    config = construct_config(opts=args.opts)
     spot = (RemoteSpot if config.USE_REMOTE_SPOT else Spot)("RealSeqEnv")
     if config.USE_REMOTE_SPOT:
         try:
