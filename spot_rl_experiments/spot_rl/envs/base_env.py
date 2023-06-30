@@ -440,6 +440,29 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations
 
+    def get_sem_exp_observation(self, goal_xy, goal_heading):
+        # Get the navigation observation
+        observations = self.get_nav_observation(goal_xy, goal_heading)
+
+        # Additional observation for the semantic map
+        # Get visual observations
+        # hand_depth's size (480, 640), in meter
+        hand_depth = (
+            np.float32(self.msg_to_cv2(self.filtered_hand_depth, "mono8"))
+            / 255.0
+            * MAX_HAND_DEPTH
+        )
+        observations["spot_hand_depth"] = hand_depth
+        # hand_rgb's size (480, 640, 3)
+        hand_rgb = self.msg_to_cv2(self.filtered_hand_rgb, "mono8")
+        observations["spot_hand_rgb"] = hand_rgb
+
+        observations["x"] = self.x
+        observations["y"] = self.y
+        observations["yaw"] = self.yaw
+
+        return observations
+
     def get_arm_joints(self):
         # Get proprioception inputs
         joints = np.array(
