@@ -8,10 +8,10 @@ import envs.utils.pose as pu
 import numpy as np
 import skimage.morphology
 from agents.utils.detic_semantic_prediction import SemanticPredDetic
+from agents.utils.fmm_planner import FMMPlanner
 from agents.utils.owlvit_semantic_prediction import SemanticPredOwlvit
 from agents.utils.semantic_prediction import SemanticPredMaskRCNN
 from constants import color_palette
-from envs.utils.fmm_planner import FMMPlanner
 from PIL import Image
 from torchvision import transforms
 
@@ -22,37 +22,34 @@ class Sem_Exp_Env_Agent:
 
     """
 
-    def __init__(self, args, rank, config, dataset):
-        self.args = args
-        config_env = config
-        super().__init__(args, rank, config_env, dataset)
+    def __init__(self, config, rank=1):
+        self.config = config
         # initialize transform for RGB observations
         self.res = transforms.Compose(
             [
                 transforms.ToPILImage(),
                 transforms.Resize(
-                    (args.frame_height, args.frame_width), interpolation=Image.NEAREST
+                    (self.config.FRAME_HEIGHT, self.config.FRAME_WIDTH),
+                    interpolation=Image.NEAREST,
                 ),
             ]
         )
 
-        # initialize semantic segmentation prediction model
-        if args.sem_gpu_id == -1:
-            args.sem_gpu_id = config_env.simulator.habitat_sim_v0.gpu_device_id
-
-        if args.detection_model == "detectron2":
-            self.sem_pred = SemanticPredMaskRCNN(args)
-        elif args.detection_model == "detic":
-            self.sem_pred = SemanticPredDetic(args)
-        elif args.detection_model == "owlvit":
-            self.sem_pred = SemanticPredOwlvit(args)
+        if self.config.DETECTION_MODEL == "detectron2":
+            raise NotImplementedError
+            # self.sem_pred = SemanticPredMaskRCNN(self.config)
+        elif self.config.DETECTION_MODEL == "detic":
+            raise NotImplementedError
+            # self.sem_pred = SemanticPredDetic(self.config)
+        elif self.config.DETECTION_MODEL == "owlvit":
+            self.sem_pred = SemanticPredOwlvit(self.config)
         else:
-            print("The detection model selected is not implemented")
             raise NotImplementedError
 
         # initializations for planning:
-        self.selem = skimage.morphology.disk(self.args.obs_dilation_selem_radius)
+        self.selem = skimage.morphology.disk(self.config.OBS_DILATION_SELEM_RADIUS)
         self.obs = None
+        self.info = None
         self.obs_shape = None
         self.collision_map = None
         self.visited = None
@@ -63,33 +60,31 @@ class Sem_Exp_Env_Agent:
         self.last_action = None
         self.count_forward_actions = None
 
-        if self.args.planner == "frontier":
-            self.start_obs_dilation_selem_radius = self.args.obs_dilation_selem_radius
-            self.goal_dilation_selem_radius = self.args.goal_dilation_selem_radius
-            self.min_obs_dilation_selem_radius = self.args.min_obs_dilation_selem_radius
-            self.agent_cell_radius = self.args.agent_cell_radius
-            self.goal_tolerance = self.args.goal_tolerance
-            self.continuous_angle_tolerance = self.args.continuous_angle_tolerance
+        if self.config.PLANNER == "frontier":
+            self.start_obs_dilation_selem_radius = self.config.OBS_DILATION_SELEM_RADIUS
+            self.goal_dilation_selem_radius = self.config.GOAL_DILATION_SELEM_RADIUS
+            self.min_obs_dilation_selem_radius = (
+                self.config.MIN_OBS_DILATION_SELEM_RADIUS
+            )
+            self.agent_cell_radius = self.config.AGENT_CELL_RADIUS
+            self.goal_tolerance = self.config.GOAL_TOLERANCE
+            self.continuous_angle_tolerance = self.config.CONTINUOUS_ANGLE_TOLERANCE
             self.curr_obs_dilation_selem_radius = None
             self.obs_dilation_selem = None
 
-        if args.visualize or args.print_images:
+        if self.config.VISUALIZE:
             self.legend = cv2.imread("docs/legend.png")
             self.vis_image = None
             self.rgb_vis = None
 
-    def reset(self, *args, return_info, **kwargs):
-        args = self.args
-
-        obs, info = super().reset(return_info=return_info, **kwargs)
-        obs = self._preprocess_obs(obs)
-
-        self.obs_shape = obs.shape
+    def reset(self, obs_size):
+        self.info = None
+        self.obs_shape = obs_size
 
         # Episode initializations
         map_shape = (
-            args.map_size_cm // args.map_resolution,
-            args.map_size_cm // args.map_resolution,
+            self.config.MAP_SIZE_CM // self.config.MAP_RESOLUTION,
+            self.config.MAP_SIZE_CM // self.config.MAP_RESOLUTION,
         )
         self.collision_map = np.zeros(map_shape)
         self.visited = np.zeros(map_shape)
@@ -97,24 +92,22 @@ class Sem_Exp_Env_Agent:
         self.col_width = 1
         self.count_forward_actions = 0
         self.curr_loc = [
-            args.map_size_cm / 100.0 / 2.0,
-            args.map_size_cm / 100.0 / 2.0,
+            self.config.MAP_SIZE_CM / 100.0 / 2.0,
+            self.config.MAP_SIZE_CM / 100.0 / 2.0,
             0.0,
         ]
         self.last_action = None
 
-        if self.args.planner == "frontier":
+        if self.condfig.PLANNER == "frontier":
             self.curr_obs_dilation_selem_radius = self.start_obs_dilation_selem_radius
             self.obs_dilation_selem = skimage.morphology.disk(
                 self.curr_obs_dilation_selem_radius
             )
 
-        if args.visualize or args.print_images:
+        if self.condfig.VISUALIZE:
             self.vis_image = vu.init_vis_image(self.goal_name, self.legend)
 
-        return obs, info
-
-    def plan_act_and_preprocess(self, planner_inputs):
+    def plan_act_and_preprocess(self, planner_inputs, info):
         """Function responsible for planning, taking the action and
         preprocessing observations
 
@@ -135,39 +128,35 @@ class Sem_Exp_Env_Agent:
                          evaluation metric info
         """
 
+        self.info = info
         # plan
         if planner_inputs["wait"]:
             self.last_action = None
             self.info["sensor_pose"] = [0.0, 0.0, 0.0]
             return np.zeros(self.obs.shape), 0.0, False, self.info
 
-        # Reset reward if new long-term goal
-        if planner_inputs["new_goal"]:
-            self.info["g_reward"] = 0
-
         action = self._plan(planner_inputs)
 
-        if self.args.visualize or self.args.print_images:
+        if self.config.VISUALIZE:
             self._visualize(planner_inputs)
 
         if action >= 0:
             # act
             action = {"action": action}
-            obs, rew, done, info = super().step(action)
-
+            obs = self.info["state"]
             # preprocess obs
             obs = self._preprocess_obs(obs)
             self.last_action = action["action"]
             self.obs = obs
             self.info = info
+            self.info["action"] = action
 
-            info["g_reward"] += rew
-
-            return obs, rew, done, info
+            return obs, 0.0, False, info
 
         else:
             self.last_action = None
             self.info["sensor_pose"] = [0.0, 0.0, 0.0]
+            self.info["action"] = -1
             return np.zeros(self.obs_shape), 0.0, False, self.info
 
     def _reach_goal_if_in_map(self, goal_map, found_goal):
@@ -215,14 +204,13 @@ class Sem_Exp_Env_Agent:
         Returns:
             action (int): action id
         """
-        args = self.args
 
         self.last_loc = self.curr_loc
 
         # Get Map prediction (obstacle)
         map_pred = np.rint(planner_inputs["map_pred"])
 
-        if self.args.planner == "frontier":
+        if self.config.PlANNER == "frontier":
             goal = self._reach_goal_if_in_map(
                 planner_inputs["goal"], planner_inputs["found_goal"]
             )
@@ -241,8 +229,8 @@ class Sem_Exp_Env_Agent:
         self.curr_loc = [start_x, start_y, start_o]
         r, c = start_y, start_x
         start = [
-            int(r * 100.0 / args.map_resolution - gx1),
-            int(c * 100.0 / args.map_resolution - gy1),
+            int(r * 100.0 / self.config.MAP_RESOLUTION - gx1),
+            int(c * 100.0 / self.config.MAP_RESOLUTION - gy1),
         ]
         start = pu.threshold_poses(start, map_pred.shape)
 
@@ -250,13 +238,13 @@ class Sem_Exp_Env_Agent:
             start[0] - 0 : start[0] + 1, start[1] - 0 : start[1] + 1
         ] = 1
 
-        if args.visualize or args.print_images:
+        if self.config.VISUALIZE:
             # Get last loc
             last_start_x, last_start_y = self.last_loc[0], self.last_loc[1]
             r, c = last_start_y, last_start_x
             last_start = [
-                int(r * 100.0 / args.map_resolution - gx1),
-                int(c * 100.0 / args.map_resolution - gy1),
+                int(r * 100.0 / self.config.MAP_RESOLUTION - gx1),
+                int(c * 100.0 / self.config.MAP_RESOLUTION - gy1),
             ]
             last_start = pu.threshold_poses(last_start, map_pred.shape)
             self.visited_vis[gx1:gx2, gy1:gy2] = vu.draw_line(
@@ -280,7 +268,7 @@ class Sem_Exp_Env_Agent:
                 self.col_width = 1
 
             dist = pu.get_l2_distance(x1, x2, y1, y2)
-            if dist < args.collision_threshold:  # Collision
+            if dist < self.config.COLLISION_THRESHOLD:  # Collision
                 width = self.col_width
                 for i in range(length):
                     for j in range(width):
@@ -293,8 +281,8 @@ class Sem_Exp_Env_Agent:
                             - (j - width // 2) * np.cos(np.deg2rad(t1))
                         )
                         r, c = wy, wx
-                        r, c = int(r * 100 / args.map_resolution), int(
-                            c * 100 / args.map_resolution
+                        r, c = int(r * 100 / self.config.MAP_RESOLUTION), int(
+                            c * 100 / self.config.MAP_RESOLUTION
                         )
                         [r, c] = pu.threshold_poses([r, c], self.collision_map.shape)
                         self.collision_map[r, c] = 1
@@ -304,7 +292,7 @@ class Sem_Exp_Env_Agent:
         )
 
         # We were not able to find a path to the high-level goal
-        if replan and self.args.planner == "frontier":
+        if replan and self.config.PLANNER == "frontier":
             # Clean collision map
             self.collision_map *= 0
 
@@ -330,10 +318,10 @@ class Sem_Exp_Env_Agent:
             if relative_angle > 180:
                 relative_angle -= 360
 
-            if relative_angle > self.args.turn_angle / 2.0:
+            if relative_angle > self.config.TURN_ANGLE / 2.0:
                 # Right
                 action = 3
-            elif relative_angle < -self.args.turn_angle / 2.0:
+            elif relative_angle < -self.config.TURN_ANGLE / 2.0:
                 # Left
                 action = 2
             else:
@@ -359,7 +347,7 @@ class Sem_Exp_Env_Agent:
             new_mat[1 : h + 1, 1 : w + 1] = mat
             return new_mat
 
-        if self.args.planner == "frontier":
+        if self.config.PLANNER == "frontier":
             obstacles = grid[x1:x2, y1:y2]
             # Dilate obstacles
             dilated_obstacles = cv2.dilate(
@@ -384,7 +372,7 @@ class Sem_Exp_Env_Agent:
 
         planner = FMMPlanner(traversible)
         # Set the goal size
-        selem = skimage.morphology.disk(self.args.goal_dilation_selem_radius)
+        selem = skimage.morphology.disk(self.config.GOAL_DILATION_SELEM_RADIUS)
         goal = skimage.morphology.binary_dilation(goal, selem) != True  # noqa
         goal = 1 - goal * 1.0
         planner.set_multi_goal(goal)
@@ -394,12 +382,12 @@ class Sem_Exp_Env_Agent:
         dist_vis[:, :c] = np.flipud(traversible)
         dist_vis[:, c : 2 * c] = np.flipud(goal)
         dist_vis[:, 2 * c :] = np.flipud(planner.fmm_dist / planner.fmm_dist.max())
-        os.makedirs(self.args.planner + "/planner_type/") if not os.path.exists(
-            self.args.planner + "/planner_type/"
+        os.makedirs(self.config.PLANNER + "/planner_type/") if not os.path.exists(
+            self.config.PLANNER + "/planner_type/"
         ) else None
         dist_vis = cv2.cvtColor((255.0 * dist_vis).astype(np.uint8), cv2.COLOR_GRAY2BGR)
         cv2.imwrite(
-            self.args.planner + "/planner_type/" + str(self.timestep) + ".png",
+            self.config.PLANNER + "/planner_type/" + str(self.timestep) + ".png",
             dist_vis.astype(np.uint8),
         )
         cv2.waitKey(1)
@@ -413,22 +401,18 @@ class Sem_Exp_Env_Agent:
         return (stg_x, stg_y), replan, stop
 
     def _preprocess_obs(self, obs, use_seg=True):
-        args = self.args
         obs = obs.transpose(1, 2, 0)
         rgb = obs[:, :, :3]
         depth = obs[:, :, 3:4]
 
-        if args.no_sem_seg:
-            sem_seg_pred = np.zeros((480, 640, 16))
-            self.rgb_vis = rgb[:, :, ::-1]
-        elif args.gt_sem_seg:
-            sem_seg_pred = self.sem_seg_gt  # generate_sem_seg_gt()
-            self.rgb_vis = rgb[:, :, ::-1]
-        else:
-            sem_seg_pred = self._get_sem_pred(rgb.astype(np.uint8), use_seg=use_seg)
-        depth = self._preprocess_depth(depth, args.min_depth, args.max_depth)
+        sem_seg_pred = self._get_sem_pred(rgb.astype(np.uint8), use_seg=use_seg)
+        depth = self._preprocess_depth(
+            depth, self.config.MIN_DEPTH, self.config.MAX_DEPTH
+        )
 
-        ds = args.env_frame_width // args.frame_width  # Downscaling factor
+        ds = (
+            self.config.ENV_FRAME_WIDTH // self.config.FRAME_WIDTH
+        )  # Downscaling factor
         if ds != 1:
             rgb = np.asarray(self.res(rgb.astype(np.uint8)))
             depth = depth[ds // 2 :: ds, ds // 2 :: ds]
@@ -462,8 +446,7 @@ class Sem_Exp_Env_Agent:
         return semantic_pred
 
     def _visualize(self, inputs):
-        args = self.args
-        dump_dir = "{}/dump/{}/".format(args.dump_location, args.exp_name)
+        dump_dir = "{}/dump/{}/".format(self.config.DUMP_LOCATION, self.config.EXP_NAME)
         ep_dir = "{}/episodes/thread_{}/eps_{}/".format(
             dump_dir, self.rank, self.episode_no
         )
@@ -481,7 +464,7 @@ class Sem_Exp_Env_Agent:
 
         sem_map += 5
 
-        no_cat_mask = sem_map == self.args.num_sem_categories + 4  # 20
+        no_cat_mask = sem_map == self.config.NUM_SEM_CATEGORIES + 4  # 20
         map_mask = np.rint(map_pred) == 1
         exp_mask = np.rint(exp_pred) == 1
         vis_mask = self.visited_vis[gx1:gx2, gy1:gy2] == 1
@@ -513,13 +496,16 @@ class Sem_Exp_Env_Agent:
             sem_map_vis, (480, 480), interpolation=cv2.INTER_NEAREST
         )
         self.vis_image[
-            50 : 50 + self.args.env_frame_height, 15 : 15 + self.args.env_frame_width
+            50 : 50 + self.config.ENV_FRAME_HEIGHT,
+            15 : 15 + self.config.ENV_FRAME_WIDTH,
         ] = self.rgb_vis
         self.vis_image[50:530, 670:1150] = sem_map_vis
 
         pos = (
-            (start_x * 100.0 / args.map_resolution - gy1) * 480 / map_pred.shape[0],
-            (map_pred.shape[1] - start_y * 100.0 / args.map_resolution + gx1)
+            (start_x * 100.0 / self.config.MAP_RESOLUTION - gy1)
+            * 480
+            / map_pred.shape[0],
+            (map_pred.shape[1] - start_y * 100.0 / self.config.MAP_RESOLUTION + gx1)
             * 480
             / map_pred.shape[1],
             np.deg2rad(-start_o),
@@ -533,7 +519,7 @@ class Sem_Exp_Env_Agent:
         )
         cv2.drawContours(self.vis_image, [agent_arrow], 0, color, -1)
 
-        if args.print_images:
+        if self.config.VISUALIZE:
             fn = "{}/episodes/thread_{}/eps_{}/{}-{}-Vis-{}.png".format(
                 dump_dir,
                 self.rank,

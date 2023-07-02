@@ -22,8 +22,8 @@ from transformers import OwlViTForObjectDetection, OwlViTProcessor  # noqa: E402
 
 
 class SemanticPredOwlvit:
-    def __init__(self, args):
-        self.args = args
+    def __init__(self, config):
+        self.config = config
         # Get the device
         self.device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -75,7 +75,7 @@ class SemanticPredOwlvit:
                 semantic_input[
                     top_left_x:bottom_right_x, top_left_y:bottom_right_y, int(label)
                 ] = 1
-            if self.args.visualize == 2 and score >= self.score_threshold:
+            if self.config.VISUALIZE is True and score >= self.score_threshold:
                 # Use this line code to add bounding box to the image
                 img = np.ascontiguousarray(img, dtype=np.uint8)
                 cv2.rectangle(
