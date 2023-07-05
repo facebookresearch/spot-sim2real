@@ -1,9 +1,10 @@
-# :robot: Repo: spot_sim2real
+# :robot: Spot-Sim2Real
 Spot-Sim2Real is a modular library for development of Spot for embodied AI tasks (e.g., [Language-guided Skill Coordination (LSC)](https://languageguidedskillcoordination.github.io/), [Adaptive Skill Coordination (ASC)](https://arxiv.org/pdf/2304.00410.pdf)) -- configuring Spot robots, controlling sensorimotor skills, and coordinating Large Language Models (LLMs).
 
-## Setup instructions - Please refer [here](/setup_instructions.txt) for information on how to setup the repo.
+## :memo: Setup instructions
+Please refer [here](/setup_instructions.txt) for information on how to setup the repo.
 
-## Connecting to the robot
+## :computer: Connecting to the robot
 Computer can be connected to the robot in one of the following modes
 1. Ethernet\
 This mode can be used to create a wired connection with the robot. Useful for teleoperating the robot via computer
@@ -78,7 +79,7 @@ git rev-parse --abbrev-ref HEAD
 git checkout main
 ```
 
-## Instructions to Record waypoints (use joystick to move robot around)
+## :video_game: Instructions to Record waypoints (use joystick to move robot around)
 - Before running scripts on the robot, waypoints should be recording. These waypoints exist inside file `spot-sim2real/spot_rl_experiments/configs/waypoints.yaml`
 
 - Before recording receptacles, make the robot sit at home position then run following command
@@ -101,7 +102,7 @@ git checkout main
     ```
 
 
-## Running Instructions
+## :rocket: Running Instructions
 ### Perform the following steps
 #### Step1. Run executable command **In a New Terminal**
 - Run the executable as
@@ -220,3 +221,7 @@ git checkout main
 
 
 - If you are done with demo of one of the above code and want to run another code, you do not need to re-run other sessions and nodes. Running a new command in the same terminal will work just fine. But **make sure to bring robot at home location and reset its home** using `spot_reset_home` in the same terminal
+
+## Acknowledgement
+We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is based on Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments
+](https://github.com/naokiyokoyama/spot_rl_experiments).
