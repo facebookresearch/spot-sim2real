@@ -1,4 +1,5 @@
-# Repo: spot_sim2real
+# :robot: Repo: spot_sim2real
+Spot-Sim2Real is a modular library for development of Spot for embodied AI tasks (e.g., [Language-guided Skill Coordination (LSC)](https://languageguidedskillcoordination.github.io/), [Adaptive Skill Coordination (ASC)](https://arxiv.org/pdf/2304.00410.pdf)) -- configuring Spot robots, controlling sensorimotor skills, and coordinating Large Language Models (LLMs).
 
 ## Setup instructions - Please refer [here](/installation/SETUP_INSTRUCTIONS.md) for information on how to setup the repo.
 
@@ -108,7 +109,7 @@ git checkout main
     spot_rl_launch_local
     ```
     This command starts 4 tmux sessions\n
-    
+
     1. roscore
     2. img_publishers
     3. proprioception
@@ -116,7 +117,7 @@ git checkout main
 
 - You can run `tmux ls` in the terminal to ensure that all 4 tmux sessions are running.
     You need to ensure that all 4 sessions remain active until 50-70 seconds after running the `spot_rl_launch_local`. If anyone of them dies before 70 seconds, it means there is some issue and you should rerun `spot_rl_launch_local`.
-    
+
 - You should try re-running `spot_rl_launch_local` atleast 2-3 times to see if the issue still persists. Many times roscore takes a while to start due to which other nodes die, re-running can fix this issue.
 
 - **Debugging strategies** for each session if any one of the 4 sessions is dying before 70 seconds
@@ -135,7 +136,7 @@ git checkout main
             $CONDA_PREFIX/bin/python -m spot_rl.utils.img_publishers --local
             ```
             Once you have fixed the issue, you need to kill all `img_publishers` nodes that are running, this can be done using `htop`
-    3. `proprioception` 
+    3. `proprioception`
         1. This node dies sometimes due to roscore taking quite a while to start up. Re-running `spot_rl_launch_local` should fix this in most cases.
         2. If it still does not get fixed, run this command on a new terminal
             ```bash
