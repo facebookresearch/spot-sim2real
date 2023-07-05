@@ -70,6 +70,14 @@ def main(spot):
     finally:
         spot.power_off()
 
+UPDATE_PERIOD = 0.2
+def cement_arm_joints(spot):
+    arm_proprioception = spot.get_arm_proprioception()
+    current_positions = np.array(
+        [v.position.value for v in arm_proprioception.values()]
+    )
+    spot.set_arm_joint_positions(positions=current_positions, travel_time=UPDATE_PERIOD)
+
 
 class SpotSemanticNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
@@ -82,6 +90,17 @@ class SpotSemanticNavEnv(SpotBaseEnv):
     def reset(self):
         observations = super().reset()
         return observations
+
+    def initialize_arm(self):
+        INITIAL_POINT = np.array([0.5, 0.0, 0.35])
+        INITIAL_RPY = np.deg2rad([0.0, 0.0, 0.0])
+        point = INITIAL_POINT
+        rpy = INITIAL_RPY
+        cmd_id = spot.move_gripper_to_point(point, rpy)
+        spot.block_until_arm_arrives(cmd_id, timeout_sec=1.5)
+        cement_arm_joints(spot)
+        return point, rpy
+
 
     def get_success(self, observations):
         return False
