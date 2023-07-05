@@ -63,7 +63,7 @@ echo $ROS_MASTER_URI
 # If output of this command does not match local ip from previous step, then update it in bashrc
 echo 'export ROS_MASTER_URI=http://<your_local_ip>:11311' >> ~/.bashrc
 ```
-## Getting to the repo
+## :desktop_computer: Getting to the repo
 Go to the repository
 ```bash
 cd $SPOT_REPO
