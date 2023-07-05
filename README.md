@@ -2,7 +2,7 @@
 Spot-Sim2Real is a modular library for development of Spot for embodied AI tasks (e.g., [Language-guided Skill Coordination (LSC)](https://languageguidedskillcoordination.github.io/), [Adaptive Skill Coordination (ASC)](https://arxiv.org/pdf/2304.00410.pdf)) -- configuring Spot robots, controlling sensorimotor skills, and coordinating Large Language Models (LLMs).
 
 ## :memo: Setup instructions
-Please refer [here](/setup_instructions.txt) for information on how to setup the repo.
+Please refer [here](/installation/SETUP_INSTRUCTIONS.md) for information on how to setup the repo.
 
 ## :computer: Connecting to the robot
 Computer can be connected to the robot in one of the following modes
