@@ -79,7 +79,7 @@ git rev-parse --abbrev-ref HEAD
 git checkout main
 ```
 
-## :video_game: Instructions to Record waypoints (use joystick to move robot around)
+## :video_game: Instructions to record waypoints (use joystick to move robot around)
 - Before running scripts on the robot, waypoints should be recording. These waypoints exist inside file `spot-sim2real/spot_rl_experiments/configs/waypoints.yaml`
 
 - Before recording receptacles, make the robot sit at home position then run following command
@@ -102,7 +102,7 @@ git checkout main
     ```
 
 
-## :rocket: Running Instructions
+## :rocket: Running instructions
 ### Perform the following steps
 #### Step1. Run executable command **In a New Terminal**
 - Run the executable as
@@ -184,7 +184,7 @@ git checkout main
     raw_head_depth: 4.11 raw_hand_depth: 4.12 hand_rgb: 4.10 filtered_head_depth: 4.15 filtered_hand_depth: 4.12 mask_rcnn_visualizations: 4.03
     ```
 
-### Step3. Reset Home **In a New Terminal**
+### Step3. Reset home **in a new terminal**
 - This is an important step. Ensure robot is at its start location and sitting, then run the following command in a new terminal
     ```bash
     spot_reset_home
@@ -192,7 +192,7 @@ git checkout main
 
 - The waypoints that were recorded are w.r.t the home location. Since the odometry drifts while robot is moving, **it is necessary to reset home before start of every new run**
 
-### Step4. Emergency Stop
+### Step4. Emergency stop
 - Since we do not have a physical emergency stop button (like the large red push buttons), we need to run an e-stop node.
     ```bash
     python -m spot_wrapper.estop
@@ -201,7 +201,7 @@ git checkout main
 - Keep this window open at all the times, if the robot starts misbehaving you should be able to quickly press `s` or `space_bar` to kill the robot
 
 
-### Step5. Main Demo code **In a New Terminal**
+### Step5. Main demo code **in a new terminal**
 - In a new window you can now run the code of your choice
 
     1. To run Sequencial experts
@@ -222,6 +222,6 @@ git checkout main
 
 - If you are done with demo of one of the above code and want to run another code, you do not need to re-run other sessions and nodes. Running a new command in the same terminal will work just fine. But **make sure to bring robot at home location and reset its home** using `spot_reset_home` in the same terminal
 
-## Acknowledgement
+## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is based on Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments
 ](https://github.com/naokiyokoyama/spot_rl_experiments).
