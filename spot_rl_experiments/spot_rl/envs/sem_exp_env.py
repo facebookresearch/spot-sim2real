@@ -6,12 +6,9 @@ import numpy as np
 import quaternion
 import skimage
 import skimage.morphology
-import spot_rl.utils.pose as pu
 import torch
 import torch.nn as nn
-from semantic_exploration.agents.sem_exp import Sem_Exp_Env_Agent
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_rl.models.semantic_map import Semantic_Mapping
 from spot_rl.real_policy import NavPolicy
 from spot_rl.utils.utils import (
     construct_config,
@@ -19,6 +16,11 @@ from spot_rl.utils.utils import (
     nav_target_from_waypoints,
 )
 from spot_wrapper.spot import Spot, wrap_heading
+
+import third_party.semantic_exploration.envs.utils.pose as pu
+from third_party.semantic_exploration.agents.sem_exp import Sem_Exp_Env_Agent
+from third_party.semantic_exploration.constants import coco_categories
+from third_party.semantic_exploration.models.semantic_map import Semantic_Mapping
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
@@ -49,6 +51,9 @@ def main(spot):
     # Reset the info to get the first observation
     observations = env.reset((goal_x, goal_y), goal_heading)
     # Once we have the first observation, we then can process the input
+    # Get the last location
+    env.last_sim_location = env.get_sim_location()
+    # Initilize the map
     env.map_init()
 
     done = False
@@ -62,11 +67,11 @@ def main(spot):
 
             # Direct control the robot
             # action: 1: forward; action 2: left; action: 3: right
-            if env.info["action"] == 1:
+            if env.obs_info["action"] == 1:
                 vel = [config.BASE_LIN_VEL, 0.0, 0.0]  # go forward
-            elif env.info["action"] == 2:
+            elif env.obs_info["action"] == 2:
                 vel = [0.0, 0.0, config.BASE_ANGULAR_VEL]  # turn left
-            elif env.info["action"] == 3:
+            elif env.obs_info["action"] == 3:
                 vel = [0.0, 0.0, -config.BASE_ANGULAR_VEL]  # turn right
             else:
                 vel = [0.0, 0.0, 0.0]
@@ -79,9 +84,12 @@ def main(spot):
             )
             # Update the observation without giving input
             observations, state, done = env.step()
-
             # Update the map here
             env.map_update()
+
+            # Vel is zero, the robot finishes exploration
+            if vel == [0.0, 0.0, 0.0]:
+                done = True
 
         if args.dock:
             env.say("Executing automatic docking")
@@ -108,7 +116,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         self.last_sim_location = None
         self.config = config
         self.num_scenes = 1
-        self.info = {}  # type: ignore
+        self.obs_info = {}  # type: ignore
         self.agent = Sem_Exp_Env_Agent(config=config)
         self.i_step = 0
         self.g_step = (
@@ -125,7 +133,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         # 3. Current Agent Location
         # 4. Past Agent Locations
         # 5,6,7,.. : Semantic Categories
-        nc = self.num_sem_categories + 1
+        nc = self.num_sem_categories + 4
 
         # Calculating full and local map sizes
         map_size = self.config.MAP_SIZE_CM // self.config.MAP_RESOLUTION
@@ -166,7 +174,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         self.full_pose[:, :2] = self.config.MAP_SIZE_CM / 100.0 / 2.0
 
         locs = self.full_pose.cpu().numpy()
-        self.planner_pose_inputs[:, :3] = self.locs
+        self.planner_pose_inputs[:, :3] = locs
         for e in range(self.num_scenes):
             r, c = locs[e, 1], locs[e, 0]
             loc_r, loc_c = [
@@ -214,15 +222,17 @@ class SpotSemExpEnv(SpotBaseEnv):
         poses = (
             torch.from_numpy(
                 np.asarray(
-                    [self.info["sensor_pose"] for env_idx in range(self.num_scenes)]
+                    [self.obs_info["sensor_pose"] for env_idx in range(self.num_scenes)]
                 )
             )
             .float()
             .to(self.config.DEVICE)
         )
-
+        # Make it to be a tensor
+        obs = torch.tensor(self.agent._preprocess_obs(self.obs_info["state"]))
+        obs = torch.unsqueeze(obs, 0)
         _, self.local_map, _, self.local_pose = self.sem_map_module(
-            self.agent._preprocess_obs(self.info["state"]),
+            obs,
             poses,
             self.local_map,
             self.local_pose,
@@ -247,7 +257,7 @@ class SpotSemExpEnv(SpotBaseEnv):
 
             # Set a disk around the agent to explore
             try:
-                radius = self.config.frontier_explore_radius
+                radius = self.config.FRONTIER_EXPLORE_RADIUS
                 explored_disk = skimage.morphology.disk(radius)
                 self.local_map[
                     e,
@@ -264,8 +274,9 @@ class SpotSemExpEnv(SpotBaseEnv):
         )
         self.global_input[:, 8:, :, :] = self.local_map[:, 4:, :, :].detach()
 
+        self.goal_cat_id = coco_categories[self.env.target.lower()]
         goal_cat_id = torch.from_numpy(
-            np.asarray([self.config.GOAL_CAT_ID for env_idx in range(self.num_scenes)])
+            np.asarray([self.goal_cat_id for env_idx in range(self.num_scenes)])
         )
 
         self.extras = torch.zeros(self.num_scenes, 2)
@@ -292,12 +303,12 @@ class SpotSemExpEnv(SpotBaseEnv):
                 )
 
         # Reset the agent
-        self.agent.reset(self.info["state"].shape)
+        self.agent.reset(self.obs_info["state"].shape, self.env.target)
         # We have to feed the info information in to the planner agent
         # Update the info and get the observation input for the map
-        # self.info now contains action info
-        self.obs_map_input, _, done, self.info = self.agent.plan_act_and_preprocess(
-            planner_inputs, self.info
+        # self.obs_info now contains action info
+        _, _, done, self.obs_info = self.agent.plan_act_and_preprocess(
+            planner_inputs[0], self.obs_info
         )
 
     def udpate_step_counter(self):
@@ -313,7 +324,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         poses = (
             torch.from_numpy(
                 np.asarray(
-                    [self.info["sensor_pose"] for env_idx in range(self.num_scenes)]
+                    [self.obs_info["sensor_pose"] for env_idx in range(self.num_scenes)]
                 )
             )
             .float()
@@ -323,9 +334,12 @@ class SpotSemExpEnv(SpotBaseEnv):
         # Set people as not obstacles
         self.local_map[:, 0, :, :] *= 1 - self.local_map[:, 19, :, :]
 
+        # Make it to be a tensor
+        obs = torch.tensor(self.agent._preprocess_obs(self.obs_info["state"]))
+        obs = torch.unsqueeze(obs, 0)
         # Update the smeantic map
         _, self.local_map, _, self.local_pose = self.sem_map_module(
-            self.obs_map_input, poses, self.local_map, self.local_pose
+            obs, poses, self.local_map, self.local_pose
         )
 
         # Set people as not obstacles for planning
@@ -407,9 +421,7 @@ class SpotSemExpEnv(SpotBaseEnv):
             )(self.full_map[:, 0:4, :, :])
             self.global_input[:, 8:, :, :] = self.local_map[:, 4:, :, :].detach()
             goal_cat_id = torch.from_numpy(
-                np.asarray(
-                    [self.config.GOAL_CAT_ID for env_idx in range(self.num_scenes)]
-                )
+                np.asarray([self.goal_cat_id for env_idx in range(self.num_scenes)])
             )
             self.extras[:, 0] = self.global_orientation[:, 0]
             self.extras[:, 1] = goal_cat_id
@@ -421,8 +433,13 @@ class SpotSemExpEnv(SpotBaseEnv):
         ]
 
         for e in range(self.num_scenes):
-            cn = self.config.GOAL_CAT_ID + 4
+            cn = self.goal_cat_id + 4
+            print("@explore_skill.py cn", cn)
             if self.local_map[e, cn, :, :].sum() != 0.0:
+                print("@explore_skill.py self.found_goal[e]", self.found_goal[e])
+                import pdb
+
+                pdb.set_trace()
                 cat_semantic_map = self.local_map[e, cn, :, :].cpu().numpy()
                 cat_semantic_scores = cat_semantic_map
                 cat_semantic_scores[cat_semantic_scores > 0] = 1.0
@@ -445,8 +462,8 @@ class SpotSemExpEnv(SpotBaseEnv):
                     self.local_map[e, 4:, :, :].argmax(0).cpu().numpy()
                 )
 
-        self.obs_map_input, _, done, infos = self.agent.plan_act_and_preprocess(
-            planner_inputs
+        _, _, done, self.obs_info = self.agent.plan_act_and_preprocess(
+            planner_inputs[0], self.obs_info
         )
 
     def get_local_map_boundaries(self, agent_loc, local_sizes, full_sizes):
@@ -524,12 +541,12 @@ class SpotSemExpEnv(SpotBaseEnv):
         dx, dy, do = self.get_pose_change()
 
         # Added observation
-        self.info = {}
-        self.info["sensor_pose"] = [dx, dy, do]
+        self.obs_info = {}
+        self.obs_info["sensor_pose"] = [dx, dy, do]
         rgb = observations["hand_rgb"].astype(np.uint8)
         depth = observations["hand_depth"]
         state = np.concatenate((rgb, depth), axis=2).transpose(2, 0, 1)
-        self.info["state"] = state
+        self.obs_info["state"] = state
 
         return observations
 
@@ -542,12 +559,12 @@ class SpotSemExpEnv(SpotBaseEnv):
         # Added observation
         # When step is called, it will update the info
         # to get the most up-to-date infomation
-        self.info = {}
-        self.info["sensor_pose"] = [dx, dy, do]
+        self.obs_info = {}
+        self.obs_info["sensor_pose"] = [dx, dy, do]
         rgb = observations["hand_rgb"].astype(np.uint8)
         depth = observations["hand_depth"]
         state = np.concatenate((rgb, depth), axis=2).transpose(2, 0, 1)
-        self.info["state"] = state
+        self.obs_info["state"] = state
         # Update the step counter
         self.udpate_step_counter()
         return observations, state, done

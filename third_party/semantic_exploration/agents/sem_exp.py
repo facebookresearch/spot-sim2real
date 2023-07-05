@@ -2,18 +2,25 @@
 import math
 import os
 
-import agents.utils.visualization as vu
 import cv2
-import envs.utils.pose as pu
 import numpy as np
 import skimage.morphology
-from agents.utils.detic_semantic_prediction import SemanticPredDetic
-from agents.utils.fmm_planner import FMMPlanner
-from agents.utils.owlvit_semantic_prediction import SemanticPredOwlvit
-from agents.utils.semantic_prediction import SemanticPredMaskRCNN
-from constants import color_palette
 from PIL import Image
 from torchvision import transforms
+
+import third_party.semantic_exploration.agents.utils.visualization as vu
+import third_party.semantic_exploration.envs.utils.pose as pu
+from third_party.semantic_exploration.agents.utils.detic_semantic_prediction import (
+    SemanticPredDetic,
+)
+from third_party.semantic_exploration.agents.utils.owlvit_semantic_prediction import (
+    SemanticPredOwlvit,
+)
+from third_party.semantic_exploration.agents.utils.semantic_prediction import (
+    SemanticPredMaskRCNN,
+)
+from third_party.semantic_exploration.constants import color_palette
+from third_party.semantic_exploration.envs.utils.fmm_planner import FMMPlanner
 
 
 class Sem_Exp_Env_Agent:
@@ -73,13 +80,20 @@ class Sem_Exp_Env_Agent:
             self.obs_dilation_selem = None
 
         if self.config.VISUALIZE:
-            self.legend = cv2.imread("docs/legend.png")
+            this_dir = os.path.dirname(os.path.abspath(__file__))
+            semantic_exploration_dir = os.path.join(os.path.dirname(this_dir))
+            self.legend = cv2.imread(semantic_exploration_dir + "/docs/legend.png")
             self.vis_image = None
             self.rgb_vis = None
+        self.goal_name = None
+        self.timestep = 0
+        self.rank = rank
+        self.episode_no = 0
 
-    def reset(self, obs_size):
+    def reset(self, obs_size, goal_name):
         self.info = None
         self.obs_shape = obs_size
+        self.goal_name = goal_name
 
         # Episode initializations
         map_shape = (
@@ -98,14 +112,15 @@ class Sem_Exp_Env_Agent:
         ]
         self.last_action = None
 
-        if self.condfig.PLANNER == "frontier":
+        if self.config.PLANNER == "frontier":
             self.curr_obs_dilation_selem_radius = self.start_obs_dilation_selem_radius
             self.obs_dilation_selem = skimage.morphology.disk(
                 self.curr_obs_dilation_selem_radius
             )
 
-        if self.condfig.VISUALIZE:
+        if self.config.VISUALIZE:
             self.vis_image = vu.init_vis_image(self.goal_name, self.legend)
+        self.timestep = 0
 
     def plan_act_and_preprocess(self, planner_inputs, info):
         """Function responsible for planning, taking the action and
@@ -140,12 +155,12 @@ class Sem_Exp_Env_Agent:
         if self.config.VISUALIZE:
             self._visualize(planner_inputs)
 
+        self.timestep += 1
+
         if action >= 0:
             # act
             action = {"action": action}
             obs = self.info["state"]
-            # preprocess obs
-            obs = self._preprocess_obs(obs)
             self.last_action = action["action"]
             self.obs = obs
             self.info = info
@@ -164,6 +179,7 @@ class Sem_Exp_Env_Agent:
         width = goal_map.shape[1]
         init_goal_map = np.zeros((height, width))
         if found_goal:
+            print("@sem_exp._reach_goal_if_in_map found_goal")
             init_goal_map = goal_map
         return init_goal_map
 
@@ -185,6 +201,7 @@ class Sem_Exp_Env_Agent:
         )
 
         if not found_goal:
+            print("@sem_exp._explore_otherwise not found_goal")
             goal_map = frontier_map
 
         return goal_map
@@ -207,10 +224,11 @@ class Sem_Exp_Env_Agent:
 
         self.last_loc = self.curr_loc
 
+        print("planner_inputs[found_goal]:", planner_inputs["found_goal"])
+
         # Get Map prediction (obstacle)
         map_pred = np.rint(planner_inputs["map_pred"])
-
-        if self.config.PlANNER == "frontier":
+        if self.config.PLANNER == "frontier":
             goal = self._reach_goal_if_in_map(
                 planner_inputs["goal"], planner_inputs["found_goal"]
             )
@@ -306,7 +324,13 @@ class Sem_Exp_Env_Agent:
 
         # Deterministic Local Policy
         if stop and planner_inputs["found_goal"] == 1:
-            action = 0  # Stop
+            print("Stop and found goal")
+            if self._get_distance_to_obstacle() <= 0.2:
+                print("Issue Stop")
+                action = 0
+            else:
+                print("Approaching Goal")
+                action = 1
         else:
             (stg_x, stg_y) = stg
             angle_st_goal = math.degrees(math.atan2(stg_x - start[0], stg_y - start[1]))
@@ -377,20 +401,69 @@ class Sem_Exp_Env_Agent:
         goal = 1 - goal * 1.0
         planner.set_multi_goal(goal)
 
-        r, c = traversible.shape
-        dist_vis = np.zeros((r, c * 3))
-        dist_vis[:, :c] = np.flipud(traversible)
-        dist_vis[:, c : 2 * c] = np.flipud(goal)
-        dist_vis[:, 2 * c :] = np.flipud(planner.fmm_dist / planner.fmm_dist.max())
-        os.makedirs(self.config.PLANNER + "/planner_type/") if not os.path.exists(
-            self.config.PLANNER + "/planner_type/"
-        ) else None
-        dist_vis = cv2.cvtColor((255.0 * dist_vis).astype(np.uint8), cv2.COLOR_GRAY2BGR)
-        cv2.imwrite(
-            self.config.PLANNER + "/planner_type/" + str(self.timestep) + ".png",
-            dist_vis.astype(np.uint8),
-        )
-        cv2.waitKey(1)
+        if self.config.VISUALIZE:
+            dump_dir = "{}/dump/{}/".format(
+                self.config.DUMP_LOCATION, self.config.EXP_NAME
+            )
+            ep_dir = "{}/episodes/thread_{}/eps_{}/".format(
+                dump_dir, self.rank, self.episode_no
+            )
+            if not os.path.exists(ep_dir):
+                os.makedirs(ep_dir)
+            r, c = traversible.shape
+            dist_vis = np.zeros((r, c * 3))
+            dist_vis[:, :c] = np.flipud(traversible)
+            dist_vis[:, c : 2 * c] = np.flipud(goal)
+            dist_vis[:, 2 * c :] = np.flipud(planner.fmm_dist / planner.fmm_dist.max())
+
+            fn = "{}/episodes/thread_{}/eps_{}/frontier-{}-{}-Vis-{}.png".format(
+                dump_dir,
+                self.rank,
+                self.episode_no,
+                self.rank,
+                self.episode_no,
+                self.timestep,
+            )
+
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            fontScale = 0.3
+            color = (0, 0, 255)  # BGR
+            thickness = 1
+            dist_vis = cv2.cvtColor(
+                (255.0 * dist_vis).astype(np.uint8), cv2.COLOR_GRAY2BGR
+            )
+            dist_vis = cv2.putText(
+                dist_vis,
+                "trav. (w: trav.; b: can't tarv.)",
+                (2, 25),
+                font,
+                fontScale,
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
+            dist_vis = cv2.putText(
+                dist_vis,
+                "goal (w: goal; b: non-goal)",
+                (c + 2, 25),
+                font,
+                fontScale,
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
+            dist_vis = cv2.putText(
+                dist_vis,
+                "trav.+goal (w: non-goal target; b: goal target)",
+                (2 * c + 2, 25),
+                font,
+                fontScale,
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
+            cv2.imwrite(fn, dist_vis.astype(np.uint8))
+            cv2.waitKey(1)
 
         state = [start[0] - x1 + 1, start[1] - y1 + 1]
         # Add the replan flag
@@ -444,6 +517,13 @@ class Sem_Exp_Env_Agent:
             semantic_pred = np.zeros((rgb.shape[0], rgb.shape[1], 16))
             self.rgb_vis = rgb[:, :, ::-1]
         return semantic_pred
+
+    def _get_distance_to_obstacle(self):
+        """ "Return the distance between the obstacle and the robot."""
+        x1, y1, t1 = self.last_loc
+        x2, y2, _ = self.curr_loc
+        dist = pu.get_l2_distance(x1, x2, y1, y2)
+        return dist
 
     def _visualize(self, inputs):
         dump_dir = "{}/dump/{}/".format(self.config.DUMP_LOCATION, self.config.EXP_NAME)

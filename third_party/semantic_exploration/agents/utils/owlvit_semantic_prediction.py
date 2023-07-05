@@ -16,9 +16,13 @@ from pathlib import Path  # noqa: E402
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
-from constants import coco_categories, coco_categories_mapping  # noqa: E402
 from PIL import Image  # noqa: E402
 from transformers import OwlViTForObjectDetection, OwlViTProcessor  # noqa: E402
+
+from third_party.semantic_exploration.constants import (  # noqa: E402
+    coco_categories,
+    coco_categories_mapping,
+)
 
 
 class SemanticPredOwlvit:

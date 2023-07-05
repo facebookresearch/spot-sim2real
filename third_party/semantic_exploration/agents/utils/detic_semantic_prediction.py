@@ -17,7 +17,6 @@ sys.path.insert(0, ROOT_DETIC + "Detic/third_party/CenterNet2")
 sys.path.insert(0, ROOT_DETIC + "Detic")
 
 from centernet.config import add_centernet_config  # noqa: E402
-from constants import coco_categories_mapping  # noqa: E402
 from detectron2.checkpoint import DetectionCheckpointer  # noqa: E402
 from detectron2.config import get_cfg  # noqa: E402
 from detectron2.data.catalog import MetadataCatalog  # noqa: E402
@@ -28,6 +27,10 @@ from detectron2.utils.visualizer import ColorMode, Visualizer  # noqa: E402
 from detic.config import add_detic_config  # noqa: E402
 from detic.modeling.text.text_encoder import build_text_encoder  # noqa: E402
 from detic.modeling.utils import reset_cls_test  # noqa: E402
+
+from third_party.semantic_exploration.constants import (  # noqa: E402
+    coco_categories_mapping,
+)
 
 BUILDIN_CLASSIFIER = {
     "lvis": ROOT_DETIC + "Detic/datasets/metadata/lvis_v1_clip_a+cname.npy",

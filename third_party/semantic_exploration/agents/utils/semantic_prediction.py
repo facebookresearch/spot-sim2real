@@ -8,13 +8,14 @@ import time
 import detectron2.data.transforms as T
 import numpy as np
 import torch
-from constants import coco_categories_mapping
 from detectron2.checkpoint import DetectionCheckpointer
 from detectron2.config import get_cfg
 from detectron2.data.catalog import MetadataCatalog
 from detectron2.modeling import build_model
 from detectron2.utils.logger import setup_logger
 from detectron2.utils.visualizer import ColorMode, Visualizer
+
+from third_party.semantic_exploration.constants import coco_categories_mapping
 
 
 class SemanticPredMaskRCNN:
