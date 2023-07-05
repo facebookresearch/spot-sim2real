@@ -78,14 +78,14 @@ def rescale_actions(actions, action_thresh=0.05, silence_only=False):
 
 class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     node_name = "spot_reality_gym"
-    no_raw = True
     proprioception = True
 
-    def __init__(self, config, spot: Spot, stopwatch=None):
+    def __init__(self, config, spot: Spot, stopwatch=None, no_raw=True):
         self.detections_buffer = {
             k: FixSizeOrderedDict(maxlen=DETECTIONS_BUFFER_LEN)
             for k in ["detections", "filtered_depth", "viz"]
         }
+        self.no_raw = no_raw
 
         super().__init__(spot=spot)
 
