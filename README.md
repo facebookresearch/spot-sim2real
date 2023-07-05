@@ -225,3 +225,22 @@ git checkout main
 ## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is based on Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments
 ](https://github.com/naokiyokoyama/spot_rl_experiments).
+
+
+## :writing_hand: Citations
+If you find this repository helpful, feel free to cite our papers: [Adaptive Skill Coordination (ASC)](https://arxiv.org/pdf/2304.00410.pdf)) and [Language-guided Skill Coordination (LSC)](https://languageguidedskillcoordination.github.io/).
+```
+@article{yokoyama2023adaptive,
+  title={Adaptive Skill Coordination for Robotic Mobile Manipulation},
+  author={Yokoyama, Naoki and Clegg, Alexander William and Undersander, Eric and Ha, Sehoon and Batra, Dhruv and Rai, Akshara},
+  journal={arXiv preprint arXiv:2304.00410},
+  year={2023}
+}
+
+
+@misc{yang2023adaptive,
+    title={LSC: Language-guided Skill Coordination for Open-Vocabulary Mobile Pick-and-Place},
+    howpublished={\url{https://languageguidedskillcoordination.github.io/}}
+}
+
+```
