@@ -232,11 +232,10 @@ If you find this repository helpful, feel free to cite our papers: [Adaptive Ski
 ```
 @article{yokoyama2023adaptive,
   title={Adaptive Skill Coordination for Robotic Mobile Manipulation},
-  author={Yokoyama, Naoki and Clegg, Alexander William and Undersander, Eric and Ha, Sehoon and Batra, Dhruv and Rai, Akshara},
+  author={Yokoyama, Naoki and Clegg, Alexander William and Truong, Joanne and Undersander, Eric  and Yang, Tsung-Yen and Arnaud, Sergio and Ha, Sehoon  and Batra, Dhruv and Rai, Akshara},
   journal={arXiv preprint arXiv:2304.00410},
   year={2023}
 }
-
 
 @misc{yang2023adaptive,
     title={LSC: Language-guided Skill Coordination for Open-Vocabulary Mobile Pick-and-Place},
