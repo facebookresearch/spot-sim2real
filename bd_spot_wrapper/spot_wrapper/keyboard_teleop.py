@@ -14,8 +14,12 @@ DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 UPDATE_PERIOD = 0.2
 
 # Where the gripper goes to upon initialization
-INITIAL_POINT = np.array([0.5, 0.0, 0.35])
-INITIAL_RPY = np.deg2rad([0.0, 45.0, 0.0])
+# INITIAL_POINT = np.array([0.5, 0.0, 0.35])
+# INITIAL_RPY = np.deg2rad([0.0, 45.0, 0.0])
+
+#sem nav arm pose
+INITIAL_POINT = np.array([0.5, 0.0, 0.7])
+INITIAL_RPY = np.deg2rad([0.0, 20.0, 0.0])
 KEY2GRIPPERMOVEMENT = {
     "w": np.array([0.0, 0.0, MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move up
     "s": np.array([0.0, 0.0, -MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move down

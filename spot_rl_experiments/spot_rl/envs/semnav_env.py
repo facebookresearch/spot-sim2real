@@ -24,15 +24,15 @@ def main(spot):
     parser.add_argument("-d", "--dock", action="store_true")
     args = parser.parse_args()
     config = construct_config(args.opts)
-
+    
     # Don't need gripper camera for Nav
     # config.USE_MRCNN = False
 
     # policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
     # policy.reset()
-
     env = SpotSemanticNavEnv(config, spot)
     env.power_robot()
+    env.initialize_arm()
     # open the gripper so the camera is not occluded
     spot.open_gripper()
     # if args.waypoint is not None:
@@ -114,15 +114,14 @@ class SpotSemanticNavEnv(SpotBaseEnv):
         return observations
 
     def initialize_arm(self):
-        INITIAL_POINT = np.array([0.5, 0.0, 0.35])
-        INITIAL_RPY = np.deg2rad([0.0, 0.0, 0.0])
+        INITIAL_POINT = np.array([0.5, 0.0, 0.7])
+        INITIAL_RPY = np.deg2rad([0.0, 20.0, 0.0])
         point = INITIAL_POINT
         rpy = INITIAL_RPY
         cmd_id = spot.move_gripper_to_point(point, rpy)
         spot.block_until_arm_arrives(cmd_id, timeout_sec=1.5)
         cement_arm_joints(spot)
         return point, rpy
-
 
     def get_success(self, observations):
         return False
