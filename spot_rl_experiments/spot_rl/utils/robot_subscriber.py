@@ -1,6 +1,7 @@
 from functools import partial
 
 import numpy as np
+import ros_numpy
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
@@ -48,6 +49,7 @@ class SpotRobotSubscriberMixin:
                 queue_size=1,
                 buff_size=2**30,
             )
+        print("here")
         rospy.loginfo(f"[{self.node_name}]: Waiting for images...")
         while not all([self.msgs[s] is not None for s in subscriptions]):
             pass
@@ -90,4 +92,11 @@ class SpotRobotSubscriberMixin:
         )
 
     def msg_to_cv2(self, *args, **kwargs) -> np.array:
-        return self.cv_bridge.imgmsg_to_cv2(*args, **kwargs)
+        try:
+            self.cv_bridge.imgmsg_to_cv2(*args, **kwargs)
+        except Exception:
+            # By pass cv_bridge issue by using ros_numpy
+            try:
+                return ros_numpy.numpify(*args, **kwargs)
+            except Exception:
+                return ros_numpy.numpify(args[0])
