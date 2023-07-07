@@ -1,3 +1,13 @@
+# flake8: noqa
+import sys
+
+sys.path.insert(0, "")
+sys.path.append("/Users/jimmytyyang/research/spot-sim2real/habitat-lab/")
+sys.path.append(
+    "/Users/jimmytyyang/research/spot-sim2real/habitat-lab/habitat_baselines"
+)
+sys.path.append("/Users/jimmytyyang/research/spot-sim2real")
+
 import os
 import time
 
@@ -27,8 +37,7 @@ DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 def main(spot):
     parser = get_default_parser()
-    parser.add_argument("-g", "--goal")
-    parser.add_argument("-w", "--waypoint")
+    parser.add_argument("-t", "--target_name")
     parser.add_argument("-d", "--dock", action="store_true")
     args = parser.parse_args()
     config = construct_config(args.opts)
@@ -39,20 +48,11 @@ def main(spot):
     policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
     policy.reset()
 
-    env = SpotSemExpEnv(config, spot)
+    env = SpotSemExpEnv(config, spot, args.target_name)
     env.power_robot()
-    if args.waypoint is not None:
-        goal_x, goal_y, goal_heading = nav_target_from_waypoints(args.waypoint)
-        env.say(f"Navigating to {args.waypoint}")
-    else:
-        assert args.goal is not None
-        goal_x, goal_y, goal_heading = [float(i) for i in args.goal.split(",")]
 
     # Reset the info to get the first observation
-    observations = env.reset((goal_x, goal_y), goal_heading)
-    # Once we have the first observation, we then can process the input
-    # Get the last location
-    env.last_sim_location = env.get_sim_location()
+    observations = env.reset((0.0, 0.0), 0.0)
     # Initilize the map
     env.map_init()
 
@@ -67,11 +67,11 @@ def main(spot):
 
             # Direct control the robot
             # action: 1: forward; action 2: left; action: 3: right
-            if env.obs_info["action"] == 1:
+            if env.obs_info["action"]["action"] == 1:
                 vel = [config.BASE_LIN_VEL, 0.0, 0.0]  # go forward
-            elif env.obs_info["action"] == 2:
+            elif env.obs_info["action"]["action"] == 2:
                 vel = [0.0, 0.0, config.BASE_ANGULAR_VEL]  # turn left
-            elif env.obs_info["action"] == 3:
+            elif env.obs_info["action"]["action"] == 3:
                 vel = [0.0, 0.0, -config.BASE_ANGULAR_VEL]  # turn right
             else:
                 vel = [0.0, 0.0, 0.0]
@@ -105,7 +105,7 @@ def main(spot):
 
 
 class SpotSemExpEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot):
+    def __init__(self, config, spot: Spot, target_name="chair"):
         super().__init__(config, spot)
         self.goal_xy = None
         self.goal_heading = None
@@ -113,7 +113,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
         self.cur_observation = None
         self.num_sem_categories = config.NUM_SEM_CATEGORIES
-        self.last_sim_location = None
+        self.last_real_location = None
         self.config = config
         self.num_scenes = 1
         self.obs_info = {}  # type: ignore
@@ -123,6 +123,7 @@ class SpotSemExpEnv(SpotBaseEnv):
             self.i_step // self.config.NUM_LOCAL_STEPS
         ) % self.config.NUM_GLOBAL_STEPS
         self.l_step = self.i_step % self.config.NUM_LOCAL_STEPS
+        self.target = target_name
 
     def map_init(self):
         """Function to initialize the map"""
@@ -274,7 +275,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         )
         self.global_input[:, 8:, :, :] = self.local_map[:, 4:, :, :].detach()
 
-        self.goal_cat_id = coco_categories[self.env.target.lower()]
+        self.goal_cat_id = coco_categories[self.target.lower()]
         goal_cat_id = torch.from_numpy(
             np.asarray([self.goal_cat_id for env_idx in range(self.num_scenes)])
         )
@@ -303,7 +304,7 @@ class SpotSemExpEnv(SpotBaseEnv):
                 )
 
         # Reset the agent
-        self.agent.reset(self.obs_info["state"].shape, self.env.target)
+        self.agent.reset(self.obs_info["state"].shape, self.target)
         # We have to feed the info information in to the planner agent
         # Update the info and get the observation input for the map
         # self.obs_info now contains action info
@@ -437,9 +438,6 @@ class SpotSemExpEnv(SpotBaseEnv):
             print("@explore_skill.py cn", cn)
             if self.local_map[e, cn, :, :].sum() != 0.0:
                 print("@explore_skill.py self.found_goal[e]", self.found_goal[e])
-                import pdb
-
-                pdb.set_trace()
                 cat_semantic_map = self.local_map[e, cn, :, :].cpu().numpy()
                 cat_semantic_scores = cat_semantic_map
                 cat_semantic_scores[cat_semantic_scores > 0] = 1.0
@@ -538,13 +536,15 @@ class SpotSemExpEnv(SpotBaseEnv):
         assert len(self.goal_xy) == 2
 
         # Get pose change
+        self.last_real_location = self.get_real_location()
         dx, dy, do = self.get_pose_change()
 
         # Added observation
         self.obs_info = {}
         self.obs_info["sensor_pose"] = [dx, dy, do]
-        rgb = observations["hand_rgb"].astype(np.uint8)
-        depth = observations["hand_depth"]
+        rgb = observations["spot_hand_rgb"].astype(np.uint8)
+        depth = observations["spot_hand_depth"]
+        depth = np.expand_dims(depth, axis=2)
         state = np.concatenate((rgb, depth), axis=2).transpose(2, 0, 1)
         self.obs_info["state"] = state
 
@@ -561,8 +561,9 @@ class SpotSemExpEnv(SpotBaseEnv):
         # to get the most up-to-date infomation
         self.obs_info = {}
         self.obs_info["sensor_pose"] = [dx, dy, do]
-        rgb = observations["hand_rgb"].astype(np.uint8)
-        depth = observations["hand_depth"]
+        rgb = observations["spot_hand_rgb"].astype(np.uint8)
+        depth = observations["spot_hand_depth"]
+        depth = np.expand_dims(depth, axis=2)
         state = np.concatenate((rgb, depth), axis=2).transpose(2, 0, 1)
         self.obs_info["state"] = state
         # Update the step counter
@@ -574,6 +575,7 @@ class SpotSemExpEnv(SpotBaseEnv):
         return succ
 
     def get_observations(self):
+        print("get_observations is called")
         self.cur_observation = self.get_sem_exp_observation(
             self.goal_xy, self.goal_heading
         )
@@ -582,6 +584,7 @@ class SpotSemExpEnv(SpotBaseEnv):
     def get_real_location(self):
         """Returns x, y, o pose of the agent"""
         # Get the location of the agent
+
         x, y, o = (
             self.cur_observation["x"],
             self.cur_observation["y"],

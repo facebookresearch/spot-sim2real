@@ -152,6 +152,8 @@ class Sem_Exp_Env_Agent:
 
         action = self._plan(planner_inputs)
 
+        print("@sem_exp.py: action", action)
+
         if self.config.VISUALIZE:
             self._visualize(planner_inputs)
 
@@ -320,16 +322,16 @@ class Sem_Exp_Env_Agent:
                 self.obs_dilation_selem = skimage.morphology.disk(
                     self.curr_obs_dilation_selem_radius
                 )
-            print("replan")
+            print("@sem_exp.py: replan")
 
         # Deterministic Local Policy
         if stop and planner_inputs["found_goal"] == 1:
-            print("Stop and found goal")
+            print("@sem_exp.py: Stop and found goal")
             if self._get_distance_to_obstacle() <= 0.2:
                 print("Issue Stop")
                 action = 0
             else:
-                print("Approaching Goal")
+                print("@sem_exp.py: Approaching Goal")
                 action = 1
         else:
             (stg_x, stg_y) = stg
@@ -352,6 +354,7 @@ class Sem_Exp_Env_Agent:
                 # Forward
                 action = 1
 
+        print("@sem_exp.py return action")
         return action
 
     def _get_stg(self, grid, start, goal, planning_window):

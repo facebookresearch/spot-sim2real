@@ -13,7 +13,7 @@ WEIGHTS:
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
   DEBLURGAN: "weights/fpn_inception.h5"
 
-DEVICE: "cuda:0"
+DEVICE: "cpu"
 USE_REMOTE_SPOT: False
 PARALLEL_INFERENCE_MODE: True
 
@@ -61,7 +61,7 @@ TERMINATE_ON_GRASP: False
 GRAYSCALE_MASK_RCNN: False
 USE_MRCNN: True
 USE_FPN_R50: False
-USE_DEBLURGAN: True
+USE_DEBLURGAN: False
 IMAGE_SCALE: 0.7
 # After this many time steps of not seeing the current target object, we become open to looking for new ones
 FORGET_TARGET_OBJECT_STEPS: 15
@@ -70,10 +70,10 @@ FORGET_TARGET_OBJECT_STEPS: 15
 RETURN_TO_BASE: True
 
 # For Semantic Map
-MAP_SIZE_CM: 2500
-MAP_RESOLUTION: 2
-GLOBAL_DOWNSCALING: 2
-VISION_RANGE: 125
+MAP_SIZE_CM: 1000 # 1000cm = 10 meter
+MAP_RESOLUTION: 2 # 1 cell = 2 cm -> 500 cell for the global map
+GLOBAL_DOWNSCALING: 2 # 250 cell for the local map
+VISION_RANGE: 125 # 125*2 = 250 cm = 2.5m
 HFOV: 55
 DU_SCALE: 1
 CAT_PRED_THRESHOLD: 1.0
@@ -94,7 +94,7 @@ CONTINUOUS_ANGLE_TOLERANCE: 30.0
 COLLISION_THRESHOLD: 0.8
 TURN_ANGLE: 9.6
 MIN_DEPTH: 0.0
-MAX_DEPTH: 3.5
+MAX_DEPTH: 1.7
 ENV_FRAME_WIDTH: 640
 ENV_FRAME_HEIGHT: 480
 FRAME_WIDTH: 160
