@@ -1,5 +1,5 @@
-**/*.egg-info/
-**/__pycache__
+**/*.egg-info/**
+**/__pycache__/**
 .vscode
 
 bd_spot_wrapper/spot_wrapper/home.txt
