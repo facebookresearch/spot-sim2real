@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
 """
 The code here should be by the Core only. This will relay any received commands straight
 to the robot from the Core via Ethernet.
