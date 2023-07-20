@@ -1,8 +1,9 @@
-**/*.egg-info/**
 **/__pycache__/**
 .vscode
 
+bd_spot_wrapper/spot_wrapper.egg-info/**
 bd_spot_wrapper/spot_wrapper/home.txt
+spot_rl_experiments/spot_rl.egg-info/**
 spot_rl_experiments/configs/waypoints.yaml
 
 **/grasp_visualizations/**

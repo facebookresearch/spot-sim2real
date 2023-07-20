@@ -14,7 +14,7 @@ git submodule update --init --recursive
 sudo apt-get update
 ```
 
-### Install Miniconda at /home/user
+### Install Miniconda at /home/<user>
 
 ```bash
 # Download miniconda
@@ -86,7 +86,8 @@ source ~/.bashrc
 mamba install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch
 
 # If this command fails for error "Could not solve for environment specs", run the following
-mamba install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch -c conda-forge
+
+# mamba install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch -c conda-forge
 ```
 
 ### Add required channels
@@ -97,18 +98,6 @@ conda config --env --add channels robostack-experimental
 conda config --env --add channels robostack
 conda config --env --set channel_priority strict
 ```
-
-### Setup pre-commit.  This allows you to run automatic pre-commit on running `git commit`
-
-```bash
-pre-commit install
-```
-
-### Creating an account on CircleCI
-
-- Since we have integrated CircleCI tests on this repo, you would need to create and link your CircleCI account
-- You can create your account from this link (https://app.circleci.com/). Once you have created the account, go to "Organization Settings", on the left tab click on "VCS"
-- Finally click on "Manage GitHub Checks". CircleCI will request access to `facebookresearch` org owner.
 
 ### Setup bd_spot_wrapper
 
@@ -125,8 +114,11 @@ pip install -e . && cd ../
 cd spot_rl_experiments/ && python generate_executables.py
 pip install -e .
 
-# Download weights (need only once)
+# Get git lfs (large file system)
+sudo apt-get install git-lfs
 git lfs install
+
+# Download weights (need only once)
 git clone https://huggingface.co/spaces/jimmytyyang/spot-sim2real-data
 unzip spot-sim2real-data/weight/weights.zip && rm -rf spot-sim2real-data && cd ../
 ```
@@ -185,6 +177,23 @@ echo 'export SPOT_IP=<your-spot-ip>' >> ~/.bashrc
 source ~/.bash_profile
 ```
 
+## Setting ROS env variables
+* If using **ROS on only 1 computer** (i.e. you don't need 2 or more machines in the ROS network), follow these steps
+    ```bash
+    echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
+    echo 'export ROS_MASTER_URI=http://localhost:11311' >> ~/.bashrc
+    ```
+* If using **ROS across multiple computers**, follow these steps on each computer
+    ```bash
+    # your_local_ip = ip address of this computer in the network
+    echo 'export ROS_IP=<your_local_ip>' >> ~/.bashrc
+    # ros_masters_ip = ip address of the computer running roscore
+    echo 'export ROS_MASTER_URI=http://<ros_masters_ip>:11311' >> ~/.bashrc
+    ```
+
+For assistance with finding the right ip of your computer, [please follow these steps](/installation/ISSUES.md#how-to-find-ip-address-of-local-computer).
+
+
 ### For Meta internal users (with Meta account), please check the following link for the ip and the password
 
 [Link](https://docs.google.com/document/d/1u4x4ZMjHDQi33PB5V2aTZ3snUIV9UdkSOV1zFhRq1Do/edit)
@@ -192,3 +201,16 @@ source ~/.bash_profile
 ### Mac Users
 
 It is not recommended to run the code on a Mac machine, and we do not support this. However, it is possible to run the code on a Mac machine. Please reach out to Jimmy Yang (jimmytyyang@meta.com) for help.
+
+
+### For folks who are interested to contribute to this repo, you'll need to setup pre-commit.
+The repo runs CI tests on each PR and the PRs are merged only when the all checks have passed.
+Installing the pre-commit allows you to run automatic pre-commit while running `git commit`. 
+```bash
+pre-commit install
+```
+
+### Creating an account on CircleCI
+- Since we have integrated CircleCI tests on this repo, you would need to create and link your CircleCI account
+- You can create your account from this link (https://app.circleci.com/). Once you have created the account, go to "Organization Settings", on the left tab click on "VCS"
+- Finally click on "Manage GitHub Checks". CircleCI will request access to `facebookresearch` org owner.
