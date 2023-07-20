@@ -76,12 +76,12 @@ class WaypointController:
                 if self.record_robot_trajectories:
                     robot_trajectory.append(
                         {
-                            "timestamp": str(time.time() - self.start_time),
-                            "pose": {
-                                "x": self.nav_env.x,
-                                "y": self.nav_env.y,
-                                "yaw": self.nav_env.yaw,
-                            },
+                            "timestamp": time.time() - self.start_time,
+                            "pose": [
+                                self.nav_env.x,
+                                self.nav_env.y,
+                                np.rad2deg(self.nav_env.yaw),
+                            ],
                         }
                     )
             # Store the trajectory for each nav_target inside the List[robot_trajectory]
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         not os.path.isdir(args.save_trajectories)
     ):
         raise Exception(
-            f"The path for saving trajectories at {args.save_trajectories} does not exist. Please provide a correct path"
+            f"The path for saving trajectories at {args.save_trajectories} was not specified. Please provide a correct path"
         )
 
     record_trajectories = (args.record_trajectories) or (

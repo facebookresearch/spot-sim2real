@@ -1,9 +1,10 @@
 import numpy as np
-from fastdtw import fastdtw
+
+# from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
 
 
-def wrap_angle_deg(angle_deg):
+def wrap_angle_deg(angle_deg) -> float:
     """
     Wrap an angle in degrees between 0 and 360.
 
@@ -17,7 +18,7 @@ def wrap_angle_deg(angle_deg):
     return wrapped_angle
 
 
-def calculate_normalized_euclidean_distance_between_pose(pose1, pose2):
+def calculate_normalized_euclidean_distance_between_pose(pose1, pose2) -> float:
     """
     Calculate the distance between two poses (as dicts).
 
@@ -44,34 +45,34 @@ def calculate_normalized_euclidean_distance_between_pose(pose1, pose2):
     return euclidean(normalized_pose1[:], normalized_pose2[:])
 
 
-def calculate_dtw_distance_between_trajectories(test_trajectory, reference_trajectory):
-    """
-    Calculate the DTW distance between a test trajectory and a reference trajectory.
+# def calculate_dtw_distance_between_trajectories(test_trajectory, reference_trajectory):
+#     """
+#     Calculate the DTW distance between a test trajectory and a reference trajectory.
 
-    Parameters:
-    - test_trajectory (list): Test trajectory containing poses.
-    - reference_trajectory (list): Reference trajectory containing poses.
+#     Parameters:
+#     - test_trajectory (list): Test trajectory containing poses.
+#     - reference_trajectory (list): Reference trajectory containing poses.
 
-    Returns:
-    - distance (float): DTW distance between the test and reference trajectories.
-    """
-    test_poses = [
-        (data["pose"]["x"], data["pose"]["y"], data["pose"]["yaw"])
-        for data in test_trajectory
-    ]
-    reference_poses = [
-        (data["pose"]["x"], data["pose"]["y"], data["pose"]["yaw"])
-        for data in reference_trajectory
-    ]
-    distance, _ = fastdtw(
-        test_poses,
-        reference_poses,
-        dist=calculate_normalized_euclidean_distance_between_pose,
-    )
-    return distance
+#     Returns:
+#     - distance (float): DTW distance between the test and reference trajectories.
+#     """
+#     test_poses = [
+#         (data["pose"]["x"], data["pose"]["y"], data["pose"]["yaw"])
+#         for data in test_trajectory
+#     ]
+#     reference_poses = [
+#         (data["pose"]["x"], data["pose"]["y"], data["pose"]["yaw"])
+#         for data in reference_trajectory
+#     ]
+#     distance, _ = fastdtw(
+#         test_poses,
+#         reference_poses,
+#         dist=calculate_normalized_euclidean_distance_between_pose,
+#     )
+#     return distance
 
 
-def is_within_bounds(test_trajectories, reference_trajectories, threshold):
+def is_within_bounds2(test_trajectories, reference_trajectories, threshold) -> bool:
     """
     Check if a test trajectory is within bounds of aleast one of the reference trajectories.
 
@@ -93,3 +94,34 @@ def is_within_bounds(test_trajectories, reference_trajectories, threshold):
     #         return True
 
     return False
+
+
+def is_pose_within_bounds(
+    test_pose, target_pose, linear_threshold, angular_threshold
+) -> bool:
+    """
+    Check if a test pose is within linear and angular bounds of target pose.
+
+    Parameters:
+    - test_pose (list): Test pose, as [x,y,yaw]
+    - target_pose (list): Target pose, as [x,y,yaw]
+
+    Returns:
+    - is_within (bool): True if the test pose is within both linear and angular bounds of the target pose, False otherwise.
+    """
+    # Linear bounds
+    # print(f"Euclidean: {euclidean(test_pose[:2], target_pose[:2])}")
+    # print(f"Angular: {abs(wrap_angle_deg(test_pose[2]) - wrap_angle_deg(target_pose[2]))}")
+    is_within_linear_bounds = (
+        euclidean(test_pose[:2], target_pose[:2]) < linear_threshold
+    )
+    angular_delta = abs(wrap_angle_deg(test_pose[2]) - wrap_angle_deg(target_pose[2]))
+    is_within_angular_bounds = (
+        min(angular_delta, 360 - angular_delta) < angular_threshold
+    )
+
+    # print(f"test_pose: {test_pose}")
+    # print(f"target_pose: {target_pose}")
+    # print(f"is_within_linear_bounds: {is_within_linear_bounds}")
+    # print(f"is_within_angular_bounds: {is_within_angular_bounds}")
+    return bool(is_within_linear_bounds and is_within_angular_bounds)
