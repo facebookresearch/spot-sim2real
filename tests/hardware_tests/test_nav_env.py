@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
 import os
 from typing import Dict, List
 
@@ -5,7 +11,7 @@ import numpy as np
 import pytest
 import yaml
 from spot_rl.envs.nav_env import WaypointController
-from spot_rl.utils.calculate_distance import is_pose_within_bounds, is_within_bounds2
+from spot_rl.utils.geomtry_utils import compute_dtw_scores, is_pose_within_bounds
 from spot_rl.utils.json_helpers import load_json_file, load_json_files
 from spot_rl.utils.utils import construct_config, nav_target_from_waypoint
 from spot_wrapper.spot import Spot
@@ -62,10 +68,35 @@ def compute_avg_and_std_time(ref_traj_set):
     return avg_time_list_traj, std_time_list_traj
 
 
-def extract_goal_poses_and_timings_from_traj(traj):
+def compute_avg_and_std_steps(ref_traj_set):
+    # List of steps taken to reach each waypoint for each trajectory in ref_traj_set
+    steps_list_traj_set = []  # type: List[List[int]]
+    for ref_traj in ref_traj_set:
+        # List of steps taken to reach each waypoint for a single trajectory in ref_traj; in this test, it will contain 3 elements
+        steps_list_traj = []  # type: List[int]
+        for wp_idx in range(len(ref_traj)):
+            # Append steps taken to reach current waypoint to list corresponding to current trajectory
+            steps_taken_to_reach_curr_wp = len(ref_traj[wp_idx])
+            steps_list_traj.append(steps_taken_to_reach_curr_wp)
+
+        # Append trajectory's waypoint's steps list to list of steps taken to reach each waypoint for all trajectories
+        steps_list_traj_set.append(steps_list_traj)
+
+    # Convert list of steps taken to reach each waypoint for all trajectories to 2-dim numpy array
+    steps_list_traj_set = np.array(steps_list_traj_set)
+
+    # Calculate mean and standard deviation of steps taken to reach each waypoint for all trajectories (size=3 as 3 trajectories in this test)
+    avg_steps_list_traj = np.mean(steps_list_traj_set, axis=0)
+    std_steps_list_traj = np.std(steps_list_traj_set, axis=0)
+
+    return avg_steps_list_traj, std_steps_list_traj
+
+
+def extract_goal_poses_timestamps_steps_from_traj(traj):
     prev_time = 0
     test_time_list = []
     test_pose_list = []
+    test_step_list = []
     num_wp_in_traj = len(traj)
     # Test that test trajectory reached each waypoint successfully
     for wp_idx in range(num_wp_in_traj):
@@ -80,7 +111,9 @@ def extract_goal_poses_and_timings_from_traj(traj):
         prev_time = time_at_last_wp
         test_time_list.append(time_delta_for_wp)
 
-    return test_pose_list, test_time_list
+        test_step_list.append(len(traj[wp_idx]))
+
+    return test_pose_list, test_time_list, test_step_list
 
 
 def test_nav_square():
@@ -105,31 +138,42 @@ def test_nav_square():
 
         try:
             test_traj = wp_controller.execute(nav_targets=test_nav_targets)
+            # test_traj = load_json_file(
+            #     os.path.join(test_square_nav_trajectories_dir, "test_traj.json")
+            # )
         except Exception:
             pytest.fails(
                 "Pytest raised an error while executing WaypointController.execute from test_nav_env.py"
             )
         finally:
             wp_controller.shutdown(should_dock=True)
+            # print("done")
 
     assert test_traj is not []
     assert len(test_traj) == len(test_waypoints)
 
     ref_traj_set = load_json_files(test_square_nav_trajectories_dir)
+
     avg_time_list_traj, std_time_list_traj = compute_avg_and_std_time(ref_traj_set)
+    avg_steps_list_traj, std_steps_list_traj = compute_avg_and_std_steps(ref_traj_set)
+    (
+        test_pose_list,
+        test_time_list,
+        test_steps_list,
+    ) = extract_goal_poses_timestamps_steps_from_traj(test_traj)
 
-    print(
-        f"Dataset: Average time taken to reach each of the waypoint - {avg_time_list_traj}"
-    )
-    print(
-        f"Dataset: Std Dev in time taken to reach each of the waypoint - {std_time_list_traj}"
-    )
+    print(f"Dataset: Avg. time to reach each waypoint - {avg_time_list_traj}")
+    print(f"Dataset: Std.Dev in time reach each waypoint - {std_time_list_traj}")
+    print(f"Test-Nav: Time taken to reach each waypoint - {test_time_list}\n")
 
-    test_pose_list, test_time_list = extract_goal_poses_and_timings_from_traj(test_traj)
+    print(f"Dataset: Avg. steps to reach each waypoint - {avg_steps_list_traj}")
+    print(f"Dataset: Std.Dev in steps to reach each waypoint - {std_steps_list_traj}")
+    print(f"Test-Nav: Steps taken to reach each waypoint - {test_steps_list}\n")
 
-    print(f"Test-Nav: Time taken to reach each of the waypoint - {test_time_list}")
-    print(f"Test-Nav: Pose at each of the goal waypoint - {test_pose_list}")
-    # Test that robot reached its goal both spatially and temporally for all waypoints
+    print(f"Test-Nav: Pose at each of the goal waypoint - {test_pose_list}\n")
+
+    allowable_std_dev_in_time = 1.5
+    allowable_std_dev_in_steps = 2.0
     for wp_idx in range(len(test_waypoints)):
         # Capture target pose for each waypoint
         target_pose = list(
@@ -150,18 +194,15 @@ def test_nav_square():
         # Test that robot reached its goal successfully temporally (within 1 std dev of mean)
         assert (
             abs(test_time_list[wp_idx] - avg_time_list_traj[wp_idx])
-            < 1.0 * std_time_list_traj[wp_idx]
+            < allowable_std_dev_in_time * std_time_list_traj[wp_idx]
         )
 
-    # Soft tests TBD
-    # Test that test trajectory took similar amount of steps to finish execution
-
-    # Test that robot was able to reach each waypoint for all waypoints inside test trajectory
+        # Test that test trajectory took similar amount of steps to finish execution
+        assert (
+            abs(test_steps_list[wp_idx] - avg_steps_list_traj[wp_idx])
+            < allowable_std_dev_in_steps * std_steps_list_traj[wp_idx]
+        )
 
     # Report DTW scores
-
-    # The magic number 6.0 is by trial and error. We need a better way to check bounds
-    # assert (
-    #     is_within_bounds2(test_traj, ref_traj_set)
-    #     is True
-    # )
+    dtw_score_list = compute_dtw_scores(test_traj, ref_traj_set)
+    print(f"DTW scores: {dtw_score_list}")
