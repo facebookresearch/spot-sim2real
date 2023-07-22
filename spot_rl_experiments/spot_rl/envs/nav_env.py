@@ -136,7 +136,6 @@ class SpotNavEnv(SpotBaseEnv):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    print(args)
     config = construct_config(args.opts)
     # Don't need gripper camera for Nav
     config.USE_MRCNN = False
@@ -162,13 +161,12 @@ if __name__ == "__main__":
         not os.path.isdir(args.save_trajectories)
     ):
         raise Exception(
-            f"The path for saving trajectories at {args.save_trajectories} was not specified. Please provide a correct path"
+            f"The path for saving trajectories at {args.save_trajectories} either not specified or incorrect. Please provide a correct path"
         )
 
     record_trajectories = (args.record_trajectories) or (
         args.save_trajectories is not None
     )
-    print(args)
 
     spot = Spot("RealNavEnv")
     with spot.get_lease(hijack=True):

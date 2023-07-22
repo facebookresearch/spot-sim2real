@@ -52,16 +52,16 @@ def calculate_normalized_euclidean_distance_between_pose(pose1, pose2) -> float:
     return euclidean(normalized_pose1[:], normalized_pose2[:])
 
 
-def calculate_dtw_distance_between_trajectories(test_traj, ref_traj):
+def calculate_dtw_distance_between_trajectories(test_traj, ref_traj) -> float:
     """
     Calculate the DTW distance between a test trajectory and a reference trajectory.
 
     Parameters:
-    - test_traj (list): Test trajectory containing poses.
-    - ref_traj (list): Reference trajectory containing poses.
+    - test_traj (List[Dict]): Test trajectory containing dict of poses.
+    - ref_traj (List[Dict]): Reference trajectory containing dict of poses.
 
     Returns:
-    - distance (float): DTW distance between the test and reference trajectories.
+    - distance (float): DTW distance between the test and reference trajectory.
     """
     test_poses = [data["pose"] for data in test_traj]
     reference_poses = [data["pose"] for data in ref_traj]
@@ -123,18 +123,14 @@ def is_pose_within_bounds(
     - is_within (bool): True if the test pose is within both linear and angular bounds of the target pose, False otherwise.
     """
     # Linear bounds
-    # print(f"Euclidean: {euclidean(test_pose[:2], target_pose[:2])}")
-    # print(f"Angular: {abs(wrap_angle_deg(test_pose[2]) - wrap_angle_deg(target_pose[2]))}")
     is_within_linear_bounds = (
         euclidean(test_pose[:2], target_pose[:2]) < linear_threshold
     )
+
+    # Angular bounds
     angular_delta = abs(wrap_angle_deg(test_pose[2]) - wrap_angle_deg(target_pose[2]))
     is_within_angular_bounds = (
         min(angular_delta, 360 - angular_delta) < angular_threshold
     )
 
-    # print(f"test_pose: {test_pose}")
-    # print(f"target_pose: {target_pose}")
-    # print(f"is_within_linear_bounds: {is_within_linear_bounds}")
-    # print(f"is_within_angular_bounds: {is_within_angular_bounds}")
     return bool(is_within_linear_bounds and is_within_angular_bounds)
