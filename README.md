@@ -28,7 +28,7 @@ ping $SPOT_IP
 
 If you get response like this, then you are on right network
 ```bash
-(spot_ros) kavitshah@frerd001:~$ ping $SPOT_IP
+(spot_ros) user@linux-machine:~$ ping $SPOT_IP
 PING 192.168.1.5 (192.168.1.5) 56(84) bytes of data.
 64 bytes from 192.168.1.5: icmp_seq=1 ttl=64 time=8.87 ms
 64 bytes from 192.168.1.5: icmp_seq=2 ttl=64 time=7.36 ms
@@ -110,7 +110,7 @@ git checkout main
 
 - You can verify if all ros nodes are up and running as expected if the output of `rostopic list` looks like the following
     ```bash
-    (spot_ros) kavitshah@frerd001:~$ rostopic list
+    (spot_ros) user@linux-machine:~$ rostopic list
     /filtered_hand_depth
     /filtered_head_depth
     /hand_rgb

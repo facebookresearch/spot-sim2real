@@ -8,10 +8,13 @@ cd spot-sim2real/
 git submodule update --init --recursive
 ```
 
-### Update the system packages
+### Update the system packages and install required pkgs
 
 ```bash
 sudo apt-get update
+sudo apt-get install gcc
+sudo apt-get install g++
+sudo apt install tmux
 ```
 
 ### Install Miniconda at /home/<user>
@@ -133,6 +136,7 @@ cd third_party/mask_rcnn_detectron2/ && pip install -e .
 git clone git@github.com:facebookresearch/detectron2.git
 pip install -e detectron2 && cd ../../
 ```
+If you face any issues in this step, refer to [this section in ISSUES.md](/installation/ISSUES.md#issues-while-running-setuppy-for-detectron2)
 
 ### Setup DeblurGAN
 
@@ -149,6 +153,7 @@ mamba install -c aihabitat habitat-sim==0.2.1 -y
 python setup.py develop --all
 cd ../../
 ```
+If you face any issues in this step, refer to [this section in ISSUES.md](/installation/ISSUES.md#issues-while-running-setuppy-for-habitat-lab)
 
 ### Download inceptionresnet weights
 
@@ -166,22 +171,13 @@ wget http://data.lip6.fr/cadene/pretrainedmodels/inceptionresnetv2-520b38e4.pth 
 sudo apt-get install libportaudio2
 ```
 
-### Setup SPOT Robot
 
-- Connect to robot's wifi, password for this wifi can be found in robot's belly after removing battery.
-- Make sure that the robot is in access point mode (update to client mode in future). Refer to [this](https://support.bostondynamics.com/s/article/Spot-network-setup) page for information regarding Spot's network setup.
-
-```bash
-echo 'export SPOT_ADMIN_PW=<your-spot-admin-password>' >> ~/.bashrc
-echo 'export SPOT_IP=<your-spot-ip>' >> ~/.bashrc
-source ~/.bash_profile
-```
-
-## Setting ROS env variables
+### Setting ROS env variables
 * If using **ROS on only 1 computer** (i.e. you don't need 2 or more machines in the ROS network), follow these steps
     ```bash
     echo 'export ROS_HOSTNAME=localhost' >> ~/.bashrc
     echo 'export ROS_MASTER_URI=http://localhost:11311' >> ~/.bashrc
+    source ~/.bashrc
     ```
 * If using **ROS across multiple computers**, follow these steps on each computer
     ```bash
@@ -189,10 +185,20 @@ source ~/.bash_profile
     echo 'export ROS_IP=<your_local_ip>' >> ~/.bashrc
     # ros_masters_ip = ip address of the computer running roscore
     echo 'export ROS_MASTER_URI=http://<ros_masters_ip>:11311' >> ~/.bashrc
+    source ~/.bashrc
     ```
 
 For assistance with finding the right ip of your computer, [please follow these steps](/installation/ISSUES.md#how-to-find-ip-address-of-local-computer).
 
+### Setup SPOT Robot
+- Connect to robot's wifi, password for this wifi can be found in robot's belly after removing battery.
+- Make sure that the robot is in access point mode (update to client mode in future). Refer to [this](https://support.bostondynamics.com/s/article/Spot-network-setup) page for information regarding Spot's network setup.
+
+```bash
+echo 'export SPOT_ADMIN_PW=<your-spot-admin-password>' >> ~/.bashrc
+echo 'export SPOT_IP=<your-spot-ip>' >> ~/.bashrc
+source ~/.bashrc
+```
 
 ### For Meta internal users (with Meta account), please check the following link for the ip and the password
 
