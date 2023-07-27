@@ -200,6 +200,21 @@ echo 'export SPOT_IP=<your-spot-ip>' >> ~/.bashrc
 source ~/.bashrc
 ```
 
+### Testing the setup by running simple navigation policy on robot
+1. Create waypoints.yaml file using the following command
+    ```bash
+    spot_rl_waypoint_recorder -x
+    ```
+2. Follow Steps 1,2,3,4 from [README.md](/README.md#running-the-demo-asclscseq-experts)
+3. Go to root of repo, and run simple command to move robot to a new waypoint using the navigation policy. This command will move robot 2.5m in front after undocking. **Ensure there is 2.5m space in front of dock**
+    ```bash
+    python spot_rl_experiments/spot_rl/envs/nav_env.py -w "test_receptacle"
+    ```
+4. Once the robot has moved, you can dock back the robot with the following command
+    ```bash
+    spot_rl_autodock
+    ```
+
 ### For Meta internal users (with Meta account), please check the following link for the ip and the password
 
 [Link](https://docs.google.com/document/d/1u4x4ZMjHDQi33PB5V2aTZ3snUIV9UdkSOV1zFhRq1Do/edit)

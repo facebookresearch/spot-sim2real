@@ -51,8 +51,24 @@ git rev-parse --abbrev-ref HEAD
 git checkout main
 ```
 
+## :light_rail: Try teleoperating the robot using keyboard
+### :rotating_light: Running Emergency Stop
+* Since we do not have a physical emergency stop button (like the large red push buttons), we need to run an e-stop node.
+    ```bash
+    python -m spot_wrapper.estop
+    ```
+
+- Keep this window open at all the times, if the robot starts misbehaving you should be able to quickly press `s` or `space_bar` to kill the robot
+
+### :musical_keyboard: Running keyboard teleop
+* Ensure you have the Estop up and running in one terminal. [Follow these instructions for e-stop](/README.md#rotating_light-running-emergency-stop)
+* Run keyboard teleop with this command in a new terminal
+    ```bash
+    spot_keyboard_teleop
+    ```
+
 ## :video_game: Instructions to record waypoints (use joystick to move robot around)
-- Before running scripts on the robot, waypoints should be recording. These waypoints exist inside file `spot-sim2real/spot_rl_experiments/configs/waypoints.yaml`
+- Before running scripts on the robot, waypoints should be recorded. These waypoints exist inside file `spot-sim2real/spot_rl_experiments/configs/waypoints.yaml`
 
 - Before recording receptacles, make the robot sit at home position then run following command
     ```bash
@@ -75,21 +91,6 @@ git checkout main
 
 
 ## :rocket: Running instructions
-### Running Emergency Stop
-* Since we do not have a physical emergency stop button (like the large red push buttons), we need to run an e-stop node.
-    ```bash
-    python -m spot_wrapper.estop
-    ```
-
-- Keep this window open at all the times, if the robot starts misbehaving you should be able to quickly press `s` or `space_bar` to kill the robot
-
-### Running keyboard teleop
-* Ensure you have the Estop up and running in one terminal. [Follow these instructions for e-stop](/README.md#running-emergency-stop)
-* Run keyboard teleop with this command in a new terminal
-    ```bash
-    spot_keyboard_teleop
-    ```
-
 ### Running the demo (ASC/LSC/Seq-Experts)
 #### Step1. Run the local launch executable
 - In a new terminal, run the executable as
@@ -155,8 +156,8 @@ git checkout main
 
 - The waypoints that were recorded are w.r.t the home location. Since the odometry drifts while robot is moving, **it is necessary to reset home before start of every new run**
 
-### Step4. Emergency stop
-- Follow the steps described in [e-stop section](/README.md#running-emergency-stop)
+#### Step4. Emergency stop
+- Follow the steps described in [e-stop section](/README.md#rotating_light-running-emergency-stop)
 
 
 #### Step5. Main demo code **in a new terminal**

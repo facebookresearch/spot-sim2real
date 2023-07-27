@@ -17,13 +17,16 @@ spot_rl_experiments_dir = osp.join(osp.dirname(spot_rl_dir))
 configs_dir = osp.join(spot_rl_experiments_dir, "configs")
 DEFAULT_CONFIG = osp.join(configs_dir, "config.yaml")
 WAYPOINTS_YAML = osp.join(configs_dir, "waypoints.yaml")
-with open(WAYPOINTS_YAML) as f:
-    WAYPOINTS = yaml.safe_load(f)
 
 ROS_TOPICS = osp.join(configs_dir, "ros_topic_names.yaml")
 ros_topics = CN()
 ros_topics.set_new_allowed(True)
 ros_topics.merge_from_file(ROS_TOPICS)
+
+
+def get_waypoint_yaml(waypoint_file=WAYPOINTS_YAML):
+    with open(waypoint_file) as f:
+        return yaml.safe_load(f)
 
 
 def get_default_parser():
@@ -53,20 +56,23 @@ def construct_config(opts=None):
 
 
 def nav_target_from_waypoints(waypoint):
-    goal_x, goal_y, goal_heading = WAYPOINTS[waypoint]
+    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
+    goal_x, goal_y, goal_heading = waypoints_yaml["nav_targets"][waypoint]
     return goal_x, goal_y, np.deg2rad(goal_heading)
 
 
 def place_target_from_waypoints(waypoint):
-    return np.array(WAYPOINTS["place_targets"][waypoint])
+    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
+    return np.array(waypoints_yaml["place_targets"][waypoint])
 
 
 def closest_clutter(x, y, clutter_blacklist=None):
+    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
     if clutter_blacklist is None:
         clutter_blacklist = []
     clutter_locations = [
         (np.array(nav_target_from_waypoints(w)[:2]), w)
-        for w in WAYPOINTS["clutter"]
+        for w in waypoints_yaml["clutter"]
         if w not in clutter_blacklist
     ]
     xy = np.array([x, y])
@@ -76,23 +82,26 @@ def closest_clutter(x, y, clutter_blacklist=None):
 
 
 def object_id_to_nav_waypoint(object_id):
+    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
     if isinstance(object_id, str):
-        for k, v in WAYPOINTS["object_targets"].items():
+        for k, v in waypoints_yaml["object_targets"].items():
             if v[0] == object_id:
                 object_id = int(k)
                 break
         if isinstance(object_id, str):
             KeyError(f"{object_id} not a valid class name!")
-    place_nav_target_name = WAYPOINTS["object_targets"][object_id][1]
+    place_nav_target_name = waypoints_yaml["object_targets"][object_id][1]
     return place_nav_target_name, nav_target_from_waypoints(place_nav_target_name)
 
 
 def object_id_to_object_name(object_id):
-    return WAYPOINTS["object_targets"][object_id][0]
+    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
+    return waypoints_yaml["object_targets"][object_id][0]
 
 
 def get_clutter_amounts():
-    return WAYPOINTS["clutter_amounts"]
+    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
+    return waypoints_yaml["clutter_amounts"]
 
 
 def arr2str(arr):

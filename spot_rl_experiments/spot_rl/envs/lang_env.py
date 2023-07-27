@@ -19,11 +19,11 @@ from spot_rl.models.sentence_similarity import SentenceSimilarity
 from spot_rl.real_policy import GazePolicy, MixerPolicy, NavPolicy, PlacePolicy
 from spot_rl.utils.remote_spot import RemoteSpot
 from spot_rl.utils.utils import (
-    WAYPOINTS,
     closest_clutter,
     construct_config,
     get_clutter_amounts,
     get_default_parser,
+    get_waypoint_yaml,
     nav_target_from_waypoints,
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
@@ -64,6 +64,9 @@ def main(spot, use_mixer, config, out_path=None):
     # Check if robot should return to base
     return_to_base = config.RETURN_TO_BASE
 
+    # Get the waypoints from waypoints.yaml
+    waypoints = get_waypoint_yaml()
+
     audio_to_text = WhisperTranslator()
     sentence_similarity = SentenceSimilarity()
     with initialize(config_path="../llm/src/conf"):
@@ -86,10 +89,10 @@ def main(spot, use_mixer, config, out_path=None):
 
     # Find closest nav_targets to the ones robot knows locations of
     nav_1 = sentence_similarity.get_most_similar_in_list(
-        nav_1, list(WAYPOINTS["nav_targets"].keys())
+        nav_1, list(waypoints["nav_targets"].keys())
     )
     nav_2 = sentence_similarity.get_most_similar_in_list(
-        nav_2, list(WAYPOINTS["nav_targets"].keys())
+        nav_2, list(waypoints["nav_targets"].keys())
     )
     print("MOST SIMILAR: ", nav_1, pick, nav_2)
 

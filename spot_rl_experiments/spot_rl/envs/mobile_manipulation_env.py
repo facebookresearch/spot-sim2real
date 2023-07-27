@@ -15,11 +15,11 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 from spot_rl.real_policy import GazePolicy, MixerPolicy, NavPolicy, PlacePolicy
 from spot_rl.utils.remote_spot import RemoteSpot
 from spot_rl.utils.utils import (
-    WAYPOINTS,
     closest_clutter,
     construct_config,
     get_clutter_amounts,
     get_default_parser,
+    get_waypoint_yaml,
     nav_target_from_waypoints,
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
@@ -63,9 +63,12 @@ def main(spot, use_mixer, config, out_path=None):
     # Check if robot should return to base
     return_to_base = config.RETURN_TO_BASE
 
+    # Get the waypoints from waypoints.yaml
+    waypoints = get_waypoint_yaml()
+
     objects_to_look = []
-    for waypoint in WAYPOINTS["object_targets"]:
-        objects_to_look.append(WAYPOINTS["object_targets"][waypoint][0])
+    for waypoint in waypoints["object_targets"]:
+        objects_to_look.append(waypoints["object_targets"][waypoint][0])
     rospy.set_param("object_target", ",".join(objects_to_look))
 
     env.power_robot()
@@ -77,7 +80,7 @@ def main(spot, use_mixer, config, out_path=None):
         if trip_idx < NUM_OBJECTS:
             # 2 objects per receptacle
             clutter_blacklist = [
-                i for i in WAYPOINTS["clutter"] if count[i] >= CLUTTER_AMOUNTS[i]
+                i for i in waypoints["clutter"] if count[i] >= CLUTTER_AMOUNTS[i]
             ]
             waypoint_name, waypoint = closest_clutter(
                 env.x, env.y, clutter_blacklist=clutter_blacklist
