@@ -64,11 +64,12 @@ def main(spot, use_mixer, config, out_path=None):
     return_to_base = config.RETURN_TO_BASE
 
     # Get the waypoints from waypoints.yaml
-    waypoints = get_waypoint_yaml()
+    waypoints_yaml_dict = get_waypoint_yaml()
 
     objects_to_look = []
-    for waypoint in waypoints["object_targets"]:
-        objects_to_look.append(waypoints["object_targets"][waypoint][0])
+    # @TODO: Make the read from dict more robust using new helpers from utils!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    for waypoint in waypoints_yaml_dict["object_targets"]:
+        objects_to_look.append(waypoints_yaml_dict["object_targets"][waypoint][0])
     rospy.set_param("object_target", ",".join(objects_to_look))
 
     env.power_robot()
@@ -80,7 +81,9 @@ def main(spot, use_mixer, config, out_path=None):
         if trip_idx < NUM_OBJECTS:
             # 2 objects per receptacle
             clutter_blacklist = [
-                i for i in waypoints["clutter"] if count[i] >= CLUTTER_AMOUNTS[i]
+                i
+                for i in waypoints_yaml_dict["clutter"]
+                if count[i] >= CLUTTER_AMOUNTS[i]
             ]
             waypoint_name, waypoint = closest_clutter(
                 env.x, env.y, clutter_blacklist=clutter_blacklist
@@ -95,7 +98,9 @@ def main(spot, use_mixer, config, out_path=None):
                 f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}."
             )
             if return_to_base:
-                waypoint = nav_target_from_waypoint("dock", waypoints=waypoints)
+                waypoint = nav_target_from_waypoint(
+                    "dock", waypoints_yaml=waypoints_yaml_dict
+                )
             else:
                 waypoint = None
                 break

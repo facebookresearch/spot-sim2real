@@ -15,6 +15,7 @@ from spot_rl.utils.json_helpers import save_json_file
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
+    get_waypoint_yaml,
     nav_target_from_waypoint,
 )
 from spot_wrapper.spot import Spot
@@ -139,6 +140,7 @@ if __name__ == "__main__":
     config = construct_config(args.opts)
     # Don't need gripper camera for Nav
     config.USE_MRCNN = False
+    waypoints_yaml_dict = get_waypoint_yaml()
 
     # Get nav_targets (list) to go to
     nav_target = None
@@ -150,7 +152,10 @@ if __name__ == "__main__":
             .split(",")
             if waypoint.strip() is not None
         ]
-        nav_targets = [nav_target_from_waypoint(waypoint) for waypoint in waypoints]
+        nav_targets = [
+            nav_target_from_waypoint(waypoint, waypoints_yaml_dict)
+            for waypoint in waypoints
+        ]
     else:
         assert args.goal is not None
         goal_x, goal_y, goal_heading = [float(i) for i in args.goal.split(",")]

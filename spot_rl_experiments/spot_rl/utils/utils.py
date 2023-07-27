@@ -23,6 +23,10 @@ ros_topics = CN()
 ros_topics.set_new_allowed(True)
 ros_topics.merge_from_file(ROS_TOPICS)
 
+# @TODO: CLEAN UP THIS FILE
+# @TODO: Make a CLass to read all data from yaml file
+# @TODO: Make reading from dictionary more robust by using get() method
+
 
 def get_waypoint_yaml(waypoint_file=WAYPOINTS_YAML):
     with open(waypoint_file) as f:
@@ -56,11 +60,13 @@ def construct_config(opts=None):
 
 
 def nav_target_from_waypoint(waypoint, waypoints_yaml):
-    
+
     waypoints_yaml_nav_target_dict = waypoints_yaml.get("nav_targets")
     if waypoints_yaml_nav_target_dict is None:
-        raise Exception("No `nav_targets` found in waypoints.yaml. Please construct waypoints.yaml correctly as per the README.md")
-    
+        raise Exception(
+            "No `nav_targets` found in waypoints.yaml. Please construct waypoints.yaml correctly as per the README.md"
+        )
+
     nav_target = waypoints_yaml_nav_target_dict.get(waypoint)
     if nav_target is None:
         raise Exception(
@@ -101,7 +107,9 @@ def object_id_to_nav_waypoint(object_id):
         if isinstance(object_id, str):
             KeyError(f"{object_id} not a valid class name!")
     place_nav_target_name = waypoints_yaml["object_targets"][object_id][1]
-    return place_nav_target_name, nav_target_from_waypoint(place_nav_target_name, waypoints_yaml)
+    return place_nav_target_name, nav_target_from_waypoint(
+        place_nav_target_name, waypoints_yaml
+    )
 
 
 def object_id_to_object_name(object_id):

@@ -10,6 +10,7 @@ from spot_rl.real_policy import GazePolicy
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
+    get_waypoint_yaml,
     nav_target_from_waypoint,
     object_id_to_object_name,
 )
@@ -20,12 +21,15 @@ def main(spot):
     parser = get_default_parser()
     args = parser.parse_args()
     config = construct_config(args.opts)
+    waypoint_yaml = get_waypoint_yaml()
 
     env = SpotGazeEnv(config, spot, mask_rcnn_weights=config.WEIGHTS.MRCNN)
     env.power_robot()
     policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
     for target_id in range(1, 9):
-        goal_x, goal_y, goal_heading = nav_target_from_waypoint("white_box")
+        goal_x, goal_y, goal_heading = nav_target_from_waypoint(
+            "white_box", waypoints_yaml=waypoint_yaml
+        )
         spot.set_base_position(
             x_pos=goal_x, y_pos=goal_y, yaw=goal_heading, end_time=100, blocking=True
         )
