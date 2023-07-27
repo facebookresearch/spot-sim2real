@@ -542,7 +542,6 @@ dependencies:
     - pyasn1==0.4.8
     - pyasn1-modules==0.2.8
     - pybullet==3.2.2
-    - pycocotools==2.0.4
     - pygments==2.11.2
     - pyjwt==2.3.0
     - python-gflags==3.1.2
@@ -568,7 +567,6 @@ dependencies:
     - tensorboard-data-server==0.6.1
     - tensorboard-plugin-wit==1.8.1
     - tensorboardx==2.5
-      tensorflow==2.9.0
     - tensorflow-estimator==2.9.0rc0
     - tensorflow-io-gcs-filesystem==0.24.0
     - termcolor==1.1.0
