@@ -201,3 +201,6 @@ If you find this repository helpful, feel free to cite our papers: [Adaptive Ski
     howpublished={\url{https://languageguidedskillcoordination.github.io/}}
 }
 ```
+
+## License
+Spot-Sim2Real is MIT licensed. See the [LICENSE file](/LICENSE) for details.
