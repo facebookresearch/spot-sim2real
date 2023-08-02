@@ -111,7 +111,6 @@ nav_targets: # i.e., where the robot needs to navigate to (x,y,yaw)
 
         return init_yaml_dict
 
-    @staticmethod
     def read_yaml(self, waypoint_file: str):
         """
         Read a yaml file and returns a dict
@@ -140,7 +139,6 @@ nav_targets: # i.e., where the robot needs to navigate to (x,y,yaw)
 
         return yaml_dict
 
-    @staticmethod
     def write_yaml(self, waypoint_file: str, yaml_dict):
         """
         Write the yaml_dict into the yaml_file.
