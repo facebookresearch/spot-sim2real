@@ -20,7 +20,7 @@ from spot_rl.utils.utils import (
     get_clutter_amounts,
     get_default_parser,
     get_waypoint_yaml,
-    nav_target_from_waypoints,
+    nav_target_from_waypoint,
     object_id_to_nav_waypoint,
     place_target_from_waypoints,
 )
@@ -64,11 +64,11 @@ def main(spot, use_mixer, config, out_path=None):
     return_to_base = config.RETURN_TO_BASE
 
     # Get the waypoints from waypoints.yaml
-    waypoints = get_waypoint_yaml()
+    waypoints_yaml_dict = get_waypoint_yaml()
 
     objects_to_look = []
-    for waypoint in waypoints["object_targets"]:
-        objects_to_look.append(waypoints["object_targets"][waypoint][0])
+    for waypoint in waypoints_yaml_dict["object_targets"]:
+        objects_to_look.append(waypoints_yaml_dict["object_targets"][waypoint][0])
     rospy.set_param("object_target", ",".join(objects_to_look))
 
     env.power_robot()
@@ -80,7 +80,9 @@ def main(spot, use_mixer, config, out_path=None):
         if trip_idx < NUM_OBJECTS:
             # 2 objects per receptacle
             clutter_blacklist = [
-                i for i in waypoints["clutter"] if count[i] >= CLUTTER_AMOUNTS[i]
+                i
+                for i in waypoints_yaml_dict["clutter"]
+                if count[i] >= CLUTTER_AMOUNTS[i]
             ]
             waypoint_name, waypoint = closest_clutter(
                 env.x, env.y, clutter_blacklist=clutter_blacklist
@@ -95,7 +97,9 @@ def main(spot, use_mixer, config, out_path=None):
                 f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}."
             )
             if return_to_base:
-                waypoint = nav_target_from_waypoints("dock")
+                waypoint = nav_target_from_waypoint(
+                    "dock", waypoints_yaml=waypoints_yaml_dict
+                )
             else:
                 waypoint = None
                 break
@@ -404,7 +408,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--use-mixer", action="store_true")
     parser.add_argument("--output")
     args = parser.parse_args()
-    config = construct_config(args.opts)
+    config = construct_config(opts=args.opts)
     spot = (RemoteSpot if config.USE_REMOTE_SPOT else Spot)("RealSeqEnv")
     if config.USE_REMOTE_SPOT:
         try:

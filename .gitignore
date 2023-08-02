@@ -7,3 +7,4 @@ spot_rl_experiments/spot_rl.egg-info/**
 spot_rl_experiments/configs/waypoints.yaml
 
 **/grasp_visualizations/**
+**/temp_recordings/**
