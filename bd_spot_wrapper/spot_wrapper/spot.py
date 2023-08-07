@@ -691,6 +691,14 @@ class SpotLease:
     """
     A class that supports execution with Python's "with" statement for safe return of
     the lease and settle-then-estop upon exit. Grants control of the Spot's motors.
+
+    Args:
+        spot: A Spot instance.
+        hijack: If True, hijack the lease from another client.
+
+    Example:
+        with SpotLease(spot) as lease:
+            # Do stuff with the robot
     """
 
     def __init__(self, spot, hijack=False):
@@ -717,13 +725,27 @@ class SpotLease:
         self.spot.spot_lease = None
 
     def create_sublease(self):
+        """
+        Create a sublease of the current lease.
+
+        Returns:
+            A bosdyn.client.lease.LeaseClient.Lease object. This sublease is a copy of the current lease.
+        """
         return self.lease.create_sublease()
 
 
 def make_robot_command(arm_joint_traj):
-    """Helper function to create a RobotCommand from an ArmJointTrajectory.
+    """
+    Helper function to create a RobotCommand from an ArmJointTrajectory.
     The returned command will be a SynchronizedCommand with an ArmJointMoveCommand
-    filled out to follow the passed in trajectory."""
+    filled out to follow the passed in trajectory.
+
+    Args:
+        arm_joint_traj: Arm joint trajectory that we want robot to follow.
+
+    Returns:
+        A RobotCommand object for achieving requesting arm joint trajectory.
+    """
 
     joint_move_command = arm_command_pb2.ArmJointMoveCommand.Request(
         trajectory=arm_joint_traj
@@ -739,6 +761,15 @@ def make_robot_command(arm_joint_traj):
 
 
 def image_response_to_cv2(image_response, reorient=True):
+    """
+    Convert the image response received from BD client to a cv2 image.
+
+    Args:
+        image_response: The output of a bosdyn.client.image.ImageClient.get_image() call.
+        reorient: If True, reorient the image to be upright.
+
+    Returns:
+        A cv2 image."""
     if image_response.shot.image.pixel_format == image_pb2.Image.PIXEL_FORMAT_DEPTH_U16:
         dtype = np.uint16
     else:
@@ -752,6 +783,7 @@ def image_response_to_cv2(image_response, reorient=True):
     else:
         img = cv2.imdecode(img, -1)
 
+    # WHAT IN THE WORLD IS THIS SECONDS CONDITION DOING?
     if reorient and image_response.source.name in SHOULD_ROTATE:
         img = np.rot90(img, k=3)
 
@@ -759,6 +791,18 @@ def image_response_to_cv2(image_response, reorient=True):
 
 
 def scale_depth_img(img, min_depth=0.0, max_depth=10.0, as_img=False):
+    """
+    Scale a depth image.
+
+    Args:
+        img: A depth image.
+        min_depth: Minimum depth value.
+        max_depth: Maximum depth value.
+        as_img: If True, return a scaled image as a cv2 image. Otherwise, return a scaled image as a numpy array.
+
+    Returns:
+        A scaled depth image (as a numpy array or cv2 image)
+    """
     min_depth, max_depth = min_depth * 1000, max_depth * 1000
     img_copy = np.clip(img.astype(np.float32), a_min=min_depth, a_max=max_depth)
     img_copy = (img_copy - min_depth) / (max_depth - min_depth)
@@ -769,6 +813,15 @@ def scale_depth_img(img, min_depth=0.0, max_depth=10.0, as_img=False):
 
 
 def draw_crosshair(img):
+    """
+    Draw a crosshair at the center of the image.
+
+    Args:
+        img: A cv2 image.
+
+    Returns:
+        A cv2 image with a crosshair drawn at the center.
+    """
     height, width = img.shape[:2]
     cx, cy = width // 2, height // 2
     img = cv2.circle(
@@ -783,5 +836,13 @@ def draw_crosshair(img):
 
 
 def wrap_heading(heading):
-    """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
+    """
+    Wrap a heading to be between -pi and pi.
+
+    Args:
+        heading: A heading in radians (can be float or numpy array)
+
+    Returns:
+        Heading wrapped between -pi and pi.
+    """
     return (heading + np.pi) % (2 * np.pi) - np.pi

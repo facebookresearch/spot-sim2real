@@ -52,9 +52,20 @@ class EstopNoGui:
 
     To use this estop, create an instance of the EstopNoGui class and use the stop() and allow()
     functions programmatically.
+
+    Example:
+        estop_nogui = EstopNoGui(client, 15)
+        # To allow the robot to move, enable the estop
+        estop.allow()
+
+        # To instantly stop the robot (hard kill-switch), disable the estop
+        estop.stop()
     """
 
     def __init__(self, client, timeout_sec, name=None):
+        """
+        Create an instance of the EstopNoGui class.
+        """
         # Force server to set up a single endpoint system
         ep = EstopEndpoint(client, name, timeout_sec)
         ep.force_simple_setup()
@@ -69,16 +80,34 @@ class EstopNoGui:
         pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Cleanly shut down estop on exit."""
+        """
+        Cleanly shut down estop on exit.
+
+        Args:
+            exc_type: Exception type
+            exc_val: Exception value
+            exc_tb: Exception traceback
+        """
         self.estop_keep_alive.end_periodic_check_in()
 
     def stop(self):
+        """
+        Stop the robot. This will cause the robot to stop moving and instantly cut power to the motors.
+
+        CAUTION: This will make the robot collapse. Also see settle_then_cut().
+        """
         self.estop_keep_alive.stop()
 
     def allow(self):
+        """
+        Allow the robot to move again.
+        """
         self.estop_keep_alive.allow()
 
     def settle_then_cut(self):
+        """
+        Stop the robot, wait for it to settle (sit), then cut power to the motors.
+        """
         self.estop_keep_alive.settle_then_cut()
 
 
