@@ -123,6 +123,26 @@ def arr2str(arr):
     return
 
 
+def map_user_input_to_boolean(prompt):
+    """
+    Maps user input to boolean
+
+    Args:
+        prompt (str): Prompt to display to user
+
+    Returns:
+        bool: True if user input is y or yes, False if user input is n or no
+    """
+    while True:
+        user_input = input(prompt + "(y/n): ").strip()
+        if user_input.lower() in ["y", "yes"]:
+            return True
+        elif user_input.lower() in ["n", "no"]:
+            return False
+        else:
+            print("Please enter a valid input - y, yes, n or no")
+
+
 class FixSizeOrderedDict(OrderedDict):
     def __init__(self, *args, maxlen=0, **kwargs):
         self._maxlen = maxlen

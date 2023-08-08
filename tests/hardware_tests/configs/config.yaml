@@ -13,7 +13,7 @@ PARALLEL_INFERENCE_MODE: True
 
 # General env params
 CTRL_HZ: 2.0
-MAX_EPISODE_STEPS: 500
+MAX_EPISODE_STEPS: 500 # Locally updated in test_gaze_env
 
 # Nav env
 SUCCESS_DISTANCE: 0.3
