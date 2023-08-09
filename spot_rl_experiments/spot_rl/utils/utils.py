@@ -72,9 +72,19 @@ def nav_target_from_waypoint(waypoint, waypoints_yaml):
     return goal_x, goal_y, np.deg2rad(goal_heading)
 
 
-def place_target_from_waypoints(waypoint):
-    waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
-    return np.array(waypoints_yaml["place_targets"][waypoint])
+def place_target_from_waypoint(waypoint, waypoints_yaml):
+    waypoints_yaml_place_target_dict = waypoints_yaml.get("place_targets")
+    if waypoints_yaml_place_target_dict is None:
+        raise Exception(
+            "No `place_targets` found in waypoints.yaml. Please construct waypoints.yaml correctly as per the README.md"
+        )
+
+    place_target = waypoints_yaml_place_target_dict.get(waypoint)
+    if place_target is None:
+        raise Exception(
+            f"Requested waypoint - {waypoint} does not exist inside `place_targets` in file waypoints.yaml. Please construct waypoints.yaml correctly as per the README.md"
+        )
+    return np.array(place_target)
 
 
 def closest_clutter(x, y, clutter_blacklist=None):

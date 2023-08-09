@@ -30,9 +30,13 @@ def main(spot: Spot):
     try:
         for point in GRIPPER_WAYPOINTS:
             spot.loginfo("TRAVELING TO WAYPOINT")
-            cmd_id = spot.move_gripper_to_point(point, [0.0, 0.0, 0.0])
-            spot.block_until_arm_arrives(cmd_id, timeout_sec=10)
-            spot.loginfo("REACHED WAYPOINT")
+            success_status = spot.move_gripper_to_point(
+                point, [0.0, 0.0, 0.0], timeout_sec=10
+            )
+            if success_status:
+                spot.loginfo("REACHED WAYPOINT")
+            else:
+                spot.loginfo("FAILED TO REACH WAYPOINT")
     finally:
         spot.power_off()
 

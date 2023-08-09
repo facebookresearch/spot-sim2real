@@ -52,6 +52,7 @@ from bosdyn.client.robot_command import (
     blocking_stand,
 )
 from bosdyn.client.robot_state import RobotStateClient
+from bosdyn.util import seconds_to_duration
 from google.protobuf import wrappers_pb2
 
 # Get Spot password and IP address
@@ -224,7 +225,9 @@ class Spot:
         self.set_arm_joint_positions(new_arm_joint_states)
         time.sleep(0.5)
 
-    def move_gripper_to_point(self, point, rotation):
+    def move_gripper_to_point(
+        self, point, rotation, seconds_to_goal=3.0, timeout_sec=10
+    ):
         """
         Moves EE to a point relative to body frame
         :param point: XYZ location
@@ -245,7 +248,12 @@ class Spot:
 
         hand_pose = math_helpers.SE3Pose(*point, quat)
         hand_trajectory = trajectory_pb2.SE3Trajectory(
-            points=[trajectory_pb2.SE3TrajectoryPoint(pose=hand_pose.to_proto())]
+            points=[
+                trajectory_pb2.SE3TrajectoryPoint(
+                    pose=hand_pose.to_proto(),
+                    time_since_reference=seconds_to_duration(seconds_to_goal),
+                )
+            ]
         )
         arm_cartesian_command = arm_command_pb2.ArmCartesianCommand.Request(
             pose_trajectory_in_task=hand_trajectory,
@@ -264,10 +272,13 @@ class Spot:
         )
         cmd_id = self.command_client.robot_command(command)
 
-        return cmd_id
+        success_status = self.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+        return success_status
 
     def block_until_arm_arrives(self, cmd_id, timeout_sec=5):
-        block_until_arm_arrives(self.command_client, cmd_id, timeout_sec=timeout_sec)
+        return block_until_arm_arrives(
+            self.command_client, cmd_id, timeout_sec=timeout_sec
+        )
 
     def get_image_responses(self, sources, quality=None):
         """Retrieve images from Spot's cameras
