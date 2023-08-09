@@ -55,6 +55,28 @@ def parse_arguments(args=sys.argv[1:]):
     return args
 
 
+def construct_config_for_nav(file_path=None, opts=[]):
+    """
+    Constructs and updates the config for nav
+
+    Args:
+        file_path (str): Path to the config file
+        opts (list): List of options to update the config
+
+    Returns:
+        config (Config): Updated config object
+    """
+    config = None
+    if file_path is None:
+        config = construct_config(opts=opts)
+    else:
+        config = construct_config(file_path=file_path, opts=opts)
+
+    # Don't need gripper camera for Nav
+    config.USE_MRCNN = False
+    return config
+
+
 class WaypointController:
     """
     WaypointController is used to navigate the robot to a given waypoint.
@@ -196,9 +218,7 @@ class SpotNavEnv(SpotBaseEnv):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    config = construct_config(opts=args.opts)
-    # Don't need gripper camera for Nav
-    config.USE_MRCNN = False
+    config = construct_config_for_nav(opts=args.opts)
     waypoints_yaml_dict = get_waypoint_yaml()
 
     # Get nav_targets_list (list) to go to

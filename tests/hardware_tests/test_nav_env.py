@@ -9,15 +9,10 @@ from typing import Dict, List
 
 import numpy as np
 import pytest
-import yaml
-from spot_rl.envs.nav_env import WaypointController
+from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
 from spot_rl.utils.geometry_utils import compute_dtw_scores, is_pose_within_bounds
 from spot_rl.utils.json_helpers import load_json_files
-from spot_rl.utils.utils import (
-    construct_config,
-    get_waypoint_yaml,
-    nav_target_from_waypoint,
-)
+from spot_rl.utils.utils import get_waypoint_yaml, nav_target_from_waypoint
 from spot_wrapper.spot import Spot
 
 hardware_tests_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,9 +33,7 @@ def init_config():
     Returns:
         config: Config object
     """
-    config = construct_config(file_path=TEST_CONFIGS_YAML, opts=[])
-    # Don't need gripper camera for Nav
-    config.USE_MRCNN = False
+    config = construct_config_for_nav(file_path=TEST_CONFIGS_YAML, opts=[])
     # Record the waypoints for test
     config.RECORD_TRAJECTORY = True
 
