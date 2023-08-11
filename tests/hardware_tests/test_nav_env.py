@@ -163,6 +163,7 @@ def test_nav_square():
     test_spot = Spot("NavEnvHardwareTest")
     test_traj = None
     with test_spot.get_lease(hijack=True):
+        test_spot.power_robot()
         wp_controller = WaypointController(
             config=config, spot=test_spot, should_record_trajectories=True
         )
@@ -174,7 +175,7 @@ def test_nav_square():
                 "Pytest raised an error while executing WaypointController.execute from test_nav_env.py"
             )
         finally:
-            wp_controller.shutdown(should_dock=True)
+            test_spot.shutdown(should_dock=False)
 
     assert test_traj is not []
     assert len(test_traj) == len(test_waypoints)

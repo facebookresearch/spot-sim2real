@@ -18,8 +18,6 @@ from spot_rl.utils.utils import (
 )
 from spot_wrapper.spot import Spot
 
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-
 
 def parse_arguments(args=sys.argv[1:]):
     parser = get_default_parser()
@@ -91,15 +89,18 @@ class GazeController:
     How to use:
         1. Create a GazeController object
         2. Call execute() method with the target object list
-        3. Call shutdown() to stop the robot
 
     Example:
-        config = construct_config(opts=[])
+        config = construct_config_for_gaze(opts=[])
         spot = Spot("spot_client_name")
-        gaze_target_list = ["apple", "banana"]
-        gaze_controller = GazeController(config, spot)
-        gaze_results = gaze_controller.execute(gaze_target_list)
-        gaze_controller.shutdown()
+        with spot.get_lease(hijack=True):
+            spot.power_robot()
+
+            gaze_target_list = ["apple", "banana"]
+            gaze_controller = GazeController(config, spot)
+            gaze_results = gaze_controller.execute(gaze_target_list)
+
+            spot.shutdown(should_dock=True)
     """
 
     def __init__(self, config, spot):
@@ -111,7 +112,6 @@ class GazeController:
         self.policy.reset()
 
         self.gaze_env = SpotGazeEnv(config, spot)
-        self.gaze_env.power_robot()
 
     def reset_env_and_policy(self, target_obj_name):
         """
@@ -171,29 +171,6 @@ class GazeController:
                 }
             )
         return gaze_success_list
-
-    def shutdown(self, should_dock=False) -> None:
-        """
-        Stops the robot and docks it if should_dock is True else sits the robot down
-
-        Args:
-            should_dock: bool indicating whether to dock the robot or not
-        """
-        try:
-            if should_dock:
-                self.gaze_env.say("Executing automatic docking")
-                dock_start_time = time.time()
-                while time.time() - dock_start_time < 2:
-                    try:
-                        self.spot.dock(dock_id=DOCK_ID, home_robot=True)
-                    except Exception:
-                        print("Dock not found... trying again")
-                        time.sleep(0.1)
-            else:
-                self.gaze_env.say("Will sit down here")
-                self.spot.sit()
-        finally:
-            self.spot.power_off()
 
 
 class SpotGazeEnv(SpotBaseEnv):
@@ -260,9 +237,10 @@ if __name__ == "__main__":
 
     print(f"Target_objects list - {target_objects_list}")
     with spot.get_lease(hijack=True):
+        spot.power_robot()
         gaze_controller = GazeController(config, spot)
         try:
             gaze_result = gaze_controller.execute(target_objects_list)
             print(gaze_result)
         finally:
-            gaze_controller.shutdown()
+            spot.shutdown(should_dock=True)

@@ -53,6 +53,7 @@ def test_place():
     test_spot = Spot("PlaceEnvHardwareTest")
     test_result = None
     with test_spot.get_lease(hijack=True):
+        test_spot.power_robot()
         place_controller = PlaceController(
             config=config, spot=test_spot, use_policies=False
         )
@@ -66,7 +67,7 @@ def test_place():
                 "Pytest raised an error while executing PlaceController.execute from test_place_env.py"
             )
         finally:
-            place_controller.shutdown(should_dock=True)
+            test_spot.shutdown(should_dock=False)
 
     print(f"Place test results : {test_result}")
     assert test_result is not []

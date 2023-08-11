@@ -26,7 +26,7 @@ def main(spot, idx):
     policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
 
     env = SpotNavEnv(config, spot)
-    env.power_robot()
+    spot.power_robot()
 
     start_waypoint, goal_waypoint = ROUTES[idx]
 

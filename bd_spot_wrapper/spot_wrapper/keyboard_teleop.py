@@ -74,8 +74,7 @@ def raise_error(sig, frame):
 
 def main(spot: Spot):
     """Uses IK to move the arm by setting hand poses"""
-    spot.power_on()
-    spot.blocking_stand()
+    spot.power_robot()
 
     # Open the gripper
     spot.open_gripper()

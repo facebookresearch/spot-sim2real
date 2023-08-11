@@ -83,6 +83,9 @@ ARM_6DOF_NAMES = [
 
 HOME_TXT = osp.join(osp.dirname(osp.abspath(__file__)), "home.txt")
 
+# Get Spot DOCK ID
+DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
+
 
 class SpotCamIds:
     r"""Enumeration of types of cameras."""
@@ -167,15 +170,25 @@ class Spot:
     def is_estopped(self):
         return self.robot.is_estopped()
 
+    def is_powered_on(self):
+        return self.robot.is_powered_on()
+
     def power_on(self, timeout_sec=20):
-        self.robot.power_on(timeout_sec=timeout_sec)
-        assert self.robot.is_powered_on(), "Robot power on failed."
+        if not self.is_powered_on():
+            self.loginfo("Powering robot on...")
+            self.robot.power_on(timeout_sec=timeout_sec)
+
+        assert self.is_powered_on(), "Robot power on failed."
         self.loginfo("Robot powered on.")
 
     def power_off(self, cut_immediately=False, timeout_sec=20):
-        self.loginfo("Powering robot off...")
-        self.robot.power_off(cut_immediately=cut_immediately, timeout_sec=timeout_sec)
-        assert not self.robot.is_powered_on(), "Robot power off failed."
+        if self.is_powered_on():
+            self.loginfo("Powering robot off...")
+            self.robot.power_off(
+                cut_immediately=cut_immediately, timeout_sec=timeout_sec
+            )
+
+        assert not self.is_powered_on(), "Robot power off failed."
         self.loginfo("Robot safely powered off.")
 
     def blocking_stand(self, timeout_sec=10):
@@ -689,13 +702,59 @@ class Spot:
         ).parent_tform_child
         return kin_state.position, kin_state.rotation
 
-    def dock(self, dock_id, home_robot=False):
+    # WHY IS DEFAUULT HOME_ROBOT=FALSE???
+    def dock(self, dock_id: int = DOCK_ID, home_robot: bool = False) -> None:
+        """
+        Dock the robot to the specified dock
+        `blocking_dock_robot` will also move the robot to the dock if the dock is in view
+        otherwise it will look for the dock at its current location
+
+        Args:
+            dock_id: The dock to dock to
+            home_robot: Whether to reset home the robot after docking
+        """
         blocking_dock_robot(self.robot, dock_id)
         if home_robot:
             self.home_robot()
 
     def undock(self):
         blocking_undock(self.robot)
+
+    def power_robot(self):
+        """
+        Power on the robot and undock/stand up
+        """
+        self.power_on()
+
+        # Undock if docked, otherwise stand up
+        try:
+            self.undock()
+        except Exception:
+            print("Undocking failed: just standing up instead...")
+            self.blocking_stand()
+
+    def shutdown(self, should_dock: bool = False) -> None:
+        """
+        Stops the robot and docks it if should_dock is True else sits the robot down
+
+        Args:
+            should_dock: bool indicating whether to dock the robot or not
+        """
+        try:
+            if should_dock:
+                print("Executing automatic docking")
+                dock_start_time = time.time()
+                while time.time() - dock_start_time < 2:
+                    try:
+                        self.dock(dock_id=DOCK_ID, home_robot=True)
+                    except Exception:
+                        print("Dock not found... trying again")
+                        time.sleep(0.1)
+            else:
+                print("Will sit down here")
+                self.sit()
+        finally:
+            self.power_off()
 
 
 class SpotLease:

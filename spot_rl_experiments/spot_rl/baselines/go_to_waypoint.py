@@ -14,8 +14,6 @@ from spot_rl.utils.utils import (
 )
 from spot_wrapper.spot import Spot
 
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-
 
 def main(spot):
     parser = get_default_parser()
@@ -44,8 +42,7 @@ def main(spot):
     else:
         kwargs = {}
 
-    spot.power_on()
-    spot.blocking_stand()
+    spot.power_robot()
     try:
         cmd_id = spot.set_base_position(
             x_pos=goal_x,
@@ -61,16 +58,9 @@ def main(spot):
             cmd_status = (
                 feedback_resp.feedback.synchronized_feedback.mobility_command_feedback
             ).se2_trajectory_feedback.status
-        if args.dock:
-            dock_start_time = time.time()
-            while time.time() - dock_start_time < 2:
-                try:
-                    spot.dock(dock_id=DOCK_ID, home_robot=True)
-                except Exception:
-                    print("Dock not found... trying again")
-                    time.sleep(0.1)
+
     finally:
-        spot.power_off()
+        spot.shutdown(should_dock=args.dock)
 
 
 if __name__ == "__main__":

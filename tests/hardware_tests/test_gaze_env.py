@@ -42,6 +42,7 @@ def test_gaze():
     test_spot = Spot("GazeEnvHardwareTest")
     test_result = None
     with test_spot.get_lease(hijack=True):
+        test_spot.power_robot()
         gaze_controller = GazeController(config, test_spot)
 
         # Test gaze
@@ -54,7 +55,7 @@ def test_gaze():
                 "Pytest raised an error while executing GazeController.execute from test_gaze_env.py"
             )
         finally:
-            gaze_controller.shutdown()
+            test_spot.shutdown(should_dock=False)
 
     assert test_result is not None
     assert len(test_result) == len(test_target_objects)
