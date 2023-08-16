@@ -189,9 +189,9 @@ class GazeController:
 class SpotGazeEnv(SpotBaseEnv):
     def __init__(self, config, spot):
         super().__init__(config, spot)
-        self.target_obj_name = self.config.TARGET_OBJ_NAME
+        self.target_obj_name = None
 
-    def reset(self, target_obj_name=None, *args, **kwargs):
+    def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
@@ -201,8 +201,6 @@ class SpotGazeEnv(SpotBaseEnv):
         self.spot.open_gripper()
 
         # Update target object name as provided in config
-        if target_obj_name is None:
-            target_obj_name = self.config.TARGET_OBJ_NAME
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
 
