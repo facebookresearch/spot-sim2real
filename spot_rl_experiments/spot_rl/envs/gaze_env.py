@@ -147,7 +147,7 @@ class GazeController:
             # Ask user for feedback about the success of the gaze and update the "success" flag accordingly
             success_status_from_user_feedback = True
             if take_user_input:
-                user_prompt = f"Did the robot successfully picked at the right object - {target_object}?"
+                user_prompt = f"Did the robot successfully pick the right object - {target_object}?"
                 success_status_from_user_feedback = map_user_input_to_boolean(
                     user_prompt
                 )
