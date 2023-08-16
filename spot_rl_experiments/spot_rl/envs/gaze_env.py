@@ -20,8 +20,6 @@ from spot_rl.utils.utils import (
 )
 from spot_wrapper.spot import Spot, wrap_heading
 
-DEBUG = False
-
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 
@@ -221,12 +219,6 @@ class SpotGazeEnv(SpotBaseEnv):
 
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
-        # CAN WE REMOVE THIS????
-        if DEBUG:
-            img = np.uint8(arm_depth_bbox * 255).reshape(*arm_depth_bbox.shape[:2])
-            img2 = np.uint8(arm_depth * 255).reshape(*arm_depth.shape[:2])
-            cv2.imwrite(f"arm_bbox_{self.num_steps:03}.png", img)
-            cv2.imwrite(f"arm_depth_{self.num_steps:03}.png", img2)
         observations = {
             "joint": self.get_arm_joints(),
             "arm_depth": arm_depth,
