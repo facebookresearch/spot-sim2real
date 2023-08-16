@@ -5,9 +5,7 @@
 
 
 import os
-from typing import Dict, List
 
-import numpy as np
 import pytest
 from spot_rl.envs.gaze_env import (
     GazeController,
@@ -18,12 +16,6 @@ from spot_wrapper.spot import Spot
 
 hardware_tests_dir = os.path.dirname(os.path.abspath(__file__))
 test_configs_dir = os.path.join(hardware_tests_dir, "configs")
-test_data_dir = os.path.join(hardware_tests_dir, "data")
-test_nav_trajectories_dir = os.path.join(test_data_dir, "nav_trajectories")
-test_square_nav_trajectories_dir = os.path.join(
-    test_nav_trajectories_dir, "square_of_side_200cm"
-)
-TEST_WAYPOINTS_YAML = os.path.join(test_configs_dir, "waypoints.yaml")
 TEST_CONFIGS_YAML = os.path.join(test_configs_dir, "config.yaml")
 
 

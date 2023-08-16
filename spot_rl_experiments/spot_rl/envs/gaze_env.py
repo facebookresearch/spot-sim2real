@@ -235,6 +235,9 @@ if __name__ == "__main__":
     spot = Spot("RealGazeEnv")
     args = parse_arguments()
     config = construct_config_for_gaze(opts=args.opts)
+
+    # Since the gaze_controller can also be used for multiple gaze,
+    # update the config if user wants to gaze at multiple objects
     max_episode_steps = (
         args.max_episode_steps
         if args.max_episode_steps is not None
