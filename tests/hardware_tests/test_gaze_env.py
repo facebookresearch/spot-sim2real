@@ -7,11 +7,8 @@
 import os
 
 import pytest
-from spot_rl.envs.gaze_env import (
-    GazeController,
-    construct_config_for_gaze,
-    update_config_for_multiple_gaze,
-)
+from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
+from spot_rl.utils.utils import get_default_parser
 from spot_wrapper.spot import Spot
 
 hardware_tests_dir = os.path.dirname(os.path.abspath(__file__))
@@ -26,12 +23,14 @@ def init_config():
     Returns:
         config: Config object
     """
-    config = construct_config_for_gaze(file_path=TEST_CONFIGS_YAML, opts=[])
+    args = get_default_parser().parse_args()
 
-    # Update config for multiple gaze
-    config = update_config_for_multiple_gaze(
-        config, dont_pick_up=True, max_episode_steps=150
-    )
+    # Update args for gaze locally here
+    args.dont_pick_up = True
+    args.max_episode_steps = 150
+
+    # Construct config for gaze
+    config = construct_config_for_gaze(args, file_path=TEST_CONFIGS_YAML)
 
     return config
 

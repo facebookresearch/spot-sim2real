@@ -8,8 +8,6 @@ import sys
 import time
 from typing import Dict, List
 
-import cv2
-import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.real_policy import GazePolicy
@@ -18,7 +16,7 @@ from spot_rl.utils.utils import (
     get_default_parser,
     map_user_input_to_boolean,
 )
-from spot_wrapper.spot import Spot, wrap_heading
+from spot_wrapper.spot import Spot
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
@@ -44,7 +42,7 @@ def parse_arguments(args=sys.argv[1:]):
     return args
 
 
-def construct_config_for_gaze(file_path=None, opts=[]):
+def construct_config_for_gaze(args, file_path=None):
     """
     Constructs and updates the config for gaze
 
@@ -57,32 +55,26 @@ def construct_config_for_gaze(file_path=None, opts=[]):
     """
     config = None
     if file_path is None:
-        config = construct_config(opts=opts)
+        config = construct_config(opts=args.opts)
     else:
-        config = construct_config(file_path=file_path, opts=[])
+        config = construct_config(file_path=file_path, opts=args.opts)
 
     # Don't need head cameras for Gaze
     config.USE_HEAD_CAMERA = False
-    return config
 
-
-def update_config_for_multiple_gaze(config, dont_pick_up, max_episode_steps):
-    """
-    Updates the config for multiple gaze
-
-    Args:
-        config (Config): Config object
-        dont_pick_up (bool): Whether to pick up the object or not
-        max_episode_steps (int): Max episode steps
-
-    Returns:
-        config (Config): Updated config object
-    """
     # Update the config based on the input argument
-    config.DONT_PICK_UP = dont_pick_up
+    if (
+        "dont_pick_up" in args.__dict__.keys()
+        and args.dont_pick_up != config.DONT_PICK_UP
+    ):
+        config.DONT_PICK_UP = args.dont_pick_up
 
     # Update max episode steps based on the input argument
-    config.MAX_EPISODE_STEPS = max_episode_steps
+    if (
+        "max_episode_steps" in args.__dict__.keys()
+        and args.max_episode_steps is not None
+    ):
+        config.MAX_EPISODE_STEPS = args.max_episode_steps
     return config
 
 
@@ -232,18 +224,7 @@ class SpotGazeEnv(SpotBaseEnv):
 if __name__ == "__main__":
     spot = Spot("RealGazeEnv")
     args = parse_arguments()
-    config = construct_config_for_gaze(opts=args.opts)
-
-    # Since the gaze_controller can also be used for multiple gaze,
-    # update the config if user wants to gaze at multiple objects
-    max_episode_steps = (
-        args.max_episode_steps
-        if args.max_episode_steps is not None
-        else config.MAX_EPISODE_STEPS
-    )
-    config = update_config_for_multiple_gaze(
-        config, dont_pick_up=args.dont_pick_up, max_episode_steps=max_episode_steps
-    )
+    config = construct_config_for_gaze(args)
 
     target_objects_list = []
     if args.target_object is not None:
