@@ -23,15 +23,15 @@ def init_config():
     Returns:
         config: Config object
     """
-    args = get_default_parser().parse_args()
-
-    # Update args for gaze locally here
-    args.dont_pick_up = True
-    args.max_episode_steps = 150
-
     # Construct config for gaze
-    config = construct_config_for_gaze(args, file_path=TEST_CONFIGS_YAML)
-
+    dont_pick_up = True
+    max_episode_steps = 150
+    config = construct_config_for_gaze(
+        file_path=TEST_CONFIGS_YAML,
+        opts=[],
+        dont_pick_up=dont_pick_up,
+        max_episode_steps=max_episode_steps,
+    )
     return config
 
 

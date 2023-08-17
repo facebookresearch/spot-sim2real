@@ -42,7 +42,9 @@ def parse_arguments(args=sys.argv[1:]):
     return args
 
 
-def construct_config_for_gaze(args, file_path=None):
+def construct_config_for_gaze(
+    file_path=None, opts=[], dont_pick_up=False, max_episode_steps=None
+):
     """
     Constructs and updates the config for gaze
 
@@ -55,26 +57,20 @@ def construct_config_for_gaze(args, file_path=None):
     """
     config = None
     if file_path is None:
-        config = construct_config(opts=args.opts)
+        config = construct_config(opts=opts)
     else:
-        config = construct_config(file_path=file_path, opts=args.opts)
+        config = construct_config(file_path=file_path, opts=opts)
 
     # Don't need head cameras for Gaze
     config.USE_HEAD_CAMERA = False
 
     # Update the config based on the input argument
-    if (
-        "dont_pick_up" in args.__dict__.keys()
-        and args.dont_pick_up != config.DONT_PICK_UP
-    ):
-        config.DONT_PICK_UP = args.dont_pick_up
+    if dont_pick_up != config.DONT_PICK_UP:
+        config.DONT_PICK_UP = dont_pick_up
 
     # Update max episode steps based on the input argument
-    if (
-        "max_episode_steps" in args.__dict__.keys()
-        and args.max_episode_steps is not None
-    ):
-        config.MAX_EPISODE_STEPS = args.max_episode_steps
+    if max_episode_steps is not None:
+        config.MAX_EPISODE_STEPS = max_episode_steps
     return config
 
 
@@ -224,7 +220,11 @@ class SpotGazeEnv(SpotBaseEnv):
 if __name__ == "__main__":
     spot = Spot("RealGazeEnv")
     args = parse_arguments()
-    config = construct_config_for_gaze(args)
+    config = construct_config_for_gaze(
+        opts=args.opts,
+        dont_pick_up=args.dont_pick_up,
+        max_episode_steps=args.max_episode_step,
+    )
 
     target_objects_list = []
     if args.target_object is not None:

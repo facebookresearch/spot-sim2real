@@ -14,13 +14,13 @@ from spot_wrapper.utils import say
 names = ["ball", "penguin", "rubiks_cube", "lion", "toy_car", "yellow_truck"]
 
 
-def main(spot, args):
-    config = construct_config_for_gaze(args)
+def main(spot, bd=False):
+    config = construct_config_for_gaze(opts=[])
     config.DONT_PICK_UP = True
     config.OBJECT_LOCK_ON_NEEDED = 5
     config.TERMINATE_ON_GRASP = True
     config.FORGET_TARGET_OBJECT_STEPS = 1000000
-    if "bd" in args.__dict__.keys() and args.bd:
+    if bd:
         config.GRASP_EVERY_STEP = True
         config.MAX_JOINT_MOVEMENT = 0.0  # freeze arm
         config.MAX_EPISODE_STEPS = 20
@@ -42,4 +42,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     spot = Spot("RealGazeEnv")
     with spot.get_lease(hijack=True):
-        main(spot, args)
+        main(spot, bd=args.bd)
