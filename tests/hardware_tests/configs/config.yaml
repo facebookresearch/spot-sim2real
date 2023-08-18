@@ -13,7 +13,7 @@ PARALLEL_INFERENCE_MODE: True
 
 # General env params
 CTRL_HZ: 2.0
-MAX_EPISODE_STEPS: 500
+MAX_EPISODE_STEPS: 500 # Locally updated in test_gaze_env
 
 # Nav env
 SUCCESS_DISTANCE: 0.3
@@ -25,7 +25,6 @@ USE_HEAD_CAMERA: True
 # Gaze env
 CENTER_TOLERANCE: 0.3
 OBJECT_LOCK_ON_NEEDED: 3
-TARGET_OBJ_NAME: "rubiks_cube"
 DONT_PICK_UP: False
 ASSERT_CENTERING: True
 

@@ -236,7 +236,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         # Gaze
         self.locked_on_object_count = 0
-        self.target_obj_name = config.TARGET_OBJ_NAME
+        self.target_obj_name = None
 
         # Place
         self.place_target = None

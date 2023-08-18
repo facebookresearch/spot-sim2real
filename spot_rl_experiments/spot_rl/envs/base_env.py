@@ -154,8 +154,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     len(self.detections_buffer["detections"]) > 0
                 ), "Mask R-CNN msgs not found!"
                 rospy.loginfo(f"[{self.node_name}]: ...msgs received.")
-                scale_pub = rospy.Publisher(rt.IMAGE_SCALE, Float32, queue_size=1)
-                scale_pub.publish(config.IMAGE_SCALE)
+
         elif config.USE_MRCNN:
             self.mrcnn = get_mrcnn_model(config)
             self.deblur_gan = get_deblurgan_model(config)
@@ -201,7 +200,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         print("[base_env.py]: Saying:", text)
         self.tts_pub.publish(String(text))
 
-    def reset(self, target_obj_id=None, *args, **kwargs):
+    def reset(self, target_obj_name=None, *args, **kwargs):
         # Reset parameters
         self.num_steps = 0
         self.reset_ran = True
@@ -209,7 +208,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.use_mrcnn = True
         self.locked_on_object_count = 0
         self.curr_forget_steps = 0
-        self.target_obj_name = target_obj_id
+        self.target_obj_name = target_obj_name
         self.last_target_obj = None
         self.obj_center_pixel = None
         self.place_attempted = False
@@ -373,7 +372,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.stopwatch.record("get_observations")
 
         self.num_steps += 1
+        print(
+            f"****************************************************num_steps: {self.num_steps}"
+        )
         timeout = self.num_steps >= self.max_episode_steps
+        if timeout:
+            print(f"Execution exceeded {self.max_episode_steps} steps. Timing out...")
+        else:
+            print(f"Execution has not exceeded {self.max_episode_steps} steps.")
         done = timeout or self.get_success(observations) or self.should_end
         self.ctrl_hz = self.config.CTRL_HZ  # revert ctrl_hz in case it slowed down
 

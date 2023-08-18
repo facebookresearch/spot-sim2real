@@ -3,103 +3,189 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import os
+import sys
 import time
+from typing import Dict, List
 
-import cv2
-import numpy as np
+import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.real_policy import GazePolicy
-from spot_rl.utils.utils import construct_config, get_default_parser
-from spot_wrapper.spot import Spot, wrap_heading
+from spot_rl.utils.utils import (
+    construct_config,
+    get_default_parser,
+    map_user_input_to_boolean,
+)
+from spot_wrapper.spot import Spot
 
-DEBUG = False
+DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
 
-def run_env(spot, config, target_obj_id=None, orig_pos=None):
+def parse_arguments(args=sys.argv[1:]):
+    parser = get_default_parser()
+    parser.add_argument(
+        "-t", "--target-object", type=str, help="name of the target object"
+    )
+    parser.add_argument(
+        "-dp",
+        "--dont_pick_up",
+        action="store_true",
+        help="robot should attempt pick but not actually pick",
+    )
+    parser.add_argument(
+        "-ms", "--max_episode_steps", type=int, help="max episode steps"
+    )
+    args = parser.parse_args(args=args)
+
+    if args.max_episode_steps is not None:
+        args.max_episode_steps = int(args.max_episode_steps)
+    return args
+
+
+def construct_config_for_gaze(
+    file_path=None, opts=[], dont_pick_up=False, max_episode_steps=None
+):
+    """
+    Constructs and updates the config for gaze
+
+    Args:
+        file_path (str): Path to the config file
+        opts (list): List of options to update the config
+
+    Returns:
+        config (Config): Updated config object
+    """
+    config = None
+    if file_path is None:
+        config = construct_config(opts=opts)
+    else:
+        config = construct_config(file_path=file_path, opts=opts)
+
     # Don't need head cameras for Gaze
     config.USE_HEAD_CAMERA = False
 
-    env = SpotGazeEnv(config, spot)
-    env.power_robot()
-    policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
-    policy.reset()
-    observations = env.reset(target_obj_id=target_obj_id)
-    done = False
-    env.say("Starting episode")
-    if orig_pos is None:
-        orig_pos = (float(env.x), float(env.y), np.pi)
-    while not done:
-        action = policy.act(observations)
-        observations, _, done, _ = env.step(arm_action=action)
-    # print("Returning to original position...")
-    # baseline_navigate(spot, orig_pos, limits=False)
-    # print("Returned.")
-    if done:
-        while True:
-            spot.set_base_velocity(0, 0, 0, 1.0)
-    return done
+    # Update the config based on the input argument
+    if dont_pick_up != config.DONT_PICK_UP:
+        print(
+            f"WARNING: Overriding dont_pick_up in config from {config.DONT_PICK_UP} to {dont_pick_up}"
+        )
+        config.DONT_PICK_UP = dont_pick_up
+
+    # Update max episode steps based on the input argument
+    if max_episode_steps is not None:
+        print(
+            f"WARNING: Overriding max_espisode_steps in config from {config.MAX_EPISODE_STEPS} to {max_episode_steps}"
+        )
+        config.MAX_EPISODE_STEPS = max_episode_steps
+    return config
 
 
-def baseline_navigate(spot, waypoint, limits=True, **kwargs):
-    goal_x, goal_y, goal_heading = waypoint
-    if limits:
-        cmd_id = spot.set_base_position(
-            x_pos=goal_x,
-            y_pos=goal_y,
-            yaw=goal_heading,
-            end_time=100,
-            max_fwd_vel=0.5,
-            max_hor_vel=0.05,
-            max_ang_vel=np.deg2rad(30),
-        )
-    else:
-        cmd_id = spot.set_base_position(
-            x_pos=goal_x, y_pos=goal_y, yaw=goal_heading, end_time=100
-        )
-    cmd_status = None
-    success = False
-    traj = []
-    st = time.time()
-    while not success and time.time() < st + 20:
-        if cmd_status != 1:
-            traj.append((time.time(), *spot.get_xy_yaw()))
-            time.sleep(0.5)
-            feedback_resp = spot.get_cmd_feedback(cmd_id)
-            cmd_status = (
-                feedback_resp.feedback.synchronized_feedback.mobility_command_feedback
-            ).se2_trajectory_feedback.status
-        else:
-            if limits:
-                cmd_id = spot.set_base_position(
-                    x_pos=goal_x,
-                    y_pos=goal_y,
-                    yaw=goal_heading,
-                    end_time=100,
-                    max_fwd_vel=0.5,
-                    max_hor_vel=0.05,
-                    max_ang_vel=np.deg2rad(30),
+class GazeController:
+    """
+    GazeController is used to gaze at, and pick given objects.
+
+    Args:
+        config (Config): Config object
+        spot (Spot): Spot object
+
+    How to use:
+        1. Create a GazeController object
+        2. Call execute() method with the target object list
+        3. Call shutdown() to stop the robot
+
+    Example:
+        config = construct_config(opts=[])
+        spot = Spot("spot_client_name")
+        gaze_target_list = ["apple", "banana"]
+        gaze_controller = GazeController(config, spot)
+        gaze_results = gaze_controller.execute(gaze_target_list)
+        gaze_controller.shutdown()
+    """
+
+    def __init__(self, config, spot):
+        self.config = config
+        self.spot = spot
+
+        # Setup
+        self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
+        self.policy.reset()
+
+        self.gaze_env = SpotGazeEnv(config, spot)
+        self.gaze_env.power_robot()
+
+    def execute(self, target_object_list, take_user_input=False):
+        """
+        Gaze at the target object list and pick up the objects if specified in the config
+
+        CAUTION: The robot will drop the object after picking it, please use objects that are not fragile
+
+        Args:
+            target_object_list (list): List of target objects to gaze at
+            take_user_input (bool): Whether to take user input for the success of the gaze
+
+        Returns:
+            gaze_success_list (list): List of dictionaries containing the target object name, time taken and success
+        """
+        gaze_success_list = []
+        print(f"Target object list : {target_object_list}")
+        for target_object in target_object_list:
+            observations = self.gaze_env.reset(target_obj_name=target_object)
+            done = False
+            start_time = time.time()
+            self.gaze_env.say(f"Gaze at target object - {target_object}")
+            while not done:
+                action = self.policy.act(observations)
+                observations, _, done, _ = self.gaze_env.step(arm_action=action)
+            self.gaze_env.say("Gaze finished")
+
+            # Ask user for feedback about the success of the gaze and update the "success" flag accordingly
+            success_status_from_user_feedback = True
+            if take_user_input:
+                user_prompt = f"Did the robot successfully pick the right object - {target_object}?"
+                success_status_from_user_feedback = map_user_input_to_boolean(
+                    user_prompt
                 )
+
+            gaze_success_list.append(
+                {
+                    "target_object": target_object,
+                    "time_taken": time.time() - start_time,
+                    "success": self.gaze_env.grasp_attempted
+                    and success_status_from_user_feedback,
+                }
+            )
+        return gaze_success_list
+
+    def shutdown(self, should_dock=False) -> None:
+        """
+        Stops the robot and docks it if should_dock is True else sits the robot down
+
+        Args:
+            should_dock: bool indicating whether to dock the robot or not
+        """
+        try:
+            if should_dock:
+                self.gaze_env.say("Executing automatic docking")
+                dock_start_time = time.time()
+                while time.time() - dock_start_time < 2:
+                    try:
+                        self.spot.dock(dock_id=DOCK_ID, home_robot=True)
+                    except Exception:
+                        print("Dock not found... trying again")
+                        time.sleep(0.1)
             else:
-                cmd_id = spot.set_base_position(
-                    x_pos=goal_x, y_pos=goal_y, yaw=goal_heading, end_time=100
-                )
-
-        x, y, yaw = spot.get_xy_yaw()
-        dist = np.linalg.norm(np.array([x, y]) - np.array([goal_x, goal_y]))
-        heading_diff = abs(wrap_heading(goal_heading - yaw))
-        success = dist < 0.3 and heading_diff < np.deg2rad(5)
-
-    return traj
-
-
-def close_enough(pos1, pos2):
-    dist = np.linalg.norm(np.array([pos1[0] - pos2[0], pos1[1] - pos2[1]]))
-    theta = abs(wrap_heading(pos1[2] - pos2[2]))
-    return dist < 0.1 and theta < np.deg2rad(2)
+                self.gaze_env.say("Will sit down here")
+                self.spot.sit()
+        finally:
+            self.spot.power_off()
 
 
 class SpotGazeEnv(SpotBaseEnv):
-    def reset(self, target_obj_id=None, *args, **kwargs):
+    def __init__(self, config, spot):
+        super().__init__(config, spot)
+        self.target_obj_name = None
+
+    def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
@@ -108,12 +194,9 @@ class SpotGazeEnv(SpotBaseEnv):
         print("Open gripper called in Gaze")
         self.spot.open_gripper()
 
-        observations = super().reset(target_obj_id=target_obj_id, *args, **kwargs)
-
-        # Reset parameters
-        self.locked_on_object_count = 0
-        if target_obj_id is None:
-            self.target_obj_name = self.config.TARGET_OBJ_NAME
+        # Update target object name as provided in config
+        observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
+        rospy.set_param("object_target", target_obj_name)
 
         return observations
 
@@ -128,11 +211,6 @@ class SpotGazeEnv(SpotBaseEnv):
 
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
-        if DEBUG:
-            img = np.uint8(arm_depth_bbox * 255).reshape(*arm_depth_bbox.shape[:2])
-            img2 = np.uint8(arm_depth * 255).reshape(*arm_depth.shape[:2])
-            cv2.imwrite(f"arm_bbox_{self.num_steps:03}.png", img)
-            cv2.imwrite(f"arm_depth_{self.num_steps:03}.png", img2)
         observations = {
             "joint": self.get_arm_joints(),
             "arm_depth": arm_depth,
@@ -147,9 +225,28 @@ class SpotGazeEnv(SpotBaseEnv):
 
 if __name__ == "__main__":
     spot = Spot("RealGazeEnv")
-    parser = get_default_parser()
-    parser.add_argument("--target-object", "-t")
-    args = parser.parse_args()
-    config = construct_config(opts=args.opts)
+    args = parse_arguments()
+    config = construct_config_for_gaze(
+        opts=args.opts,
+        dont_pick_up=args.dont_pick_up,
+        max_episode_steps=args.max_episode_steps,
+    )
+
+    target_objects_list = []
+    if args.target_object is not None:
+        target_objects_list = [
+            target
+            for target in args.target_object.replace(" ,", ",")
+            .replace(", ", ",")
+            .split(",")
+            if target.strip() is not None
+        ]
+
+    print(f"Target_objects list - {target_objects_list}")
     with spot.get_lease(hijack=True):
-        run_env(spot, config, target_obj_id=args.target_object)
+        gaze_controller = GazeController(config, spot)
+        try:
+            gaze_result = gaze_controller.execute(target_objects_list)
+            print(gaze_result)
+        finally:
+            gaze_controller.shutdown()
