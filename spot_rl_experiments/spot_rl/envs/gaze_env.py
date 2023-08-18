@@ -66,10 +66,16 @@ def construct_config_for_gaze(
 
     # Update the config based on the input argument
     if dont_pick_up != config.DONT_PICK_UP:
+        print(
+            f"WARNING: Overriding dont_pick_up in config from {config.DONT_PICK_UP} to {dont_pick_up}"
+        )
         config.DONT_PICK_UP = dont_pick_up
 
     # Update max episode steps based on the input argument
     if max_episode_steps is not None:
+        print(
+            f"WARNING: Overriding max_espisode_steps in config from {config.MAX_EPISODE_STEPS} to {max_episode_steps}"
+        )
         config.MAX_EPISODE_STEPS = max_episode_steps
     return config
 
@@ -223,7 +229,7 @@ if __name__ == "__main__":
     config = construct_config_for_gaze(
         opts=args.opts,
         dont_pick_up=args.dont_pick_up,
-        max_episode_steps=args.max_episode_step,
+        max_episode_steps=args.max_episode_steps,
     )
 
     target_objects_list = []
