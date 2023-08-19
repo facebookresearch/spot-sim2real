@@ -9,16 +9,10 @@ from typing import Tuple
 
 import numpy as np
 import rospy
-from spot_rl.envs.gaze_env import SpotGazeEnv
-from spot_rl.envs.nav_env import SpotNavEnv
-from spot_rl.envs.place_env import SpotPlaceEnv
-from spot_rl.real_policy import GazePolicy, NavPolicy, PlacePolicy
-from spot_rl.utils.utils import (  # get_default_parser,
-    construct_config,
-    nav_target_from_waypoints,
-    place_target_from_waypoint,
-    get_waypoint_yaml,
-)
+from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
+from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
+from spot_rl.envs.place_env import PlaceController, construct_config_for_place
+from spot_rl.utils.utils import nav_target_from_waypoints, place_target_from_waypoints
 from spot_wrapper.spot import Spot
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
@@ -30,20 +24,23 @@ class SpotSkillManager:
         # We will probably receive a config as part of the constructor
         # And eventually that specifies the set of skills that we can instantiate and execute
         self.__init_spot()
-        self.__initiate_policies()
-        self.__initialize_environments()
+        self.__initiate_controllers()
+
         # Power on the robot
         # TODO: Check if this can be moved outside of env
-        self.nav_env.power_robot()
+        self.nav_controller.nav_env.power_robot()
+
+        # TODO: Re-think this
         self.reset()
 
         self.waypoints_yaml_dict = get_waypoint_yaml()
         # ...
 
-    def __del__(self):
-        self.dock()
+    # TODO: What is the best thing to do here in terms of shutdown?
+    # def __del__(self):
+    #     self.dock()
 
-    #     self.power_off()
+    # #     self.power_off()
 
     def __init_spot(self):
         # Create Spot object
@@ -55,43 +52,23 @@ class SpotSkillManager:
             print("Failed to get lease for Spot. Exiting!")
             exit(1)
 
-        # Get configs
-        # parser = get_default_parser()
-        # args = parser.parse_args()
-        self.nav_config = construct_config(None)  # TODO: Get config from constructor
-        self.pick_config = construct_config(None)  # TODO: Get config from constructor
-        self.place_config = construct_config(None)  # TODO: Get config from constructor
+        # Construct configs for nav, gaze, and place
+        self.nav_config = construct_config_for_nav()
+        self.pick_config = construct_config_for_gaze(
+            max_episode_steps=35
+        )  # Based on Sergio's code for CVPR ..... RE-THINK THIS
+        self.place_config = construct_config_for_place()
 
-        # TODO: The way configs are handled in the original code is a bit messy ... fix this
-        # Example:
-        # Don't need gripper camera for Nav
-        self.nav_config.USE_MRCNN = False
-
-        # Don't need head cameras for Gaze
-        self.pick_config.USE_HEAD_CAMERA = False
-
-        # Don't need cameras for Place
-        self.place_config.USE_HEAD_CAMERA = False
-        self.place_config.USE_MRCNN = False
-
-    def __initiate_policies(self):
-        # Initialize the nav, place, and pick policies (NavPolicy, PlacePolicy, GazePolicy)
-        self.nav_policy = NavPolicy(
-            self.nav_config.WEIGHTS.NAV, device=self.nav_config.DEVICE
+    def __initiate_controllers(self):
+        self.nav_controller = WaypointController(
+            config=self.nav_config, spot=self.spot, should_record_trajectories=False
         )
-        self.pick_policy = GazePolicy(
-            self.pick_config.WEIGHTS.GAZE, device=self.pick_config.DEVICE
-        )
-        self.place_policy = PlacePolicy(
-            self.place_config.WEIGHTS.PLACE, device=self.place_config.DEVICE
+        self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
+        self.place_controller = PlaceController(
+            config=self.place_config, spot=self.spot, use_policies=True
         )
 
-    def __initialize_environments(self):
-        # Initialize the nav, place, and pick environments (SpotNavEnv, SpotPlaceEnv, SpotGazeEnv)
-        self.nav_env = SpotNavEnv(self.nav_config, self.spot)
-        self.pick_env = SpotGazeEnv(self.pick_config, self.spot)
-        self.place_env = SpotPlaceEnv(self.place_config, self.spot)
-
+    # TODO: FIND A WAY TO RESET THE POLICIES FOR EACH ENV.
     def reset(self):
         # Reset the the policies the environments
         self.nav_policy.reset()
@@ -103,37 +80,39 @@ class SpotSkillManager:
         # reset the nav environment with the current target (or use the ros param)
         # run the nav policy until success
         # reset (policies and nav environment)
+
         if nav_target is not None:
             try:
                 goal_x, goal_y, goal_heading = nav_target_from_waypoints(nav_target)
-            except KeyError:
+                nav_target_list = [nav_target_from_waypoints(nav_target)]
+            except Exception:
                 return (
                     False,
-                    f"Failed - place target {nav_target} not found - use the exact name",
+                    f"Failed - nav target {nav_target} not found - use the exact name",
                 )
-                # raise Exception(f"Nav target: {nav_target} does not exist in waypoints.yaml")
         else:
             return False, "No nav target specified, skipping nav"
-            # return False
 
-        self.nav_env.say(f"Navigating to {nav_target}")
+        self.nav_controller.say(f"Navigating to {nav_target}")
 
-        observations = self.nav_env.reset((goal_x, goal_y), goal_heading)
-        done = False
-        time.sleep(1)
+        result = None
         try:
-            while not done:
-                # Get best action using nav policy
-                action = self.nav_policy.act(observations)
-
-                # Execute action
-                observations, _, done, _ = self.nav_env.step(base_action=action)
+            result = self.nav_controller.execute(nav_target_list)
         except KeyboardInterrupt:
-            raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
+            raise KeyboardInterrupt(
+                "Keyboard interrupt detected, stopping navigation"
+            )  # TODO: DO WE NEED THIS?
+        except Exception:
+            return False, "Error encountered while navigating"
 
-        # do we need a reset here? of nav policy
-        # policy.nav_policy
-        return True, "Sucess"
+        # TODO: RESET THE NAV ENVIRONMENT HERE or inside nav_controller.execute()?
+        self.reset()
+
+        # TODO: Please check if this is correct formulation of success.
+        if result[0].get("success"):
+            return True, "Success"
+        else:
+            return False, "Navigation failed"
 
     def pick(self, pick_target: str = None) -> Tuple[bool, str]:
         # The current pick target is simply a string (received on the variable pick_target)
@@ -151,92 +130,75 @@ class SpotSkillManager:
             print("No pick target specified, skipping pick")
             return False, "No pick target specified, skipping pick"
 
-        self.pick_env.say(f"Picking {pick_target}")
+        self.gaze_controller.say(f"Picking {pick_target}")
 
-        rospy.set_param("object_target", pick_target)
-        observations = self.pick_env.reset(target_obj_id=pick_target)
-        done = False
-        time.sleep(1)
-        k = 0
+        # rospy.set_param("object_target", pick_target) ->> gaze_env.reset() takes care of this ...REMOVE from here
+
+        # WHY WAS MAX_EPISODE_STEPS = 35 ... SERGIO?
+        result = None
         try:
-            while (not done) and (k < 35):
-                # Get best action using pick policy
-                action = self.pick_policy.act(observations)
-
-                # Execute action
-                observations, _, done, _ = self.pick_env.step(arm_action=action)
-                k += 1
-
-            if done:
-                # WHY DOES gaze_env.py & place_env.py RESET BASE VELOCITY INSIDE A WHILE LOOP?
-                self.spot.set_base_velocity(0, 0, 0, 1.0)
+            result = self.gaze_controller.execute([pick_target])
         except KeyboardInterrupt:
-            raise KeyboardInterrupt("Keyboard interrupt detected, stopping picking")
+            raise KeyboardInterrupt(
+                "Keyboard interrupt detected, stopping picking"
+            )  # TODO: DO WE NEED THIS?
+        except Exception:
+            return False, "Error encountered while picking"
 
-        if done:
+        # TODO: We only reset after a navipicknavplace
+        self.reset()
+
+        # TODO: Please check if this is correct formulation of success.
+        if result[0].get("success"):
             return True, "Success"
         else:
-            return False, "Failure - object not found"
+            return False, "Pick failed"
 
     def place(self, place_target: str = None) -> Tuple[bool, str]:
         # use the logic of current skill to get place_target (place_target_from_waypoint)
         # reset the nav environment with the current target (or use the ros param)  ---->>>>>> This is probably not needed
         # run the nav policy until success ???????? @Sergio Why run NAV here? Isn't NAV a skill in itself?
         # reset (policies and place environment)
+
         if place_target is not None:
             # Navigate to the place target
-            try:
-                self.nav(place_target)
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt(
-                    "Keyboard interrupt detected, stopping navigation for place"
-                )
-            except KeyError:
-                raise Exception(
-                    f"Place target: {place_target} does not exist in waypoints.yaml"
-                )
-            except Exception as e:
-                raise Exception(f"Error while navigating to place target: {e}")
+
+            nav_result = self.nav(place_target)
+            if not nav_result[0]:
+                return nav_result
 
             # Get the place target coordinates
             try:
-                goal_place = place_target_from_waypoint(place_target, self.waypoints_yaml_dict)
+                goal_place = place_target_from_waypoints(place_target)
+                place_target_list = [place_target_from_waypoints(place_target)]
             except KeyError:
                 return False, f"Failed - place target {place_target} not found"
-                # raise Exception(f"Place target: {place_target} does not exist in waypoints.yaml")
 
         else:
-            # @TODO: We should put the arm back here in the stow position if it is not already there, otherwise docking fails
+            # TODO: We should put the arm back here in the stow position if it is not already there, otherwise docking fails
             return False, "No place target specified, skipping place"
 
-        self.place_env.say(f"Place target object at {place_target} i.e. {goal_place}")
+        self.place_controller.say(
+            f"Place target object at {place_target} i.e. {goal_place}"
+        )
 
         # TODO: Figure out if we want target close to the robot or not (i.e. target_is_local=True or False)
-        observations = self.place_env.reset(goal_place)
-        done = False
-        time.sleep(1)
-        k = 0
+        result = None
         try:
-            while not done and k < 35:
-                # Get best action using place policy
-                action = self.place_policy.act(observations)
-
-                # Execute action
-                observations, _, done, _ = self.place_env.step(arm_action=action)
-                k += 1
-
-            if done:
-                # WHY DOES gaze_env.py & place_env.py RESET BASE VELOCITY INSIDE A WHILE LOOP?
-                self.spot.set_base_velocity(0, 0, 0, 1.0)
+            result = self.place_controller.execute(place_target_list)
         except KeyboardInterrupt:
             raise KeyboardInterrupt("Keyboard interrupt detected, stopping navigation")
-        if not done:
-            self.spot.rotate_gripper_with_delta(wrist_roll=1.57)
-            self.spot.open_gripper()
-            time.sleep(0.75)
+        except Exception:
+            return False, "Error encountered while placing"
+
         # TODO: We only reset after a navipicknavplace
         self.reset()
-        return True, "Success"
+
+        # TODO: Please check if this is correct formulation of success.
+        if result[0].get("success"):
+            return True, "Success"
+        else:
+            return False, "Place failed"
 
     def dock(self):
         # TODO: Stow back the arm
@@ -246,24 +208,17 @@ class SpotSkillManager:
 
         # Reset observation????
 
-        # Dock
-        self.nav_env.say("Executing automatic docking")
-        dock_start_time = time.time()
-        while time.time() - dock_start_time < 2:
-            try:
-                print("Trying to dock")
-                print("DOCK_ID", DOCK_ID)
-                self.spot.dock(dock_id=DOCK_ID, home_robot=True)
-            except Exception:
-                print("Dock not found... trying again")
-                time.sleep(0.1)
+        # Dock  ---- TODO: Move this method to spot.py, also rename it to `dock_and_power_off()`
+        self.nav_controller.shutdown()
 
+        # WHY RESET policies here?
         self.reset()
         return None
 
-    def power_off(self):
-        # Power off spot
-        self.spot.power_off()
+    # TODO: DO WE NEED THIS?
+    # def power_off(self):
+    #     # Power off spot
+    #     self.spot.power_off()
 
 
 if __name__ == "__main__":

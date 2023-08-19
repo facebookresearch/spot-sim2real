@@ -156,6 +156,9 @@ class GazeController:
             )
         return gaze_success_list
 
+    def say(self, *args):
+        self.gaze_env.say(*args)
+
     def shutdown(self, should_dock=False) -> None:
         """
         Stops the robot and docks it if should_dock is True else sits the robot down

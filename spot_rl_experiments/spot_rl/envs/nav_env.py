@@ -166,6 +166,9 @@ class WaypointController:
         # Return waypoints back
         return robot_trajectories
 
+    def say(self, *args):
+        self.nav_env.say(*args)
+
     def shutdown(self, should_dock=False) -> None:
         """
         Stops the robot and docks it if should_dock is True else sits the robot down
