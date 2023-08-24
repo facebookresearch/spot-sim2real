@@ -170,7 +170,7 @@ def test_nav_square():
         try:
             test_traj = wp_controller.execute(nav_targets_list=test_nav_targets_list)
         except Exception:
-            pytest.fails(
+            pytest.fail(
                 "Pytest raised an error while executing WaypointController.execute from test_nav_env.py"
             )
         finally:

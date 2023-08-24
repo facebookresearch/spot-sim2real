@@ -101,6 +101,22 @@ class PlaceController:
         self.place_env = SpotPlaceEnv(config, spot)
         self.place_env.power_robot()
 
+    def reset_env_and_policy(self, place_target, is_local):
+        """
+        Resets the place_env and policy
+
+        Args:
+            place_target (np.array([x,y,z])): Place target in either global frame or base frame of the robot
+            is_local (bool): Whether the place target is in the base frame of the robot
+
+        Returns:
+            observations: Initial observations from the place_env
+        """
+        observations = self.place_env.reset(place_target, is_local)
+        self.policy.reset()
+
+        return observations
+
     def execute(self, place_target_list, is_local=False):
         """
         Execute place for each place target in place_target_list
@@ -120,7 +136,7 @@ class PlaceController:
         for place_target in place_target_list:
             start_time = time.time()
             if self.use_policies:
-                observations = self.place_env.reset(place_target, is_local)
+                observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
 
                 while not done:
