@@ -9,7 +9,10 @@ from typing import Dict
 
 import numpy as np
 import ruamel.yaml
-from spot_rl.utils.generate_place_goal import get_global_place_target
+from spot_rl.utils.generate_place_goal import (
+    get_global_place_target,
+    get_local_place_target,
+)
 from spot_rl.utils.utils import get_default_parser
 from spot_wrapper.spot import Spot
 
@@ -326,7 +329,7 @@ class WaypointRecorder:
                 f"{clutter_target_name} already exists in 'clutter_amounts' => ({clutter_target_name}:{self.yaml_dict.get('clutter_amounts').get(clutter_target_name)})"
             )
 
-    def record_place_target(self, place_target_name: str):
+    def record_place_target(self, place_target_name: str, is_local: bool = False):
         """
         Record a waypoint as a place target
 
@@ -342,8 +345,12 @@ class WaypointRecorder:
 
         self.record_nav_target(place_target_name)
 
+        place_target = None
         # Get place target as current gripper position
-        place_target = get_global_place_target(self.spot)
+        if is_local:
+            place_target = get_local_place_target(self.spot)
+        else:
+            place_target = get_global_place_target(self.spot)
 
         # Add place_targets list if not present
         if "place_targets" not in self.yaml_dict:
@@ -379,7 +386,7 @@ def main(spot: Spot):
     elif args.clutter:
         waypoint_recorder.record_clutter_target(args.clutter)
     elif args.place_target:
-        waypoint_recorder.record_place_target(args.place_target)
+        waypoint_recorder.record_place_target(args.place_target, is_local=True)
     else:
         raise NotImplementedError
 
