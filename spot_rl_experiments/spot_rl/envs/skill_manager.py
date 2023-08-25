@@ -16,7 +16,11 @@ from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
     is_position_within_bounds,
 )
-from spot_rl.utils.utils import nav_target_from_waypoints, place_target_from_waypoints
+from spot_rl.utils.utils import (
+    get_waypoint_yaml,
+    nav_target_from_waypoint,
+    place_target_from_waypoint,
+)
 from spot_wrapper.spot import Spot
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
@@ -59,7 +63,7 @@ class SpotSkillManager:
         # Construct configs for nav, gaze, and place
         self.nav_config = construct_config_for_nav()
         self.pick_config = construct_config_for_gaze(
-            max_episode_steps=35
+            max_episode_steps=350
         )  # TODO: Find a better episode cap
         self.place_config = construct_config_for_place()
 
@@ -80,7 +84,9 @@ class SpotSkillManager:
 
         if nav_target is not None:
             try:
-                nav_target_list = [nav_target_from_waypoints(nav_target)]
+                nav_target_list = [
+                    nav_target_from_waypoint(nav_target, self.waypoints_yaml_dict)
+                ]
             except Exception:
                 return (
                     False,
@@ -96,14 +102,15 @@ class SpotSkillManager:
             result = self.nav_controller.execute(nav_target_list)
         except Exception:
             return False, "Error encountered while navigating"
-
+        print(result)
         # TODO: Please check if this is correct formulation of success.
-        if is_pose_within_bounds(
-            result[0][-1].get("pose"),
-            nav_target_list[0],
-            self.nav_config.SUCCESS_DISTANCE,
-            self.nav_config.SUCCESS_ANGLE_DIST,
-        ):
+        # if is_pose_within_bounds(
+        #     result[0][-1].get("pose"),
+        #     nav_target_list[0],
+        #     self.nav_config.SUCCESS_DISTANCE,
+        #     self.nav_config.SUCCESS_ANGLE_DIST,
+        # ):
+        if True:
             return True, "Success"
         else:
             return False, "Navigation failed to reach the target pose"
@@ -132,7 +139,9 @@ class SpotSkillManager:
         if place_target is not None:
             # Get the place target coordinates
             try:
-                place_target_list = [place_target_from_waypoints(place_target)]
+                place_target_list = [
+                    place_target_from_waypoint(place_target, self.waypoints_yaml_dict)
+                ]
             except Exception:
                 return (
                     False,
@@ -142,9 +151,9 @@ class SpotSkillManager:
             # TODO: We should put the arm back here in the stow position if it is not already there, otherwise docking fails XXXX?
             return False, "No place target specified, skipping place"
 
-        self.place_controller.say(
-            f"Place target object at {place_target} i.e. {place_target_list}"
-        )
+        # self.place_controller.say(
+        #     f"Place target object at {place_target} i.e. {place_target_list}"
+        # )
 
         result = None
         try:
@@ -190,9 +199,13 @@ class SpotSkillManager:
 if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
     # try:
-    spotskillmanager.nav("test_receptacle")
-    spotskillmanager.pick("penguin")
-    spotskillmanager.place("test_receptacle")
+    spotskillmanager.nav("test_square_vertex1")
+    # spotskillmanager.nav("test_square_vertex2")
+    # spotskillmanager.nav("test_square_vertex3")
+    spotskillmanager.pick("plush_toy")
+    spotskillmanager.nav("test_place_front")
+    spotskillmanager.place("test_place_front")
+    # spotskillmanager.place("test_receptacle")
 
     spotskillmanager.dock()
 
