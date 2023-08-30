@@ -17,6 +17,8 @@ sudo apt-get install g++
 sudo apt install tmux
 ```
 
+Note that if you are using a fedora machine, then you should use ```dnf``` instead of ```apt-get```
+
 ### Install Miniconda at /home/<user>
 
 ```bash
@@ -197,8 +199,10 @@ For assistance with finding the right ip of your computer, [please follow these 
 ```bash
 echo 'export SPOT_ADMIN_PW=<your-spot-admin-password>' >> ~/.bashrc
 echo 'export SPOT_IP=<your-spot-ip>' >> ~/.bashrc
+echo 'export SPOT_DOCK_ID=<your-spot-dock-id>' >> ~/.bashrc
 source ~/.bashrc
 ```
+Note that SPOT_DOCK_ID is optional. It is needed when you want to automatically dock the robot.
 
 ### Testing the setup by running simple navigation policy on robot
 1. Create waypoints.yaml file using the following command
@@ -226,7 +230,7 @@ It is not recommended to run the code on a Mac machine, and we do not support th
 
 ### For folks who are interested to contribute to this repo, you'll need to setup pre-commit.
 The repo runs CI tests on each PR and the PRs are merged only when the all checks have passed.
-Installing the pre-commit allows you to run automatic pre-commit while running `git commit`. 
+Installing the pre-commit allows you to run automatic pre-commit while running `git commit`.
 ```bash
 pre-commit install
 ```
