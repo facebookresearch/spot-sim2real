@@ -1,44 +1,50 @@
-dock: [1.5, 0.0, 0.0]
-place_targets:
+place_targets: # i.e., where an object needs to be placed (x,y,z)
   test_receptacle:
-  - 5.0000000000000000
-  - 0.0000000000000000
-  - 0.7500000000000000
-
-clutter:
+  - 3.0
+  - 0.0
+  - 0.8
+  test_place_front:
+  - 0.5386111736297607
+  - 2.0660316944122314
+  - 0.8526139855384827
+  test_place_left:
+  - 1.0181900262832642
+  - 2.718299150466919
+  - 0.7702412009239197
+  test_place_right:
+  - 0.8784048557281494
+  - 1.3122460842132568
+  - 0.8244163990020752
+  test_place_front_local:
+  - 0.8947359323501587
+  - -0.007524226792156696
+  - 0.3428913950920105
+  test_place_left_local:
+  - 0.4745634198188782
+  - -0.6008669137954712
+  - 0.32207614183425903
+  test_place_right_local:
+  - 0.45935842394828796
+  - 0.619202733039856
+  - 0.32563456892967224
+clutter: # i.e., where an object is currently placed
+# <receptacle where clutter exists>
 - test_receptacle
-
-clutter_amounts:
-  test_receptacle
-
+clutter_amounts: # i.e., how much clutter exists in each receptacle
+# <receptacle where clutter exists>: <number of objects in that receptacle>
+  test_receptacle: 1
 object_targets: # i.e., where an object belongs / needs to be placed
   # <Class_id>: [<object's name>, <which place_target it belongs to>]
-  0: [plush toy, couch]
-  1: [cup, couch]
-
-test_square_vertex1:
-- 3.5000000000000000
-- 0.0000000000000000
-- 0.0000000000000000
-test_square_vertex2:
-- 3.5000000000000000
-- 2.0000000000000000
-- 90.00000000000000
-test_square_vertex3:
-- 1.5000000000000000
-- 2.0000000000000000
-- 180.00000000000000
-test_square_vertex4:
-- 1.5000000000000000
-- 0.0000000000000000
-- 0.0000000000000000
-test_receptacle:
-- 3.5000000000000000
-- 0.0000000000000000
-- 0.0000000000000000
-
-
-nav_targets:
+  0: [penguin, test_receptacle]
+nav_targets: # i.e., where the robot needs to navigate to (x,y,yaw)
+  dock:
+  - 1.5
+  - 0.0
+  - 0.0
+  test_receptacle:
+  - 2.5
+  - 0.0
+  - 0.0
   test_square_vertex1:
   - 3.5000000000000000
   - 0.0000000000000000
@@ -55,7 +61,27 @@ nav_targets:
   - 1.5000000000000000
   - 0.0000000000000000
   - 0.0000000000000000
-  test_receptacle:
-  - 3.5000000000000000
-  - 0.0000000000000000
-  - 0.0000000000000000
+  test_place_front:
+  - 1.4441700909323596
+  - 2.026882783804053
+  - 178.45419616518004
+  test_place_left:
+  - 1.4441700909323596
+  - 2.026882783804053
+  - 178.45419616518004
+  test_place_right:
+  - 1.4441700909323596
+  - 2.026882783804053
+  - 178.45419616518004
+  test_place_front_local:
+  - 1.426323766222765
+  - 1.945521966351792
+  - 178.50685239575841
+  test_place_left_local:
+  - 1.4053379478814445
+  - 1.9788141541515076
+  - 178.5227422619643
+  test_place_right_local:
+  - 1.3708475904759478
+  - 1.9290485108877686
+  - 177.9276973925623

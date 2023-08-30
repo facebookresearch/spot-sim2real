@@ -54,8 +54,7 @@ INSTRUCTIONS = (
 def move_to_initial(spot):
     point = INITIAL_POINT
     rpy = INITIAL_RPY
-    cmd_id = spot.move_gripper_to_point(point, rpy)
-    spot.block_until_arm_arrives(cmd_id, timeout_sec=1.5)
+    spot.move_gripper_to_point(point, rpy, timeout_sec=1.5)
     cement_arm_joints(spot)
 
     return point, rpy
@@ -140,10 +139,9 @@ def main(spot: Spot):
                         # Move gripper
                         point_rpy += KEY2GRIPPERMOVEMENT[pressed_key]
                         point, rpy = point_rpy[:3], point_rpy[3:]
-                        cmd_id = spot.move_gripper_to_point(point, rpy)
                         print("Gripper destination: ", point, rpy)
-                        spot.block_until_arm_arrives(
-                            cmd_id, timeout_sec=UPDATE_PERIOD * 0.5
+                        spot.move_gripper_to_point(
+                            point, rpy, timeout_sec=UPDATE_PERIOD * 0.5
                         )
                 elif pressed_key in KEY2BASEMOVEMENT:
                     # Move base

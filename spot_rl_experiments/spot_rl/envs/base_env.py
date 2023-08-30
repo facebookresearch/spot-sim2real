@@ -735,31 +735,43 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # the robot is at the place receptacle
         gripper_T_base = self.get_in_gripper_tf()
         base_T_gripper = gripper_T_base.inverted()
-        base_frame_place_target = self.get_base_frame_place_target()
+        base_frame_place_target = self.get_base_frame_place_target_spot()
         hab_place_target = self.spot2habitat_translation(base_frame_place_target)
         gripper_pos = base_T_gripper.transform_point(hab_place_target)
 
         return gripper_pos
 
-    def get_base_frame_place_target(self):
+    def get_base_frame_place_target_spot(self):
         if self.place_target_is_local:
             base_frame_place_target = self.place_target
         else:
             base_frame_place_target = self.get_target_in_base_frame(self.place_target)
         return base_frame_place_target
 
-    def get_place_distance(self):
-        gripper_T_base = self.get_in_gripper_tf()
-        base_frame_gripper_pos = np.array(gripper_T_base.translation)
-        base_frame_place_target = self.get_base_frame_place_target()
-        hab_place_target = self.spot2habitat_translation(base_frame_place_target)
-        hab_place_target = np.array(hab_place_target)
-        place_dist = np.linalg.norm(hab_place_target - base_frame_gripper_pos)
-        xy_dist = np.linalg.norm(
-            hab_place_target[[0, 2]] - base_frame_gripper_pos[[0, 2]]
+    def get_base_frame_place_target_hab(self):
+        """
+        Returns the current place target in the base frame as (x,z,-y) as per Habitat convention
+        """
+        base_frame_place_target_spot = self.get_base_frame_place_target_spot()
+        base_frame_place_target_hab = np.array(
+            self.spot2habitat_translation(base_frame_place_target_spot)
         )
-        z_dist = abs(hab_place_target[1] - base_frame_gripper_pos[1])
-        return place_dist, xy_dist, z_dist
+        return base_frame_place_target_hab
+
+    # THIS METHOD IS DEPRECATED!!
+    # def get_place_distance(self):
+    #     gripper_T_base = self.get_in_gripper_tf()
+    #     base_frame_gripper_pos = np.array(gripper_T_base.translation)
+    #     base_frame_place_target = self.get_base_frame_place_target_spot()
+    #     hab_place_target = self.spot2habitat_translation(base_frame_place_target)
+    #     hab_place_target = np.array(hab_place_target)
+
+    #     place_dist = np.linalg.norm(hab_place_target - base_frame_gripper_pos)
+    #     xy_dist = np.linalg.norm(
+    #         hab_place_target[[0, 2]] - base_frame_gripper_pos[[0, 2]]
+    #     )
+    #     z_dist = abs(hab_place_target[1] - base_frame_gripper_pos[1])
+    #     return place_dist, xy_dist, z_dist
 
     def get_in_gripper_tf(self):
         wrist_T_base = self.spot2habitat_transform(
@@ -768,6 +780,34 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         gripper_T_base = wrist_T_base @ mn.Matrix4.translation(self.ee_gripper_offset)
 
         return gripper_T_base
+
+    def get_gripper_position_in_base_frame_hab(self):
+        """
+        Returns the gripper position in the base frame as (x,z,-y) as per Habitat convention
+
+        Returns:
+            ee_pos_hab: Gripper position as an np.array([x,z,-y])
+        """
+
+        # Get end effector position (in base frame as per Habitat convention)
+        ee_pos_hab = np.array(self.get_in_gripper_tf().translation)
+        return ee_pos_hab
+
+    def get_gripper_position_in_base_frame_spot(self):
+        """
+        Returns the gripper position in the base frame as (x,y,z)
+
+        Returns:
+            ee_pos_spot: Gripper position as an np.array([x,y,z])
+        """
+        # Get end effector position (in base frame as per Hab convention)
+        ee_pos_hab = self.get_gripper_position_in_base_frame_hab()
+
+        # Convert ee_positoin (in base frame) to Spot convention .. (x,z,-y) -> (x,-y,z)
+        ee_pos_spot = ee_pos_hab[np.array([0, 2, 1])]
+        # Correct the sign on "y" .. (x,-y,z) -> (x,y,z)
+        ee_pos_spot[1] *= -1
+        return ee_pos_spot
 
     def get_target_in_base_frame(self, place_target):
         global_T_local = self.curr_transform.inverted()

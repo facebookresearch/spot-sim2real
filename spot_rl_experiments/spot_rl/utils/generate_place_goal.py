@@ -22,6 +22,8 @@ def get_global_place_target(spot: Spot):
     base_place_target_habitat = np.array(gripper_T_base.translation)
     base_place_target = base_place_target_habitat[[0, 2, 1]]
 
+    # TODO: Check if we are missing a multiplication with (-1) on y
+
     x, y, yaw = spot.get_xy_yaw()
     base_T_global = mn.Matrix4.from_(
         mn.Matrix4.rotation_z(mn.Rad(yaw)).rotation(),

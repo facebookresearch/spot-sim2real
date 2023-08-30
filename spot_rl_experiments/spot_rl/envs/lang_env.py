@@ -17,6 +17,7 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 from spot_rl.llm.src.rearrange_llm import RearrangeEasyChain
 from spot_rl.models.sentence_similarity import SentenceSimilarity
 from spot_rl.real_policy import GazePolicy, MixerPolicy, NavPolicy, PlacePolicy
+from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_rl.utils.remote_spot import RemoteSpot
 from spot_rl.utils.utils import (
     closest_clutter,
@@ -26,7 +27,7 @@ from spot_rl.utils.utils import (
     get_waypoint_yaml,
     nav_target_from_waypoint,
     object_id_to_nav_waypoint,
-    place_target_from_waypoints,
+    place_target_from_waypoint,
 )
 from spot_rl.utils.whisper_translator import WhisperTranslator
 from spot_wrapper.spot import Spot
@@ -275,8 +276,15 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
     def step(self, base_action, arm_action, *args, **kwargs):
         # import pdb; pdb.set_trace()
-        _, xy_dist, z_dist = self.get_place_distance()
-        place = xy_dist < self.config.SUCC_XY_DIST and z_dist < self.config.SUCC_Z_DIST
+        gripper_pos_in_base_frame = self.get_gripper_position_in_base_frame_hab()
+        place_target_in_base_frame = self.get_base_frame_place_target_hab()
+        place = is_position_within_bounds(
+            gripper_pos_in_base_frame,
+            place_target_in_base_frame,
+            self.config.SUCC_XY_DIST,
+            self.config.SUCC_Z_DIST,
+            convention="habitat",
+        )
         if place:
             print("place is true")
 
@@ -316,12 +324,18 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
             print("done is true")
 
         if self.grasp_attempted and not self.navigating_to_place:
+            # Get the waypoints from waypoints.yaml
+            waypoints_yaml_dict = get_waypoint_yaml()
+
             # Determine where to go based on what object we've just grasped
             waypoint_name = rospy.get_param("/viz_place")
-            waypoint = nav_target_from_waypoint(waypoint_name, get_waypoint_yaml())
+            waypoint = nav_target_from_waypoint(waypoint_name, waypoints_yaml_dict)
 
             self.say("Navigating to " + waypoint_name)
-            self.place_target = place_target_from_waypoints(waypoint_name)
+
+            self.place_target = place_target_from_waypoint(
+                waypoint_name, waypoints_yaml_dict
+            )
             self.goal_xy, self.goal_heading = (waypoint[:2], waypoint[2])
             self.navigating_to_place = True
             info["grasp_success"] = True

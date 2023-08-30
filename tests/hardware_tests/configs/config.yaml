@@ -61,3 +61,6 @@ FORGET_TARGET_OBJECT_STEPS: 15
 
 # Docking (currently only used by ASC, Seq Exp and Language env)
 RETURN_TO_BASE: True
+
+# BD params
+ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
