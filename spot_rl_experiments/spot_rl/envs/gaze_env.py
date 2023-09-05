@@ -113,6 +113,22 @@ class GazeController:
         self.gaze_env = SpotGazeEnv(config, spot)
         self.gaze_env.power_robot()
 
+    def reset_env_and_policy(self, target_obj_name):
+        """
+        Resets the gaze_env and policy
+
+        Args:
+            target_obj_name (str): Name of the target object
+
+        Returns:
+            observations: observations from the gaze_env
+
+        """
+        observations = self.gaze_env.reset(target_obj_name=target_obj_name)
+        self.policy.reset()
+
+        return observations
+
     def execute(self, target_object_list, take_user_input=False):
         """
         Gaze at the target object list and pick up the objects if specified in the config
@@ -129,7 +145,7 @@ class GazeController:
         gaze_success_list = []
         print(f"Target object list : {target_object_list}")
         for target_object in target_object_list:
-            observations = self.gaze_env.reset(target_obj_name=target_object)
+            observations = self.reset_env_and_policy(target_obj_name=target_object)
             done = False
             start_time = time.time()
             self.gaze_env.say(f"Gaze at target object - {target_object}")

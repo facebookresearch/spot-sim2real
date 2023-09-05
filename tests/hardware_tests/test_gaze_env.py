@@ -50,7 +50,7 @@ def test_gaze():
                 target_object_list=test_target_objects, take_user_input=True
             )
         except Exception:
-            pytest.fails(
+            pytest.fail(
                 "Pytest raised an error while executing GazeController.execute from test_gaze_env.py"
             )
         finally:

@@ -115,6 +115,23 @@ class WaypointController:
         self.nav_env = SpotNavEnv(config, self.spot)
         self.nav_env.power_robot()
 
+    def reset_env_and_policy(self, nav_target):
+        """
+        Resets the nav_env and policy
+
+        Args:
+            nav_target: (x,y,theta) where robot needs to navigate to
+
+        Returns:
+            observations: observations from the nav_env
+
+        """
+        (goal_x, goal_y, goal_heading) = nav_target
+        observations = self.nav_env.reset((goal_x, goal_y), goal_heading)
+        self.policy.reset()
+
+        return observations
+
     def execute(self, nav_targets_list) -> List[List[Dict]]:
         """
         Executes the navigation to the given nav_targets_list and returns the robot's trajectory
@@ -128,8 +145,7 @@ class WaypointController:
 
         robot_trajectories = []  # type: List[List[Dict]]
         for nav_target in nav_targets_list:
-            (goal_x, goal_y, goal_heading) = nav_target
-            observations = self.nav_env.reset((goal_x, goal_y), goal_heading)
+            observations = self.reset_env_and_policy(nav_target)
             done = False
 
             # List of Dicts to store trajectory for each of the nav_targets in nav_targets_list

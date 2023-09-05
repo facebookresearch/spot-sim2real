@@ -62,7 +62,7 @@ def test_place():
                 place_target_list=test_place_targets_list, is_local=True
             )
         except Exception:
-            pytest.fails(
+            pytest.fail(
                 "Pytest raised an error while executing PlaceController.execute from test_place_env.py"
             )
         finally:
