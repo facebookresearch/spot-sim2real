@@ -105,7 +105,7 @@ def main(spot, use_mixer, config, out_path=None):
     rospy.set_param("viz_object", pick)
     rospy.set_param("viz_place", nav_2)
 
-    env.power_robot()
+    spot.power_robot()
     time.sleep(1)
     out_data = []
 
@@ -144,6 +144,7 @@ def main(spot, use_mixer, config, out_path=None):
         env.stopwatch.print_stats(latest=True)
 
     # Go to the dock
+    # TODO: This needs to be cleaned up
     env.say(f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}.")
     if return_to_base:
         waypoint = nav_target_from_waypoint("dock", waypoints_yaml=waypoints_yaml_dict)
@@ -433,3 +434,4 @@ if __name__ == "__main__":
                 main(spot, args.use_mixer, config, args.output)
             finally:
                 spot.power_off()
+                # TODO: This above line should be spot.shutdown() ????

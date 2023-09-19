@@ -72,7 +72,7 @@ def main(spot, use_mixer, config, out_path=None):
         objects_to_look.append(waypoints_yaml_dict["object_targets"][waypoint][0])
     rospy.set_param("object_target", ",".join(objects_to_look))
 
-    env.power_robot()
+    spot.power_robot()
     time.sleep(1)
     count = Counter()
     out_data = []
@@ -169,19 +169,8 @@ def main(spot, use_mixer, config, out_path=None):
         with open(out_path, "w") as f:
             f.write(data)
 
-    if return_to_base:
-        env.say("Executing automatic docking")
-        dock_start_time = time.time()
-        while time.time() - dock_start_time < 2:
-            try:
-                spot.dock(dock_id=DOCK_ID, home_robot=True)
-            except Exception:
-                print("Dock not found... trying again")
-                time.sleep(0.1)
-    else:
-        env.say("Since RETURN_TO_BASE was set to false in config.yaml, will sit down.")
-        time.sleep(2)
-        spot.sit()
+    # Dock/Sit down and power off
+    spot.shutdown(should_dock=return_to_base)
 
     print("Done!")
 
@@ -435,3 +424,4 @@ if __name__ == "__main__":
                 main(spot, args.use_mixer, config, args.output)
             finally:
                 spot.power_off()
+                # TODO: This above line should be spot.shutdown() ????

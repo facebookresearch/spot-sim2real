@@ -24,8 +24,6 @@ from spot_rl.utils.utils import (
 )
 from spot_wrapper.spot import Spot
 
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-
 
 def parse_arguments(args=sys.argv[1:]):
     parser = get_default_parser()
@@ -77,21 +75,24 @@ class PlaceController:
     How to use:
         1. Create PlaceController object
         2. Call execute() with place_target_list as input
-        3. Call shutdown() to stop the robot
 
     Example:
         config = construct_config_for_place(opts=[])
         spot = Spot("PlaceController")
-        place_target_list = [target1, target2, ...]
-        place_controller = PlaceController(config, spot, use_policies=True)
-        place_result = place_controller.execute(place_target_list, is_local=False)
-        place_controller.shutdown()
+        with spot.get_lease(hijack=True):
+            spot.power_robot()
+
+            place_target_list = [target1, target2, ...]
+            place_controller = PlaceController(config, spot, use_policies=True)
+            place_result = place_controller.execute(place_target_list, is_local=False)
+
+            spot.shutdown(should_dock=True)
     """
 
     def __init__(self, config, spot: Spot, use_policies=True):
+        self.config = config
         self.spot = spot
         self.use_policies = use_policies
-        self.config = config
 
         # Setup
         if self.use_policies:
@@ -99,7 +100,6 @@ class PlaceController:
             self.policy.reset()
 
         self.place_env = SpotPlaceEnv(config, spot)
-        self.place_env.power_robot()
 
     def reset_env_and_policy(self, place_target, is_local):
         """
@@ -201,23 +201,6 @@ class PlaceController:
 
         return success_list
 
-    def shutdown(self, should_dock=False):
-        try:
-            if should_dock:
-                self.place_env.say("Executing automatic docking")
-                dock_start_time = time.time()
-                while time.time() - dock_start_time < 2:
-                    try:
-                        self.spot.dock(dock_id=DOCK_ID, home_robot=True)
-                    except Exception:
-                        print("Dock not found... trying again")
-                        time.sleep(0.1)
-            else:
-                self.place_env.say("Will sit down here")
-                self.spot.sit()
-        finally:
-            self.spot.power_off()
-
 
 class SpotPlaceEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
@@ -294,12 +277,13 @@ if __name__ == "__main__":
 
     spot = Spot("RealPlaceEnv")
     with spot.get_lease(hijack=True):
+        spot.power_robot()
         place_controller = PlaceController(config, spot, use_policies=True)
         try:
             place_result = place_controller.execute(
                 place_target_list, args.target_is_local
             )
         finally:
-            place_controller.shutdown(False)
+            spot.shutdown(should_dock=True)
 
     print(f"Place results - {place_result}")

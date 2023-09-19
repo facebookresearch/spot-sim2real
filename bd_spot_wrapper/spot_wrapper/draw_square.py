@@ -20,8 +20,7 @@ GRIPPER_WAYPOINTS = [
 
 
 def main(spot: Spot):
-    spot.power_on()
-    spot.blocking_stand()
+    spot.power_robot()
 
     # Open the gripper
     spot.open_gripper()

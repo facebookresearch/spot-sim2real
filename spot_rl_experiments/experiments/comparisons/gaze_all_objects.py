@@ -27,13 +27,14 @@ def main(spot, bd=False):
     else:
         config.MAX_EPISODE_STEPS = 150
 
+    spot.power_robot()
     gaze_controller = GazeController(config, spot)
     for _ in range(3):
         time.sleep(2)
         gaze_controller.execute(target_object_list=names, take_user_input=False)
         time.sleep(2)
 
-    gaze_controller.shutdown(should_dock=False)
+    spot.shutdown(should_dock=False)
 
 
 if __name__ == "__main__":

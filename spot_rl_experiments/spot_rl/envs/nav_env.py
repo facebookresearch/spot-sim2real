@@ -20,8 +20,6 @@ from spot_rl.utils.utils import (
 )
 from spot_wrapper.spot import Spot
 
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-
 
 def parse_arguments(args=sys.argv[1:]):
     parser = get_default_parser()
@@ -89,31 +87,34 @@ class WaypointController:
     How to use:
         1. Create WaypointController object
         2. Call execute() with nav_targets list as input and get robot's trajectory as output
-        3. Call shutdown() to stop the robot
 
     Example:
         config = construct_config(opts=[])
         spot = Spot("spot_client_name")
-        nav_targets_list = [target1, target2, ...]
-        waypoint_controller = WaypointController(config, spot)
-        robot_trajectories = waypoint_controller.execute(nav_targets_list)
-        waypoint_controller.shutdown()
+        with spot.get_lease(hijack=True):
+            spot.power_on()
+
+            nav_targets_list = [target1, target2, ...]
+            waypoint_controller = WaypointController(config, spot)
+            robot_trajectories = waypoint_controller.execute(nav_targets_list)
+
+            spot.shutdown()
     """
 
     def __init__(self, config, spot: Spot, should_record_trajectories=False) -> None:
+        self.config = config
+        self.spot = spot
+
         # Record robot's trajectory (i.e. waypoints)
         self.recording_in_progress = False
         self.start_time = 0.0
         self.record_robot_trajectories = should_record_trajectories
-
-        self.spot = spot
 
         # Setup
         self.policy = NavPolicy(config.WEIGHTS.NAV, device=config.DEVICE)
         self.policy.reset()
 
         self.nav_env = SpotNavEnv(config, self.spot)
-        self.nav_env.power_robot()
 
     def reset_env_and_policy(self, nav_target):
         """
@@ -182,29 +183,6 @@ class WaypointController:
         # Return waypoints back
         return robot_trajectories
 
-    def shutdown(self, should_dock=False) -> None:
-        """
-        Stops the robot and docks it if should_dock is True else sits the robot down
-
-        Args:
-            should_dock: bool indicating whether to dock the robot or not
-        """
-        try:
-            if should_dock:
-                self.nav_env.say("Executing automatic docking")
-                dock_start_time = time.time()
-                while time.time() - dock_start_time < 2:
-                    try:
-                        self.spot.dock(dock_id=DOCK_ID, home_robot=True)
-                    except Exception:
-                        print("Dock not found... trying again")
-                        time.sleep(0.1)
-            else:
-                self.nav_env.say("Will sit down here")
-                self.spot.sit()
-        finally:
-            self.spot.power_off()
-
 
 class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
@@ -270,6 +248,7 @@ if __name__ == "__main__":
 
     spot = Spot("RealNavEnv")
     with spot.get_lease(hijack=True):
+        spot.power_robot()
         wp_controller = WaypointController(
             config=config, spot=spot, should_record_trajectories=record_trajectories
         )
@@ -278,7 +257,7 @@ if __name__ == "__main__":
                 nav_targets_list=nav_targets_list
             )
         finally:
-            wp_controller.shutdown(should_dock=args.dock)
+            spot.shutdown(should_dock=args.dock)
 
         if args.save_trajectories_path is not None:
             # Ensure the folder name ends with a trailing slash
