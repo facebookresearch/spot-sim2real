@@ -72,6 +72,7 @@ lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
           Once you have fixed the issue, you need to kill all `img_publishers` nodes that are running `spot_rl_launch_local`, this can be done using `htop`
       4. If failure is due to missing `waypoints.yaml` file, then [follow these steps to generate the `waypoints.yaml` file](/README.md#video_game-instructions-to-record-waypoints-use-joystick-to-move-robot-around)
       5. If you face an issue regarding `"Block8 has no module relu"`, [follow these steps described in ISSUES.md](/installation/ISSUES.md#if-you-face-an-issue-saying-block8-has-no-module-relu)
+      6. If facing this bug -- `"KeyError: 'Neither weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth nor /home/$USER/spot-sim2real/spot_rl_experiments/weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth exist!'"` [Follow these steps](https://github.com/facebookresearch/spot-sim2real/blob/main/installation/SETUP_INSTRUCTIONS.md#setup-spot_rl_experiments)
   3. `proprioception`
       1. This node dies sometimes due to roscore taking quite a while to start up. Re-running `spot_rl_launch_local` should fix this in most cases.
       2. If it still does not get fixed, run this command on a new terminal
