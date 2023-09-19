@@ -75,8 +75,8 @@ def test_place():
 
     for wp_idx in range(len(test_waypoints_local)):
         # Capture test and target position of place target in base frame
-        test_position = list(test_result[wp_idx].get("ee_pos"))
-        target_position = list(test_result[wp_idx].get("place_target"))
+        test_position = np.array(test_result[wp_idx].get("ee_pos"))
+        target_position = np.array(test_result[wp_idx].get("place_target"))
         # Test that robot reached its goal successfully spatially
         assert (
             is_position_within_bounds(
