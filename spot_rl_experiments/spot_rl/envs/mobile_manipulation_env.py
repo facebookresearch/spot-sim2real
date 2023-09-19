@@ -423,5 +423,4 @@ if __name__ == "__main__":
             try:
                 main(spot, args.use_mixer, config, args.output)
             finally:
-                spot.power_off()
-                # TODO: This above line should be spot.shutdown() ????
+                spot.shutdown(should_dock=True)
