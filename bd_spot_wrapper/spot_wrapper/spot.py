@@ -13,6 +13,13 @@
 """ Easy-to-use wrapper for properly controlling Spot """
 import os
 import os.path as osp
+
+###
+# from bosdyn.api.spot_cam import service_pb2_grpc
+# from bosdyn.client.spot_cam.media_log import MediaLogClient
+# from bosdyn.client.directory_registration import DirectoryRegistrationClient, DirectoryRegistrationKeepAlive
+# # from bosdyn.client.data_acquisition import DataAcquisitionClient
+import pdb
 import time
 from collections import OrderedDict
 
@@ -20,7 +27,10 @@ import bosdyn.client
 import bosdyn.client.lease
 import bosdyn.client.util
 import cv2
+import magnum as mn
 import numpy as np
+import quaternion
+import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -54,6 +64,12 @@ from bosdyn.client.robot_command import (
 from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
 from google.protobuf import wrappers_pb2
+
+# from bosdyn.client.server_util import GrpcServiceRunner
+# # from bosdyn.api import data_acquisition_plugin_service_pb2_grpc
+
+# from bosdyn.client.data_acquisition_plugin_service import (Capability, DataAcquisitionPluginService)
+###
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -118,7 +134,42 @@ SHOULD_ROTATE = [
     SpotCamIds.FRONTRIGHT_DEPTH,
     SpotCamIds.HAND_DEPTH,
     SpotCamIds.HAND,
+    # SpotCamIds.FRONTRIGHT_FISHEYE
 ]
+
+# class X_Adapter:
+#     """Provide access to the latest data from a fake sensor."""
+
+#     def __init__(self):
+#         pass
+
+#     def _update_gps_callback(self, msg, **metadata):
+#         pass
+
+#     def get_GPS_data(self, request, store_helper):
+#         pass
+
+
+# def make_service(robot, port, service_name, options, logger=None):
+#     adapter = X_Adapter(robot, service_name)
+#     capabilities = adapter.get_capabilities()
+#     return DataAcquisitionPluginService(robot, capabilities, adapter.get_X)
+
+# def run_service(bosdyn_sdk_robot, port, service_name, options, logger=None):
+# def run_service(bosdyn_sdk_robot=None, port=None, service_name=None, options=None, logger=None):
+#     # Proto service specific function used to attach a servicer to a server.
+#     add_servicer_to_server_fn = service_pb2_grpc.add_MediaLogServiceServicer_to_server
+
+#     # # Instance of the servicer to be run.
+#     service_servicer = service_pb2_grpc.MediaLogServiceServicer()
+#     service_runner = GrpcServiceRunner(service_servicer, add_servicer_to_server_fn, port, max_workers=1, logger=logger)
+#     print(f"#############{service_runner.port}")
+
+#     dir_reg_client = bosdyn_sdk_robot.ensure_client(DirectoryRegistrationClient.default_service_name)
+#     keep_alive = DirectoryRegistrationKeepAlive(dir_reg_client)
+#     service_name = MediaLogClient.default_service_name
+#     service_type = MediaLogClient.service_type
+#     keep_alive.start(service_name, service_type, service_name, SPOT_IP, service_runner.port)
 
 
 class Spot:
@@ -293,7 +344,7 @@ class Spot:
             self.command_client, cmd_id, timeout_sec=timeout_sec
         )
 
-    def get_image_responses(self, sources, quality=None):
+    def get_image_responses(self, sources, quality=None, pixel_format=None):
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -306,8 +357,20 @@ class Spot:
                 quality = [quality] * len(sources)
             else:
                 assert len(quality) == len(sources)
-            sources = [build_image_request(src, q) for src, q in zip(sources, quality)]
-            image_responses = self.image_client.get_image(sources)
+            img_requests = [
+                build_image_request(src, q) for src, q in zip(sources, quality)
+            ]
+            image_responses = self.image_client.get_image(img_requests)
+        elif pixel_format is not None:
+            if isinstance(pixel_format, int):
+                pixel_format = [pixel_format] * len(sources)
+            else:
+                assert len(pixel_format) == len(sources)
+            img_requests = [
+                build_image_request(src, pixel_format=pf)
+                for src, pf in zip(sources, pixel_format)
+            ]
+            image_responses = self.image_client.get_image(img_requests)
         else:
             image_responses = self.image_client.get_image_from_sources(sources)
 
@@ -755,6 +818,103 @@ class Spot:
         finally:
             self.power_off()
 
+    # TODO: Maybe this is not needed?
+    def experiment(self, is_hand=True, is_grayscale=False):
+        img_src = [SpotCamIds.HAND_COLOR]
+        if not is_hand:
+            img_src = [SpotCamIds.FRONTRIGHT_FISHEYE]
+
+        pixel_format = image_pb2.Image.PIXEL_FORMAT_RGB_U8
+        if is_grayscale:
+            pixel_format = image_pb2.Image.PIXEL_FORMAT_GREYSCALE_U8
+
+        img_resp = self.get_image_responses(img_src, pixel_format=pixel_format)
+        return img_resp[0]
+
+    # DEBUG METHOD. REMOVE LATER
+    def experiment_camera(self, is_hand=True):
+        pdb.set_trace()
+
+    # TODO: Can this me combined with experiment()???
+    def get_camera_intrinsics(self, source, quality=None, pixel_format=None):
+        """Retrieve images from Spot's cameras
+
+        :param sources: list containing camera uuids
+        :param quality: either an int or a list specifying what quality each source
+            should return its image with
+        :return: list containing bosdyn image response objects
+        """
+        image_response = self.get_image_responses(
+            [source], quality=quality, pixel_format=pixel_format
+        )[0]
+        cam_intrinsics = image_response.source.pinhole.intrinsics
+        return cam_intrinsics
+
+    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    def convert_transformation_from_sophus_to_magnum(
+        self, sp_transformation: sp.SE3
+    ) -> mn.Matrix4:
+        """
+        First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
+        Then convert rvec and tvec to Magnum pose
+
+        Args:
+            sp_transformation (sp.SE3): Sophus transformation matrix
+
+        Returns:
+            mn_tranformation (mn.Matrix4): 4x4 pose matrix
+        """
+        tvec = sp_transformation.translation()
+        rvec = sp_transformation.so3().log()
+
+        # DEBUGGING
+        # print(f"Spot - tvec: {type(tvec)}")
+        # print(f"Spot - rvec: {rvec}")
+
+        assert rvec.shape == (3,) and tvec.shape == (3,)
+
+        # Get rotation angle as norm of rvec
+        angle = np.linalg.norm(rvec)
+
+        # Get unit axis of rotation
+        axis = rvec / angle
+
+        # Get rotation matrix from angle and axis
+        rotation_matrix = mn.Quaternion.rotation(
+            mn.Rad(angle), mn.Vector3(axis)
+        ).to_matrix()
+
+        # Get pose matrix from rotation matrix and translation vector
+        mn_tranformation = mn.Matrix4.from_(rotation_matrix, tvec)
+
+        # DEBUGGING
+        # print(f"spot - sophus tf - {sp_transformation}")
+        # print(f"spot - magnum tf - {mn_tranformation}")
+        return mn_tranformation
+
+    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    def convert_transformation_from_BD_to_magnun(self, bd_transformation_dict: dict):
+        """
+        Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
+
+        Args:
+            bd_transformation_dict (dict): Bosdyn transformation dictionary
+
+        Returns:
+            mn_tranformation_dict (dict): Magnum transformation dictionary
+        """
+        # Assert bd_transformation_dict has "position" and "rotation" keys
+        # assert "position" in bd_transformation_dict.keys() and "rotation" in bd_transformation_dict.keys()
+        pos = bd_transformation_dict.position
+        rot = bd_transformation_dict.rotation
+        quat = quaternion.quaternion(rot.w, rot.x, rot.y, rot.z)
+
+        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
+        translation = mn.Vector3(pos.x, pos.y, pos.z)
+
+        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
+        return mn_transformation
+
 
 class SpotLease:
     """
@@ -854,3 +1014,22 @@ def draw_crosshair(img):
 def wrap_heading(heading):
     """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
     return (heading + np.pi) % (2 * np.pi) - np.pi
+
+
+if __name__ == "__main__":
+    spot = Spot("SASD")
+
+    with spot.get_lease(hijack=True) as lease:
+        spot.loginfo("Lease acquired.")
+        spot.power_on()
+        resp_head = spot.experiment(is_hand=False)
+        # cv2_image_head_r = image_response_to_cv2(resp_head, reorient=True)
+
+        resp_hand = spot.experiment(is_hand=True)
+        # cv2_image_hand = image_response_to_cv2(resp_hand, reorient=False)
+        # cv2.imwrite("test_head_right_rgb.png", cv2_image_head_r)
+        # cv2.imwrite("test_hand_rgb.png", cv2_image_hand)
+        # spot.experiment_camera()
+        print(resp_head)
+        print(resp_hand)
+        spot.blocking_stand()
