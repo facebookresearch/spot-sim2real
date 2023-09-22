@@ -3,9 +3,12 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Tuple
+from typing import Tuple, overload
 
 import numpy as np
+
+# pip install multipledispatch
+from multipledispatch import dispatch
 from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
 from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
 from spot_rl.envs.place_env import PlaceController, construct_config_for_place
@@ -22,6 +25,10 @@ from spot_wrapper.spot import Spot
 
 
 class SpotSkillManager:
+    """
+    TODO: ADD DOCSTRING FOR USAGE
+    """
+
     def __init__(self):
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
@@ -76,7 +83,9 @@ class SpotSkillManager:
         # Reset the policies and environments via the controllers
         raise NotImplementedError
 
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:
+    # @dispatch(str)
+    # @overload
+    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # noqa
         """
         Perform the nav action on the specified navigation target
 
@@ -87,11 +96,14 @@ class SpotSkillManager:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
+        print(f"Received nav target request for - {nav_target}")
+
         if nav_target is not None:
+            # Get the nav target coordinates
             try:
-                nav_target_list = [
-                    nav_target_from_waypoint(nav_target, self.waypoints_yaml_dict)
-                ]
+                nav_target_tuple = nav_target_from_waypoint(
+                    nav_target, self.waypoints_yaml_dict
+                )
             except Exception:
                 return (
                     False,
@@ -100,20 +112,42 @@ class SpotSkillManager:
         else:
             return False, "No nav target specified, skipping nav"
 
-        print(f"Navigating to {nav_target}")
+        nav_x, nav_y, nav_theta = nav_target_tuple
+        status, message = self.nav2loc(nav_x, nav_y, nav_theta)
+        # status, message = self.nav(x=nav_x, y=nav_y, theta=nav_theta) <--- THIS LINE GIVES NotImplementedError: Could not find signature for place: <>
+        return status, message
+
+    # @overload
+    # @dispatch(float, float, float)  # noqa
+    def nav2loc(self, x: float, y: float, theta=float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the specified navigation target (location)
+
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+            theta (float): yaw for the nav target (in radians) specified in the world frame
+
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+
+        print(f"Navigating to x, y, theta : {x}, {y}, {theta}")
 
         result = None
+        nav_target_tuple = None
         try:
-            result = self.nav_controller.execute(nav_target_list)
+            nav_target_tuple = (x, y, theta)
+            result = self.nav_controller.execute([nav_target_tuple])
         except Exception:
             return False, "Error encountered while navigating"
 
-        _nav_target_pose = nav_target_list[0]
         # Make the angle from rad to deg
         _nav_target_pose_deg = (
-            _nav_target_pose[0],
-            _nav_target_pose[1],
-            np.rad2deg(_nav_target_pose[2]),
+            nav_target_tuple[0],
+            nav_target_tuple[1],
+            np.rad2deg(nav_target_tuple[2]),
         )
         check_navigation_suc = is_pose_within_bounds(
             result[0][-1].get("pose"),
@@ -127,6 +161,7 @@ class SpotSkillManager:
         else:
             return False, "Navigation failed to reach the target pose"
 
+    # @dispatch(str)
     def pick(self, pick_target: str = None) -> Tuple[bool, str]:
         """
         Perform the pick action on the specified pick target
@@ -138,6 +173,9 @@ class SpotSkillManager:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
+        # TODO: TEST PRINT FOR NONE type
+        print(f"Received pick target request for - {pick_target}")
+
         if pick_target is None:
             print("No pick target specified, skipping pick")
             return False, "No pick target specified, skipping pick"
@@ -156,7 +194,9 @@ class SpotSkillManager:
         else:
             return False, "Pick failed to pick the target object"
 
-    def place(self, place_target: str = None) -> Tuple[bool, str]:
+    # @dispatch(str)
+    # @overload
+    def place(self, place_target: str = None) -> Tuple[bool, str]:  # noqa
         """
         Perform the place action on the specified place target
 
@@ -167,12 +207,14 @@ class SpotSkillManager:
             bool: True if place was successful, False otherwise
             str: Message indicating the status of the place
         """
+        print(f"Received place target request for - {place_target}")
+
         if place_target is not None:
             # Get the place target coordinates
             try:
-                place_target_list = [
-                    place_target_from_waypoint(place_target, self.waypoints_yaml_dict)
-                ]
+                place_target_location = place_target_from_waypoint(
+                    place_target, self.waypoints_yaml_dict
+                )
             except Exception:
                 return (
                     False,
@@ -181,11 +223,34 @@ class SpotSkillManager:
         else:
             return False, "No place target specified, skipping place"
 
-        print(f"Place target object at {place_target} i.e. {place_target_list}")
+        place_x, place_y, place_z = np.round(
+            place_target_location.astype(np.float64), 1
+        ).tolist()
+        # status, message = self.place(x=place_x, y=place_y, z=place_z) <--- THIS LINE GIVES NotImplementedError: Could not find signature for place: <>
+        status, message = self.place2loc(place_x, place_y, place_z)
+        return status, message
+
+    # @overload
+    # @dispatch(float, float, float)  # noqa
+    def place2loc(self, x: float, y: float, z: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the place action on the specified place target (location)
+
+        Args:
+            x (float): x coordinate of the place target (in meters) specified in the world frame
+            y (float): y coordinate of the place target (in meters) specified in the world frame
+            z (float): z coordinate of the place target (in meters) specified in the world frame
+
+        Returns:
+            bool: True if place was successful, False otherwise
+            str: Message indicating the status of the place
+        """
+        print(f"Place target object at x, y, z : {x}, {y}, {z}")
 
         result = None
         try:
-            result = self.place_controller.execute(place_target_list)
+            place_target_tuple = (x, y, z)
+            result = self.place_controller.execute([place_target_tuple])
         except Exception:
             return False, "Error encountered while placing"
 
@@ -226,15 +291,15 @@ if __name__ == "__main__":
 
     # Nav-Pick-Nav-Place sequence 1
     spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("penguin_plush")
-    spotskillmanager.nav("test_place_left")
+    spotskillmanager.pick("ball_plush")
+    spotskillmanager.nav("test_place_front")
     spotskillmanager.place("test_place_front")
 
-    # # Nav-Pick-Nav-Place sequence 2
+    # Nav-Pick-Nav-Place sequence 2
     spotskillmanager.nav("test_square_vertex3")
     spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_right")
-    spotskillmanager.place("test_place_right")
+    spotskillmanager.nav("test_place_left")
+    spotskillmanager.place("test_place_left")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()
