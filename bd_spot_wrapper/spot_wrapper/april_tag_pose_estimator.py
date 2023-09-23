@@ -38,9 +38,7 @@ class AprilTagPoseEstimator:
         image, mn_camera_T_marker = atpo.detect_markers_and_estimate_pose(image, should_render=True)
     """
 
-    def __init__(
-        self, spot: Spot, camera_intrinsics: dict, marker_length: float = MARKER_LENGTH
-    ):
+    def __init__(self, camera_intrinsics: dict, marker_length: float = MARKER_LENGTH):
         apriltag_dict = aruco.Dictionary_get(aruco.DICT_APRILTAG_36h11)
         self._cam_module = frt.CameraModule(dictionary=apriltag_dict)
 
@@ -56,9 +54,6 @@ class AprilTagPoseEstimator:
 
         # Registere marker IDs
         self._registered_marker_ids = []  # type: List[int]
-
-        # MAYBE: we dont need spot
-        self._spot = spot
 
     @staticmethod
     def _validate_camera_intrinsics(camera_intrinsics: dict):
@@ -92,7 +87,7 @@ class AprilTagPoseEstimator:
         marker = markers[0]
         # Pose of marker in camera frame expressed as SE3 (in Sophus Library)
         sp_camera_T_marker = marker.pose
-        mn_camera_T_marker = self._spot.convert_transformation_from_sophus_to_magnum(
+        mn_camera_T_marker = Spot.convert_transformation_from_sophus_to_magnum(
             sp_camera_T_marker
         )
 
