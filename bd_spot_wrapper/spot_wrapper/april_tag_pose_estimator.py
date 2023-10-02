@@ -74,7 +74,7 @@ class AprilTagPoseEstimator:
 
     # TODO: If arguments are passed by reference in python, then we can avoid returning image????
     def detect_markers_and_estimate_pose(
-        self, image, should_render=False
+        self, image, should_render=False, magnum: bool = True
     ) -> Tuple[object, mn.Matrix4]:
         markers = self._cam_module.detect_markers(image)
 
@@ -93,4 +93,7 @@ class AprilTagPoseEstimator:
 
         if should_render:
             image = self._cam_module.render_markers(image, markers=[marker])
-        return image, mn_camera_T_marker
+
+        if magnum:
+            return image, mn_camera_T_marker
+        return image, sp_camera_T_marker
