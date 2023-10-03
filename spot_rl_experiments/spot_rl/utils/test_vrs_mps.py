@@ -44,230 +44,241 @@ def label_img(
         line_type,
     )
 
-    # def plot_trajectory(self, marker: np.ndarray=None, device: np.ndarray=None):
-    #     print(f"PLTO TRAJ : {marker}")
-    #     fig = plt.figure()
-    #     ax = fig.add_subplot(111, projection='3d')
-    #     if marker is not None:
-    #         print("Printing Marker")
-    #         print(marker[0], marker[1], marker[2])
-    #         ax.plot(marker[0], marker[1], marker[2], 'ro', markersize=12)
-
-    #     if device is not None:
-    #         print("Printing Marker2")
-    #         print(device[0], device[1], device[2])
-    #         ax.plot(device[0], device[1], device[2], 'go', markersize=12)
-    #     ax.plot(self.xyz_trajectory[:,0], self.xyz_trajectory[:,1], self.xyz_trajectory[:,2])
-    #     plt.ioff()  # Use non-interactive mode.
-    #     plt.show()  # Show the figure. Won't return until the figure is closed.
-
-
-def plot_rgb_and_trajectory(
-    marker: sp.SE3, device: sp.SE3, rgb, timestamp_of_interest=None, traj_data=None
-):
-    fig = plt.figure(figsize=plt.figaspect(2.0))
-    fig.suptitle("A tale of 2 subplots")
-
-    _ = fig.add_subplot(1, 2, 1)
-    plt.imshow(rgb)
-
-    scene = Scene()
-    scene.add_camera("aria", frame="world", pose_in_frame=device, size=AXES_SCALE)
-    scene.add_camera("dock", frame="world", pose_in_frame=marker, size=AXES_SCALE)
-
-    for camera_name in scene.get_cameras():
-        print(
-            f"Pose of camera '{camera_name}':\n {scene.get_camera_info(camera_name)['pose_in_frame']}\n"
-        )
-
-    plt_ax = scene.visualize(fig=fig, should_return=True)
-    plt_ax.plot(traj_data[:, 0], traj_data[:, 1], traj_data[:, 2])
-    plt.show()
-
 
 ######################################################################
 
 
-class VRSStreamer:
-    def __init__(self, vrs_file_path: str):
+class VRSMPSStreamer:
+    def __init__(self, vrs_file_path: str, mps_file_path: str):
         assert vrs_file_path is not None and os.path.exists(
             vrs_file_path
         ), "Incorrect VRS file path"
-
-        self._qr_pose_estimator_dict = dict()  # type: Dict[str, Any]
-        self._src_calib_params_dict = dict()  # type: Dict[str, Any]
-        self._dst_calib_params_dict = dict()  # type: Dict[str, Any]
-        self.provider = data_provider.create_vrs_data_provider(vrsfile)
-        assert self.provider is not None, "Cannot open VRS file"
-
-    def _loop_stream(self, name_image_transform_zip):
-        for name, image, cam_T_marker in name_image_transform_zip:
-            image = np.rot90(image, k=3)
-            image = np.ascontiguousarray(
-                image
-            )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
-
-            # Augment displayed image with marker location information
-            if cam_T_marker is not None:
-                position = cam_T_marker.translation()
-                label_img(image, "Detected QR Marker", (50, 50))
-                label_img(image, f"X = {[position[0]]}", (50, 75))
-                label_img(image, f"Y : {position[1]}", (50, 100))
-                label_img(image, f"Z : {position[2]}", (50, 125))
-            cv2.imshow(f"Stream - {name}", image)
-        cv2.waitKey(1)
-
-    def create_display_windows(self, stream_name_list: list):
-        for stream_name in stream_name_list:
-            cv2.namedWindow(f"Stream - {stream_name}", cv2.WINDOW_NORMAL)
-
-    def rectify_image(self, stream_name: str, image):
-        src_calib = self._src_calib_params_dict.get(stream_name)
-        dst_calib = self._dst_calib_params_dict.get(stream_name)
-        rectified_image = calibration.distort_by_calibration(
-            image, dst_calib, src_calib
-        )
-        return rectified_image
-
-    def stream_cameras(self, stream_names: list, should_rectify=True, detect_qr=False):
-        start_time = time.time()
-        self.create_display_windows(stream_name_list=stream_names)
-
-        image_data_ret_list = []
-        processed_img_ret_list = []
-        transformation_ret_list = []
-
-        # Setup rectification
-        device_calib = self.provider.get_device_calibration()
-        # sensor_calib_list = [device_calib.get_sensor_calib(label) for label in stream_names][0]
-        # print(dir(sensor_calib_list))
-
-        sp_device_T_camera_list = [
-            sp.SE3(device_calib.get_transform_device_sensor(label).matrix())
-            for label in stream_names
-        ]
-        assert len(sp_device_T_camera_list) == len(stream_names)
-
-        if should_rectify:
-            for stream_name in stream_names:
-                if stream_name not in self._src_calib_params_dict.keys():
-                    self._src_calib_params_dict[
-                        stream_name
-                    ] = device_calib.get_camera_calib(stream_name)
-                    self._dst_calib_params_dict[
-                        stream_name
-                    ] = calibration.get_linear_camera_calibration(
-                        512, 512, 280, stream_name
-                    )
-
-        # Setup April tag detection
-        if detect_qr:
-            for stream_name in stream_names:
-                if stream_name not in self._qr_pose_estimator_dict.keys():
-                    focal_lengths = self._dst_calib_params_dict.get(
-                        stream_name
-                    ).get_focal_lengths()
-                    principal_point = self._dst_calib_params_dict.get(
-                        stream_name
-                    ).get_principal_point()
-                    calib_dict = {
-                        "fx": focal_lengths[0].item(),
-                        "fy": focal_lengths[1].item(),
-                        "ppx": principal_point[0].item(),
-                        "ppy": principal_point[1].item(),
-                        "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
-                    }
-
-                    # LETS ONLY DETECT DOCK-ID RIGHT NOW
-                    april_tag_pose_estimator = AprilTagPoseEstimator(
-                        camera_intrinsics=calib_dict
-                    )
-                    april_tag_pose_estimator.register_marker_ids([DOCK_ID])
-                    self._qr_pose_estimator_dict[stream_name] = april_tag_pose_estimator
-
-        # Assuming all frames are synced
-        # stream_id = self.provider.get_stream_id_from_label(stream_names[0])
-        # stream_id = self.provider.get_stream_id_from_label(STREAM1_NAME)
-        # num_frames = self.provider.get_num_data(stream_id)
-        # CUSTOM RANGE FOR VIDEO - TODO: REMOVE LATER
-        custom_range = range(1400, 1550)
-        for frame_idx in custom_range:
-            image_list = []
-            camera_T_marker_list = []
-            for stream_name in stream_names:
-                stream_id = self.provider.get_stream_id_from_label(stream_name)
-                frame_data = self.provider.get_image_data_by_index(stream_id, frame_idx)
-                frame_data_array = frame_data[0].to_numpy_array()
-                if should_rectify:
-                    frame_data_array = self.rectify_image(
-                        stream_name=stream_name, image=frame_data_array
-                    )
-                    if detect_qr:
-                        (
-                            frame_data_array,
-                            camera_T_marker,
-                        ) = self._qr_pose_estimator_dict[
-                            stream_name
-                        ].detect_markers_and_estimate_pose(
-                            image=frame_data_array, should_render=True, magnum=False
-                        )
-                        if camera_T_marker is not None:
-                            print(
-                                f"Time stamp with Detections- {frame_data[1].capture_timestamp_ns}"
-                            )
-                            image_data_ret_list.append(frame_data)
-                            transformation_ret_list.append(
-                                sp_device_T_camera_list[0] * camera_T_marker
-                            )
-                            processed_img_ret_list.append(frame_data_array)
-
-                image_list.append(frame_data_array)
-                camera_T_marker_list.append(camera_T_marker)
-
-            self._loop_stream(zip(stream_names, image_list, camera_T_marker_list))
-
-        end_time = time.time()
-        total_time = end_time - start_time
-        print(f"Total time to complete stream = {total_time} seconds")
-
-        return image_data_ret_list, transformation_ret_list, processed_img_ret_list
-
-
-class MPSStreamer:
-    def __init__(self, mps_file_path: str):
         assert mps_file_path is not None and os.path.exists(
             mps_file_path
         ), "Incorrect MPS dir path"
+
+        self.provider = data_provider.create_vrs_data_provider(vrsfile)
+        assert self.provider is not None, "Cannot open VRS file"
+
+        self.device_calib = self.provider.get_device_calibration()
+
+        # TODO: Condition check to ensure stream name is valid
+
+        self._qr_pose_estimator = None  # type: ignore
+        self._src_calib_params = None  # type: ignore
+        self._dst_calib_params = None  # type: ignore
 
         # Trajectory and global points
         closed_loop_trajectory_file = os.path.join(
             mps_file_path, "closed_loop_trajectory.csv"
         )
-        # global_points_file = os.path.join(mps_file_path, "global_points.csv.gz")
-        online_cam_calib_file = os.path.join(mps_file_path, "online_calibration.jsonl")
         self.mps_trajectory = mps.read_closed_loop_trajectory(
             closed_loop_trajectory_file
         )
+        # global_points_file = os.path.join(mps_file_path, "global_points.csv.gz")
+        online_cam_calib_file = os.path.join(mps_file_path, "online_calibration.jsonl")
         self.online_cam_calib = mps.read_online_calibration(online_cam_calib_file)
 
         self.xyz_trajectory = np.empty([len(self.mps_trajectory), 3])
         # # self.quat_trajectory = np.empty([len(self.mps_trajectory), 4])
         self.trajectory_s = np.empty([len(self.mps_trajectory)])
-        self.sp_transform_trajectory = []  # type: List[Any]
+
+        self.ariaWorld_T_device_trajectory = []  # type: List[Any]
+        self.ariaCorrectedWorld_T_device_trajectory = []  # type: List[Any]
+        self.ariaCorrectedWorld_T_cpf_trajectory = []  # type: List[Any]
+
+        # Setup some generic transforms
+        self.device_T_cpf = sp.SE3(
+            self.device_calib.get_transform_device_cpf().matrix()
+        )
+        # breakpoint()
+        self.cpf_T_device = self.device_T_cpf.inverse()
+
+        # Initialize Trajectory after setting up cpf transforms
         self.initialize_trajectory()
 
+        # sensor_calib_list = [device_calib.get_sensor_calib(label) for label in stream_names][0]
+        # print(dir(sensor_calib_list))
+
+    def plot_rgb_and_trajectory(
+        self,
+        marker: sp.SE3,
+        device: sp.SE3,
+        rgb,
+        timestamp_of_interest=None,
+        traj_data=None,
+    ):
+        fig = plt.figure(figsize=plt.figaspect(2.0))
+        fig.suptitle("A tale of 2 subplots")
+
+        _ = fig.add_subplot(1, 2, 1)
+        plt.imshow(rgb)
+
+        scene = Scene()
+        scene.add_frame("correctedWorld", pose=self.device_T_cpf)
+        scene.add_camera(
+            "aria", frame="correctedWorld", pose_in_frame=device, size=AXES_SCALE
+        )
+        scene.add_camera(
+            "dock", frame="correctedWorld", pose_in_frame=marker, size=AXES_SCALE
+        )
+
+        for camera_name in scene.get_cameras():
+            print(
+                f"Pose of camera '{camera_name}':\n {scene.get_camera_info(camera_name)['pose_in_frame']}\n"
+            )
+
+        plt_ax = scene.visualize(fig=fig, should_return=True)
+        plt_ax.plot(traj_data[:, 0], traj_data[:, 1], traj_data[:, 2])
+        plt.show()
+
+    def _init_april_tag_detector(self):
+        focal_lengths = self._dst_calib_params.get_focal_lengths()
+        principal_point = self._dst_calib_params.get_principal_point()
+        calib_dict = {
+            "fx": focal_lengths[0].item(),
+            "fy": focal_lengths[1].item(),
+            "ppx": principal_point[0].item(),
+            "ppy": principal_point[1].item(),
+            "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
+        }
+
+        # LETS ONLY DETECT DOCK-ID RIGHT NOW
+        self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
+        self._qr_pose_estimator.register_marker_ids([DOCK_ID])
+
+    def _augmeng_img_with_text(
+        self, img: np.ndarray, frame_T_marker: sp.SE3 = None, frame: str = "device"
+    ):
+        img = np.rot90(img, k=3)
+        img = np.ascontiguousarray(
+            img
+        )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
+
+        # Augment displayed image with marker location information
+        if frame_T_marker is not None:
+            position = frame_T_marker.translation()
+            label_img(img, "Detected QR Marker", (50, 50))
+            label_img(img, f"Frame = {frame}", (50, 75))
+            label_img(img, f"X : {position[0]}", (50, 100))
+            label_img(img, f"Y : {position[1]}", (50, 125))
+            label_img(img, f"Z : {position[2]}", (50, 150))
+
+        return img
+
+    def _display(self, img: np.ndarray, stream_name: str, wait: int = 1):
+        cv2.imshow(f"Stream - {stream_name}", img)
+        cv2.waitKey(wait)
+
+    def create_display_window(self, stream_name: str):
+        cv2.namedWindow(f"Stream - {stream_name}", cv2.WINDOW_NORMAL)
+
+    def rectify_image(self, image):
+        rectified_image = calibration.distort_by_calibration(
+            image, self._dst_calib_params, self._src_calib_params
+        )
+        return rectified_image
+
+    def parse_camera_stream(
+        self,
+        stream_name: str,
+        should_rectify=True,
+        detect_qr=False,
+        should_display=False,
+    ):
+        stream_id = self.provider.get_stream_id_from_label(stream_name)
+
+        img_list = []
+        img_metadata_list = []
+        cpf_T_marker_list = []
+
+        device_T_camera = sp.SE3(
+            self.device_calib.get_transform_device_sensor(stream_name).matrix()
+        )
+        assert device_T_camera is not None
+
+        # Setup camera calibration parameters by over-writing self._src_calib_param & self._dst_calib_param
+        if should_rectify:
+            self._src_calib_params = self.device_calib.get_camera_calib(stream_name)
+            self._dst_calib_params = calibration.get_linear_camera_calibration(
+                512, 512, 280, stream_name
+            )
+
+        # Setup April tag detection by over-writing self._qr_pose_estimator
+        if detect_qr:
+            self._init_april_tag_detector()
+
+        if should_display:
+            self.create_display_window(stream_name)
+
+        # num_frames = self.provider.get_num_data(stream_id)
+        # CUSTOM RANGE FOR VIDEO - TODO: REMOVE LATER
+        custom_range = range(1400, 1550)
+        for frame_idx in custom_range:
+            frame_data = self.provider.get_image_data_by_index(stream_id, frame_idx)
+            img = frame_data[0].to_numpy_array()
+            img_metadata = frame_data[1]
+
+            cpf_T_marker = None
+
+            if should_rectify:
+                img = self.rectify_image(image=img)
+
+            if detect_qr:
+                (
+                    img,
+                    camera_T_marker,
+                ) = self._qr_pose_estimator.detect_markers_and_estimate_pose(  # type: ignore
+                    image=img, should_render=True, magnum=False
+                )
+                if camera_T_marker is not None:
+                    cpf_T_marker = self.cpf_T_device * device_T_camera * camera_T_marker
+                    img = self._augmeng_img_with_text(
+                        img=img, frame_T_marker=cpf_T_marker, frame="cpf"
+                    )
+                    print(
+                        f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}"
+                    )
+
+                    img_list.append(img)
+                    img_metadata_list.append(img_metadata)
+                    cpf_T_marker_list.append(cpf_T_marker)
+
+            if should_display:
+                self._display(img=img, stream_name=stream_name)
+
+        return img_list, img_metadata_list, cpf_T_marker_list
+
     def initialize_trajectory(self):
+
+        # frame(ariaWorld) is same as frame(device) at the start
+        cpf_T_ariaWorld = self.cpf_T_device
+
         for i in range(len(self.mps_trajectory)):
-            # breakpoint()
             self.trajectory_s[i] = self.mps_trajectory[
                 i
             ].tracking_timestamp.total_seconds()
-            self.sp_transform_trajectory.append(
-                sp.SE3(self.mps_trajectory[i].transform_world_device.matrix())
+
+            ariaWorld_T_device = sp.SE3(
+                self.mps_trajectory[i].transform_world_device.matrix()
             )
-            self.xyz_trajectory[i, :] = self.sp_transform_trajectory[i].translation()
+            self.ariaWorld_T_device_trajectory.append(ariaWorld_T_device)
+
+            ariaWorld_T_cpf = ariaWorld_T_device * self.device_T_cpf
+
+            ariaCorrectedWorld_T_device = cpf_T_ariaWorld * ariaWorld_T_device
+            self.ariaCorrectedWorld_T_device_trajectory.append(
+                ariaCorrectedWorld_T_device
+            )
+
+            ariaCorrectedWorld_T_cpf = ariaCorrectedWorld_T_device * self.device_T_cpf
+            self.ariaCorrectedWorld_T_cpf_trajectory.append(ariaCorrectedWorld_T_cpf)
+
+            self.xyz_trajectory[i, :] = ariaWorld_T_cpf.translation()
             # self.quat_trajectory[i,:] = self.mps_trajectory[i].transform_world_device.quaternion()
-        assert len(self.trajectory_s) == len(self.sp_transform_trajectory)
+        assert len(self.trajectory_s) == len(
+            self.ariaCorrectedWorld_T_device_trajectory
+        )
 
     def get_closest_mps_idx_to_timestamp_ns(self, timestamp_ns_of_interest: int):
         mps_idx_of_interest = np.argmin(
@@ -282,7 +293,23 @@ class MPSStreamer:
         mps_idx_of_interest = self.get_closest_mps_idx_to_timestamp_ns(
             timestamp_ns_of_interest
         )
-        sp_transform_of_interest = self.sp_transform_trajectory[mps_idx_of_interest]
+        sp_transform_of_interest = self.ariaWorld_T_device_trajectory[
+            mps_idx_of_interest
+        ]
+        return sp_transform_of_interest
+
+    def get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
+        self, timestamp_ns_of_interest: int
+    ):
+        """
+        timestamp_of_interest -> nanoseconds
+        """
+        mps_idx_of_interest = self.get_closest_mps_idx_to_timestamp_ns(
+            timestamp_ns_of_interest
+        )
+        sp_transform_of_interest = self.ariaCorrectedWorld_T_cpf_trajectory[
+            mps_idx_of_interest
+        ]
         return sp_transform_of_interest
 
 
@@ -297,38 +324,39 @@ if __name__ == "__main__":
     # stream_list = [STREAM1_NAME, STREAM2_NAME]                # takes 79 seconds
     # stream_list = [STREAM1_NAME]                              # takes 47 seconds
 
-    vrs_streamer = VRSStreamer(vrs_file_path=vrsfile)
+    vrs_mps_streamer = VRSMPSStreamer(vrs_file_path=vrsfile, mps_file_path=mpspath)
 
-    stream_list = [STREAM1_NAME]
-    img_data_list, t_list, processed_img_list = vrs_streamer.stream_cameras(
-        stream_list, detect_qr=True
-    )
+    (
+        img_list,
+        img_metadata_list,
+        cpf_T_marker_list,
+    ) = vrs_mps_streamer.parse_camera_stream(stream_name=STREAM1_NAME, detect_qr=True)
 
-    mps_streamer = MPSStreamer(mps_file_path=mpspath)
-
-    for img_data, device_T_marker, processed_img in zip(
-        img_data_list, t_list, processed_img_list
+    for img, img_metadata, cpf_T_marker in zip(
+        img_list, img_metadata_list, cpf_T_marker_list
     ):
-        vrs_timestamp_of_interest_ns = img_data[1].capture_timestamp_ns
-        mps_idx_of_intersest = mps_streamer.get_closest_mps_idx_to_timestamp_ns(
+        vrs_timestamp_of_interest_ns = img_metadata.capture_timestamp_ns
+        mps_idx_of_intersest = vrs_mps_streamer.get_closest_mps_idx_to_timestamp_ns(
             vrs_timestamp_of_interest_ns
         )
-        ariaworld_T_device = mps_streamer.get_closest_world_T_device_to_timestamp(
-            vrs_timestamp_of_interest_ns
+        ariaCorrectedWorld_T_cpf = (
+            vrs_mps_streamer.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
+                vrs_timestamp_of_interest_ns
+            )
         )
-        ariaworld_T_marker = ariaworld_T_device * device_T_marker
+        ariaCorrectedWorld_T_marker = ariaCorrectedWorld_T_cpf * cpf_T_marker
 
-        marker_position = ariaworld_T_marker.translation()
-        device_position = ariaworld_T_device.translation()
+        marker_position = ariaCorrectedWorld_T_marker.translation()
+        device_position = ariaCorrectedWorld_T_cpf.translation()
         delta = marker_position - device_position
         dist = np.linalg.norm(delta)
 
         print(marker_position, device_position, dist)
-        plot_rgb_and_trajectory(
-            marker=ariaworld_T_marker,
-            device=ariaworld_T_device,
-            rgb=np.rot90(processed_img, k=3),
-            traj_data=mps_streamer.xyz_trajectory,
+        vrs_mps_streamer.plot_rgb_and_trajectory(
+            marker=ariaCorrectedWorld_T_marker,
+            device=ariaCorrectedWorld_T_cpf,
+            rgb=img,
+            traj_data=vrs_mps_streamer.xyz_trajectory,
         )
 
 # TODO: Record raw and rectified camera params for each camera in a config file
