@@ -1,0 +1,1 @@
+projectaria-tools'[all]'
