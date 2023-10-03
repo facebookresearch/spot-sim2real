@@ -851,8 +851,9 @@ class Spot:
         return cam_intrinsics
 
     # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    @staticmethod
     def convert_transformation_from_sophus_to_magnum(
-        self, sp_transformation: sp.SE3
+        sp_transformation: sp.SE3,
     ) -> mn.Matrix4:
         """
         First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
