@@ -29,9 +29,15 @@ class OwlVit:
         self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
 
         self.prefix = "an image of a"
-        self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
+        if labels is not None:
+            self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
+        else:
+            self.labels = None
         self.score_threshold = score_threshold
         self.show_img = show_img
+
+    def set_labels(self, labels):
+        self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
 
     def run_inference(self, img):
         """
@@ -78,9 +84,6 @@ class OwlVit:
         results = self.processor.post_process(
             outputs=outputs, target_sizes=target_sizes
         )
-        # img = img.to('cpu')
-        # if self.show_img:
-        #    self.show_img_with_overlaid_bounding_boxes(img, results)
 
         return self.get_most_confident_bounding_box_per_label(
             results
