@@ -26,8 +26,12 @@ class SpotSkillManager:
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
 
+        
+
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
+
+        
 
         # Power on the robot
         self.spot.power_robot()
@@ -36,7 +40,8 @@ class SpotSkillManager:
         self.waypoints_yaml_dict = get_waypoint_yaml()
 
     def __del__(self):
-        self.spot.shutdown(should_dock=True)
+        pass
+        #self.spot.shutdown(should_dock=True)
 
     def __init_spot(self):
         """
@@ -54,7 +59,7 @@ class SpotSkillManager:
 
         # Construct configs for nav, gaze, and place
         self.nav_config = construct_config_for_nav()
-        self.pick_config = construct_config_for_gaze(max_episode_steps=350)
+        self.pick_config = construct_config_for_gaze(max_episode_steps=350, dont_pick_up=True)
         self.place_config = construct_config_for_place()
 
     def __initiate_controllers(self):
@@ -67,6 +72,7 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
+        print("nav controller finished")
         self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
@@ -87,11 +93,13 @@ class SpotSkillManager:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
+        print("coming here")
         if nav_target is not None:
             try:
                 nav_target_list = [
                     nav_target_from_waypoint(nav_target, self.waypoints_yaml_dict)
                 ]
+
             except Exception:
                 return (
                     False,
@@ -145,16 +153,16 @@ class SpotSkillManager:
         print(f"Picking {pick_target}")
 
         result = None
-        try:
-            result = self.gaze_controller.execute([pick_target])
-        except Exception:
-            return False, "Error encountered while picking"
+        #try: try & catch was nerfing the code failure
+        result = self.gaze_controller.execute([pick_target])
+        #except Exception as e:
+            #return False, "Error encountered while picking"
 
         # Check for success and return appropriately
         if result[0].get("success"):
-            return True, "Successfully picked the target object"
+            return True, result[0] #"Successfully picked the target object"
         else:
-            return False, "Pick failed to pick the target object"
+            return False, result[0] #"Pick failed to pick the target object"
 
     def place(self, place_target: str = None) -> Tuple[bool, str]:
         """

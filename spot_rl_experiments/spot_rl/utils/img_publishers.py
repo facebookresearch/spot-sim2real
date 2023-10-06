@@ -387,6 +387,7 @@ class MRCNNModel:
         if stopwatch is not None:
             stopwatch.record("mrcnn_secs")
         detections_str = f"{int(timestamp.nsecs)}|{pred2string(pred)}"
+        print(f"Our debug {detections_str}")
         viz_img = self.mrcnn.visualize_inference(img, pred)
         return detections_str, viz_img
 
@@ -408,7 +409,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--bounding_box_detector",
         choices=["owlvit", "mrcnn"],
-        default="owlvit",
+        default="mrcnn", #"owlvit" # we need to change this behaviour, take the model name from config.yaml, otherwise it defaults to OwlVIT
         help="bounding box detector model to use (owlvit or maskrcnn)",
     )
 
