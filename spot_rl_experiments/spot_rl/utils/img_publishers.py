@@ -405,6 +405,7 @@ if __name__ == "__main__":
         "--local", action="store_true", help="fully local robot connection"
     )
     #Akshara's comment, image detector will come from config.yaml, see lines 429, 430 
+    #
     # parser.add_argument(
     #     "--bounding_box_detector",
     #     choices=["owlvit", "mrcnn"],
