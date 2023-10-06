@@ -562,7 +562,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 if label.isdigit():
                     label = object_id_to_object_name(int(label))
                 if label is not None : detected_classes.append(label) 
-                #just making sure that if our objectname is none it shouldn't break this fn object_id_to_object_name was only mainly used to print data so these are some local changes
+                
 
             print("[bounding_box]: Detected:", ", ".join(detected_classes))
 

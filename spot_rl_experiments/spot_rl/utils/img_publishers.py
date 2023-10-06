@@ -27,7 +27,6 @@ from std_msgs.msg import (
     MultiArrayLayout,
     String,
 )
-
 try:
     from spot_rl.utils.mask_rcnn_utils import (
         generate_mrcnn_detections,
@@ -387,7 +386,6 @@ class MRCNNModel:
         if stopwatch is not None:
             stopwatch.record("mrcnn_secs")
         detections_str = f"{int(timestamp.nsecs)}|{pred2string(pred)}"
-        print(f"Our debug {detections_str}")
         viz_img = self.mrcnn.visualize_inference(img, pred)
         return detections_str, viz_img
 
@@ -406,18 +404,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--local", action="store_true", help="fully local robot connection"
     )
-    parser.add_argument(
-        "--bounding_box_detector",
-        choices=["owlvit", "mrcnn"],
-        default="mrcnn", #"owlvit" # we need to change this behaviour, take the model name from config.yaml, otherwise it defaults to OwlVIT
-        help="bounding box detector model to use (owlvit or maskrcnn)",
-    )
+    #Addressing Akshara's comment, image detector will come from config.yaml, see lines 429, 430 
+    # parser.add_argument(
+    #     "--bounding_box_detector",
+    #     choices=["owlvit", "mrcnn"],
+    #     default="mrcnn", #"owlvit" # we need to change this behaviour, take the model name from config.yaml, otherwise it defaults to OwlVIT
+    #     help="bounding box detector model to use (owlvit or maskrcnn)",
+    # )
 
     args = parser.parse_args()
     # assert (
     #    len([i[1] for i in args._get_kwargs() if i[1]]) == 1
     # ), "One and only one arg must be provided."
-
+    
     filter_head_depth = args.filter_head_depth
     filter_hand_depth = args.filter_hand_depth
     decompress = args.decompress
@@ -426,7 +425,10 @@ if __name__ == "__main__":
     core = args.core
     listen = args.listen
     local = args.local
-    bounding_box_detector = args.bounding_box_detector
+    config_ = construct_config()
+    bounding_box_detector = "mrcnn" if config_.USE_MRCNN else "owlvit"
+    del config_
+    #bounding_box_detector = args.bounding_box_detector
     mrcnn = args.mrcnn
     owlvit = args.owlvit
 
