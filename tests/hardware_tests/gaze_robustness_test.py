@@ -3,9 +3,6 @@ from spot_rl.utils.utils import map_user_input_to_boolean
 
 
 if __name__ == "__main__":
-    
-    #print(spotskillmanager.pick_config)
-    # Nav-Pick-Nav-Place sequence 1
     run_the_loop = True
     while run_the_loop:
         spotskillmanager = SpotSkillManager()
@@ -13,7 +10,6 @@ if __name__ == "__main__":
         spotskillmanager.place_config.SUCCESS_DISTANCE = 0.10
         spotskillmanager.pick_config.SUCCESS_DISTANCE = 0.10
         spotskillmanager.pick_config.MAX_EPISODE_STEPS = 350
-        max_steps = 350
         #spotskillmanager.nav("starting_point")
         spotskillmanager.nav("pick_table_01")
         pick_stats = spotskillmanager.pick("ball")
