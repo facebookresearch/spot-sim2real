@@ -430,7 +430,6 @@ if __name__ == "__main__":
     local = args.local
     config_ = construct_config()
     bounding_box_detector = "mrcnn" if config_.USE_MRCNN else "owlvit"
-    del config_
     # bounding_box_detector = args.bounding_box_detector
     mrcnn = args.mrcnn
     owlvit = args.owlvit

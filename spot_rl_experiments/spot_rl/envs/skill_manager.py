@@ -34,13 +34,14 @@ class SpotSkillManager:
 
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
-        
-        #Flag will decide whether we want to shutdown or keep the spot same
+
+        # Flag will decide whether we want to shutdown or keep the spot same
         self.shutdownndock_on_delete = shutdownndock_on_delete
-    
+
     def __del__(self):
         if self.shutdownndock_on_delete:
             self.spot.shutdown(should_dock=True)
+
     def __init_spot(self):
         """
         Initialize the Spot object, acquire lease, and construct configs
@@ -57,7 +58,9 @@ class SpotSkillManager:
 
         # Construct configs for nav, gaze, and place
         self.nav_config = construct_config_for_nav()
-        self.pick_config = construct_config_for_gaze(max_episode_steps=350, dont_pick_up=True)
+        self.pick_config = construct_config_for_gaze(
+            max_episode_steps=350, dont_pick_up=True
+        )
         self.place_config = construct_config_for_place()
 
     def __initiate_controllers(self):
@@ -70,7 +73,7 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
-        
+
         self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
@@ -150,16 +153,25 @@ class SpotSkillManager:
         print(f"Picking {pick_target}")
 
         result = None
-        try: 
+        try:
             result = self.gaze_controller.execute([pick_target])
         except Exception as e:
-            return False, f"Pick failed to pick the target object {result[0]['target_object']} due to error : {e}"
+            return (
+                False,
+                f"Pick failed to pick the target object {result[0]['target_object']} due to error : {e}",
+            )
 
         # Check for success and return appropriately
         if result[0].get("success"):
-            return True, f"Successfully picked the target object {result[0]['target_object']} in {result[0]['success']} secs"
+            return (
+                True,
+                f"Successfully picked the target object {result[0]['target_object']} in {result[0]['time_taken']} secs",
+            )
         else:
-            return False, f"Pick failed to pick the target object {result[0]['target_object']}"
+            return (
+                False,
+                f"Pick failed to pick the target object {result[0]['target_object']}",
+            )
 
     def place(self, place_target: str = None) -> Tuple[bool, str]:
         """
