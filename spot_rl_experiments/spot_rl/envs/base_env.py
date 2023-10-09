@@ -561,8 +561,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 # Maskrnn return ids but other object detectors return already the string class
                 if label.isdigit():
                     label = object_id_to_object_name(int(label))
-                if label is not None : detected_classes.append(label) 
-                
+                if label is not None:
+                    detected_classes.append(label)
 
             print("[bounding_box]: Detected:", ", ".join(detected_classes))
 
