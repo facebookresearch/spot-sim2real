@@ -16,6 +16,7 @@ if __name__ == "__main__":
         pick_stats = spotskillmanager.pick("ball")
         print(pick_stats)
         # spotskillmanager.nav("starting_point")
+        #
         spotskillmanager.gaze_controller.reset_env_and_policy()
         spotskillmanager.nav("pick_table_01")
 
