@@ -239,3 +239,11 @@ pre-commit install
 - Since we have integrated CircleCI tests on this repo, you would need to create and link your CircleCI account
 - You can create your account from this link (https://app.circleci.com/). Once you have created the account, go to "Organization Settings", on the left tab click on "VCS"
 - Finally click on "Manage GitHub Checks". CircleCI will request access to `facebookresearch` org owner.
+`
+### Installing FairOtag for QR code detection
+Run these commands from outside of spot-sim2real
+```bash
+git clone -b fairo_viz_subplots git@github.com:KavitShah1998/fairo.git
+cd fairo/perception/fairotag/
+pip install -e .
+```

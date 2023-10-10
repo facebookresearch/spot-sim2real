@@ -13,6 +13,7 @@
 """ Easy-to-use wrapper for properly controlling Spot """
 import os
 import os.path as osp
+import pdb
 import time
 from collections import OrderedDict
 
@@ -20,7 +21,10 @@ import bosdyn.client
 import bosdyn.client.lease
 import bosdyn.client.util
 import cv2
+import magnum as mn
 import numpy as np
+import quaternion
+import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -293,7 +297,7 @@ class Spot:
             self.command_client, cmd_id, timeout_sec=timeout_sec
         )
 
-    def get_image_responses(self, sources, quality=None):
+    def get_image_responses(self, sources, quality=None, pixel_format=None):
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -306,8 +310,20 @@ class Spot:
                 quality = [quality] * len(sources)
             else:
                 assert len(quality) == len(sources)
-            sources = [build_image_request(src, q) for src, q in zip(sources, quality)]
-            image_responses = self.image_client.get_image(sources)
+            img_requests = [
+                build_image_request(src, q) for src, q in zip(sources, quality)
+            ]
+            image_responses = self.image_client.get_image(img_requests)
+        elif pixel_format is not None:
+            if isinstance(pixel_format, int):
+                pixel_format = [pixel_format] * len(sources)
+            else:
+                assert len(pixel_format) == len(sources)
+            img_requests = [
+                build_image_request(src, pixel_format=pf)
+                for src, pf in zip(sources, pixel_format)
+            ]
+            image_responses = self.image_client.get_image(img_requests)
         else:
             image_responses = self.image_client.get_image_from_sources(sources)
 
@@ -754,6 +770,96 @@ class Spot:
                 self.sit()
         finally:
             self.power_off()
+
+    def get_hand_image(self, is_rgb=True):
+        img_src = [SpotCamIds.HAND_COLOR]
+
+        pixel_format = image_pb2.Image.PIXEL_FORMAT_RGB_U8
+        if not is_rgb:
+            pixel_format = image_pb2.Image.PIXEL_FORMAT_GREYSCALE_U8
+
+        img_resp = self.get_image_responses(img_src, pixel_format=pixel_format)
+        return img_resp[0]
+
+    def get_camera_intrinsics(self, source, quality=None, pixel_format=None):
+        """Retrieve images from Spot's cameras
+
+        :param sources: list containing camera uuids
+        :param quality: either an int or a list specifying what quality each source
+            should return its image with
+        :return: list containing bosdyn image response objects
+        """
+        image_response = self.get_image_responses(
+            [source], quality=quality, pixel_format=pixel_format
+        )[0]
+        cam_intrinsics = image_response.source.pinhole.intrinsics
+        return cam_intrinsics
+
+    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    @staticmethod
+    def convert_transformation_from_sophus_to_magnum(
+        sp_transformation: sp.SE3,
+    ) -> mn.Matrix4:
+        """
+        First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
+        Then convert rvec and tvec to Magnum pose
+
+        Args:
+            sp_transformation (sp.SE3): Sophus transformation matrix
+
+        Returns:
+            mn_tranformation (mn.Matrix4): 4x4 pose matrix
+        """
+        tvec = sp_transformation.translation()
+        rvec = sp_transformation.so3().log()
+
+        # DEBUGGING
+        # print(f"Spot - tvec: {type(tvec)}")
+        # print(f"Spot - rvec: {rvec}")
+
+        assert rvec.shape == (3,) and tvec.shape == (3,)
+
+        # Get rotation angle as norm of rvec
+        angle = np.linalg.norm(rvec)
+
+        # Get unit axis of rotation
+        axis = rvec / angle
+
+        # Get rotation matrix from angle and axis
+        rotation_matrix = mn.Quaternion.rotation(
+            mn.Rad(angle), mn.Vector3(axis)
+        ).to_matrix()
+
+        # Get pose matrix from rotation matrix and translation vector
+        mn_tranformation = mn.Matrix4.from_(rotation_matrix, tvec)
+
+        # DEBUGGING
+        # print(f"spot - sophus tf - {sp_transformation}")
+        # print(f"spot - magnum tf - {mn_tranformation}")
+        return mn_tranformation
+
+    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    def convert_transformation_from_BD_to_magnun(self, bd_transformation_dict: dict):
+        """
+        Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
+
+        Args:
+            bd_transformation_dict (dict): Bosdyn transformation dictionary
+
+        Returns:
+            mn_tranformation_dict (dict): Magnum transformation dictionary
+        """
+        # Assert bd_transformation_dict has "position" and "rotation" keys
+        # assert "position" in bd_transformation_dict.keys() and "rotation" in bd_transformation_dict.keys()
+        pos = bd_transformation_dict.position
+        rot = bd_transformation_dict.rotation
+        quat = quaternion.quaternion(rot.w, rot.x, rot.y, rot.z)
+
+        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
+        translation = mn.Vector3(pos.x, pos.y, pos.z)
+
+        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
+        return mn_transformation
 
 
 class SpotLease:
