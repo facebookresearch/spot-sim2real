@@ -10,7 +10,9 @@ from matplotlib import pyplot as plt
 from projectaria_tools.core import calibration, data_provider, mps
 from scipy.spatial.transform import Rotation as R
 from spot_rl.envs.skill_manager import SpotSkillManager
-from spot_rl.utils.april_tag_pose_estimator import AprilTagPoseEstimator
+from aria_data_loaders.aria_data_utils.utils.april_tag_pose_estimator import (
+    AprilTagPoseEstimator,
+)
 
 ### - $$$ SPOT=start $$$
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
@@ -307,7 +309,6 @@ class VRSMPSStreamer:
         return img_list, img_metadata_list, cpf_T_marker_list
 
     def initialize_trajectory(self):
-
         # frame(ariaWorld) is same as frame(device) at the start
         cpf_T_ariaWorld = self.cpf_T_device
 
