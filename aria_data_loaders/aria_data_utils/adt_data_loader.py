@@ -45,7 +45,7 @@ class ADTSequences:
         """
         self.data_root = data_root
         self.verbose = verbose
-        self.device_data = []
+        self.device_data: list = []
         self._get_sequences(is_path=is_path)
         self._do_indexing()
 
@@ -156,7 +156,7 @@ class ADTSubsequence:
             "3dbbox",
             "pose",
         ]
-        self._raw_data = {}
+        self._raw_data: Dict[str, Any] = {}
         self._data_getters = []
         self._data_getters.append(self._get_rgb)
         self._data_getters.append(self._get_segmentation)
@@ -430,7 +430,7 @@ class ADTSubsequence:
         found_frames = {}
         found = {oid: False for oid in object_id_list}
         iterator = ADTSubsequenceIterator(self, reverse=True)
-        object_id_list = set(object_id_list)
+        object_id_set = set(object_id_list)
         while True:
             try:
                 data = next(iterator)
@@ -439,7 +439,7 @@ class ADTSubsequence:
                 break
             segmentation_frame = data["segmentation"][0]
             instance_ids_in_frame = set(np.unique(segmentation_frame))
-            seg_matches = list(instance_ids_in_frame.intersection(object_id_list))
+            seg_matches = list(instance_ids_in_frame.intersection(object_id_set))
 
             if seg_matches:
                 for match in seg_matches:
@@ -449,7 +449,7 @@ class ADTSubsequence:
                         found_frames[match].append(data)
                     if len(found_frames[match]) == num_instances:
                         found[match] = True
-                        object_id_list.remove(match)
+                        object_id_set.remove(match)
             if len(object_id_list) == 0:
                 print("Found enough instances! Breaking!")
                 break

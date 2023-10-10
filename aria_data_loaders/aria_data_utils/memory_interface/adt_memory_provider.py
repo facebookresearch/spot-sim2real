@@ -12,16 +12,15 @@ import numpy as np
 import openai
 import torch
 import yaml
-from matplotlib import pyplot as plt
-
-from tqdm import tqdm
-from transformers import OwlViTForObjectDetection, OwlViTProcessor
-
 from habitat_llm.agent.memory.adt_data_loader import (
     ADTSequences,
     ADTSubsequenceIterator,
 )
-from habitat_llm.agent.memory.memory_objects import Memory  # <-- will probably need to copy this over
+from habitat_llm.agent.memory.memory_objects import (  # <-- will probably need to copy this over
+    Memory,
+)
+from tqdm import tqdm
+from transformers import OwlViTForObjectDetection, OwlViTProcessor
 
 logger = logging.getLogger("adt_memory_provider")
 logging.basicConfig(level=logging.DEBUG)
@@ -37,7 +36,7 @@ class ADTMemoryProvider:
             verbose=config.verbose,
         )
         self._objects = None
-        self._episode_id = None
+        self._episode_id: int = None
         if hasattr(config, "sequence_id"):
             self.load(config.sequence_id)
 
@@ -207,22 +206,22 @@ ANSWER:"""
         object_names,
         object_ids,
         object_info_dict,
-        debug: str = False,
+        debug: bool = False,
         num_instances=5,
         ep_id=None,
         ns_delta=0.25 * 1e9,
-    ) -> List[Dict[str, Any]]:
+    ) -> Tuple[Dict[str, list], Dict[int, list]]:
         """use vision model to find objects similar to <object_names>
         multiple object-names may map to the same object instance, in that case
         object_ids should be provided to get a measure of both instance-level and
         description-level predictions
         """
-        named_results = {obj_name: [] for obj_name in object_names}
+        named_results: Dict[str, list] = {obj_name: [] for obj_name in object_names}
         if not object_ids or object_ids is None:
             raise ValueError(
                 "object_ids must be provided for instance-level predictions"
             )
-        id_results = {oid: [] for oid in object_ids}
+        id_results: Dict[int, list] = {oid: [] for oid in object_ids}
         processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
         model = OwlViTForObjectDetection.from_pretrained("google/owlvit-base-patch32")
         logger.info(f"Searching for {object_names} in sequence")
@@ -304,7 +303,7 @@ ANSWER:"""
     def _llm_based_object_search(
         self, object_name, object_info_dict, llm, debug: bool = False
     ) -> List[int]:
-        object_id_list = []
+        object_id_list: List[int] = []
         objects = ""
         object_num = 0
         tot_objects = len(object_info_dict)
@@ -391,7 +390,9 @@ ANSWER:"""
             category_name=object_info.category,
         )
 
-    def _choose_gt_objects(self, num_instances=1) -> Tuple[List[int], Dict[int, Any]]:
+    def _choose_gt_objects(
+        self, num_instances: int = 1
+    ) -> Tuple[List[int], List[dict]]:
         (
             object_info_dict,
             object_instance_ids,
@@ -419,9 +420,6 @@ ANSWER:"""
                     raise ValueError(
                         "LLM object not provided, can not generate descriptions"
                     )
-                for oid in sampled_objects:
-                    object_name = self.data_loader.data.object_info_dict[oid].name
-                    # prompt = EXPANSION_PROMPT.format(object_name)
             else:
                 raise ValueError(
                     f"Invalid method: {method}. Valid methods: id, description"
