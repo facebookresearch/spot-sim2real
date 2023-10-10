@@ -10,12 +10,13 @@ from matplotlib import pyplot as plt
 from projectaria_tools.core import calibration, data_provider, mps
 from scipy.spatial.transform import Rotation as R
 from spot_rl.envs.skill_manager import SpotSkillManager
-from aria_data_loaders.aria_data_utils.utils.april_tag_pose_estimator import (
-    AprilTagPoseEstimator,
-)
 
 ### - $$$ SPOT=start $$$
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
+
+from aria_data_loaders.aria_data_utils.utils.april_tag_pose_estimator import (
+    AprilTagPoseEstimator,
+)
 
 ### - $$$ SPOT=end $$$
 
@@ -102,7 +103,7 @@ def take_snapshot(spot: Spot):
 ######################################################################
 
 
-class VRSMPSStreamer:
+class AriaReader:
     def __init__(self, vrs_file_path: str, mps_file_path: str):
         assert vrs_file_path is not None and os.path.exists(
             vrs_file_path
@@ -772,7 +773,7 @@ class SpotQRDetector:
 
 
 if __name__ == "__main__":
-    vrs_mps_streamer = VRSMPSStreamer(vrs_file_path=vrsfile, mps_file_path=mpspath)
+    vrs_mps_streamer = AriaReader(vrs_file_path=vrsfile, mps_file_path=mpspath)
 
     (
         img_list,
