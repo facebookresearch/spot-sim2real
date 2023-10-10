@@ -13,5 +13,9 @@ setuptools.setup(
     description="SIRo friendly data-loaders for Aria data \
     based on Project Aria data utilities",
     packages=setuptools.find_packages(),
-    install_requires=['requirements.txt'],
+    install_requires=[
+        "click",
+        "transformers",
+        "projectaria-tools",
+    ],
 )

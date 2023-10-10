@@ -36,8 +36,8 @@ class OwlVit:
         self.score_threshold = score_threshold
         self.show_img = show_img
 
-    def set_labels(self, labels):
-        self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
+    def set_labels(self, labels: list):
+        self.labels = [[f"{self.prefix} {label}" for label in labels]]
 
     def run_inference(self, img):
         """
@@ -67,11 +67,15 @@ class OwlVit:
 
         return self.get_most_confident_bounding_box_per_label(results)
 
-    def run_inference_and_return_img(self, img):
+    def run_inference_and_return_img(self, img, verbose=False):
         """
         img: an open cv image in (H, W, C) format
         """
         # img = img.to(self.device)
+        if verbose:
+            print("Detection labels:", self.labels)
+            print("Detection score threshold:", self.score_threshold)
+            print("Image shape:", img.shape)
 
         inputs = self.processor(text=self.labels, images=img, return_tensors="pt")
         target_sizes = torch.Tensor([img.shape[:2]]).to(self.device)
