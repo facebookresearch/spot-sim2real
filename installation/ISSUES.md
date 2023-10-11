@@ -171,7 +171,10 @@ After the change, the code should look like follows:
   ```
 
   ## Issues while running setup.py for Detectron2
+  
   If you face the following issues while running setup.py for Detectron2, it indicates either gcc & g++ are missing from your system or are not linked properly.
+
+  ### Missing compilers
 
   ```bash
 error: command 'gcc' failed: No such file or directory
@@ -188,6 +191,26 @@ ERROR: Could not build wheels for pycocotools, which is required to install pypr
  2. Install gcc -> `sudo apt-get install gcc`
  3. Install g++ -> `sudo apt-get install g++`
  4. Then retry running the same setup.py command
+
+### Improperly linked compilers
+
+ However if you see an error along the lines of 
+ ```bash
+  /path/to/spot_ros/env/compiler_compat/ld: skipping incompatible /lib64/libm.so.6 when searching for /lib64/libm.so.6
+ ```
+
+Then this may mean your python is accessing different versions of `ld` and `gcc/g++` creating a linking problem. We need to ensure `ld` and compiler binaries are being used from the same place, i.e. system or from within the environment. First run the following command: 
+
+```bash
+which ld
+```
+
+If the `ld` being linked is from within the environment, then make sure `which gcc` and `which g++` return the system binaries, i.e. `/usr/bin/gcc` and `/usr/bin/g++`. If all the conditions are met then you are facing an improper linking issue. Easy fix would be to install C/C++ compilers for your environment through: 
+```bash
+mamba install -c conda-forge cxx-xompiler
+```
+
+Rerun `pip install -e detectron2` from the correct place in the repository (`repo_root/third_party/mask_rcnn_detector2`).
 
   ## Issues while running setup.py for Habitat-lab
   If you face the following issues while running setup.py for Habitat-lab, it is because a running the setup script tried to install a newer version of `tensorflow` which depends on newer version of `numpy` which conflicts with already existing `numpy` version in our v-env.
