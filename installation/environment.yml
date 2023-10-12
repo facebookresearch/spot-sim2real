@@ -1,4 +1,4 @@
-name: spot_ros_updated
+name: spot_ros
 channels:
   - pytorch
   - robostack
