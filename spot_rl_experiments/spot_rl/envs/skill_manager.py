@@ -22,9 +22,15 @@ from spot_wrapper.spot import Spot
 
 
 class SpotSkillManager:
-    def __init__(self, shutdownndock_on_delete=False):
+    def __init__(
+        self,
+        shutdownndock_on_delete=True,
+        nav_config=None,
+        pick_config=None,
+        place_config=None,
+    ):
         # Create the spot object, init lease, and construct configs
-        self.__init_spot()
+        self.__init_spot(nav_config, pick_config, place_config)
 
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
@@ -42,7 +48,7 @@ class SpotSkillManager:
         if self.shutdownndock_on_delete:
             self.spot.shutdown(should_dock=True)
 
-    def __init_spot(self):
+    def __init_spot(self, nav_config=None, pick_config=None, place_config=None):
         """
         Initialize the Spot object, acquire lease, and construct configs
         """
@@ -57,11 +63,15 @@ class SpotSkillManager:
             exit(1)
 
         # Construct configs for nav, gaze, and place
-        self.nav_config = construct_config_for_nav()
-        self.pick_config = construct_config_for_gaze(
-            max_episode_steps=350, dont_pick_up=True
+        self.nav_config = (
+            construct_config_for_nav() if nav_config is None else nav_config
         )
-        self.place_config = construct_config_for_place()
+        self.pick_config = (
+            construct_config_for_gaze() if pick_config is None else pick_config
+        )
+        self.place_config = (
+            construct_config_for_place() if place_config is None else place_config
+        )
 
     def __initiate_controllers(self):
         """
