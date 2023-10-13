@@ -2,9 +2,11 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
+import click
 import cv2
 import numpy as np
 import sophus as sp
+from aria_data_utils.utils.april_tag_pose_estimator import AprilTagPoseEstimator
 from fairotag.scene import Scene
 from matplotlib import pyplot as plt
 from projectaria_tools.core import calibration, data_provider, mps
@@ -13,10 +15,6 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 
 ### - $$$ SPOT=start $$$
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
-
-from aria_data_loaders.aria_data_utils.utils.april_tag_pose_estimator import (
-    AprilTagPoseEstimator,
-)
 
 ### - $$$ SPOT=end $$$
 
@@ -112,7 +110,7 @@ class AriaReader:
             mps_file_path
         ), "Incorrect MPS dir path"
 
-        self.provider = data_provider.create_vrs_data_provider(vrsfile)
+        self.provider = data_provider.create_vrs_data_provider(vrs_file_path)
         assert self.provider is not None, "Cannot open VRS file"
 
         self.device_calib = self.provider.get_device_calibration()
@@ -395,7 +393,7 @@ class AriaReader:
                 img_metadata.capture_timestamp_ns
             )  # maybe this can be replaced
             ariaCorrectedWorld_T_cpf = (
-                vrs_mps_streamer.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
+                self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
                     vrs_timestamp_of_interest_ns
                 )
             )
@@ -584,7 +582,7 @@ class SpotQRDetector:
 
         hand_bd_body_T_odom_dict = (
             frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                "odom"
+                "vision"
             ).parent_tform_child
         )
         hand_mn_body_T_odom = self.spot.convert_transformation_from_BD_to_magnun(
@@ -772,8 +770,12 @@ class SpotQRDetector:
         pass
 
 
-if __name__ == "__main__":
-    vrs_mps_streamer = AriaReader(vrs_file_path=vrsfile, mps_file_path=mpspath)
+@click.command()
+@click.option("--data-path", help="Path to the data directory", type=str)
+@click.option("--vrs-name", help="Name of the vrs file", type=str)
+def main(data_path: str, vrs_name: str):
+    vrsfile = os.path.join(data_path, vrs_name + ".vrs")
+    vrs_mps_streamer = AriaReader(vrs_file_path=vrsfile, mps_file_path=data_path)
 
     (
         img_list,
@@ -835,8 +837,13 @@ if __name__ == "__main__":
         * vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[mps_idx_of_interest]
     )
     print(f"spotWorld_T_cpf_at_interest - {spotWorld_T_cpf_at_interest}")
+    position = spotWorld_T_cpf_at_interest.translation()
 
-    # skill_manager = SpotSkillManager()
-    # skill_manager.nav2loc(x=position[0], y=position[1], theta=0.0)
+    skill_manager = SpotSkillManager()
+    skill_manager.nav2loc(x=position[0], y=position[1], theta=0.0)
+
 
 # TODO: Record raw and rectified camera params for each camera in a config file
+
+if __name__ == "__main__":
+    main()
