@@ -242,3 +242,17 @@ Rerun `pip install -e detectron2` from the correct place in the repository (`rep
   1. Clear all caches from mamba - `mamba clean -f -a`
   2. Install spefic tensorflow version - `pip install tensorflow==2.9.0`
   3. Then retry running the same setup.py command
+
+## Execution Issues
+
+### Issue with libstdc++
+
+Your cxx libraries are outdated if you see an error like following: 
+```bash
+libGL error: MESA-LOADER: failed to open iris: /path/to/lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found
+```
+Recommended fix: 
+```bash
+mamba upgrade -c conda-forge gcc
+```
+(above should update all cxx libraries)
