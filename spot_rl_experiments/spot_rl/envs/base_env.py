@@ -186,14 +186,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
     def detections_cb(self, msg):
         timestamp, detections_str = msg.data.split("|")
-        self.detections_buffer["detections"][int(timestamp)] = detections_str
+        self.detections_buffer["detections"][str(timestamp)] = detections_str
 
     def img_callback(self, topic, msg):
         super().img_callback(topic, msg)
         if topic == rt.MASK_RCNN_VIZ_TOPIC:
-            self.detections_buffer["viz"][int(msg.header.stamp.nsecs)] = msg
+            self.detections_buffer["viz"][str(msg.header.stamp)] = msg
         elif topic == rt.FILTERED_HAND_DEPTH:
-            self.detections_buffer["filtered_depth"][int(msg.header.stamp.nsecs)] = msg
+            self.detections_buffer["filtered_depth"][str(msg.header.stamp)] = msg
 
     def say(self, *args):
         text = " ".join(args)

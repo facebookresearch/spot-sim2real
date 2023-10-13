@@ -20,7 +20,9 @@ import bosdyn.client
 import bosdyn.client.lease
 import bosdyn.client.util
 import cv2
+import magnum as mn
 import numpy as np
+import quaternion
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -755,6 +757,100 @@ class Spot:
         finally:
             self.power_off()
 
+    def get_hand_image(self, is_rgb=True):
+        img_src = [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+
+        pixel_format_rgb = (
+            image_pb2.Image.PIXEL_FORMAT_RGB_U8
+            if is_rgb
+            else image_pb2.Image.PIXEL_FORMAT_GREYSCALE_U8
+        )
+        pixel_format_depth = image_pb2.Image.PIXEL_FORMAT_DEPTH_U16
+        img_resp = self.get_image_responses(
+            img_src, pixel_format=[pixel_format_rgb, pixel_format_depth]
+        )
+        return img_resp
+
+    def get_camera_intrinsics(self, source, quality=None, pixel_format=None):
+        """Retrieve images from Spot's cameras
+
+        :param sources: list containing camera uuids
+        :param quality: either an int or a list specifying what quality each source
+            should return its image with
+        :return: list containing bosdyn image response objects
+        """
+        image_response = self.get_image_responses(
+            [source], quality=quality, pixel_format=pixel_format
+        )[0]
+        cam_intrinsics = image_response.source.pinhole.intrinsics
+        return cam_intrinsics
+
+    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    # @staticmethod
+    # def convert_transformation_from_sophus_to_magnum( # Needed for spot-Aria integration
+    #     sp_transformation: sp.SE3,
+    # ) -> mn.Matrix4:
+    #     """
+    #     First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
+    #     Then convert rvec and tvec to Magnum pose
+
+    #     Args:
+    #         sp_transformation (sp.SE3): Sophus transformation matrix
+
+    #     Returns:
+    #         mn_tranformation (mn.Matrix4): 4x4 pose matrix
+    #     """
+    #     tvec = sp_transformation.translation()
+    #     rvec = sp_transformation.so3().log()
+
+    #     # DEBUGGING
+    #     # print(f"Spot - tvec: {type(tvec)}")
+    #     # print(f"Spot - rvec: {rvec}")
+
+    #     assert rvec.shape == (3,) and tvec.shape == (3,)
+
+    #     # Get rotation angle as norm of rvec
+    #     angle = np.linalg.norm(rvec)
+
+    #     # Get unit axis of rotation
+    #     axis = rvec / angle
+
+    #     # Get rotation matrix from angle and axis
+    #     rotation_matrix = mn.Quaternion.rotation(
+    #         mn.Rad(angle), mn.Vector3(axis)
+    #     ).to_matrix()
+
+    #     # Get pose matrix from rotation matrix and translation vector
+    #     mn_tranformation = mn.Matrix4.from_(rotation_matrix, tvec)
+
+    #     # DEBUGGING
+    #     # print(f"spot - sophus tf - {sp_transformation}")
+    #     # print(f"spot - magnum tf - {mn_tranformation}")
+    #     return mn_tranformation
+
+    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
+    def convert_transformation_from_BD_to_magnun(self, bd_transformation_dict: dict):
+        """
+        Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
+
+        Args:
+            bd_transformation_dict (dict): Bosdyn transformation dictionary
+
+        Returns:
+            mn_tranformation_dict (dict): Magnum transformation dictionary
+        """
+        # Assert bd_transformation_dict has "position" and "rotation" keys
+        # assert "position" in bd_transformation_dict.keys() and "rotation" in bd_transformation_dict.keys()
+        pos = bd_transformation_dict.position
+        rot = bd_transformation_dict.rotation
+        quat = quaternion.quaternion(rot.w, rot.x, rot.y, rot.z)
+
+        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
+        translation = mn.Vector3(pos.x, pos.y, pos.z)
+
+        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
+        return mn_transformation
+
 
 class SpotLease:
     """
@@ -821,8 +917,8 @@ def image_response_to_cv2(image_response, reorient=True):
     else:
         img = cv2.imdecode(img, -1)
 
-    if reorient and image_response.source.name in SHOULD_ROTATE:
-        img = np.rot90(img, k=3)
+    # if reorient and image_response.source.name in SHOULD_ROTATE:
+    # img = np.rot90(img, k=3)
 
     return img
 
@@ -854,3 +950,67 @@ def draw_crosshair(img):
 def wrap_heading(heading):
     """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
     return (heading + np.pi) % (2 * np.pi) - np.pi
+
+
+def get_3d_point(cam_intrinsics, pixel_uv, z):
+    # Get camera intrinsics
+    fx = cam_intrinsics.focal_length.x
+    fy = cam_intrinsics.focal_length.y
+    cx = cam_intrinsics.principal_point.x
+    cy = cam_intrinsics.principal_point.y
+
+    print(fx, fy, cx, cy)
+    # Get 3D point
+    x = (pixel_uv[0] - cx) * z / fx
+    y = (pixel_uv[1] - cy) * z / fy
+    return np.array([x, y, z])
+
+
+if __name__ == "__main__":
+    print("Testing Spot class...")
+    spot = Spot("Prefix")
+    # breakpoint()
+    while True:
+        imgs = spot.get_hand_image()
+        rgb_img = image_response_to_cv2(imgs[0])
+        unscaled_dep_img = image_response_to_cv2(imgs[1])
+
+        dep_img = scale_depth_img(unscaled_dep_img, max_depth=1.7, as_img=False)
+
+        gray_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2GRAY)
+        # gray_img = (255-gray_img)
+        # gray_dep = cv2.cvtColor(dep_img, cv2.COLOR_BGR2GRAY)
+        circles_in_rgb = cv2.HoughCircles(
+            gray_img,
+            cv2.HOUGH_GRADIENT,
+            1,
+            20,
+            param1=85,
+            param2=30,
+            minRadius=15,
+            maxRadius=35,
+        )
+        # circles_in_dep = cv2.HoughCircles(dep_img,cv2.HOUGH_GRADIENT,1,20,param1=50,param2=30,minRadius=0,maxRadius=0)
+
+        if circles_in_rgb is not None:
+            circle_col = circles_in_rgb[0][0]
+            # circle_dep = circles_in_dep[0][0]
+
+            rgb_center = (int(circle_col[0]), int(circle_col[1]))
+            rgb_radius = int(circle_col[2])
+
+            # dep_center = (int(circle_dep[0]), int(circle_dep[1]))
+            # dep_radius = int(circle_dep[2])
+            # circles_in_dep = cv2.HoughCircles(dep_img,cv2.HOUGH_GRADIENT,1,20,param1=50,param2=30,minRadius=0,maxRadius=0)
+            cv2.circle(rgb_img, rgb_center, rgb_radius, (255, 0, 255), 3)
+            cv2.circle(dep_img, rgb_center, rgb_radius, (255, 0, 255), 3)
+
+            z = unscaled_dep_img[rgb_center[1], rgb_center[0]]
+            point_in_world = get_3d_point(
+                imgs[1].source.pinhole.intrinsics, rgb_center, z
+            )
+            # print(dep_img.shape)
+            print(f"Depth at ROI : {z} | 3D point: {point_in_world}")
+        cv2.imshow("rgb", rgb_img)
+        cv2.imshow("depth", dep_img)
+        cv2.waitKey(1)
