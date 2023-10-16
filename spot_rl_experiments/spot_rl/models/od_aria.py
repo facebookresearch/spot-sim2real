@@ -1,8 +1,9 @@
 import argparse
 import time
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
+from matplotlib import pyplot as plt
 from owlvit import OwlVit
 from projectaria_tools.core import data_provider, mps
 from projectaria_tools.core.sensor_data import TimeDomain, TimeQueryOptions
@@ -71,7 +72,7 @@ parser.add_argument("--score_threshold", type=float, default=0.1)
 parser.add_argument("--show_img", type=bool, default=True)
 parser.add_argument(
     "--labels",
-    type=list,
+    type=List[str],
     default=[
         [
             "indoor plant",
