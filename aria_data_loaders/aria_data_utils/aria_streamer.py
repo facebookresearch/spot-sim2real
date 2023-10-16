@@ -817,7 +817,7 @@ def main(data_path: str, vrs_name: str):
     vrs_mps_streamer.plot_rgb_and_trajectory(
         marker_pose=avg_ariaCorrectedWorld_T_marker,
         device_pose_list=[
-            vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[-1],
+            vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[-2500],
             avg_ariaCorrectedWorld_T_spotWorld,
             avg_ariaCorrectedWorld_T_spot,
         ],
@@ -825,12 +825,14 @@ def main(data_path: str, vrs_name: str):
         traj_data=vrs_mps_streamer.xyz_trajectory,
     )
 
-    vrs_timestamp_of_interest = vrs_mps_streamer.get_vrs_timestamp_from_img_idx(
-        stream_name=STREAM1_NAME, idx_of_interest=574
-    )
-    mps_idx_of_interest = vrs_mps_streamer.get_closest_mps_idx_to_timestamp_ns(
-        vrs_timestamp_of_interest
-    )
+    # TODO: make idx_of_interest as a dynamic variable (will come from object detection)
+    # vrs_timestamp_of_interest = vrs_mps_streamer.get_vrs_timestamp_from_img_idx(
+    #     stream_name=STREAM1_NAME, idx_of_interest=574
+    # )
+    # mps_idx_of_interest = vrs_mps_streamer.get_closest_mps_idx_to_timestamp_ns(
+    #     vrs_timestamp_of_interest
+    # )
+    mps_idx_of_interest = -2500
 
     spotWorld_T_cpf_at_interest = (
         avg_spotWorld_T_ariaCorrectedWorld
@@ -840,7 +842,7 @@ def main(data_path: str, vrs_name: str):
     position = spotWorld_T_cpf_at_interest.translation()
 
     skill_manager = SpotSkillManager()
-    skill_manager.nav2loc(x=position[0], y=position[1], theta=0.0)
+    skill_manager.nav(position[0], position[1], 0.0)
 
 
 # TODO: Record raw and rectified camera params for each camera in a config file
