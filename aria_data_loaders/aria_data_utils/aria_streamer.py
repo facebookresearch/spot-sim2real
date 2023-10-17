@@ -1,17 +1,19 @@
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 import cv2
 import numpy as np
 import sophus as sp
+from aria_data_utils.image_utils import centered_heuristic, check_bbox_intersection
 from aria_data_utils.utils.april_tag_pose_estimator import AprilTagPoseEstimator
 from fairotag.scene import Scene
 from matplotlib import pyplot as plt
 from projectaria_tools.core import calibration, data_provider, mps
 from scipy.spatial.transform import Rotation as R
 from spot_rl.envs.skill_manager import SpotSkillManager
+from spot_rl.models.owlvit import OwlVit
 
 ### - $$$ SPOT=start $$$
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
@@ -102,13 +104,15 @@ def take_snapshot(spot: Spot):
 
 
 class AriaReader:
-    def __init__(self, vrs_file_path: str, mps_file_path: str):
+    def __init__(self, vrs_file_path: str, mps_file_path: str, verbose=False):
         assert vrs_file_path is not None and os.path.exists(
             vrs_file_path
         ), "Incorrect VRS file path"
         assert mps_file_path is not None and os.path.exists(
             mps_file_path
         ), "Incorrect MPS dir path"
+
+        self.verbose = verbose
 
         self.provider = data_provider.create_vrs_data_provider(vrs_file_path)
         assert self.provider is not None, "Cannot open VRS file"
@@ -183,9 +187,9 @@ class AriaReader:
         plt_ax.plot(traj_data[:, 0], traj_data[:, 1], traj_data[:, 2])
         plt.show()
 
-    def _init_april_tag_detector(self):
-        focal_lengths = self._dst_calib_params.get_focal_lengths()
-        principal_point = self._dst_calib_params.get_principal_point()
+    def _init_april_tag_detector(self) -> Dict[str, Any]:
+        focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
+        principal_point = self._dst_calib_params.get_principal_point()  # type:ignore
         calib_dict = {
             "fx": focal_lengths[0].item(),
             "fy": focal_lengths[1].item(),
@@ -196,7 +200,35 @@ class AriaReader:
 
         # LETS ONLY DETECT DOCK-ID RIGHT NOW
         self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
-        self._qr_pose_estimator.register_marker_ids([DOCK_ID, 521])
+        self._qr_pose_estimator.register_marker_ids([DOCK_ID, 521])  # type:ignore
+        outputs: Dict[str, Any] = {}
+        outputs["tag_cpf_T_marker_list"] = []
+        outputs["tag_image_list"] = []
+        outputs["tag_image_metadata_list"] = []
+        return outputs
+
+    def _init_object_detector(
+        self, object_labels: List[str], verbose: bool = None
+    ) -> Dict[str, Any]:
+        """initialize object_detector by loading it to GPU and setting up the labels"""
+        if verbose is None:
+            verbose = self.verbose
+        self.object_detector = OwlVit(
+            [object_labels], score_threshold=0.125, show_img=verbose
+        )
+        outputs: Dict[str, Any] = {}
+        outputs["object_image_list"] = {obj_name: [] for obj_name in object_labels}
+        outputs["object_image_metadata_list"] = {
+            obj_name: [] for obj_name in object_labels
+        }
+        outputs["object_image_segment_list"] = {
+            obj_name: [] for obj_name in object_labels
+        }
+        outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
+        outputs["object_ariaWorld_T_cpf_list"] = {
+            obj_name: [] for obj_name in object_labels
+        }
+        return outputs
 
     def _rotate_img(self, img: np.ndarray, k: int = 3):
         img = np.rot90(img, k=3)
@@ -206,7 +238,7 @@ class AriaReader:
         return img
 
     def _display(self, img: np.ndarray, stream_name: str, wait: int = 1):
-        cv2.imshow(f"Stream - {stream_name}", img)
+        cv2.imshow(f"Stream - {stream_name}", cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         cv2.waitKey(wait)
 
     def _create_display_window(self, stream_name: str):
@@ -218,6 +250,61 @@ class AriaReader:
         )
         return rectified_image
 
+    def _get_scored_object_detections(
+        self, img: np.ndarray, heuristic=None
+    ) -> Tuple[bool, Dict[str, float], Dict[str, bool], np.ndarray]:
+        """
+        Detect object instances in the frame. score them based on heuristics
+        and return a tuple of (valid, score, result_image)
+        Input:
+        - img: np.ndarray: image to run inference on
+        - heuristic: function: function to score the detections
+        Output:
+        - valid: bool: whether the frame is valid or not
+        - score: float: score of the frame (based on :heuristic:)
+        - result_image: np.ndarray: image with bounding boxes drawn on it
+        """
+        detections, result_image = self.object_detector.run_inference_and_return_img(
+            img
+        )
+        if heuristic is not None:
+            valid, score, stop = heuristic(detections)
+
+        return valid, score, stop, result_image
+
+    def _p1_demo_heuristics(
+        self, detections, img_size=(512, 512)
+    ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
+        """*P1 Demo Specific*
+        Heuristics to filter out unwanted and bad obejct detections. This heuristic
+        scores each frame based on (a) % of pixels occupied by object in the frame
+        and (b) proximity of bbox to image center. Further only those images are
+        scored which have only the object detection without a hand in the frame.
+
+        Detections are expected to have the format:
+        [["object_name", "confidence", "bbox"]]
+        """
+        valid = False
+        score = {}
+        stop = {}
+        # figure out if this is an interaction frame
+        if len(detections) > 1:
+            objects_in_frame = [det[0] for det in detections]
+            # FIXME: only works for 1 object of interest right now, extend to multiple
+            if "hand" in objects_in_frame and "water bottle" in objects_in_frame:
+                print(f"checking for intersection b/w: {object}")
+                stop["water bottle"] = check_bbox_intersection(
+                    detections[objects_in_frame.index("water bottle")][2],
+                    detections[objects_in_frame.index("hand")][2],
+                )
+                print(f"Intersection: {stop}")
+        if len(detections) == 1:
+            if "water bottle" == detections[0][0]:
+                score["water bottle"] = centered_heuristic(detections)[0]
+                valid = True
+
+        return valid, score, stop
+
     def get_vrs_timestamp_from_img_idx(
         self, stream_name: str = STREAM1_NAME, idx_of_interest: int = -1
     ):
@@ -228,16 +315,36 @@ class AriaReader:
     def parse_camera_stream(
         self,
         stream_name: str,
-        should_rectify=True,
-        detect_qr=False,
-        should_display=True,
-        should_rec_timestamp_from_user=False,
-    ):
-        stream_id = self.provider.get_stream_id_from_label(stream_name)
+        should_rectify: bool = True,
+        detect_qr: bool = False,
+        should_display: bool = True,
+        should_rec_timestamp_from_user: bool = False,
+        detect_objects: bool = False,
+        object_labels: List[str] = None,
+        reverse: bool = False,
+    ) -> Dict[str, Any]:
+        """Parse linearly through a camera stream and return a dict of detections
+        Detection types supported:
+        - April Tag
+        - Object Detection
 
-        img_list = []
-        img_metadata_list = []
-        cpf_T_marker_list = []
+        April tag outputs:
+        - "tag_image_list" - List of np.ndarrays of images with detections
+        - "tag_image_metadata_list" - List of image metadata
+        - "tag_cpf_T_marker_list" - List of Sophus SE3 transforms from CPF to marker
+           CPF is the center frame of Aria with Z pointing out, X pointing up
+           and Y pointing left
+
+        Object detection outputs:
+        - "object_image_list" - List of np.ndarrays of images with detections
+        - "object_image_metadata_list" - List of image metadata
+        - "object_image_segment" - List of Int signifying which segment the image
+            belongs to; smaller number means latter the segment time-wise
+        - "object_score_list" - List of Float signifying the detection score
+        - "object_ariaWorld_T_cpf_list" - List of Sophus SE3 transforms from AriaWorld
+          to CPF
+        """
+        stream_id = self.provider.get_stream_id_from_label(stream_name)
 
         device_T_camera = sp.SE3(
             self.device_calib.get_transform_device_sensor(stream_name).to_matrix()
@@ -251,17 +358,24 @@ class AriaReader:
                 512, 512, 280, stream_name
             )
 
+        outputs = {}
+
         # Setup April tag detection by over-writing self._qr_pose_estimator
         if detect_qr:
-            self._init_april_tag_detector()
+            outputs.update(self._init_april_tag_detector())
+
+        if detect_objects:
+            outputs.update(self._init_object_detector(object_labels))
 
         if should_display:
             self._create_display_window(stream_name)
 
         num_frames = self.provider.get_num_data(stream_id)
-        # CUSTOM RANGE FOR VIDEO - TODO: REMOVE LATER
-        # custom_range = range(1400, 1550)
-        custom_range = range(0, num_frames)
+        # TODO: make this range updatable: min_frame_idx, max_frame_idx as args
+        if reverse:
+            custom_range = range(num_frames - 1, 0, -1)
+        else:
+            custom_range = range(0, num_frames)
         for frame_idx in custom_range:
             frame_data = self.provider.get_image_data_by_index(stream_id, frame_idx)
             img = frame_data[0].to_numpy_array()
@@ -282,6 +396,37 @@ class AriaReader:
 
             img = self._rotate_img(img=img)
 
+            if detect_objects:
+                # FIXME: done for 1 specific object at the moment, extend for multiple
+                valid, score, stop, result_img = self._get_scored_object_detections(
+                    img, heuristic=self._p1_demo_heuristics
+                )
+                if stop and stop["water bottle"]:
+                    print("Turning off object-detection")
+                    detect_objects = False
+                if valid:
+                    score_string = str(score["water bottle"]).replace(".", "_")
+                    plt.imsave(
+                        f"./results/{frame_idx}_{valid}_{score_string}.jpg", result_img
+                    )
+                    print("saving valid frame, {score=}")
+                    for object_name in score.keys():
+                        outputs["object_image_list"][object_name].append(img)
+                        outputs["object_score_list"][object_name].append(
+                            score[object_name]
+                        )
+                        outputs["object_ariaWorld_T_cpf_list"][object_name].append(
+                            self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
+                                img_metadata.capture_timestamp_ns
+                            )
+                        )
+                        # TODO: following is not being used at the moment, clean-up if
+                        # multi-object, multi-view logic seems to not require this
+                        outputs["object_image_segment_list"][object_name].append(-1)
+                        outputs["object_image_metadata_list"][object_name].append(
+                            img_metadata
+                        )
+
             if camera_T_marker is not None:
                 cpf_T_marker = self.cpf_T_device * device_T_camera * camera_T_marker
                 img = decorate_img_with_text(
@@ -292,10 +437,9 @@ class AriaReader:
                 print(
                     f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}"
                 )
-
-                img_list.append(img)
-                img_metadata_list.append(img_metadata)
-                cpf_T_marker_list.append(cpf_T_marker)
+                outputs["tag_image_list"].append(img)
+                outputs["tag_image_metadata_list"].append(img_metadata)
+                outputs["tag_cpf_T_marker_list"].append(cpf_T_marker)
 
             if should_display:
                 self._display(img=img, stream_name=stream_name)
@@ -305,7 +449,7 @@ class AriaReader:
                 if val == "c":
                     self.vrs_idx_of_interest_list.append(frame_idx)
 
-        return img_list, img_metadata_list, cpf_T_marker_list
+        return outputs
 
     def initialize_trajectory(self):
         # frame(ariaWorld) is same as frame(device) at the start
@@ -773,23 +917,31 @@ class SpotQRDetector:
 @click.command()
 @click.option("--data-path", help="Path to the data directory", type=str)
 @click.option("--vrs-name", help="Name of the vrs file", type=str)
-def main(data_path: str, vrs_name: str):
+@click.option("--dry-run", type=bool, default=False)
+@click.option("--verbose", type=bool, default=True)
+def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     vrsfile = os.path.join(data_path, vrs_name + ".vrs")
-    vrs_mps_streamer = AriaReader(vrs_file_path=vrsfile, mps_file_path=data_path)
-
-    (
-        img_list,
-        img_metadata_list,
-        cpf_T_marker_list,
-    ) = vrs_mps_streamer.parse_camera_stream(
-        stream_name=STREAM1_NAME, detect_qr=True, should_rec_timestamp_from_user=False
+    vrs_mps_streamer = AriaReader(
+        vrs_file_path=vrsfile, mps_file_path=data_path, verbose=verbose
     )
+
+    outputs = vrs_mps_streamer.parse_camera_stream(
+        stream_name=STREAM1_NAME,
+        detect_qr=True,
+        should_rec_timestamp_from_user=False,
+        detect_objects=True,
+        object_labels=["water bottle", "person", "hand"],
+        reverse=True,
+    )
+    tag_img_list = outputs["tag_image_list"]
+    tag_img_metadata_list = outputs["tag_image_metadata_list"]
+    tag_cpf_T_marker_list = outputs["tag_cpf_T_marker_list"]
 
     avg_ariaCorrectedWorld_T_marker = (
         vrs_mps_streamer.get_avg_ariaCorrectedWorld_T_marker(
-            img_list,
-            img_metadata_list,
-            cpf_T_marker_list,
+            tag_img_list,
+            tag_img_metadata_list,
+            tag_cpf_T_marker_list,
             filter_dist=2.4,
             should_plot=False,
         )
@@ -814,14 +966,24 @@ def main(data_path: str, vrs_name: str):
     avg_spot_T_ariaCorrectedWorld = avg_spot_T_marker * avg_marker_T_ariaCorrectedWorld
     avg_ariaCorrectedWorld_T_spot = avg_spot_T_ariaCorrectedWorld.inverse()
 
+    # find best CPF location, wrt AriaWorld, for best scored object detection
+    # FIXME: extend to multiple objects
+    best_idx = outputs["object_score_list"]["water bottle"].index(
+        max(outputs["object_score_list"]["water bottle"])
+    )
+    best_object_ariaWorld_T_cpf = outputs["object_ariaWorld_T_cpf_list"][
+        "water bottle"
+    ][best_idx]
+
     vrs_mps_streamer.plot_rgb_and_trajectory(
         marker_pose=avg_ariaCorrectedWorld_T_marker,
         device_pose_list=[
-            vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[-2500],
+            # vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[-2500],
             avg_ariaCorrectedWorld_T_spotWorld,
             avg_ariaCorrectedWorld_T_spot,
+            best_object_ariaWorld_T_cpf,
         ],
-        rgb=np.zeros((350, 700, 3), dtype=np.uint8),
+        rgb=outputs["object_image_list"]["water bottle"][best_idx],
         traj_data=vrs_mps_streamer.xyz_trajectory,
     )
 
@@ -841,8 +1003,9 @@ def main(data_path: str, vrs_name: str):
     print(f"spotWorld_T_cpf_at_interest - {spotWorld_T_cpf_at_interest}")
     position = spotWorld_T_cpf_at_interest.translation()
 
-    skill_manager = SpotSkillManager()
-    skill_manager.nav(position[0], position[1], 0.0)
+    if not dry_run:
+        skill_manager = SpotSkillManager()
+        skill_manager.nav(position[0], position[1], 0.0)
 
 
 # TODO: Record raw and rectified camera params for each camera in a config file

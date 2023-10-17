@@ -1,4 +1,5 @@
 import math
+from typing import List
 
 import numpy as np
 
@@ -56,3 +57,40 @@ def calculate_iou(box1, box2):
     assert iou <= 1.0
     assert iou >= 0.0
     return iou.item()
+
+
+def centered_heuristic(
+    detections: list, pixel_wt=0.65, image_size=(512, 512)
+) -> List[float]:
+    """Given one instance of object detection from OWL-ViT, calculate the graspability
+    score.
+    graspability_score = w1 * (%_of_object_pixels) + w2 * (dist_bbox_from_img_center)
+    """
+    center_wt = 1 - pixel_wt
+    scores = []
+    for det in detections:
+        xmin, ymin, xmax, ymax = det[2][0], det[2][1], det[2][2], det[2][3]
+        bbox_center = ((xmin + xmax) // 2, (ymin + ymax) // 2)
+        img_center = (image_size[0] // 2, image_size[1] // 2)
+        dist_from_center = np.linalg.norm(np.array(bbox_center) - np.array(img_center))
+        dist_from_center = 1 - dist_from_center / np.linalg.norm(np.array(img_center))
+        bbox_area = (xmax - xmin) * (ymax - ymin)
+        img_area = image_size[0] * image_size[1]
+        percent_object_pixels = bbox_area / img_area
+        score = pixel_wt * percent_object_pixels + center_wt * dist_from_center
+        scores.append(score.item())
+    return scores
+
+
+def check_bbox_intersection(bbox1, bbox2) -> bool:
+    """Given two bounding boxes described in pixel convention, returns True
+    if they intersect, False if they do not"""
+    xmin1, ymin1, xmax1, ymax1 = bbox1
+    xmin2, ymin2, xmax2, ymax2 = bbox2
+    # Check for intersection
+    if xmax1 < xmin2 or xmax2 < xmin1 or ymax1 < ymin2 or ymax2 < ymin1:
+        # No intersection
+        return False
+    else:
+        # Intersection
+        return True
