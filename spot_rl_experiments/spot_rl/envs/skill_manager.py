@@ -22,9 +22,15 @@ from spot_wrapper.spot import Spot
 
 
 class SpotSkillManager:
-    def __init__(self):
+    def __init__(
+        self,
+        shutdownndock_on_delete=True,
+        nav_config=None,
+        pick_config=None,
+        place_config=None,
+    ):
         # Create the spot object, init lease, and construct configs
-        self.__init_spot()
+        self.__init_spot(nav_config, pick_config, place_config)
 
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
@@ -35,10 +41,14 @@ class SpotSkillManager:
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
 
-    def __del__(self):
-        self.spot.shutdown(should_dock=True)
+        # Flag will decide whether we want to shutdown or keep the spot same
+        self.shutdownndock_on_delete = shutdownndock_on_delete
 
-    def __init_spot(self):
+    def __del__(self):
+        if self.shutdownndock_on_delete:
+            self.spot.shutdown(should_dock=True)
+
+    def __init_spot(self, nav_config=None, pick_config=None, place_config=None):
         """
         Initialize the Spot object, acquire lease, and construct configs
         """
@@ -53,9 +63,15 @@ class SpotSkillManager:
             exit(1)
 
         # Construct configs for nav, gaze, and place
-        self.nav_config = construct_config_for_nav()
-        self.pick_config = construct_config_for_gaze(max_episode_steps=350)
-        self.place_config = construct_config_for_place()
+        self.nav_config = (
+            construct_config_for_nav() if nav_config is None else nav_config
+        )
+        self.pick_config = (
+            construct_config_for_gaze() if pick_config is None else pick_config
+        )
+        self.place_config = (
+            construct_config_for_place() if place_config is None else place_config
+        )
 
     def __initiate_controllers(self):
         """
@@ -67,6 +83,7 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
+
         self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
@@ -92,6 +109,7 @@ class SpotSkillManager:
                 nav_target_list = [
                     nav_target_from_waypoint(nav_target, self.waypoints_yaml_dict)
                 ]
+
             except Exception:
                 return (
                     False,
@@ -147,14 +165,23 @@ class SpotSkillManager:
         result = None
         try:
             result = self.gaze_controller.execute([pick_target])
-        except Exception:
-            return False, "Error encountered while picking"
+        except Exception as e:
+            return (
+                False,
+                f"Pick failed to pick the target object {result[0]['target_object']} due to error : {e}",
+            )
 
         # Check for success and return appropriately
         if result[0].get("success"):
-            return True, "Successfully picked the target object"
+            return (
+                True,
+                f"Successfully picked the target object {result[0]['target_object']} in {result[0]['time_taken']} secs",
+            )
         else:
-            return False, "Pick failed to pick the target object"
+            return (
+                False,
+                f"Pick failed to pick the target object {result[0]['target_object']}",
+            )
 
     def place(self, place_target: str = None) -> Tuple[bool, str]:
         """

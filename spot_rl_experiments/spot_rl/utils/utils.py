@@ -119,7 +119,12 @@ def object_id_to_nav_waypoint(object_id):
 
 def object_id_to_object_name(object_id):
     waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
-    return waypoints_yaml["object_targets"][object_id][0]
+    return (
+        waypoints_yaml["object_targets"][object_id][0]
+        if object_id in waypoints_yaml["object_targets"]
+        else None
+    )
+    # This makes sure that object_id if not present in the waypoints.yaml it won't break the outer higher order code
 
 
 def get_clutter_amounts():
