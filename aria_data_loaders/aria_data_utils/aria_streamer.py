@@ -225,7 +225,7 @@ class AriaReader:
             obj_name: [] for obj_name in object_labels
         }
         outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
-        outputs["object_ariaWorld_T_cpf_list"] = {
+        outputs["object_ariaCorrectedWorld_T_cpf_list"] = {
             obj_name: [] for obj_name in object_labels
         }
         return outputs
@@ -341,7 +341,7 @@ class AriaReader:
         - "object_image_segment" - List of Int signifying which segment the image
             belongs to; smaller number means latter the segment time-wise
         - "object_score_list" - List of Float signifying the detection score
-        - "object_ariaWorld_T_cpf_list" - List of Sophus SE3 transforms from AriaWorld
+        - "object_ariaCorrectedWorld_T_cpf_list" - List of Sophus SE3 transforms from AriaWorld
           to CPF
         """
         stream_id = self.provider.get_stream_id_from_label(stream_name)
@@ -415,7 +415,9 @@ class AriaReader:
                         outputs["object_score_list"][object_name].append(
                             score[object_name]
                         )
-                        outputs["object_ariaWorld_T_cpf_list"][object_name].append(
+                        outputs["object_ariaCorrectedWorld_T_cpf_list"][
+                            object_name
+                        ].append(
                             self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
                                 img_metadata.capture_timestamp_ns
                             )
@@ -971,9 +973,9 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     best_idx = outputs["object_score_list"]["water bottle"].index(
         max(outputs["object_score_list"]["water bottle"])
     )
-    best_object_ariaWorld_T_cpf = outputs["object_ariaWorld_T_cpf_list"][
-        "water bottle"
-    ][best_idx]
+    best_object_ariaCorrectedWorld_T_cpf = outputs[
+        "object_ariaCorrectedWorld_T_cpf_list"
+    ]["water bottle"][best_idx]
 
     vrs_mps_streamer.plot_rgb_and_trajectory(
         marker_pose=avg_ariaCorrectedWorld_T_marker,
@@ -981,7 +983,7 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
             # vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[-2500],
             avg_ariaCorrectedWorld_T_spotWorld,
             avg_ariaCorrectedWorld_T_spot,
-            best_object_ariaWorld_T_cpf,
+            best_object_ariaCorrectedWorld_T_cpf,
         ],
         rgb=outputs["object_image_list"]["water bottle"][best_idx],
         traj_data=vrs_mps_streamer.xyz_trajectory,
@@ -999,7 +1001,9 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     # )
     # mps_idx_of_interest = -2500
 
-    pose_of_interest = avg_spotWorld_T_ariaCorrectedWorld * best_object_ariaWorld_T_cpf
+    pose_of_interest = (
+        avg_spotWorld_T_ariaCorrectedWorld * best_object_ariaCorrectedWorld_T_cpf
+    )
     position = pose_of_interest.translation()
 
     if not dry_run:
