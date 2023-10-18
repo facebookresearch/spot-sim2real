@@ -409,7 +409,7 @@ class AriaReader:
                     plt.imsave(
                         f"./results/{frame_idx}_{valid}_{score_string}.jpg", result_img
                     )
-                    print("saving valid frame, {score=}")
+                    print(f"saving valid frame, {score=}")
                     for object_name in score.keys():
                         outputs["object_image_list"][object_name].append(img)
                         outputs["object_score_list"][object_name].append(
@@ -988,20 +988,19 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     )
 
     # TODO: make idx_of_interest as a dynamic variable (will come from object detection)
+    # vrs_timestamp_of_interest = outputs["object_image_metadata_list"]["water bottle"][
+    # best_idx
+    # ].capture_timestamp_ns
     # vrs_timestamp_of_interest = vrs_mps_streamer.get_vrs_timestamp_from_img_idx(
     #     stream_name=STREAM1_NAME, idx_of_interest=574
     # )
     # mps_idx_of_interest = vrs_mps_streamer.get_closest_mps_idx_to_timestamp_ns(
     #     vrs_timestamp_of_interest
     # )
-    mps_idx_of_interest = -2500
+    # mps_idx_of_interest = -2500
 
-    spotWorld_T_cpf_at_interest = (
-        avg_spotWorld_T_ariaCorrectedWorld
-        * vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[mps_idx_of_interest]
-    )
-    print(f"spotWorld_T_cpf_at_interest - {spotWorld_T_cpf_at_interest}")
-    position = spotWorld_T_cpf_at_interest.translation()
+    pose_of_interest = avg_spotWorld_T_ariaCorrectedWorld * best_object_ariaWorld_T_cpf
+    position = pose_of_interest.translation()
 
     if not dry_run:
         skill_manager = SpotSkillManager()
