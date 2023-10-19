@@ -412,6 +412,8 @@ if __name__ == "__main__":
     #     default="mrcnn", #"owlvit" # we need to change this behaviour, take the model name from config.yaml, otherwise it defaults to OwlVIT
     #     help="bounding box detector model to use (owlvit or maskrcnn)",
     # )
+    config_ = construct_config()
+    bounding_box_detector = "mrcnn" if config_.USE_MRCNN else "owlvit"
 
     args = parser.parse_args()
     # assert (
@@ -426,8 +428,7 @@ if __name__ == "__main__":
     core = args.core
     listen = args.listen
     local = args.local
-    config_ = construct_config()
-    bounding_box_detector = "mrcnn" if config_.USE_MRCNN else "owlvit"
+
     # bounding_box_detector = args.bounding_box_detector
     mrcnn = args.mrcnn
     owlvit = args.owlvit

@@ -24,7 +24,6 @@ from spot_wrapper.spot import Spot
 class SpotSkillManager:
     def __init__(
         self,
-        shutdownndock_on_delete=True,
         nav_config=None,
         pick_config=None,
         place_config=None,
@@ -41,12 +40,10 @@ class SpotSkillManager:
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
 
-        # Flag will decide whether we want to shutdown or keep the spot same
-        self.shutdownndock_on_delete = shutdownndock_on_delete
-
     def __del__(self):
-        if self.shutdownndock_on_delete:
-            self.spot.shutdown(should_dock=True)
+        pass
+        # if self.shutdownndock_on_delete:
+        #     self.spot.shutdown(should_dock=True)
 
     def __init_spot(self, nav_config=None, pick_config=None, place_config=None):
         """
