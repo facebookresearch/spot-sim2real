@@ -211,10 +211,10 @@ class SpotNavEnv(SpotBaseEnv):
         # Update the point goal given depth and rgb images
         if self._enable_nav_goal_change:
             arm_depth, arm_depth_bbox = self.get_gripper_images()
-            # Update the goal xy here
-            self._goal_xy = self.spot.get_new_goal_given_obj_img(
-                arm_depth, arm_depth_bbox
-            )
+            # Update the object x, y here
+            obj_xy = self.spot.get_new_goal_given_obj_img(arm_depth, arm_depth_bbox)
+            # Update the obj_xy to consider the base offset
+            self._goal_xy = obj_xy
 
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 

@@ -463,6 +463,16 @@ class Spot:
 
         return cmd_id
 
+    def get_global_from_local(self, x_pos, y_pos, yaw):
+        """Local x, y, yaw locations given the base"""
+        curr_x, curr_y, curr_yaw = self.get_xy_yaw(use_boot_origin=True)
+        coors = np.array([x_pos, y_pos, 1.0])
+        local_T_global = self._get_local_T_global(curr_x, curr_y, curr_yaw)
+        x, y, w = local_T_global.dot(coors)
+        global_x_pos, global_y_pos = x / w, y / w
+        global_yaw = wrap_heading(curr_yaw + yaw)
+        return global_x_pos, global_y_pos, global_yaw
+
     def set_base_position(
         self,
         x_pos,
@@ -493,13 +503,10 @@ class Spot:
                 obstacle_avoidance_padding=0.05,  # in meters
             ),
         )
-        curr_x, curr_y, curr_yaw = self.get_xy_yaw(use_boot_origin=True)
-        coors = np.array([x_pos, y_pos, 1.0])
         if relative:
-            local_T_global = self._get_local_T_global(curr_x, curr_y, curr_yaw)
-            x, y, w = local_T_global.dot(coors)
-            global_x_pos, global_y_pos = x / w, y / w
-            global_yaw = wrap_heading(curr_yaw + yaw)
+            global_x_pos, global_y_pos, global_yaw = self.get_global_from_local(
+                x_pos, y_pos, yaw
+            )
         else:
             global_x_pos, global_y_pos, global_yaw = self.xy_yaw_home_to_global(
                 x_pos, y_pos, yaw
@@ -588,7 +595,10 @@ class Spot:
         return arm_joint_positions.tolist()
 
     def get_new_goal_given_obj_img(self, depth, bbox):
-        """Estimate the goal location based on the depth and bbox of the target object"""
+        """Estimate the goal location based on the depth and bbox of the target object
+        :param as_array
+        :return the x, y location in the world frame
+        """
         x = 0
         y = 0
         return np.array([x, y])
