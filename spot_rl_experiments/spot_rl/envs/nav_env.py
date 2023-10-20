@@ -188,6 +188,7 @@ class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
         super().__init__(config, spot)
         self._goal_xy = None
+        self._enable_nav_goal_change = config.ENABLE_NAV_GOAL_CHANGE
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
@@ -206,16 +207,15 @@ class SpotNavEnv(SpotBaseEnv):
             self.spot.set_base_velocity(0.0, 0.0, 0.0, 1 / self.ctrl_hz)
         return succ
 
-    @property
-    def goal_xy(self):
-        return self._goal_xy
-
-    @goal_xy.setter
-    def goal_xy(self, goal_xy):
-        """Set the goal of the robot"""
-        self._goal_xy = goal_xy
-
     def get_observations(self):
+        # Update the point goal given depth and rgb images
+        if self._enable_nav_goal_change:
+            arm_depth, arm_depth_bbox = self.get_gripper_images()
+            # Update the goal xy here
+            self._goal_xy = self.spot.get_new_goal_given_obj_img(
+                arm_depth, arm_depth_bbox
+            )
+
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
 

@@ -587,9 +587,11 @@ class Spot:
             return arm_joint_positions
         return arm_joint_positions.tolist()
 
-    def get_new_goal_given_obj_img(self):
-        """Estimate the goal"""
-        pass
+    def get_new_goal_given_obj_img(self, depth, bbox):
+        """Estimate the goal location based on the depth and bbox of the target object"""
+        x = 0
+        y = 0
+        return np.array([x, y])
 
     def set_arm_joint_positions(
         self, positions, travel_time=1.0, max_vel=2.5, max_acc=15, return_cmd=False
