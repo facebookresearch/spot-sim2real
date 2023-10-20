@@ -425,8 +425,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             f"gh: {np.rad2deg(observations['goal_heading'][0]):.2f}\t"
         )
 
-    def get_nav_observation(self, goal_xy, goal_heading):
+    def get_nav_observation(self, goal_xy, goal_heading, update_goal_given_img=False):
         observations = {}
+
+        # Update the point goal given depth and rgb images
+        if update_goal_given_img:
+            arm_depth, arm_depth_bbox = self.get_gripper_images()
+            goal_xy = self.spot.get_new_goal_given_obj_img(arm_depth, arm_depth_bbox)
 
         # Get visual observations
         front_depth = self.msg_to_cv2(self.filtered_head_depth, "mono8")

@@ -587,6 +587,10 @@ class Spot:
             return arm_joint_positions
         return arm_joint_positions.tolist()
 
+    def get_new_goal_given_obj_img(self):
+        """Estimate the goal"""
+        pass
+
     def set_arm_joint_positions(
         self, positions, travel_time=1.0, max_vel=2.5, max_acc=15, return_cmd=False
     ):

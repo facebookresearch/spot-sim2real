@@ -187,16 +187,16 @@ class WaypointController:
 class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
         super().__init__(config, spot)
-        self.goal_xy = None
+        self._goal_xy = None
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
 
     def reset(self, goal_xy, goal_heading):
-        self.goal_xy = np.array(goal_xy, dtype=np.float32)
+        self._goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading
         observations = super().reset()
-        assert len(self.goal_xy) == 2
+        assert len(self._goal_xy) == 2
 
         return observations
 
@@ -206,8 +206,17 @@ class SpotNavEnv(SpotBaseEnv):
             self.spot.set_base_velocity(0.0, 0.0, 0.0, 1 / self.ctrl_hz)
         return succ
 
+    @property
+    def goal_xy(self):
+        return self._goal_xy
+
+    @goal_xy.setter
+    def goal_xy(self, goal_xy):
+        """Set the goal of the robot"""
+        self._goal_xy = goal_xy
+
     def get_observations(self):
-        return self.get_nav_observation(self.goal_xy, self.goal_heading)
+        return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
 
 if __name__ == "__main__":
