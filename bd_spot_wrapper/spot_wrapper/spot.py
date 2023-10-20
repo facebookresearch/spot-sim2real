@@ -463,15 +463,23 @@ class Spot:
 
         return cmd_id
 
-    def get_global_from_local(self, x_pos, y_pos, yaw):
-        """Local x, y, yaw locations given the base"""
-        curr_x, curr_y, curr_yaw = self.get_xy_yaw(use_boot_origin=True)
+    def get_global_from_local_based_on_input_T(
+        self, x_pos, y_pos, yaw, curr_x, curr_y, curr_yaw
+    ):
+        """Transform the point given the x,y,yaw location"""
         coors = np.array([x_pos, y_pos, 1.0])
         local_T_global = self._get_local_T_global(curr_x, curr_y, curr_yaw)
         x, y, w = local_T_global.dot(coors)
         global_x_pos, global_y_pos = x / w, y / w
         global_yaw = wrap_heading(curr_yaw + yaw)
         return global_x_pos, global_y_pos, global_yaw
+
+    def get_global_from_local(self, x_pos, y_pos, yaw):
+        """Local x, y, yaw locations given the base"""
+        curr_x, curr_y, curr_yaw = self.get_xy_yaw(use_boot_origin=True)
+        return self.get_global_from_local_based_on_input_T(
+            x_pos, y_pos, yaw, curr_x, curr_y, curr_yaw
+        )
 
     def set_base_position(
         self,

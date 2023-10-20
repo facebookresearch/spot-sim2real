@@ -214,7 +214,12 @@ class SpotNavEnv(SpotBaseEnv):
             # Update the object x, y here
             obj_xy = self.spot.get_new_goal_given_obj_img(arm_depth, arm_depth_bbox)
             # Update the obj_xy to consider the base offset
-            self._goal_xy = self.spot.get_global_from_local(obj_xy[0], obj_xy[1])
+            obj_nav_offset_x = -1.5
+            goal_x, goal_y, _ = self.spot.get_global_from_local_based_on_input_T(
+                obj_nav_offset_x, 0, 0, obj_xy[0], obj_xy[1], 0
+            )
+            # Make it to be an array
+            self._goal_xy = np.array([goal_x, goal_y])
 
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
