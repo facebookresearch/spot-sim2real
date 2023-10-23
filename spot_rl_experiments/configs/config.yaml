@@ -70,3 +70,6 @@ RETURN_TO_BASE: True
 
 # BD params
 ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
+
+# Prints
+VERBOSE: True
