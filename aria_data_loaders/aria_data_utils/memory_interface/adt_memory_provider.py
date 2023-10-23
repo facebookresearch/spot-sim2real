@@ -12,14 +12,11 @@ import numpy as np
 import openai
 import torch
 import yaml
-from habitat_llm.agent.memory.adt_data_loader import (
-    ADTSequences,
-    ADTSubsequenceIterator,
-)
-from habitat_llm.agent.memory.memory_objects import (  # <-- will probably need to copy this over
-    Memory,
-)
+from aria_data_utils.adt_data_loader import ADTSequences, ADTSubsequenceIterator
+from aria_data_utils.memory_interface.memory_objects import Memory
 from tqdm import tqdm
+
+# TODO: we can reuse OwlVit implemented in spot-rl here instead of this barebone thing
 from transformers import OwlViTForObjectDetection, OwlViTProcessor
 
 logger = logging.getLogger("adt_memory_provider")

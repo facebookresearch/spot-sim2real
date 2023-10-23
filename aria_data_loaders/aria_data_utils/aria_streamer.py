@@ -783,10 +783,11 @@ class SpotQRDetector:
         return head_mn_body_T_frfe
 
     def _get_spotWorld_T_handcam(
-        self, frame_tree_snapshot_hand, use_vision_as_world: bool = True
+        self, frame_tree_snapshot_hand, spot_frame: str = "vision"
     ):
-
-        spot_world_frame = "vision" if use_vision_as_world else "odom"
+        if spot_frame != "vision" and spot_frame != "odom":
+            raise ValueError("spot_frame should be either vision or odom")
+        spot_world_frame = spot_frame
 
         # print(frame_tree_snapshot_hand)
         hand_bd_wrist_T_handcam_dict = (
@@ -825,7 +826,6 @@ class SpotQRDetector:
     def _get_spotWorld_T_headcam(
         self, frame_tree_snapshot_head, use_vision_as_world: bool = True
     ):
-
         spot_world_frame = "vision" if use_vision_as_world else "odom"
 
         # print(frame_tree_snapshot_head)
@@ -870,13 +870,14 @@ class SpotQRDetector:
 
     def get_avg_spotWorld_T_marker_HAND(
         self,
-        use_vision_as_world: bool = True,
+        spot_frame: str = "vision",
         data_size_for_avg: int = 10,
         filter_dist: float = 2.2,
     ):
-        print("Withing function")
+        if spot_frame != "vision" and spot_frame != "odom":
+            raise ValueError("base_frame should be either vision or odom")
         cv2.namedWindow("hand_image", cv2.WINDOW_AUTOSIZE)
-        spot_world_frame = "vision" if use_vision_as_world else "odom"
+        spot_world_frame = spot_frame
 
         # Get Hand camera intrinsics
         hand_cam_intrinsics = self.spot.get_camera_intrinsics(SpotCamIds.HAND_COLOR)
@@ -915,7 +916,7 @@ class SpotQRDetector:
             frame_tree_snapshot_hand = img_response_hand.shot.transforms_snapshot
             hand_mn_body_T_handcam = self._get_body_T_handcam(frame_tree_snapshot_hand)
             hand_mn_spotWorld_T_handcam = self._get_spotWorld_T_handcam(
-                frame_tree_snapshot_hand, use_vision_as_world=use_vision_as_world
+                frame_tree_snapshot_hand, spot_frame=spot_frame
             )
 
             if is_marker_detected_from_hand_cam:

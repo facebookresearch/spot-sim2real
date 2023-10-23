@@ -108,29 +108,6 @@ class ADTSequences:
     def get_rectified_2d_bbox(self, bbox_2d) -> Optional[np.ndarray]:
         return self.data.get_rectified_2d_bbox(bbox_2d)
 
-    def create_object_retrieval_benchmark(
-        self, num_sequences, num_objects, method="id", llm=None
-    ):
-        """Creates a retrieval benchmark for ADT sequences"""
-        num_tot_sequences = len(self.file_paths)
-        sampled_sequences = random.sample(range(num_tot_sequences), num_sequences)
-        sequence_to_object_map = {}
-        for sequence_idx in sampled_sequences:
-            self.load_sequence(sequence_idx)
-            sampled_objects = random.sample(self.data.object_instance_ids, num_objects)
-            if method == "id":
-                sequence_to_object_map[sequence_idx] = sampled_objects
-            elif method == "description":
-                if llm is None:
-                    raise ValueError(
-                        "LLM object not provided, can not generate descriptions"
-                    )
-            else:
-                raise ValueError(
-                    f"Invalid method: {method}. Valid methods: id, description"
-                )
-        return sequence_to_object_map
-
 
 class ADTSubsequence:
     """Wrapper class to make I/O easier for ADT data"""
@@ -172,7 +149,14 @@ class ADTSubsequence:
         )
 
     def _transform_pose(self, data) -> Tuple[Any, int]:
-        """Transforms pose from left IMU frame to RGB camera frame"""
+        """Transforms pose from left IMU frame to RGB camera frame
+
+        Default Aria-frame is left IMU frame. This function transforms pose
+        from left IMU frame to RGB camera frame such that artifacts detected in
+        image may be associated with the correct camera location.
+
+        Reference: https://facebookresearch.github.io/projectaria_tools/docs/data_formats/coordinate_convention/3d_coordinate_frame_convention
+        """
         transform_world_rgb = (
             data["pose"].transform_scene_device.matrix() @ self._T_device_rgb.matrix()
         )
@@ -182,7 +166,7 @@ class ADTSubsequence:
         )  # this is probably a Sophus SE3 object
 
     def get_rectified_2d_bbox(self, bbox_2d) -> Optional[np.ndarray]:
-        """Rectifies 2D bounding box"""
+        """Rectifies GT 2D bounding box from fish-eye RGB image"""
         sensor_name = self.subsequence.raw_data_provider_ptr().get_label_from_stream_id(
             self._rgb_stream_id
         )
@@ -419,14 +403,14 @@ class ADTSubsequence:
         else:
             print("\033[1m" + "\033[91m" + "Try another object!" + "\033[0m")
 
+    # TODO: this is a specialized function...wonder if it should remain here?
     def linear_search_for_object_in_sequence(
         self,
         object_id_list: list,
         num_instances: int = 1,
         stream_id: StreamId = StreamId("214-1"),  # RGB device code
     ) -> dict:
-        """Linear search for object in sequence"""
-        # TODO: This is a generally useful function, maybe move out to a utils file?
+        """Linear search for frames with specified objects in them"""
         found_frames = {}
         found = {oid: False for oid in object_id_list}
         iterator = ADTSubsequenceIterator(self, reverse=True)
