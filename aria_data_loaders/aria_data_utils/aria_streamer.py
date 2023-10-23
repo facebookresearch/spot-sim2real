@@ -14,11 +14,7 @@ from projectaria_tools.core import calibration, data_provider, mps
 from scipy.spatial.transform import Rotation as R
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.models.owlvit import OwlVit
-
-### - $$$ SPOT=start $$$
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
-
-### - $$$ SPOT=end $$$
 
 """
 dict = {
@@ -45,10 +41,9 @@ dict = {
     "5m" : 581,
 }
 """
-name = "Start_2m"
-vrsfile = f"/home/kavitsha/fair/aria_data/{name}/{name}.vrs"
-mpspath = f"/home/kavitsha/fair/aria_data/{name}/"
+
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
+# TODO: Clean up the following
 AXES_SCALE = 0.9
 STREAM1_NAME = "camera-rgb"
 STREAM2_NAME = "camera-slam-left"
@@ -67,6 +62,19 @@ def label_img(
     thickness: int = 2,
     line_type: int = cv2.LINE_AA,
 ):
+    """
+    Helper method to label image with text
+
+    Args:
+        img (np.ndarray): Image to be labeled
+        text (str): Text to be labeled
+        org (tuple): (x,y) position of text
+        font_face (int, optional): Font face. Defaults to cv2.FONT_HERSHEY_SIMPLEX.
+        font_scale (float, optional): Font scale. Defaults to 0.8.
+        color (tuple, optional): Color of text. Defaults to (0, 0, 255).
+        thickness (int, optional): Thickness of text. Defaults to 2.
+        line_type (int, optional): Line type. Defaults to cv2.LINE_AA.
+    """
     cv2.putText(
         img,
         text,
@@ -79,7 +87,16 @@ def label_img(
     )
 
 
-def decorate_img_with_text(img, frame: str, position):
+# @TODO: Maybe make position as Any?
+def decorate_img_with_text(img: np.ndarray, frame: str, position: np.ndarray):
+    """
+    Helper method to label image with text
+
+    Args:
+        img (np.ndarray): Image to be labeled
+        frame (str): Frame of reference (for labeling)
+        position (np.ndarray): Position of object in frame of reference
+    """
     label_img(img, "Detected QR Marker", (50, 50), color=(0, 0, 255))
     label_img(img, f"Frame = {frame}", (50, 75), color=(0, 0, 255))
     label_img(img, f"X : {position[0]}", (50, 100), color=(0, 0, 255))
@@ -112,6 +129,7 @@ class AriaReader:
             mps_file_path
         ), "Incorrect MPS dir path"
 
+        # TODO: Maybe rename this flag as we also have a config.VERBOSE flag (for logging) .. to avoid confusion
         self.verbose = verbose
 
         self.provider = data_provider.create_vrs_data_provider(vrs_file_path)
@@ -121,25 +139,28 @@ class AriaReader:
 
         # TODO: Condition check to ensure stream name is valid
 
+        # April tag detector object
         self._qr_pose_estimator = None  # type: ignore
+
+        # Aria device camera calibration parameters
         self._src_calib_params = None  # type: ignore
         self._dst_calib_params = None  # type: ignore
 
-        # Trajectory and global points
+        # Closed loop trajectory
         closed_loop_trajectory_file = os.path.join(
             mps_file_path, "closed_loop_trajectory.csv"
         )
         self.mps_trajectory = mps.read_closed_loop_trajectory(
             closed_loop_trajectory_file
         )
-        # global_points_file = os.path.join(mps_file_path, "global_points.csv.gz")
-        online_cam_calib_file = os.path.join(mps_file_path, "online_calibration.jsonl")
-        self.online_cam_calib = mps.read_online_calibration(online_cam_calib_file)
 
+        # XYZ trajectory for mps
         self.xyz_trajectory = np.empty([len(self.mps_trajectory), 3])
-        # # self.quat_trajectory = np.empty([len(self.mps_trajectory), 4])
+
+        # Timestamps for mps in seconds
         self.trajectory_s = np.empty([len(self.mps_trajectory)])
 
+        # Different transformations along the trajectory
         self.ariaWorld_T_device_trajectory = []  # type: List[Any]
         self.ariaCorrectedWorld_T_device_trajectory = []  # type: List[Any]
         self.ariaCorrectedWorld_T_cpf_trajectory = []  # type: List[Any]
@@ -154,16 +175,25 @@ class AriaReader:
         self.initialize_trajectory()
 
         # sensor_calib_list = [device_calib.get_sensor_calib(label) for label in stream_names][0]
+        # Record VRS timestamps of interest based upon user input during vrs parsing
         self.vrs_idx_of_interest_list = []  # type: List[Any]
 
     def plot_rgb_and_trajectory(
         self,
         marker_pose: sp.SE3,
         device_pose_list: List[sp.SE3],
-        rgb,
-        timestamp_of_interest=None,
-        traj_data=None,
+        rgb: np.ndarray,
+        traj_data: np.ndarray = None,
     ):
+        """
+        Plot RGB image with trajectory
+
+        Args:
+            marker_pose (sp.SE3): Pose of marker in frame of reference
+            device_pose_list (List[sp.SE3]): List of device poses in frame of reference
+            rgb (np.ndarray): RGB image
+            traj_data (np.ndarray): Trajectory data
+        """
         fig = plt.figure(figsize=plt.figaspect(2.0))
         fig.suptitle("A tale of 2 subplots")
 
@@ -188,6 +218,11 @@ class AriaReader:
         plt.show()
 
     def _init_april_tag_detector(self) -> Dict[str, Any]:
+        """
+        Initialize April tag detector object for pose estimation of QR code
+
+        Can only detect dock code
+        """
         focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
         principal_point = self._dst_calib_params.get_principal_point()  # type:ignore
         calib_dict = {
@@ -198,9 +233,8 @@ class AriaReader:
             "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
         }
 
-        # LETS ONLY DETECT DOCK-ID RIGHT NOW
         self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
-        self._qr_pose_estimator.register_marker_ids([DOCK_ID, 521])  # type:ignore
+        self._qr_pose_estimator.register_marker_ids([DOCK_ID])  # type:ignore
         outputs: Dict[str, Any] = {}
         outputs["tag_cpf_T_marker_list"] = []
         outputs["tag_image_list"] = []
@@ -230,21 +264,55 @@ class AriaReader:
         }
         return outputs
 
-    def _rotate_img(self, img: np.ndarray, k: int = 3):
-        img = np.rot90(img, k=3)
+    def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
+        """
+        Rotate image in multiples of 90d degrees
+
+        Args:
+            img (np.ndarray): Image to be rotated
+            k (int, optional): Number of times to rotate by 90 degrees. Defaults to 3.
+
+        Returns:
+            np.ndarray: Rotated image
+        """
         img = np.ascontiguousarray(
-            img
+            np.rot90(img, k=num_of_rotation)
         )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
         return img
 
     def _display(self, img: np.ndarray, stream_name: str, wait: int = 1):
+        """
+        Display image in a cv2 window
+
+        Args:
+            img (np.ndarray): Image to be displayed
+            stream_name (str): Stream name
+            wait (int, optional): Wait time in ms. Defaults to 1 ms
+        """
         cv2.imshow(f"Stream - {stream_name}", cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         cv2.waitKey(wait)
 
     def _create_display_window(self, stream_name: str):
+        """
+        Create a display window for image
+
+        Args:
+            stream_name (str): Stream name
+        """
         cv2.namedWindow(f"Stream - {stream_name}", cv2.WINDOW_NORMAL)
 
-    def _rectify_image(self, image):
+    def _rectify_image(self, image) -> np.ndarray:
+        """
+        Rectify fisheye image based upon camera calibration parameters
+        Ensure you have set self._src_calib_param & self._dst_calib_param
+
+        Args:
+            image (np.ndarray): Image to be rectified or undistorted
+
+        Returns:
+            np.ndarray: Rectified image
+        """
+        assert self._src_calib_params is not None and self._dst_calib_params is not None
         rectified_image = calibration.distort_by_calibration(
             image, self._dst_calib_params, self._src_calib_params
         )
@@ -308,6 +376,16 @@ class AriaReader:
     def get_vrs_timestamp_from_img_idx(
         self, stream_name: str = STREAM1_NAME, idx_of_interest: int = -1
     ):
+        """
+        Get VRS timestamp corresponding to VRS image index
+
+        Args:
+            stream_name (str, optional): Stream name. Defaults to STREAM1_NAME.
+            idx_of_interest (int, optional): Index of interest. Defaults to -1 i.e. the last position of VRS.
+
+        Returns:
+            int: Corresponding VRS timestamp in nanoseconds
+        """
         stream_id = self.provider.get_stream_id_from_label(stream_name)
         frame_data = self.provider.get_image_data_by_index(stream_id, idx_of_interest)
         return frame_data[1].capture_timestamp_ns
@@ -328,6 +406,18 @@ class AriaReader:
         - April Tag
         - Object Detection
 
+        Args:
+            stream_name (str): Stream name
+            should_rectify (bool, optional): Boolean to indicate if fisheye images should be rectified. Defaults to True.
+            detect_qr (bool, optional): Boolean to indicate if QR code (Dock ID) should be detected. Defaults to False.
+            should_display (bool, optional): Boolean to indicate if image should be displayed. Defaults to True.
+            should_rec_timestamp_from_user (bool, optional): Boolean to iteratively parse through VRS stream and record
+                                                             instances of interest. Defaults to False.
+            detect_objects (bool, optional): Boolean to indicate if object detection should be performed. Defaults to False.
+            object_labels (List[str], optional): List of object labels to be detected. Defaults to None.
+            reverse (bool, optional): Boolean to indicate if VRS stream should be parsed in reverse. Defaults to False.
+                                      Useful based on the algorithm to detect objects from VRS stream.
+
         April tag outputs:
         - "tag_image_list" - List of np.ndarrays of images with detections
         - "tag_image_metadata_list" - List of image metadata
@@ -344,14 +434,16 @@ class AriaReader:
         - "object_ariaCorrectedWorld_T_cpf_list" - List of Sophus SE3 transforms from AriaWorld
           to CPF
         """
+        # Get stream id from stream name
         stream_id = self.provider.get_stream_id_from_label(stream_name)
 
+        # Get device_T_camera i.e. transformation from camera frame of interest to device frame (i.e. left slam camera frame)
         device_T_camera = sp.SE3(
             self.device_calib.get_transform_device_sensor(stream_name).to_matrix()
         )
         assert device_T_camera is not None
 
-        # Setup camera calibration parameters by over-writing self._src_calib_param & self._dst_calib_param
+        # Setup camera calibration parameters by over-writing self._src_calib_param & self._dst_calib_param if needed
         if should_rectify:
             self._src_calib_params = self.device_calib.get_camera_calib(stream_name)
             self._dst_calib_params = calibration.get_linear_camera_calibration(
@@ -360,10 +452,11 @@ class AriaReader:
 
         outputs = {}
 
-        # Setup April tag detection by over-writing self._qr_pose_estimator
+        # Setup April tag detection by over-writing self._qr_pose_estimator if needed
         if detect_qr:
             outputs.update(self._init_april_tag_detector())
 
+        # Setup object detection (Owl-VIT) if needed
         if detect_objects:
             outputs.update(self._init_object_detector(object_labels))
 
@@ -377,15 +470,19 @@ class AriaReader:
         else:
             custom_range = range(0, num_frames)
         for frame_idx in custom_range:
+            # Get image data for frame
             frame_data = self.provider.get_image_data_by_index(stream_id, frame_idx)
             img = frame_data[0].to_numpy_array()
             img_metadata = frame_data[1]
 
+            # Initialize camera_T_marker to None for current image frame
             camera_T_marker = None
 
+            # Rectify current image frame
             if should_rectify:
                 img = self._rectify_image(image=img)
 
+            # Detect QR code in current image frame
             if detect_qr:
                 (
                     img,
@@ -394,8 +491,10 @@ class AriaReader:
                     image=img, should_render=True, magnum=False
                 )
 
+            # Rotate current image frame
             img = self._rotate_img(img=img)
 
+            # TODO: @Priyam, can you add comment for this block please?
             if detect_objects:
                 # FIXME: done for 1 specific object at the moment, extend for multiple
                 valid, score, stop, result_img = self._get_scored_object_detections(
@@ -429,8 +528,12 @@ class AriaReader:
                             img_metadata
                         )
 
+            # If april tag is detected, compute the transformation of marker in cpf frame
+            # TODO: Update cpf to device
             if camera_T_marker is not None:
                 cpf_T_marker = self.cpf_T_device * device_T_camera * camera_T_marker
+
+                # Decorate image with text for visualization
                 img = decorate_img_with_text(
                     img=img,
                     frame="cpf",
@@ -439,13 +542,18 @@ class AriaReader:
                 print(
                     f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}"
                 )
+
+                # Append data to lists for return
                 outputs["tag_image_list"].append(img)
                 outputs["tag_image_metadata_list"].append(img_metadata)
                 outputs["tag_cpf_T_marker_list"].append(cpf_T_marker)
 
+            # Display current image frame
             if should_display:
                 self._display(img=img, stream_name=stream_name)
 
+            # Record instances of interest (press 'c' to record, 'o' to skip. Will ask input at each frame)
+            # TODO: Maybe we can delete this?
             if should_rec_timestamp_from_user:
                 val = input("o to skip, c to record")
                 if val == "c":
@@ -640,26 +748,8 @@ class SpotQRDetector:
             hand_bd_body_T_wrist_dict
         )
 
-        # hand_bd_body_T_odom_dict = frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-        #     "odom"
-        # ).parent_tform_child
-        # hand_mn_body_T_odom = self.spot.convert_transformation_from_BD_to_magnun(
-        #     hand_bd_body_T_odom_dict
-        # )
-        # hand_mn_odom_T_body = hand_mn_body_T_odom.inverted()
-
-        # print("hand__body_T_odom", hand_mn_body_T_odom)
-        # print("hand__odom_T_body", hand_mn_odom_T_body)
-
         hand_mn_body_T_handcam = hand_mn_body_T_wrist @ hand_mn_wrist_T_handcam
-        # hand_mn_odom_T_handcam = hand_mn_odom_T_body @ hand_mn_body_T_handcam
-        # hand_mn_odom_T_wrist = hand_mn_odom_T_body @ hand_mn_body_T_wrist
 
-        # print(f"wrist_T_handcam - mn: {hand_mn_wrist_T_handcam}")
-        # print(f"body_T_wrist - mn: {hand_mn_body_T_wrist}")
-        # print(f"body_T_handcam - mn : {hand_mn_body_T_handcam}")
-        # print(f"odom_T_handcam - mn : {hand_mn_odom_T_handcam}")
-        # print(f"odom_T_wrist - mn : {hand_mn_odom_T_wrist}")
         return hand_mn_body_T_handcam
 
     def _get_body_T_headcam(self, frame_tree_snapshot_head):
@@ -687,26 +777,17 @@ class SpotQRDetector:
             head_bd_body_T_head_dict
         )
 
-        # head_bd_body_T_odom_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
-        #     "odom"
-        # ).parent_tform_child
-        # head_mn_body_T_odom = self.spot.convert_transformation_from_BD_to_magnun(
-        #     head_bd_body_T_odom_dict
-        # )
-        # head_mn_odom_T_body = head_mn_body_T_odom.inverted()
-
-        # print("head__body_T_odom", head_mn_body_T_odom)
-        # print("head__odom_T_body", head_mn_odom_T_body)
-
         head_mn_head_T_frfe = head_mn_head_T_fr @ head_mn_fr_T_frfe_dict
         head_mn_body_T_frfe = head_mn_body_T_head @ head_mn_head_T_frfe
-        # head_mn_odom_T_frfe = head_mn_odom_T_body @ head_mn_body_T_frfe
 
-        # print(f"head__body_T_frfe - mn: {head_mn_body_T_frfe}")
-        # print(f"head__odom_T_frfe - mn : {head_mn_odom_T_frfe}").
         return head_mn_body_T_frfe
 
-    def _get_odom_T_handcam(self, frame_tree_snapshot_hand):
+    def _get_spotWorld_T_handcam(
+        self, frame_tree_snapshot_hand, use_vision_as_world: bool = True
+    ):
+
+        spot_world_frame = "vision" if use_vision_as_world else "odom"
+
         # print(frame_tree_snapshot_hand)
         hand_bd_wrist_T_handcam_dict = (
             frame_tree_snapshot_hand.child_to_parent_edge_map.get(
@@ -726,31 +807,27 @@ class SpotQRDetector:
             hand_bd_body_T_wrist_dict
         )
 
-        hand_bd_body_T_odom_dict = (
+        hand_bd_body_T_spotWorld_dict = (
             frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                "vision"
+                spot_world_frame
             ).parent_tform_child
         )
-        hand_mn_body_T_odom = self.spot.convert_transformation_from_BD_to_magnun(
-            hand_bd_body_T_odom_dict
+        hand_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnun(
+            hand_bd_body_T_spotWorld_dict
         )
-        hand_mn_odom_T_body = hand_mn_body_T_odom.inverted()
-
-        # print("hand__body_T_odom", hand_mn_body_T_odom)
-        # print("hand__odom_T_body", hand_mn_odom_T_body)
+        hand_mn_spotWorld_T_body = hand_mn_body_T_spotWorld.inverted()
 
         hand_mn_body_T_handcam = hand_mn_body_T_wrist @ hand_mn_wrist_T_handcam
-        hand_mn_odom_T_handcam = hand_mn_odom_T_body @ hand_mn_body_T_handcam
-        # hand_mn_odom_T_wrist = hand_mn_odom_T_body @ hand_mn_body_T_wrist
+        hand_mn_spotWorld_T_handcam = hand_mn_spotWorld_T_body @ hand_mn_body_T_handcam
 
-        # print(f"wrist_T_handcam - mn: {hand_mn_wrist_T_handcam}")
-        # print(f"body_T_wrist - mn: {hand_mn_body_T_wrist}")
-        # print(f"body_T_handcam - mn : {hand_mn_body_T_handcam}")
-        # print(f"odom_T_handcam - mn : {hand_mn_odom_T_handcam}")
-        # print(f"odom_T_wrist - mn : {hand_mn_odom_T_wrist}")
-        return hand_mn_odom_T_handcam
+        return hand_mn_spotWorld_T_handcam
 
-    def _get_odom_T_headcam(self, frame_tree_snapshot_head):
+    def _get_spotWorld_T_headcam(
+        self, frame_tree_snapshot_head, use_vision_as_world: bool = True
+    ):
+
+        spot_world_frame = "vision" if use_vision_as_world else "odom"
+
         # print(frame_tree_snapshot_head)
         head_bd_fr_T_frfe_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright_fisheye"
@@ -775,32 +852,31 @@ class SpotQRDetector:
             head_bd_body_T_head_dict
         )
 
-        head_bd_body_T_odom_dict = (
+        head_bd_body_T_spotWorld_dict = (
             frame_tree_snapshot_head.child_to_parent_edge_map.get(
-                "odom"
+                spot_world_frame
             ).parent_tform_child
         )
-        head_mn_body_T_odom = self.spot.convert_transformation_from_BD_to_magnun(
-            head_bd_body_T_odom_dict
+        head_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnun(
+            head_bd_body_T_spotWorld_dict
         )
-        head_mn_odom_T_body = head_mn_body_T_odom.inverted()
-
-        # print("head__body_T_odom", head_mn_body_T_odom)
-        # print("head__odom_T_body", head_mn_odom_T_body)
+        head_mn_spotWorld_T_body = head_mn_body_T_spotWorld.inverted()
 
         head_mn_head_T_frfe = head_mn_head_T_fr @ head_mn_fr_T_frfe_dict
         head_mn_body_T_frfe = head_mn_body_T_head @ head_mn_head_T_frfe
-        head_mn_odom_T_frfe = head_mn_odom_T_body @ head_mn_body_T_frfe
+        head_mn_spotWorld_T_frfe = head_mn_spotWorld_T_body @ head_mn_body_T_frfe
 
-        # print(f"head__body_T_frfe - mn: {head_mn_body_T_frfe}")
-        # print(f"head__odom_T_frfe - mn : {head_mn_odom_T_frfe}").
-        return head_mn_odom_T_frfe
+        return head_mn_spotWorld_T_frfe
 
     def get_avg_spotWorld_T_marker_HAND(
-        self, data_size_for_avg: int = 10, filter_dist: float = 2.2
+        self,
+        use_vision_as_world: bool = True,
+        data_size_for_avg: int = 10,
+        filter_dist: float = 2.2,
     ):
         print("Withing function")
         cv2.namedWindow("hand_image", cv2.WINDOW_AUTOSIZE)
+        spot_world_frame = "vision" if use_vision_as_world else "odom"
 
         # Get Hand camera intrinsics
         hand_cam_intrinsics = self.spot.get_camera_intrinsics(SpotCamIds.HAND_COLOR)
@@ -835,14 +911,16 @@ class SpotQRDetector:
                 print("Trackedddd")
                 is_marker_detected_from_hand_cam = True
 
-            # Spot - odom_T_handcam computation
+            # Spot - spotWorld_T_handcam computation
             frame_tree_snapshot_hand = img_response_hand.shot.transforms_snapshot
             hand_mn_body_T_handcam = self._get_body_T_handcam(frame_tree_snapshot_hand)
-            hand_mn_odom_T_handcam = self._get_odom_T_handcam(frame_tree_snapshot_hand)
+            hand_mn_spotWorld_T_handcam = self._get_spotWorld_T_handcam(
+                frame_tree_snapshot_hand, use_vision_as_world=use_vision_as_world
+            )
 
             if is_marker_detected_from_hand_cam:
-                hand_mn_odom_T_marker = (
-                    hand_mn_odom_T_handcam @ hand_mn_handcam_T_marker
+                hand_mn_spotWorld_T_marker = (
+                    hand_mn_spotWorld_T_handcam @ hand_mn_handcam_T_marker
                 )
 
                 hand_mn_body_T_marker = (
@@ -850,7 +928,9 @@ class SpotQRDetector:
                 )
 
                 img_rend_hand = decorate_img_with_text(
-                    img_rend_hand, "Odom", hand_mn_odom_T_marker.translation
+                    img_rend_hand,
+                    spot_world_frame,
+                    hand_mn_spotWorld_T_marker.translation,
                 )
 
                 dist = hand_mn_handcam_T_marker.translation.length()
@@ -860,10 +940,10 @@ class SpotQRDetector:
                 )
                 if dist < filter_dist:
                     marker_position_from_dock_list.append(
-                        np.array(hand_mn_odom_T_marker.translation)
+                        np.array(hand_mn_spotWorld_T_marker.translation)
                     )
                     marker_quaternion_form_dock_list.append(
-                        R.from_matrix(hand_mn_odom_T_marker.rotation()).as_quat()
+                        R.from_matrix(hand_mn_spotWorld_T_marker.rotation()).as_quat()
                     )
                     marker_position_from_robot_list.append(
                         np.array(hand_mn_body_T_marker.translation)
@@ -903,13 +983,17 @@ class SpotQRDetector:
         return avg_spotWorld_T_marker, avg_spot_T_marker
 
     def get_avg_spotWorld_T_marker_HEAD(
-        self, data_size_for_avg: int = 10, filter_dist: float = 2.4
+        self,
+        use_vision_as_world: bool = True,
+        data_size_for_avg: int = 10,
+        filter_dist: float = 2.4,
     ):
         pass
 
     def get_avg_spotWorld_T_marker(
         self,
         camera: str = "hand",
+        use_vision_as_world: bool = True,
         data_size_for_avg: int = 10,
         filter_dist: float = 2.4,
     ):
