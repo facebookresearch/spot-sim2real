@@ -1,12 +1,16 @@
 import math
-from typing import List
+from typing import List, Tuple, Union
 
 import numpy as np
 
 
-def rotate_point(origin, point, angle):
+def rotate_pixel_coords(
+    origin: Tuple[int, int],
+    point: Tuple[int, int],
+    angle: float,
+) -> Tuple[int, int]:
     """
-    Rotate a point counterclockwise by a given angle around a given origin.
+    Rotate a pixel-index counterclockwise by a given angle around a given origin.
     The angle should be given in radians.
 
     modified from answer here: https://stackoverflow.com/questions/34372480/rotate-point-about-another-point-in-degrees-python
@@ -19,7 +23,9 @@ def rotate_point(origin, point, angle):
     return int(qx), int(qy)
 
 
-def calculate_score(frame, object_id, box=None):
+def calculate_score(
+    frame, object_id: int, box: list = None, pixel_thresh=5000
+) -> Tuple[int, float]:
     """calculates the detection and recognition score for an object
     Returns two metrics:
     - Binary metric: detected object exists in the frame
@@ -28,24 +34,23 @@ def calculate_score(frame, object_id, box=None):
     object_pixels = np.sum(frame["segmentation"] == object_id)
     print(object_pixels)
     binary_score, iou_score = 0, -1.0
-    if object_pixels > 5000:
+    if object_pixels > pixel_thresh:
         binary_score = 1
         if box is not None:
             # calculate iou
             gt_box = frame["2dbbox"][object_id].box_range
             # convert both boxes to same convention
             x1, x2, y1, y2 = gt_box
-            breakpoint()
             angle = math.radians(90)
-            center = (frame["rgb"].shape[1] // 2, frame["rgb"].shape[0] // 2)
-            x1, y1 = rotate_point(center, (x1, y1), angle)
-            x2, y2 = rotate_point(center, (x2, y2), angle)
+            img_center = (frame["rgb"].shape[1] // 2, frame["rgb"].shape[0] // 2)
+            x1, y1 = rotate_pixel_coords(img_center, (x1, y1), angle)
+            x2, y2 = rotate_pixel_coords(img_center, (x2, y2), angle)
             gt_box = [x1, y1, x2, y2]
             iou_score = calculate_iou(box, gt_box)
     return binary_score, iou_score
 
 
-def calculate_iou(box1, box2):
+def calculate_iou(box1: np.ndarray, box2: np.ndarray) -> float:
     """calculates the intersection over union score for two boxes"""
     x1, y1, x2, y2 = box1
     x3, y3, x4, y4 = box2
@@ -60,7 +65,7 @@ def calculate_iou(box1, box2):
 
 
 def centered_heuristic(
-    detections: list, pixel_wt=0.65, image_size=(512, 512)
+    detections: list, pixel_wt: float = 0.65, image_size: Tuple[int, int] = (512, 512)
 ) -> List[float]:
     """Given one instance of object detection from OWL-ViT, calculate the graspability
     score.
@@ -82,7 +87,7 @@ def centered_heuristic(
     return scores
 
 
-def check_bbox_intersection(bbox1, bbox2) -> bool:
+def check_bbox_intersection(bbox1: List[int], bbox2: List[int]) -> bool:
     """Given two bounding boxes described in pixel convention, returns True
     if they intersect, False if they do not"""
     xmin1, ymin1, xmax1, ymax1 = bbox1
