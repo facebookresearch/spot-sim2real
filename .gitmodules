@@ -2,11 +2,14 @@
 	path = third_party/habitat-lab
 	url = git@github.com:naokiyokoyama/habitat-lab.git
 	branch = pvp
+	ignore = dirty
 [submodule "third_party/DeblurGANv2"]
 	path = third_party/DeblurGANv2
 	url = git@github.com:naokiyokoyama/DeblurGANv2.git
 	branch = master
+	ignore = dirty
 [submodule "third_party/mask_rcnn_detectron2"]
 	path = third_party/mask_rcnn_detectron2
 	url = https://github.com/naokiyokoyama/mask_rcnn_detectron2
 	branch = main
+	ignore = dirty
