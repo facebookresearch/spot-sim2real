@@ -120,6 +120,210 @@ def take_snapshot(spot: Spot):
 ######################################################################
 
 
+############ Resuable Classes & Methods to keep code clean ###########
+
+
+class GenericDetector:
+    def __init__(self):
+        self.is_enabled = False
+
+    def enable_detector(self):
+        self.is_enabled = True
+
+    def disable_detector(self):
+        self.is_enabled = False
+
+    def process_frame(self, frame: np.ndarray):
+        raise NotImplementedError
+
+
+class AprilTagDetectorWrapper(GenericDetector):
+    def __init__(self):
+        super().__init__()
+
+    def _init_april_tag_detector(
+        self, focal_lengths: Any, principal_point: Any
+    ) -> Dict[str, Any]:
+        """
+        Initialize April tag detector object for pose estimation of QR code
+
+        Can only detect dock code
+        """
+        assert self.is_enabled is True
+
+        # focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
+        # principal_point = self._dst_calib_params.get_principal_point()  # type:ignore
+        calib_dict = {
+            "fx": focal_lengths[0].item(),
+            "fy": focal_lengths[1].item(),
+            "ppx": principal_point[0].item(),
+            "ppy": principal_point[1].item(),
+            "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
+        }
+
+        self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
+        self._qr_pose_estimator.register_marker_ids([DOCK_ID])  # type:ignore
+        outputs: Dict[str, Any] = {}
+        outputs["tag_cpf_T_marker_list"] = []
+        outputs["tag_image_list"] = []
+        outputs["tag_image_metadata_list"] = []
+        return outputs
+
+    def process_frame(
+        self, frame: np.ndarray, verbose: bool = True
+    ) -> Tuple[np.ndarray, sp.SE3]:
+        assert self.is_enabled is True
+
+        return self._qr_pose_estimator.detect_markers_and_estimate_pose(  # type: ignore
+            image=frame, should_render=verbose, magnum=False
+        )
+
+    def get_outputs(
+        self,
+        frame: np.ndarray,
+        outputs: Dict,
+        cpf_T_device,
+        device_T_camera,
+        camera_T_marker,
+        img_metadata: Any,
+    ):
+        # TODO: Update cpf to device
+        cpf_T_marker = cpf_T_device * device_T_camera * camera_T_marker
+
+        # Decorate image with text for visualization
+        img = decorate_img_with_text(
+            img=frame,
+            frame="cpf",  ### LOL
+            position=cpf_T_marker.translation(),
+        )
+        print(f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}")
+
+        # Append data to lists for return
+        outputs["tag_image_list"].append(img)
+        outputs["tag_image_metadata_list"].append(img_metadata)
+        outputs["tag_cpf_T_marker_list"].append(cpf_T_marker)
+
+        return frame, outputs
+
+
+class ObjectDetectorWrapper(GenericDetector):
+    def __init__(self):
+        super().__init__()
+
+    def _init_object_detector(
+        self, object_labels: List[str], verbose: bool = None
+    ) -> Dict[str, Any]:
+        """initialize object_detector by loading it to GPU and setting up the labels"""
+        assert self.is_enabled is True
+        # TODO: Decide VERBOSE
+        # if verbose is None:
+        #     verbose = self.verbose
+        self.object_detector = OwlVit(
+            [object_labels], score_threshold=0.125, show_img=verbose
+        )
+        outputs: Dict[str, Any] = {}
+        outputs["object_image_list"] = {obj_name: [] for obj_name in object_labels}
+        outputs["object_image_metadata_list"] = {
+            obj_name: [] for obj_name in object_labels
+        }
+        outputs["object_image_segment_list"] = {
+            obj_name: [] for obj_name in object_labels
+        }
+        outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
+        outputs["object_ariaCorrectedWorld_T_cpf_list"] = {
+            obj_name: [] for obj_name in object_labels
+        }
+        return outputs
+
+    def _get_scored_object_detections(
+        self, img: np.ndarray, heuristic=None
+    ) -> Tuple[bool, Dict[str, float], Dict[str, bool], np.ndarray]:
+        """
+        Detect object instances in the frame. score them based on heuristics
+        and return a tuple of (valid, score, result_image)
+        Input:
+        - img: np.ndarray: image to run inference on
+        - heuristic: function: function to score the detections
+        Output:
+        - valid: bool: whether the frame is valid or not
+        - score: float: score of the frame (based on :heuristic:)
+        - result_image: np.ndarray: image with bounding boxes drawn on it
+        """
+        detections, result_image = self.object_detector.run_inference_and_return_img(
+            img
+        )
+        if heuristic is not None:
+            valid, score, stop = heuristic(detections)
+
+        return valid, score, stop, result_image
+
+    def _p1_demo_heuristics(
+        self, detections, img_size=(512, 512)
+    ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
+        """*P1 Demo Specific*
+        Heuristics to filter out unwanted and bad obejct detections. This heuristic
+        scores each frame based on (a) % of pixels occupied by object in the frame
+        and (b) proximity of bbox to image center. Further only those images are
+        scored which have only the object detection without a hand in the frame.
+
+        Detections are expected to have the format:
+        [["object_name", "confidence", "bbox"]]
+        """
+        valid = False
+        score = {}
+        stop = {}
+        # figure out if this is an interaction frame
+        if len(detections) > 1:
+            objects_in_frame = [det[0] for det in detections]
+            # FIXME: only works for 1 object of interest right now, extend to multiple
+            if "hand" in objects_in_frame and "water bottle" in objects_in_frame:
+                print(f"checking for intersection b/w: {object}")
+                stop["water bottle"] = check_bbox_intersection(
+                    detections[objects_in_frame.index("water bottle")][2],
+                    detections[objects_in_frame.index("hand")][2],
+                )
+                print(f"Intersection: {stop}")
+        if len(detections) == 1:
+            if "water bottle" == detections[0][0]:
+                score["water bottle"] = centered_heuristic(detections)[0]
+                valid = True
+
+        return valid, score, stop
+
+    def process_frame(self, frame: np.ndarray, outputs: Dict, img_metadata: Any):
+        assert self.is_enabled is True
+
+        # FIXME: done for 1 specific object at the moment, extend for multiple
+        valid, score, stop, result_img = self._get_scored_object_detections(
+            frame, heuristic=self._p1_demo_heuristics
+        )
+        if stop and stop["water bottle"]:
+            print("Turning off object-detection")
+            detect_objects = False
+        if valid:
+            # score_string = str(score["water bottle"]).replace(".", "_")
+            # plt.imsave(
+            #     f"./results/{frame_idx}_{valid}_{score_string}.jpg", result_img
+            # )
+            # print(f"saving valid frame, {score=}")
+            for object_name in score.keys():
+                outputs["object_image_list"][object_name].append(frame)
+                outputs["object_score_list"][object_name].append(score[object_name])
+                outputs["object_ariaCorrectedWorld_T_cpf_list"][object_name].append(
+                    self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
+                        img_metadata.capture_timestamp_ns
+                    )
+                )
+                # TODO: following is not being used at the moment, clean-up if
+                # multi-object, multi-view logic seems to not require this
+                outputs["object_image_segment_list"][object_name].append(-1)
+                outputs["object_image_metadata_list"][object_name].append(img_metadata)
+
+            return frame, outputs, detect_objects
+
+######################################################################
+
+
 class AriaReader:
     def __init__(self, vrs_file_path: str, mps_file_path: str, verbose=False):
         assert vrs_file_path is not None and os.path.exists(
@@ -140,7 +344,10 @@ class AriaReader:
         # TODO: Condition check to ensure stream name is valid
 
         # April tag detector object
-        self._qr_pose_estimator = None  # type: ignore
+        self.april_tag_detection_wrapper = AprilTagDetectorWrapper()
+
+        # Object detection object
+        self.object_detection_wrapper = ObjectDetectorWrapper()
 
         # Aria device camera calibration parameters
         self._src_calib_params = None  # type: ignore
@@ -217,53 +424,6 @@ class AriaReader:
         plt_ax.plot(traj_data[:, 0], traj_data[:, 1], traj_data[:, 2])
         plt.show()
 
-    def _init_april_tag_detector(self) -> Dict[str, Any]:
-        """
-        Initialize April tag detector object for pose estimation of QR code
-
-        Can only detect dock code
-        """
-        focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
-        principal_point = self._dst_calib_params.get_principal_point()  # type:ignore
-        calib_dict = {
-            "fx": focal_lengths[0].item(),
-            "fy": focal_lengths[1].item(),
-            "ppx": principal_point[0].item(),
-            "ppy": principal_point[1].item(),
-            "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
-        }
-
-        self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
-        self._qr_pose_estimator.register_marker_ids([DOCK_ID])  # type:ignore
-        outputs: Dict[str, Any] = {}
-        outputs["tag_cpf_T_marker_list"] = []
-        outputs["tag_image_list"] = []
-        outputs["tag_image_metadata_list"] = []
-        return outputs
-
-    def _init_object_detector(
-        self, object_labels: List[str], verbose: bool = None
-    ) -> Dict[str, Any]:
-        """initialize object_detector by loading it to GPU and setting up the labels"""
-        if verbose is None:
-            verbose = self.verbose
-        self.object_detector = OwlVit(
-            [object_labels], score_threshold=0.125, show_img=verbose
-        )
-        outputs: Dict[str, Any] = {}
-        outputs["object_image_list"] = {obj_name: [] for obj_name in object_labels}
-        outputs["object_image_metadata_list"] = {
-            obj_name: [] for obj_name in object_labels
-        }
-        outputs["object_image_segment_list"] = {
-            obj_name: [] for obj_name in object_labels
-        }
-        outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
-        outputs["object_ariaCorrectedWorld_T_cpf_list"] = {
-            obj_name: [] for obj_name in object_labels
-        }
-        return outputs
-
     def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
         """
         Rotate image in multiples of 90d degrees
@@ -318,61 +478,6 @@ class AriaReader:
         )
         return rectified_image
 
-    def _get_scored_object_detections(
-        self, img: np.ndarray, heuristic=None
-    ) -> Tuple[bool, Dict[str, float], Dict[str, bool], np.ndarray]:
-        """
-        Detect object instances in the frame. score them based on heuristics
-        and return a tuple of (valid, score, result_image)
-        Input:
-        - img: np.ndarray: image to run inference on
-        - heuristic: function: function to score the detections
-        Output:
-        - valid: bool: whether the frame is valid or not
-        - score: float: score of the frame (based on :heuristic:)
-        - result_image: np.ndarray: image with bounding boxes drawn on it
-        """
-        detections, result_image = self.object_detector.run_inference_and_return_img(
-            img
-        )
-        if heuristic is not None:
-            valid, score, stop = heuristic(detections)
-
-        return valid, score, stop, result_image
-
-    def _p1_demo_heuristics(
-        self, detections, img_size=(512, 512)
-    ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
-        """*P1 Demo Specific*
-        Heuristics to filter out unwanted and bad obejct detections. This heuristic
-        scores each frame based on (a) % of pixels occupied by object in the frame
-        and (b) proximity of bbox to image center. Further only those images are
-        scored which have only the object detection without a hand in the frame.
-
-        Detections are expected to have the format:
-        [["object_name", "confidence", "bbox"]]
-        """
-        valid = False
-        score = {}
-        stop = {}
-        # figure out if this is an interaction frame
-        if len(detections) > 1:
-            objects_in_frame = [det[0] for det in detections]
-            # FIXME: only works for 1 object of interest right now, extend to multiple
-            if "hand" in objects_in_frame and "water bottle" in objects_in_frame:
-                print(f"checking for intersection b/w: {object}")
-                stop["water bottle"] = check_bbox_intersection(
-                    detections[objects_in_frame.index("water bottle")][2],
-                    detections[objects_in_frame.index("hand")][2],
-                )
-                print(f"Intersection: {stop}")
-        if len(detections) == 1:
-            if "water bottle" == detections[0][0]:
-                score["water bottle"] = centered_heuristic(detections)[0]
-                valid = True
-
-        return valid, score, stop
-
     def get_vrs_timestamp_from_img_idx(
         self, stream_name: str = STREAM1_NAME, idx_of_interest: int = -1
     ):
@@ -396,7 +501,6 @@ class AriaReader:
         should_rectify: bool = True,
         detect_qr: bool = False,
         should_display: bool = True,
-        should_rec_timestamp_from_user: bool = False,
         detect_objects: bool = False,
         object_labels: List[str] = None,
         reverse: bool = False,
@@ -411,8 +515,6 @@ class AriaReader:
             should_rectify (bool, optional): Boolean to indicate if fisheye images should be rectified. Defaults to True.
             detect_qr (bool, optional): Boolean to indicate if QR code (Dock ID) should be detected. Defaults to False.
             should_display (bool, optional): Boolean to indicate if image should be displayed. Defaults to True.
-            should_rec_timestamp_from_user (bool, optional): Boolean to iteratively parse through VRS stream and record
-                                                             instances of interest. Defaults to False.
             detect_objects (bool, optional): Boolean to indicate if object detection should be performed. Defaults to False.
             object_labels (List[str], optional): List of object labels to be detected. Defaults to None.
             reverse (bool, optional): Boolean to indicate if VRS stream should be parsed in reverse. Defaults to False.
@@ -454,11 +556,24 @@ class AriaReader:
 
         # Setup April tag detection by over-writing self._qr_pose_estimator if needed
         if detect_qr:
-            outputs.update(self._init_april_tag_detector())
+            focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
+            principal_point = (
+                self._dst_calib_params.get_principal_point()
+            )  # type:ignore
+            self.april_tag_detection_wrapper.enable_detector()
+            outputs.update(
+                self._init_april_tag_detector(
+                    focal_lengths=focal_lengths, principal_point=principal_point
+                )
+            )
 
         # Setup object detection (Owl-VIT) if needed
         if detect_objects:
-            outputs.update(self._init_object_detector(object_labels))
+            # TODO: Pass self.verbose flag
+            self.object_detection_wrapper.enable_detector()
+            outputs.update(
+                self._init_object_detector(object_labels, verbose=self.verbose)
+            )
 
         if should_display:
             self._create_display_window(stream_name)
@@ -475,89 +590,50 @@ class AriaReader:
             img = frame_data[0].to_numpy_array()
             img_metadata = frame_data[1]
 
-            # Initialize camera_T_marker to None for current image frame
-            camera_T_marker = None
-
             # Rectify current image frame
-            if should_rectify:
+            if should_rectify: # TODO: ALWAYS TRUE
                 img = self._rectify_image(image=img)
 
-            # Detect QR code in current image frame
-            if detect_qr:
-                (
-                    img,
-                    camera_T_marker,
-                ) = self._qr_pose_estimator.detect_markers_and_estimate_pose(  # type: ignore
-                    image=img, should_render=True, magnum=False
-                )
+            def X(img, outputs):
+                # Initialize camera_T_marker to None for current image frame
+                camera_T_marker = None
 
-            # Rotate current image frame
-            img = self._rotate_img(img=img)
+                # Detect QR code in current image frame
+                if detect_qr:
+                    (
+                        img,
+                        camera_T_marker,
+                    ) = self.april_tag_detection_wrapper.process_frame(
+                        frame=img, should_render=True
+                    )  # type: ignore
 
-            # TODO: @Priyam, can you add comment for this block please?
-            if detect_objects:
-                # FIXME: done for 1 specific object at the moment, extend for multiple
-                valid, score, stop, result_img = self._get_scored_object_detections(
-                    img, heuristic=self._p1_demo_heuristics
-                )
-                if stop and stop["water bottle"]:
-                    print("Turning off object-detection")
-                    detect_objects = False
-                if valid:
-                    score_string = str(score["water bottle"]).replace(".", "_")
-                    plt.imsave(
-                        f"./results/{frame_idx}_{valid}_{score_string}.jpg", result_img
+                # Rotate current image frame
+                img = self._rotate_img(img=img)
+
+                # TODO: @Priyam, can you add comment for this block please?
+                if detect_objects:
+                    (
+                        img,
+                        outputs,
+                        detect_objects,
+                    ) = self.object_detection_wrapper.process_frame(
+                        frame=img, outputs=outputs, img_metadata=img_metadata
                     )
-                    print(f"saving valid frame, {score=}")
-                    for object_name in score.keys():
-                        outputs["object_image_list"][object_name].append(img)
-                        outputs["object_score_list"][object_name].append(
-                            score[object_name]
-                        )
-                        outputs["object_ariaCorrectedWorld_T_cpf_list"][
-                            object_name
-                        ].append(
-                            self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
-                                img_metadata.capture_timestamp_ns
-                            )
-                        )
-                        # TODO: following is not being used at the moment, clean-up if
-                        # multi-object, multi-view logic seems to not require this
-                        outputs["object_image_segment_list"][object_name].append(-1)
-                        outputs["object_image_metadata_list"][object_name].append(
-                            img_metadata
-                        )
 
-            # If april tag is detected, compute the transformation of marker in cpf frame
-            # TODO: Update cpf to device
-            if camera_T_marker is not None:
-                cpf_T_marker = self.cpf_T_device * device_T_camera * camera_T_marker
-
-                # Decorate image with text for visualization
-                img = decorate_img_with_text(
-                    img=img,
-                    frame="cpf",
-                    position=cpf_T_marker.translation(),
-                )
-                print(
-                    f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}"
-                )
-
-                # Append data to lists for return
-                outputs["tag_image_list"].append(img)
-                outputs["tag_image_metadata_list"].append(img_metadata)
-                outputs["tag_cpf_T_marker_list"].append(cpf_T_marker)
+                # If april tag is detected, compute the transformation of marker in cpf frame
+                if camera_T_marker is not None:
+                    img, outputs = self.april_tag_detection_wrapper.get_outputs(
+                        frame=img,
+                        outputs=outputs,
+                        cpf_T_device=self.cpf_T_device,
+                        device_T_camera=device_T_camera,
+                        camera_T_marker=camera_T_marker,
+                        img_metadata=img_metadata,
+                    )
 
             # Display current image frame
             if should_display:
                 self._display(img=img, stream_name=stream_name)
-
-            # Record instances of interest (press 'c' to record, 'o' to skip. Will ask input at each frame)
-            # TODO: Maybe we can delete this?
-            if should_rec_timestamp_from_user:
-                val = input("o to skip, c to record")
-                if val == "c":
-                    self.vrs_idx_of_interest_list.append(frame_idx)
 
         return outputs
 
@@ -592,9 +668,14 @@ class AriaReader:
 
     # TODO: Can be optimized. This is making O(n^2)
     def get_closest_mps_idx_to_timestamp_ns(self, timestamp_ns_of_interest: int):
+
+        # VRS timestamps are NOT 100% synced with MPS timestamps
+        # So we find the closest MPS timestamp to the VRS timestamp
         mps_idx_of_interest = np.argmin(
             np.abs(self.trajectory_s * 1e9 - timestamp_ns_of_interest)
         )
+
+        # TODO: Change logic
         return mps_idx_of_interest
 
     def get_closest_world_T_device_to_timestamp(self, timestamp_ns_of_interest: int):
