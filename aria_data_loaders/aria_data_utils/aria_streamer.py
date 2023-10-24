@@ -6,8 +6,10 @@ import click
 import cv2
 import numpy as np
 import sophus as sp
-from aria_data_utils.image_utils import centered_heuristic, check_bbox_intersection
-from aria_data_utils.utils.april_tag_pose_estimator import AprilTagPoseEstimator
+from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
+from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
+from aria_data_utils.image_utils import decorate_img_with_text
+from aria_data_utils.perception.april_tag_pose_estimator import AprilTagPoseEstimator
 from fairotag.scene import Scene
 from matplotlib import pyplot as plt
 from projectaria_tools.core import calibration, data_provider, mps
@@ -49,61 +51,8 @@ STREAM1_NAME = "camera-rgb"
 STREAM2_NAME = "camera-slam-left"
 STREAM3_NAME = "camera-slam-right"
 
+
 ############## Simple Helper Methods to keep code clean ##############
-
-
-def label_img(
-    img: np.ndarray,
-    text: str,
-    org: tuple,
-    font_face: int = cv2.FONT_HERSHEY_SIMPLEX,
-    font_scale: float = 0.8,
-    color: tuple = (0, 0, 255),
-    thickness: int = 2,
-    line_type: int = cv2.LINE_AA,
-):
-    """
-    Helper method to label image with text
-
-    Args:
-        img (np.ndarray): Image to be labeled
-        text (str): Text to be labeled
-        org (tuple): (x,y) position of text
-        font_face (int, optional): Font face. Defaults to cv2.FONT_HERSHEY_SIMPLEX.
-        font_scale (float, optional): Font scale. Defaults to 0.8.
-        color (tuple, optional): Color of text. Defaults to (0, 0, 255).
-        thickness (int, optional): Thickness of text. Defaults to 2.
-        line_type (int, optional): Line type. Defaults to cv2.LINE_AA.
-    """
-    cv2.putText(
-        img,
-        text,
-        org,
-        font_face,
-        font_scale,
-        color,
-        thickness,
-        line_type,
-    )
-
-
-# @TODO: Maybe make position as Any?
-def decorate_img_with_text(img: np.ndarray, frame: str, position: np.ndarray):
-    """
-    Helper method to label image with text
-
-    Args:
-        img (np.ndarray): Image to be labeled
-        frame (str): Frame of reference (for labeling)
-        position (np.ndarray): Position of object in frame of reference
-    """
-    label_img(img, "Detected QR Marker", (50, 50), color=(0, 0, 255))
-    label_img(img, f"Frame = {frame}", (50, 75), color=(0, 0, 255))
-    label_img(img, f"X : {position[0]}", (50, 100), color=(0, 0, 255))
-    label_img(img, f"Y : {position[1]}", (50, 125), color=(0, 250, 0))
-    label_img(img, f"Z : {position[2]}", (50, 150), color=(250, 0, 0))
-
-    return img
 
 
 # DEBUG FUNCTION. REMOVE LATER
@@ -115,213 +64,6 @@ def take_snapshot(spot: Spot):
     cv2_image_hand = image_response_to_cv2(resp_hand, reorient=False)
     cv2.imwrite("test_head_right_rgb1.jpg", cv2_image_head_r)
     cv2.imwrite("test_hand_rgb1.jpg", cv2_image_hand)
-
-
-######################################################################
-
-
-############ Resuable Classes & Methods to keep code clean ###########
-
-
-class GenericDetector:
-    def __init__(self):
-        self.is_enabled = False
-
-    def enable_detector(self):
-        self.is_enabled = True
-
-    def disable_detector(self):
-        self.is_enabled = False
-
-    def process_frame(self, frame: np.ndarray):
-        raise NotImplementedError
-
-
-class AprilTagDetectorWrapper(GenericDetector):
-    def __init__(self):
-        super().__init__()
-
-    def _init_april_tag_detector(
-        self, focal_lengths: Any, principal_point: Any
-    ) -> Dict[str, Any]:
-        """
-        Initialize April tag detector object for pose estimation of QR code
-
-        Can only detect dock code
-        """
-        assert self.is_enabled is True
-
-        # focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
-        # principal_point = self._dst_calib_params.get_principal_point()  # type:ignore
-        calib_dict = {
-            "fx": focal_lengths[0].item(),
-            "fy": focal_lengths[1].item(),
-            "ppx": principal_point[0].item(),
-            "ppy": principal_point[1].item(),
-            "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
-        }
-
-        self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
-        self._qr_pose_estimator.register_marker_ids([DOCK_ID])  # type:ignore
-        outputs: Dict[str, Any] = {}
-        outputs["tag_cpf_T_marker_list"] = []
-        outputs["tag_image_list"] = []
-        outputs["tag_image_metadata_list"] = []
-        return outputs
-
-    def process_frame(
-        self, frame: np.ndarray, verbose: bool = True
-    ) -> Tuple[np.ndarray, sp.SE3]:
-        assert self.is_enabled is True
-
-        return self._qr_pose_estimator.detect_markers_and_estimate_pose(  # type: ignore
-            image=frame, should_render=verbose, magnum=False
-        )
-
-    def get_outputs(
-        self,
-        frame: np.ndarray,
-        outputs: Dict,
-        cpf_T_device,
-        device_T_camera,
-        camera_T_marker,
-        img_metadata: Any,
-    ):
-        # TODO: Update cpf to device
-        cpf_T_marker = cpf_T_device * device_T_camera * camera_T_marker
-
-        # Decorate image with text for visualization
-        img = decorate_img_with_text(
-            img=frame,
-            frame="cpf",  ### LOL
-            position=cpf_T_marker.translation(),
-        )
-        print(f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}")
-
-        # Append data to lists for return
-        outputs["tag_image_list"].append(img)
-        outputs["tag_image_metadata_list"].append(img_metadata)
-        outputs["tag_cpf_T_marker_list"].append(cpf_T_marker)
-
-        return frame, outputs
-
-
-class ObjectDetectorWrapper(GenericDetector):
-    def __init__(self):
-        super().__init__()
-
-    def _init_object_detector(
-        self, object_labels: List[str], verbose: bool = None
-    ) -> Dict[str, Any]:
-        """initialize object_detector by loading it to GPU and setting up the labels"""
-        assert self.is_enabled is True
-        # TODO: Decide VERBOSE
-        # if verbose is None:
-        #     verbose = self.verbose
-        self.object_detector = OwlVit(
-            [object_labels], score_threshold=0.125, show_img=verbose
-        )
-        outputs: Dict[str, Any] = {}
-        outputs["object_image_list"] = {obj_name: [] for obj_name in object_labels}
-        outputs["object_image_metadata_list"] = {
-            obj_name: [] for obj_name in object_labels
-        }
-        outputs["object_image_segment_list"] = {
-            obj_name: [] for obj_name in object_labels
-        }
-        outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
-        outputs["object_ariaCorrectedWorld_T_cpf_list"] = {
-            obj_name: [] for obj_name in object_labels
-        }
-        return outputs
-
-    def _get_scored_object_detections(
-        self, img: np.ndarray, heuristic=None
-    ) -> Tuple[bool, Dict[str, float], Dict[str, bool], np.ndarray]:
-        """
-        Detect object instances in the frame. score them based on heuristics
-        and return a tuple of (valid, score, result_image)
-        Input:
-        - img: np.ndarray: image to run inference on
-        - heuristic: function: function to score the detections
-        Output:
-        - valid: bool: whether the frame is valid or not
-        - score: float: score of the frame (based on :heuristic:)
-        - result_image: np.ndarray: image with bounding boxes drawn on it
-        """
-        detections, result_image = self.object_detector.run_inference_and_return_img(
-            img
-        )
-        if heuristic is not None:
-            valid, score, stop = heuristic(detections)
-
-        return valid, score, stop, result_image
-
-    def _p1_demo_heuristics(
-        self, detections, img_size=(512, 512)
-    ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
-        """*P1 Demo Specific*
-        Heuristics to filter out unwanted and bad obejct detections. This heuristic
-        scores each frame based on (a) % of pixels occupied by object in the frame
-        and (b) proximity of bbox to image center. Further only those images are
-        scored which have only the object detection without a hand in the frame.
-
-        Detections are expected to have the format:
-        [["object_name", "confidence", "bbox"]]
-        """
-        valid = False
-        score = {}
-        stop = {}
-        # figure out if this is an interaction frame
-        if len(detections) > 1:
-            objects_in_frame = [det[0] for det in detections]
-            # FIXME: only works for 1 object of interest right now, extend to multiple
-            if "hand" in objects_in_frame and "water bottle" in objects_in_frame:
-                print(f"checking for intersection b/w: {object}")
-                stop["water bottle"] = check_bbox_intersection(
-                    detections[objects_in_frame.index("water bottle")][2],
-                    detections[objects_in_frame.index("hand")][2],
-                )
-                print(f"Intersection: {stop}")
-        if len(detections) == 1:
-            if "water bottle" == detections[0][0]:
-                score["water bottle"] = centered_heuristic(detections)[0]
-                valid = True
-
-        return valid, score, stop
-
-    def process_frame(self, frame: np.ndarray, outputs: Dict, img_metadata: Any):
-        assert self.is_enabled is True
-
-        # FIXME: done for 1 specific object at the moment, extend for multiple
-        valid, score, stop, result_img = self._get_scored_object_detections(
-            frame, heuristic=self._p1_demo_heuristics
-        )
-        if stop and stop["water bottle"]:
-            print("Turning off object-detection")
-            detect_objects = False
-        if valid:
-            # score_string = str(score["water bottle"]).replace(".", "_")
-            # plt.imsave(
-            #     f"./results/{frame_idx}_{valid}_{score_string}.jpg", result_img
-            # )
-            # print(f"saving valid frame, {score=}")
-            for object_name in score.keys():
-                outputs["object_image_list"][object_name].append(frame)
-                outputs["object_score_list"][object_name].append(score[object_name])
-                outputs["object_ariaCorrectedWorld_T_cpf_list"][object_name].append(
-                    self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
-                        img_metadata.capture_timestamp_ns
-                    )
-                )
-                # TODO: following is not being used at the moment, clean-up if
-                # multi-object, multi-view logic seems to not require this
-                outputs["object_image_segment_list"][object_name].append(-1)
-                outputs["object_image_metadata_list"][object_name].append(img_metadata)
-
-            return frame, outputs, detect_objects
-
-######################################################################
 
 
 class AriaReader:
@@ -552,28 +294,28 @@ class AriaReader:
                 512, 512, 280, stream_name
             )
 
-        outputs = {}
+        outputs: Dict[str, Any] = {}
 
         # Setup April tag detection by over-writing self._qr_pose_estimator if needed
         if detect_qr:
-            focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
-            principal_point = (
-                self._dst_calib_params.get_principal_point()
-            )  # type:ignore
+            # focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
+            # principal_point = (
+            #     self._dst_calib_params.get_principal_point()  # type: ignore
+            # )
             self.april_tag_detection_wrapper.enable_detector()
-            outputs.update(
-                self._init_april_tag_detector(
-                    focal_lengths=focal_lengths, principal_point=principal_point
-                )
-            )
+            # outputs.update(
+            #     self._init_april_tag_detector(
+            #         focal_lengths=focal_lengths, principal_point=principal_point
+            #     )
+            # )
 
         # Setup object detection (Owl-VIT) if needed
         if detect_objects:
             # TODO: Pass self.verbose flag
             self.object_detection_wrapper.enable_detector()
-            outputs.update(
-                self._init_object_detector(object_labels, verbose=self.verbose)
-            )
+            # outputs.update(
+            #     self._init_object_detector(object_labels, verbose=self.verbose)
+            # )
 
         if should_display:
             self._create_display_window(stream_name)
@@ -591,10 +333,10 @@ class AriaReader:
             img_metadata = frame_data[1]
 
             # Rectify current image frame
-            if should_rectify: # TODO: ALWAYS TRUE
+            if should_rectify:  # TODO: ALWAYS TRUE
                 img = self._rectify_image(image=img)
 
-            def X(img, outputs):
+            def p1_demo_logic(img, outputs):
                 # Initialize camera_T_marker to None for current image frame
                 camera_T_marker = None
 
@@ -610,15 +352,9 @@ class AriaReader:
                 # Rotate current image frame
                 img = self._rotate_img(img=img)
 
-                # TODO: @Priyam, can you add comment for this block please?
-                if detect_objects:
-                    (
-                        img,
-                        outputs,
-                        detect_objects,
-                    ) = self.object_detection_wrapper.process_frame(
-                        frame=img, outputs=outputs, img_metadata=img_metadata
-                    )
+                (img, outputs,) = self.object_detection_wrapper.process_frame(
+                    frame=img, outputs=outputs, img_metadata=img_metadata
+                )
 
                 # If april tag is detected, compute the transformation of marker in cpf frame
                 if camera_T_marker is not None:
@@ -668,7 +404,6 @@ class AriaReader:
 
     # TODO: Can be optimized. This is making O(n^2)
     def get_closest_mps_idx_to_timestamp_ns(self, timestamp_ns_of_interest: int):
-
         # VRS timestamps are NOT 100% synced with MPS timestamps
         # So we find the closest MPS timestamp to the VRS timestamp
         mps_idx_of_interest = np.argmin(
@@ -1096,7 +831,6 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     outputs = vrs_mps_streamer.parse_camera_stream(
         stream_name=STREAM1_NAME,
         detect_qr=True,
-        should_rec_timestamp_from_user=False,
         detect_objects=True,
         object_labels=["water bottle", "person", "hand"],
         reverse=True,

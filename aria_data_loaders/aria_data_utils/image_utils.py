@@ -1,6 +1,7 @@
 import math
 from typing import List, Tuple, Union
 
+import cv2
 import numpy as np
 
 
@@ -99,3 +100,57 @@ def check_bbox_intersection(bbox1: List[int], bbox2: List[int]) -> bool:
     else:
         # Intersection
         return True
+
+
+# @TODO: Maybe make position as Any?
+def decorate_img_with_text(img: np.ndarray, frame: str, position: np.ndarray):
+    """
+    Helper method to label image with text
+
+    Args:
+        img (np.ndarray): Image to be labeled
+        frame (str): Frame of reference (for labeling)
+        position (np.ndarray): Position of object in frame of reference
+    """
+    label_img(img, "Detected QR Marker", (50, 50), color=(0, 0, 255))
+    label_img(img, f"Frame = {frame}", (50, 75), color=(0, 0, 255))
+    label_img(img, f"X : {position[0]}", (50, 100), color=(0, 0, 255))
+    label_img(img, f"Y : {position[1]}", (50, 125), color=(0, 250, 0))
+    label_img(img, f"Z : {position[2]}", (50, 150), color=(250, 0, 0))
+
+    return img
+
+
+def label_img(
+    img: np.ndarray,
+    text: str,
+    org: tuple,
+    font_face: int = cv2.FONT_HERSHEY_SIMPLEX,
+    font_scale: float = 0.8,
+    color: tuple = (0, 0, 255),
+    thickness: int = 2,
+    line_type: int = cv2.LINE_AA,
+):
+    """
+    Helper method to label image with text
+
+    Args:
+        img (np.ndarray): Image to be labeled
+        text (str): Text to be labeled
+        org (tuple): (x,y) position of text
+        font_face (int, optional): Font face. Defaults to cv2.FONT_HERSHEY_SIMPLEX.
+        font_scale (float, optional): Font scale. Defaults to 0.8.
+        color (tuple, optional): Color of text. Defaults to (0, 0, 255).
+        thickness (int, optional): Thickness of text. Defaults to 2.
+        line_type (int, optional): Line type. Defaults to cv2.LINE_AA.
+    """
+    cv2.putText(
+        img,
+        text,
+        org,
+        font_face,
+        font_scale,
+        color,
+        thickness,
+        line_type,
+    )
