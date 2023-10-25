@@ -111,16 +111,13 @@ class AriaReader:
 
         # Different transformations along the trajectory
         self.ariaWorld_T_device_trajectory = []  # type: List[Any]
-        self.ariaCorrectedWorld_T_device_trajectory = []  # type: List[Any]
-        self.ariaCorrectedWorld_T_cpf_trajectory = []  # type: List[Any]
 
         # Setup some generic transforms
         self.device_T_cpf = sp.SE3(
             self.device_calib.get_transform_device_cpf().to_matrix()
         )
-        self.cpf_T_device = self.device_T_cpf.inverse()
 
-        # Initialize Trajectory after setting up cpf transforms
+        # Initialize Trajectory after setting up device transforms
         self.initialize_trajectory()
 
         # sensor_calib_list = [device_calib.get_sensor_calib(label) for label in stream_names][0]
@@ -150,14 +147,14 @@ class AriaReader:
         plt.imshow(rgb)
 
         scene = Scene()
-        scene.add_frame("correctedWorld", pose=self.device_T_cpf)
+        # scene.add_frame("correctedWorld", pose=self.device_T_cpf)
         scene.add_camera(
-            "dock", frame="correctedWorld", pose_in_frame=marker_pose, size=AXES_SCALE
+            "dock", frame="world", pose_in_frame=marker_pose, size=AXES_SCALE
         )
         for i in range(len(device_pose_list)):
             scene.add_camera(
                 f"device_{i}",
-                frame="correctedWorld",
+                frame="world",
                 pose_in_frame=device_pose_list[i],
                 size=AXES_SCALE,
             )
@@ -265,9 +262,10 @@ class AriaReader:
         April tag outputs:
         - "tag_image_list" - List of np.ndarrays of images with detections
         - "tag_image_metadata_list" - List of image metadata
-        - "tag_cpf_T_marker_list" - List of Sophus SE3 transforms from CPF to marker
+        - "tag_device_T_marker_list" - List of Sophus SE3 transforms from Device frame to marker
            CPF is the center frame of Aria with Z pointing out, X pointing up
            and Y pointing left
+           Device frame is the base frame of Aria which is aligned with left-slam camera frame
 
         Object detection outputs:
         - "object_image_list" - List of np.ndarrays of images with detections
@@ -275,8 +273,8 @@ class AriaReader:
         - "object_image_segment" - List of Int signifying which segment the image
             belongs to; smaller number means latter the segment time-wise
         - "object_score_list" - List of Float signifying the detection score
-        - "object_ariaCorrectedWorld_T_cpf_list" - List of Sophus SE3 transforms from AriaWorld
-          to CPF
+        - "object_ariaWorld_T_device_list" - List of Sophus SE3 transforms from AriaWorld
+          to device # TODO: @Priyam .. a_T_b is an SE3 transform from b to a right???
         """
         # Get stream id from stream name
         stream_id = self.provider.get_stream_id_from_label(stream_name)
@@ -361,7 +359,6 @@ class AriaReader:
                     img, outputs = self.april_tag_detection_wrapper.get_outputs(
                         frame=img,
                         outputs=outputs,
-                        cpf_T_device=self.cpf_T_device,
                         device_T_camera=device_T_camera,
                         camera_T_marker=camera_T_marker,
                         img_metadata=img_metadata,
@@ -375,7 +372,6 @@ class AriaReader:
 
     def initialize_trajectory(self):
         # frame(ariaWorld) is same as frame(device) at the start
-        cpf_T_ariaWorld = self.cpf_T_device
 
         for i in range(len(self.mps_trajectory)):
             self.trajectory_s[i] = self.mps_trajectory[
@@ -385,22 +381,9 @@ class AriaReader:
                 self.mps_trajectory[i].transform_world_device.to_matrix()
             )
             self.ariaWorld_T_device_trajectory.append(ariaWorld_T_device)
-
-            ariaWorld_T_cpf = ariaWorld_T_device * self.device_T_cpf
-
-            ariaCorrectedWorld_T_device = cpf_T_ariaWorld * ariaWorld_T_device
-            self.ariaCorrectedWorld_T_device_trajectory.append(
-                ariaCorrectedWorld_T_device
-            )
-
-            ariaCorrectedWorld_T_cpf = ariaCorrectedWorld_T_device * self.device_T_cpf
-            self.ariaCorrectedWorld_T_cpf_trajectory.append(ariaCorrectedWorld_T_cpf)
-
-            self.xyz_trajectory[i, :] = ariaWorld_T_cpf.translation()
+            self.xyz_trajectory[i, :] = ariaWorld_T_device.translation()
             # self.quat_trajectory[i,:] = self.mps_trajectory[i].transform_world_device.quaternion()
-        assert len(self.trajectory_s) == len(
-            self.ariaCorrectedWorld_T_device_trajectory
-        )
+        assert len(self.trajectory_s) == len(self.ariaWorld_T_device_trajectory)
 
     # TODO: Can be optimized. This is making O(n^2)
     def get_closest_mps_idx_to_timestamp_ns(self, timestamp_ns_of_interest: int):
@@ -413,7 +396,9 @@ class AriaReader:
         # TODO: Change logic
         return mps_idx_of_interest
 
-    def get_closest_world_T_device_to_timestamp(self, timestamp_ns_of_interest: int):
+    def get_closest_ariaWorld_T_device_to_timestamp(
+        self, timestamp_ns_of_interest: int
+    ):
         """
         timestamp_of_interest -> nanoseconds
         """
@@ -425,67 +410,46 @@ class AriaReader:
         ]
         return sp_transform_of_interest
 
-    def get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
-        self, timestamp_ns_of_interest: int
-    ):
-        """
-        timestamp_of_interest -> nanoseconds
-        """
-        mps_idx_of_interest = self.get_closest_mps_idx_to_timestamp_ns(
-            timestamp_ns_of_interest
-        )
-        sp_transform_of_interest = self.ariaCorrectedWorld_T_cpf_trajectory[
-            mps_idx_of_interest
-        ]
-        return sp_transform_of_interest
-
-    def get_avg_ariaCorrectedWorld_T_marker(
+    def get_avg_ariaWorld_T_marker(
         self,
         img_list: List,
         img_metadata_list: List,
-        cpf_T_marker_list: List,
+        device_T_marker_list: List,
         filter_dist: float = 2.4,
         should_plot: bool = False,
     ) -> sp.SE3:
         marker_position_list = []
         marker_quaternion_list = []
-        # X = [] # dist(marker_avg, marker[i])
-        # Y = [] # dist[i]
 
         # For viz
-        ariaCorrectedWorld_T_cpf_list = []
-        ariaCorrectedWorld_T_marker_list = []
+        ariaWorld_T_device_list = []
+        ariaWorld_T_marker_list = []
         img_viz_list = []
-        for img, img_metadata, cpf_T_marker in zip(
-            img_list, img_metadata_list, cpf_T_marker_list
+        for img, img_metadata, device_T_marker in zip(
+            img_list, img_metadata_list, device_T_marker_list
         ):
             vrs_timestamp_of_interest_ns = (
                 img_metadata.capture_timestamp_ns
             )  # maybe this can be replaced
-            ariaCorrectedWorld_T_cpf = (
-                self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
-                    vrs_timestamp_of_interest_ns
-                )
+            ariaWorld_T_device = self.get_closest_ariaWorld_T_device_to_timestamp(
+                vrs_timestamp_of_interest_ns
             )
-            ariaCorrectedWorld_T_marker = ariaCorrectedWorld_T_cpf * cpf_T_marker
+            ariaWorld_T_marker = ariaWorld_T_device * device_T_marker
 
-            marker_position = ariaCorrectedWorld_T_marker.translation()
-            device_position = ariaCorrectedWorld_T_cpf.translation()
+            marker_position = ariaWorld_T_marker.translation()
+            device_position = ariaWorld_T_device.translation()
             delta = marker_position - device_position
             dist = np.linalg.norm(delta)
-            # Y.append(dist)
 
             # Consider only those detections where detected marker is within a certain distance of the camera
             if dist < filter_dist:
                 marker_position_list.append(marker_position)
-                quat = R.from_matrix(
-                    ariaCorrectedWorld_T_marker.so3().matrix()
-                ).as_quat()
+                quat = R.from_matrix(ariaWorld_T_marker.so3().matrix()).as_quat()
                 marker_quaternion_list.append(quat)
 
                 if should_plot:
-                    ariaCorrectedWorld_T_cpf_list.append(ariaCorrectedWorld_T_cpf)
-                    ariaCorrectedWorld_T_marker_list.append(ariaCorrectedWorld_T_marker)
+                    ariaWorld_T_device_list.append(ariaWorld_T_device)
+                    ariaWorld_T_marker_list.append(ariaWorld_T_marker)
                     img_viz_list.append(img)
 
         marker_position_np = np.array(marker_position_list)
@@ -494,38 +458,25 @@ class AriaReader:
         marker_quaternion_np = np.array(marker_quaternion_list)
         avg_marker_quaternion = np.mean(marker_quaternion_np, axis=0)
 
-        avg_ariaCorrectedWorld_T_marker = sp.SE3(
+        avg_ariaWorld_T_marker = sp.SE3(
             R.from_quat(avg_marker_quaternion).as_matrix(), avg_marker_position
         )
 
         if should_plot:
-            assert len(marker_position_list) == len(ariaCorrectedWorld_T_marker_list)
+            assert len(marker_position_list) == len(ariaWorld_T_marker_list)
 
             for i in range(len(marker_position_list)):
                 self.plot_rgb_and_trajectory(
-                    marker_pose=ariaCorrectedWorld_T_marker_list[i],
+                    marker_pose=ariaWorld_T_marker_list[i],
                     device_pose_list=[
-                        ariaCorrectedWorld_T_cpf_list[i],
-                        avg_ariaCorrectedWorld_T_marker,
+                        ariaWorld_T_device_list[i],
+                        avg_ariaWorld_T_marker,
                     ],
                     rgb=img_viz_list[i],
                     traj_data=self.xyz_trajectory,
                 )
 
-        # Get a plot for last location of Aria
-        # plt_ax = self.plot_rgb_and_trajectory(
-        #             marker_pose=ariaCorrectedWorld_T_marker_list[i],
-        #             device_pose_list=[ariaCorrectedWorld_T_cpf_list[i],avg_ariaCorrectedWorld_T_marker],
-        #             rgb=img_viz_list[i],
-        #             traj_data=self.xyz_trajectory,
-        #         )
-        # X = [np.linalg.norm(avg_marker_position - marker_position) for marker_position in marker_position_l]
-        # plt.scatter(X,Y)
-        # plt.xlabel("euclid_dist(avg_marker_position, marker_postition[i])")
-        # plt.ylabel("dist[i]")
-        # plt.show()
-
-        return avg_ariaCorrectedWorld_T_marker
+        return avg_ariaWorld_T_marker
 
 
 class SpotQRDetector:
@@ -745,9 +696,9 @@ class SpotQRDetector:
                 )
 
                 img_rend_hand = decorate_img_with_text(
-                    img_rend_hand,
-                    spot_world_frame,
-                    hand_mn_spotWorld_T_marker.translation,
+                    img=img_rend_hand,
+                    frame_name=spot_world_frame,
+                    position=hand_mn_spotWorld_T_marker.translation,
                 )
 
                 dist = hand_mn_handcam_T_marker.translation.length()
@@ -837,18 +788,16 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     )
     tag_img_list = outputs["tag_image_list"]
     tag_img_metadata_list = outputs["tag_image_metadata_list"]
-    tag_cpf_T_marker_list = outputs["tag_cpf_T_marker_list"]
+    tag_device_T_marker_list = outputs["tag_device_T_marker_list"]
 
-    avg_ariaCorrectedWorld_T_marker = (
-        vrs_mps_streamer.get_avg_ariaCorrectedWorld_T_marker(
-            tag_img_list,
-            tag_img_metadata_list,
-            tag_cpf_T_marker_list,
-            filter_dist=2.4,
-            should_plot=False,
-        )
+    avg_ariaWorld_T_marker = vrs_mps_streamer.get_avg_ariaWorld_T_marker(
+        tag_img_list,
+        tag_img_metadata_list,
+        tag_device_T_marker_list,
+        filter_dist=2.4,
+        should_plot=False,
     )
-    print(avg_ariaCorrectedWorld_T_marker)
+    print(avg_ariaWorld_T_marker)
 
     spot = Spot("ArmKeyboardTeleop")
     spot_qr = SpotQRDetector(spot=spot)
@@ -859,31 +808,33 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
 
     print(avg_spotWorld_T_marker)
 
-    avg_marker_T_ariaCorrectedWorld = avg_ariaCorrectedWorld_T_marker.inverse()
-    avg_spotWorld_T_ariaCorrectedWorld = (
-        avg_spotWorld_T_marker * avg_marker_T_ariaCorrectedWorld
-    )
-    avg_ariaCorrectedWorld_T_spotWorld = avg_spotWorld_T_ariaCorrectedWorld.inverse()
+    avg_marker_T_ariaWorld = avg_ariaWorld_T_marker.inverse()
+    avg_spotWorld_T_ariaWorld = avg_spotWorld_T_marker * avg_marker_T_ariaWorld
+    avg_ariaWorld_T_spotWorld = avg_spotWorld_T_ariaWorld.inverse()
 
-    avg_spot_T_ariaCorrectedWorld = avg_spot_T_marker * avg_marker_T_ariaCorrectedWorld
-    avg_ariaCorrectedWorld_T_spot = avg_spot_T_ariaCorrectedWorld.inverse()
+    avg_spot_T_ariaWorld = avg_spot_T_marker * avg_marker_T_ariaWorld
+    avg_ariaWorld_T_spot = avg_spot_T_ariaWorld.inverse()
 
-    # find best CPF location, wrt AriaWorld, for best scored object detection
+    # find best device location, wrt AriaWorld, for best scored object detection
     # FIXME: extend to multiple objects
     best_idx = outputs["object_score_list"]["water bottle"].index(
         max(outputs["object_score_list"]["water bottle"])
     )
-    best_object_ariaCorrectedWorld_T_cpf = outputs[
-        "object_ariaCorrectedWorld_T_cpf_list"
-    ]["water bottle"][best_idx]
+    best_object_ariaWorld_T_device = outputs["object_ariaWorld_T_device_list"][
+        "water bottle"
+    ][best_idx]
+
+    best_object_ariaWorld_T_cpf = (
+        best_object_ariaWorld_T_device * vrs_mps_streamer.device_T_cpf
+    )
 
     vrs_mps_streamer.plot_rgb_and_trajectory(
-        marker_pose=avg_ariaCorrectedWorld_T_marker,
+        marker_pose=avg_ariaWorld_T_marker,
         device_pose_list=[
-            # vrs_mps_streamer.ariaCorrectedWorld_T_cpf_trajectory[-2500],
-            avg_ariaCorrectedWorld_T_spotWorld,
-            avg_ariaCorrectedWorld_T_spot,
-            best_object_ariaCorrectedWorld_T_cpf,
+            # vrs_mps_streamer.ariaWorld_T_device_trajectory[-2500],
+            avg_ariaWorld_T_spotWorld,
+            avg_ariaWorld_T_spot,
+            best_object_ariaWorld_T_cpf,
         ],
         rgb=outputs["object_image_list"]["water bottle"][best_idx],
         traj_data=vrs_mps_streamer.xyz_trajectory,
@@ -901,9 +852,7 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     # )
     # mps_idx_of_interest = -2500
 
-    pose_of_interest = (
-        avg_spotWorld_T_ariaCorrectedWorld * best_object_ariaCorrectedWorld_T_cpf
-    )
+    pose_of_interest = avg_spotWorld_T_ariaWorld * best_object_ariaWorld_T_cpf
     position = pose_of_interest.translation()
 
     if not dry_run:

@@ -30,7 +30,7 @@ class ObjectDetectorWrapper(GenericDetector):
             obj_name: [] for obj_name in object_labels
         }
         outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
-        outputs["object_ariaCorrectedWorld_T_cpf_list"] = {
+        outputs["object_ariaWorld_T_device_list"] = {
             obj_name: [] for obj_name in object_labels
         }
         return outputs
@@ -109,8 +109,8 @@ class ObjectDetectorWrapper(GenericDetector):
             for object_name in score.keys():
                 outputs["object_image_list"][object_name].append(frame)
                 outputs["object_score_list"][object_name].append(score[object_name])
-                outputs["object_ariaCorrectedWorld_T_cpf_list"][object_name].append(
-                    self.get_closest_ariaCorrectedWorld_T_cpf_to_timestamp(
+                outputs["object_ariaWorld_T_device_list"][object_name].append(
+                    self.get_closest_ariaWorld_T_device_to_timestamp(
                         img_metadata.capture_timestamp_ns
                     )
                 )

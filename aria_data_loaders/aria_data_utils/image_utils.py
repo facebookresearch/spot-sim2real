@@ -103,7 +103,7 @@ def check_bbox_intersection(bbox1: List[int], bbox2: List[int]) -> bool:
 
 
 # @TODO: Maybe make position as Any?
-def decorate_img_with_text(img: np.ndarray, frame: str, position: np.ndarray):
+def decorate_img_with_text(img: np.ndarray, frame_name: str, position: np.ndarray):
     """
     Helper method to label image with text
 
@@ -113,7 +113,7 @@ def decorate_img_with_text(img: np.ndarray, frame: str, position: np.ndarray):
         position (np.ndarray): Position of object in frame of reference
     """
     label_img(img, "Detected QR Marker", (50, 50), color=(0, 0, 255))
-    label_img(img, f"Frame = {frame}", (50, 75), color=(0, 0, 255))
+    label_img(img, f"Frame = {frame_name}", (50, 75), color=(0, 0, 255))
     label_img(img, f"X : {position[0]}", (50, 100), color=(0, 0, 255))
     label_img(img, f"Y : {position[1]}", (50, 125), color=(0, 250, 0))
     label_img(img, f"Z : {position[2]}", (50, 150), color=(250, 0, 0))

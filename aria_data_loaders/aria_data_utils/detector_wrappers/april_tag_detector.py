@@ -37,43 +37,41 @@ class AprilTagDetectorWrapper(GenericDetector):
         self._qr_pose_estimator = AprilTagPoseEstimator(camera_intrinsics=calib_dict)
         self._qr_pose_estimator.register_marker_ids([DOCK_ID])  # type:ignore
         outputs: Dict[str, Any] = {}
-        outputs["tag_cpf_T_marker_list"] = []
+        outputs["tag_device_T_marker_list"] = []
         outputs["tag_image_list"] = []
         outputs["tag_image_metadata_list"] = []
         return outputs
 
     def process_frame(
-        self, frame: np.ndarray, verbose: bool = True
+        self, img_frame: np.ndarray, verbose: bool = True
     ) -> Tuple[np.ndarray, sp.SE3]:
         assert self.is_enabled is True
 
         return self._qr_pose_estimator.detect_markers_and_estimate_pose(  # type: ignore
-            image=frame, should_render=verbose, magnum=False
+            image=img_frame, should_render=verbose, magnum=False
         )
 
     def get_outputs(
         self,
-        frame: np.ndarray,
+        img_frame: np.ndarray,
         outputs: Dict,
-        cpf_T_device,
         device_T_camera,
         camera_T_marker,
         img_metadata: Any,
     ):
-        # TODO: Update cpf to device
-        cpf_T_marker = cpf_T_device * device_T_camera * camera_T_marker
+        device_T_marker = device_T_camera * camera_T_marker
 
         # Decorate image with text for visualization
         img = decorate_img_with_text(
-            img=frame,
-            frame="cpf",  # LOL
-            position=cpf_T_marker.translation(),
+            img=img_frame,
+            frame_name="device",
+            position=device_T_marker.translation(),
         )
         print(f"Time stamp with Detections- {img_metadata.capture_timestamp_ns}")
 
         # Append data to lists for return
         outputs["tag_image_list"].append(img)
         outputs["tag_image_metadata_list"].append(img_metadata)
-        outputs["tag_cpf_T_marker_list"].append(cpf_T_marker)
+        outputs["tag_device_T_marker_list"].append(device_T_marker)
 
-        return frame, outputs
+        return img_frame, outputs
