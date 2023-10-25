@@ -10,6 +10,7 @@ from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetecto
 from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
 from aria_data_utils.image_utils import decorate_img_with_text
 from aria_data_utils.perception.april_tag_pose_estimator import AprilTagPoseEstimator
+from bosdyn.client.frame_helpers import get_a_tform_b
 from fairotag.scene import Scene
 from matplotlib import pyplot as plt
 from projectaria_tools.core import calibration, data_provider, mps
@@ -31,7 +32,7 @@ dict = {
     "file" : "Start_1halfm.vrs",
     "2m" : 238,
     "3m" : 348,
-    "4m" : 458,
+"4m" : 458
     "5m" : 598,
 }
 
@@ -126,10 +127,10 @@ class AriaReader:
 
     def plot_rgb_and_trajectory(
         self,
-        marker_pose: sp.SE3,
-        device_pose_list: List[sp.SE3],
+        pose_list: List[sp.SE3],
         rgb: np.ndarray,
         traj_data: np.ndarray = None,
+        block: bool = True,
     ):
         """
         Plot RGB image with trajectory
@@ -147,21 +148,16 @@ class AriaReader:
         plt.imshow(rgb)
 
         scene = Scene()
-        # scene.add_frame("correctedWorld", pose=self.device_T_cpf)
-        scene.add_camera(
-            "dock", frame="world", pose_in_frame=marker_pose, size=AXES_SCALE
-        )
-        for i in range(len(device_pose_list)):
+        for i in range(len(pose_list)):
             scene.add_camera(
                 f"device_{i}",
-                frame="world",
-                pose_in_frame=device_pose_list[i],
+                pose_in_frame=pose_list[i],
                 size=AXES_SCALE,
             )
 
         plt_ax = scene.visualize(fig=fig, should_return=True)
         plt_ax.plot(traj_data[:, 0], traj_data[:, 1], traj_data[:, 2])
-        plt.show()
+        plt.show(block=block)
 
     def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
         """
@@ -273,8 +269,6 @@ class AriaReader:
         - "object_image_segment" - List of Int signifying which segment the image
             belongs to; smaller number means latter the segment time-wise
         - "object_score_list" - List of Float signifying the detection score
-        - "object_ariaWorld_T_device_list" - List of Sophus SE3 transforms from AriaWorld
-          to device # TODO: @Priyam .. a_T_b is an SE3 transform from b to a right???
         """
         # Get stream id from stream name
         stream_id = self.provider.get_stream_id_from_label(stream_name)
@@ -296,24 +290,26 @@ class AriaReader:
 
         # Setup April tag detection by over-writing self._qr_pose_estimator if needed
         if detect_qr:
-            # focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
-            # principal_point = (
-            #     self._dst_calib_params.get_principal_point()  # type: ignore
-            # )
+            focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
+            principal_point = (
+                self._dst_calib_params.get_principal_point()  # type: ignore
+            )
             self.april_tag_detection_wrapper.enable_detector()
-            # outputs.update(
-            #     self._init_april_tag_detector(
-            #         focal_lengths=focal_lengths, principal_point=principal_point
-            #     )
-            # )
+            outputs.update(
+                self.april_tag_detection_wrapper._init_april_tag_detector(
+                    focal_lengths=focal_lengths, principal_point=principal_point
+                )
+            )
 
         # Setup object detection (Owl-VIT) if needed
         if detect_objects:
             # TODO: Pass self.verbose flag
             self.object_detection_wrapper.enable_detector()
-            # outputs.update(
-            #     self._init_object_detector(object_labels, verbose=self.verbose)
-            # )
+            outputs.update(
+                self.object_detection_wrapper._init_object_detector(
+                    object_labels, verbose=self.verbose
+                )
+            )
 
         if should_display:
             self._create_display_window(stream_name)
@@ -334,35 +330,35 @@ class AriaReader:
             if should_rectify:  # TODO: ALWAYS TRUE
                 img = self._rectify_image(image=img)
 
-            def p1_demo_logic(img, outputs):
-                # Initialize camera_T_marker to None for current image frame
-                camera_T_marker = None
+            # Initialize camera_T_marker to None for current image frame
+            camera_T_marker = None
 
-                # Detect QR code in current image frame
-                if detect_qr:
-                    (
-                        img,
-                        camera_T_marker,
-                    ) = self.april_tag_detection_wrapper.process_frame(
-                        frame=img, should_render=True
-                    )  # type: ignore
+            # Detect QR code in current image frame
+            if detect_qr:
+                (
+                    img,
+                    camera_T_marker,
+                ) = self.april_tag_detection_wrapper.process_frame(
+                    img_frame=img, verbose=True
+                )  # type: ignore
 
-                # Rotate current image frame
-                img = self._rotate_img(img=img)
+            # Rotate current image frame
+            img = self._rotate_img(img=img)
 
-                (img, outputs,) = self.object_detection_wrapper.process_frame(
-                    frame=img, outputs=outputs, img_metadata=img_metadata
+            if self.object_detection_wrapper.is_enabled:
+                (img, outputs) = self.object_detection_wrapper.process_frame(
+                    img_frame=img, outputs=outputs, img_metadata=img_metadata
                 )
 
-                # If april tag is detected, compute the transformation of marker in cpf frame
-                if camera_T_marker is not None:
-                    img, outputs = self.april_tag_detection_wrapper.get_outputs(
-                        frame=img,
-                        outputs=outputs,
-                        device_T_camera=device_T_camera,
-                        camera_T_marker=camera_T_marker,
-                        img_metadata=img_metadata,
-                    )
+            # If april tag is detected, compute the transformation of marker in cpf frame
+            if camera_T_marker is not None:
+                device_T_marker = device_T_camera * camera_T_marker
+                img, outputs = self.april_tag_detection_wrapper.get_outputs(
+                    img_frame=img,
+                    outputs=outputs,
+                    device_T_marker=device_T_marker,
+                    img_metadata=img_metadata,
+                )
 
             # Display current image frame
             if should_display:
@@ -444,7 +440,11 @@ class AriaReader:
             # Consider only those detections where detected marker is within a certain distance of the camera
             if dist < filter_dist:
                 marker_position_list.append(marker_position)
-                quat = R.from_matrix(ariaWorld_T_marker.so3().matrix()).as_quat()
+                quat = R.from_matrix(ariaWorld_T_marker.rotationMatrix()).as_quat()
+
+                # Ensure quaternion's w is always positive for effective averaging as multiple quaternions can represent the same rotation
+                if quat[3] > 0:
+                    quat = -1.0 * quat
                 marker_quaternion_list.append(quat)
 
                 if should_plot:
@@ -467,8 +467,8 @@ class AriaReader:
 
             for i in range(len(marker_position_list)):
                 self.plot_rgb_and_trajectory(
-                    marker_pose=ariaWorld_T_marker_list[i],
-                    device_pose_list=[
+                    pose_list=[
+                        ariaWorld_T_marker_list[i],
                         ariaWorld_T_device_list[i],
                         avg_ariaWorld_T_marker,
                     ],
@@ -518,6 +518,15 @@ class SpotQRDetector:
         hand_mn_body_T_handcam = hand_mn_body_T_wrist @ hand_mn_wrist_T_handcam
 
         return hand_mn_body_T_handcam
+
+    def get_spot_a_T_b(self, a: str, b: str) -> sp.SE3:
+        frame_tree_snapshot = (
+            self.spot.get_robot_state().kinematic_state.transforms_snapshot
+        )
+        se3_pose = get_a_tform_b(frame_tree_snapshot, a, b)
+        pos = se3_pose.get_translation()
+        quat = se3_pose.rotation.normalize()
+        return sp.SE3(quat.to_matrix(), pos)
 
     def _get_body_T_headcam(self, frame_tree_snapshot_head):
         # print(frame_tree_snapshot_head)
@@ -783,7 +792,7 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
         stream_name=STREAM1_NAME,
         detect_qr=True,
         detect_objects=True,
-        object_labels=["water bottle", "person", "hand"],
+        object_labels=["penguin_plush", "person", "hand"],
         reverse=True,
     )
     tag_img_list = outputs["tag_image_list"]
@@ -810,38 +819,62 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
 
     avg_marker_T_ariaWorld = avg_ariaWorld_T_marker.inverse()
     avg_spotWorld_T_ariaWorld = avg_spotWorld_T_marker * avg_marker_T_ariaWorld
-    avg_ariaWorld_T_spotWorld = avg_spotWorld_T_ariaWorld.inverse()
+    # avg_ariaWorld_T_spotWorld = avg_spotWorld_T_ariaWorld.inverse()
 
-    avg_spot_T_ariaWorld = avg_spot_T_marker * avg_marker_T_ariaWorld
-    avg_ariaWorld_T_spot = avg_spot_T_ariaWorld.inverse()
+    # avg_spot_T_ariaWorld = avg_spot_T_marker * avg_marker_T_ariaWorld
+    # avg_ariaWorld_T_spot = avg_spot_T_ariaWorld.inverse()
 
     # find best device location, wrt AriaWorld, for best scored object detection
     # FIXME: extend to multiple objects
-    best_idx = outputs["object_score_list"]["water bottle"].index(
-        max(outputs["object_score_list"]["water bottle"])
-    )
-    best_object_ariaWorld_T_device = outputs["object_ariaWorld_T_device_list"][
-        "water bottle"
-    ][best_idx]
 
-    best_object_ariaWorld_T_cpf = (
-        best_object_ariaWorld_T_device * vrs_mps_streamer.device_T_cpf
+    best_idx = outputs["object_score_list"]["penguin_plush"].index(
+        max(outputs["object_score_list"]["penguin_plush"])
+    )
+    best_timestamp_ns = outputs["object_image_metadata_list"]["penguin_plush"][
+        best_idx
+    ].capture_timestamp_ns
+    best_object_ariaWorld_T_device = (
+        vrs_mps_streamer.get_closest_ariaWorld_T_device_to_timestamp(best_timestamp_ns)
     )
 
+    best_object_spotWorld_T_cpf = (
+        avg_spotWorld_T_ariaWorld
+        * best_object_ariaWorld_T_device
+        * vrs_mps_streamer.device_T_cpf
+    )
+    spotWorld_xyz_trajectory = np.array(
+        [
+            (avg_spotWorld_T_ariaWorld * ariaWorld_T_device).translation()
+            for ariaWorld_T_device in vrs_mps_streamer.ariaWorld_T_device_trajectory
+        ]
+    )
     vrs_mps_streamer.plot_rgb_and_trajectory(
-        marker_pose=avg_ariaWorld_T_marker,
-        device_pose_list=[
-            # vrs_mps_streamer.ariaWorld_T_device_trajectory[-2500],
-            avg_ariaWorld_T_spotWorld,
-            avg_ariaWorld_T_spot,
-            best_object_ariaWorld_T_cpf,
+        pose_list=[
+            avg_spotWorld_T_marker,
+            avg_spotWorld_T_ariaWorld * vrs_mps_streamer.device_T_cpf,
+            spot_qr.get_spot_a_T_b("vision", "body"),
+            # avg_spotWorld_T_ariaWorld * vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
+            best_object_spotWorld_T_cpf,
         ],
-        rgb=outputs["object_image_list"]["water bottle"][best_idx],
-        traj_data=vrs_mps_streamer.xyz_trajectory,
+        rgb=np.zeros((10, 10, 3), dtype=np.uint8),
+        traj_data=spotWorld_xyz_trajectory,
+        block=False,
     )
+    plt.show()
+    # vrs_mps_streamer.plot_rgb_and_trajectory(
+    #     pose_list=[
+    #         avg_ariaWorld_T_marker,
+    #         avg_ariaWorld_T_spotWorld,
+    #         avg_ariaWorld_T_spot,
+    #         vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
+    #     ],
+    #     rgb=np.zeros((10, 10, 3), dtype = np.uint8),
+    #     traj_data=vrs_mps_streamer.xyz_trajectory,
+    #     block=True,
+    # )
 
     # TODO: make idx_of_interest as a dynamic variable (will come from object detection)
-    # vrs_timestamp_of_interest = outputs["object_image_metadata_list"]["water bottle"][
+    # vrs_timestamp_of_interest = outputs["object_image_metadata_list"]["penguin_plush"][
     # best_idx
     # ].capture_timestamp_ns
     # vrs_timestamp_of_interest = vrs_mps_streamer.get_vrs_timestamp_from_img_idx(
@@ -852,12 +885,14 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     # )
     # mps_idx_of_interest = -2500
 
-    pose_of_interest = avg_spotWorld_T_ariaWorld * best_object_ariaWorld_T_cpf
+    pose_of_interest = best_object_spotWorld_T_cpf
     position = pose_of_interest.translation()
-
+    print(f" Going to - {position}")
+    breakpoint()
     if not dry_run:
         skill_manager = SpotSkillManager()
         skill_manager.nav(position[0], position[1], 0.0)
+        skill_manager.pick("plush_penguin")
 
 
 # TODO: Record raw and rectified camera params for each camera in a config file

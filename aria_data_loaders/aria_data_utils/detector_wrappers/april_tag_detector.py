@@ -55,12 +55,9 @@ class AprilTagDetectorWrapper(GenericDetector):
         self,
         img_frame: np.ndarray,
         outputs: Dict,
-        device_T_camera,
-        camera_T_marker,
+        device_T_marker,
         img_metadata: Any,
     ):
-        device_T_marker = device_T_camera * camera_T_marker
-
         # Decorate image with text for visualization
         img = decorate_img_with_text(
             img=img_frame,
