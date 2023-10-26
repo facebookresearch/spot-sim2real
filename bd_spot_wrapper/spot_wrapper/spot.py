@@ -303,6 +303,8 @@ class Spot:
         :param sources: list containing camera uuids
         :param quality: either an int or a list specifying what quality each source
             should return its image with
+        :param pixel_format: either an int or a list specifying what pixel format each source
+            should return its image with
         :return: list containing bosdyn image response objects
         """
         if quality is not None:
@@ -839,7 +841,7 @@ class Spot:
         return mn_tranformation
 
     # MAYBE WE DONT NEED THIS IN SPOT.PY???????
-    def convert_transformation_from_BD_to_magnun(self, bd_transformation_dict: dict):
+    def convert_transformation_from_BD_to_magnum(self, bd_transformation_dict: dict):
         """
         Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
 

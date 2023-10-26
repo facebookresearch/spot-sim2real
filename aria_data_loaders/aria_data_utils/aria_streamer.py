@@ -51,7 +51,7 @@ AXES_SCALE = 0.9
 STREAM1_NAME = "camera-rgb"
 STREAM2_NAME = "camera-slam-left"
 STREAM3_NAME = "camera-slam-right"
-
+FILTER_DIST = 2.4  # in meters (distance for valid detection)
 
 ############## Simple Helper Methods to keep code clean ##############
 
@@ -196,7 +196,7 @@ class AriaReader:
         """
         cv2.namedWindow(f"Stream - {stream_name}", cv2.WINDOW_NORMAL)
 
-    def _rectify_image(self, image) -> np.ndarray:
+    def _rectify_image(self, image: np.ndarray) -> np.ndarray:
         """
         Rectify fisheye image based upon camera calibration parameters
         Ensure you have set self._src_calib_param & self._dst_calib_param
@@ -215,7 +215,7 @@ class AriaReader:
 
     def get_vrs_timestamp_from_img_idx(
         self, stream_name: str = STREAM1_NAME, idx_of_interest: int = -1
-    ):
+    ) -> int:
         """
         Get VRS timestamp corresponding to VRS image index
 
@@ -411,7 +411,7 @@ class AriaReader:
         img_list: List,
         img_metadata_list: List,
         device_T_marker_list: List,
-        filter_dist: float = 2.4,
+        filter_dist: float = FILTER_DIST,
         should_plot: bool = False,
     ) -> sp.SE3:
         marker_position_list = []
@@ -502,7 +502,7 @@ class SpotQRDetector:
                 "hand_color_image_sensor"
             ).parent_tform_child
         )
-        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnun(
+        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnum(
             hand_bd_wrist_T_handcam_dict
         )
 
@@ -511,7 +511,7 @@ class SpotQRDetector:
                 "arm0.link_wr1"
             ).parent_tform_child
         )
-        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnun(
+        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnum(
             hand_bd_body_T_wrist_dict
         )
 
@@ -533,14 +533,14 @@ class SpotQRDetector:
         head_bd_fr_T_frfe_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright_fisheye"
         ).parent_tform_child
-        head_mn_fr_T_frfe_dict = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_fr_T_frfe_dict = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_fr_T_frfe_dict
         )
 
         head_bd_head_T_fr_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright"
         ).parent_tform_child
-        head_mn_head_T_fr = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_head_T_fr = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_head_T_fr_dict
         )
 
@@ -549,7 +549,7 @@ class SpotQRDetector:
                 "head"
             ).parent_tform_child
         )
-        head_mn_body_T_head = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_body_T_head = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_body_T_head_dict
         )
 
@@ -571,7 +571,7 @@ class SpotQRDetector:
                 "hand_color_image_sensor"
             ).parent_tform_child
         )
-        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnun(
+        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnum(
             hand_bd_wrist_T_handcam_dict
         )
 
@@ -580,7 +580,7 @@ class SpotQRDetector:
                 "arm0.link_wr1"
             ).parent_tform_child
         )
-        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnun(
+        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnum(
             hand_bd_body_T_wrist_dict
         )
 
@@ -589,7 +589,7 @@ class SpotQRDetector:
                 spot_world_frame
             ).parent_tform_child
         )
-        hand_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnun(
+        hand_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnum(
             hand_bd_body_T_spotWorld_dict
         )
         hand_mn_spotWorld_T_body = hand_mn_body_T_spotWorld.inverted()
@@ -608,14 +608,14 @@ class SpotQRDetector:
         head_bd_fr_T_frfe_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright_fisheye"
         ).parent_tform_child
-        head_mn_fr_T_frfe_dict = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_fr_T_frfe_dict = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_fr_T_frfe_dict
         )
 
         head_bd_head_T_fr_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright"
         ).parent_tform_child
-        head_mn_head_T_fr = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_head_T_fr = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_head_T_fr_dict
         )
 
@@ -624,7 +624,7 @@ class SpotQRDetector:
                 "head"
             ).parent_tform_child
         )
-        head_mn_body_T_head = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_body_T_head = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_body_T_head_dict
         )
 
@@ -633,7 +633,7 @@ class SpotQRDetector:
                 spot_world_frame
             ).parent_tform_child
         )
-        head_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnun(
+        head_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnum(
             head_bd_body_T_spotWorld_dict
         )
         head_mn_spotWorld_T_body = head_mn_body_T_spotWorld.inverted()
@@ -763,7 +763,7 @@ class SpotQRDetector:
         self,
         use_vision_as_world: bool = True,
         data_size_for_avg: int = 10,
-        filter_dist: float = 2.4,
+        filter_dist: float = FILTER_DIST,
     ):
         pass
 
@@ -772,7 +772,7 @@ class SpotQRDetector:
         camera: str = "hand",
         use_vision_as_world: bool = True,
         data_size_for_avg: int = 10,
-        filter_dist: float = 2.4,
+        filter_dist: float = FILTER_DIST,
     ):
         pass
 
@@ -803,7 +803,7 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
         tag_img_list,
         tag_img_metadata_list,
         tag_device_T_marker_list,
-        filter_dist=2.4,
+        filter_dist=FILTER_DIST,
         should_plot=False,
     )
     print(avg_ariaWorld_T_marker)

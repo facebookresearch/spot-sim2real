@@ -5,7 +5,7 @@ import fairotag as frt
 import magnum as mn
 import sophus as sp
 
-# MAYBE: we dont need spot
+# TODO: we dont need spot, remove
 from spot_wrapper.spot import Spot
 
 MARKER_LENGTH = 0.146
@@ -54,11 +54,28 @@ class AprilTagPoseEstimator:
         self._registered_marker_ids = []  # type: List[int]
 
     @staticmethod
-    def _validate_camera_intrinsics(camera_intrinsics: dict):
+    def _validate_camera_intrinsics(camera_intrinsics: dict) -> bool:
+        """
+        Ensures the camera instrinsics being passed contains all required fields
+        Must contain - ["fx", "fy", "ppx", "ppy", "coeffs"]
+
+        Arg:
+            camera_intrinsics (Dict) : Camera intrinsics dictionary
+
+        Returns:
+            bool : True only if all fields are present, False otherwise
+        """
         _required_keys = ["fx", "fy", "ppx", "ppy", "coeffs"]
         return all(keys in camera_intrinsics for keys in _required_keys)
 
     def register_marker_ids(self, marker_ids: List[int]):
+        """
+        Register the markers for detector to detect.
+        Detector will only recognise registered markers.
+
+        Args:
+            marker_ids (List[int]): List of markers ids (int) to register
+        """
         assert all(
             isinstance(marker_id, int) for marker_id in marker_ids
         ), "Marker ID must be an integer"
@@ -70,10 +87,23 @@ class AprilTagPoseEstimator:
             else:
                 print(f"Marker ID {marker_id} is already registered .. skipping")
 
-    # TODO: If arguments are passed by reference in python, then we can avoid returning image????
     def detect_markers_and_estimate_pose(
         self, image, should_render=False, magnum: bool = True
-    ) -> Tuple[object, mn.Matrix4]:
+    ) -> Tuple[object, sp.SE3]:
+        """
+        Detect all registered markers in the given image frame
+        ONLY supports 1 marker at this time, only considers first
+        detection and ignores rest
+
+        Args:
+            image (np.ndarray) : Image on which markers need to be detected
+            should_render (bool) : If image should be updated with detected markers
+            magnum (bool) : If return type for camera_T_marker should be from magnum or sophus
+
+        Returns:
+            image (np.ndarray) : Updated image after marking detections
+            camera_T_marker (sp.SE3) : SE3 matrix representing marker frame as detected in camera frame
+        """
         markers = self._cam_module.detect_markers(image)
 
         if len(markers) == 0:
@@ -97,6 +127,7 @@ class AprilTagPoseEstimator:
         if should_render:
             image = self._cam_module.render_markers(image, markers=[marker])
 
+        # TODO: Remove all dependence on magnum inside aria streaming
         if magnum:
             return image, mn_camera_T_marker
         return image, sp_camera_T_marker
