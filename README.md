@@ -2,7 +2,7 @@
 Spot-Sim2Real is a modular library for development of Spot for embodied AI tasks (e.g., [Language-guided Skill Coordination (LSC)](https://languageguidedskillcoordination.github.io/), [Adaptive Skill Coordination (ASC)](https://arxiv.org/pdf/2304.00410.pdf)) -- configuring Spot robots, controlling sensorimotor skills, and coordinating Large Language Models (LLMs).
 
 ## :memo: Setup instructions
-Please refer to the [setup instructions page](/installation/SETUP_INSTRUCTIONS.md) for information on how to setup the repo.
+Please refer to the [setup instructions page](/installation/SETUP_INSTRUCTIONS.md) for information on how to setup the repo. Note that this repo by-default does not track dirty status of submodules, if you're making any intentional changes within the third-party packages be sure to track them separately.
 
 ## :computer: Connecting to the robot
 Computer can be connected to the robot in one of the following modes.
@@ -180,6 +180,21 @@ git checkout main
 
 
 - If you are done with demo of one of the above code and want to run another code, you do not need to re-run other sessions and nodes. Running a new command in the same terminal will work just fine. But **make sure to bring robot at home location and reset its home** using `spot_reset_home` in the same terminal
+
+## :eyeglasses: Run Spot-Aria project code
+To run the current spot-aria code, follow these steps
+```bash
+# Go to the aria directory
+cd aria_data_loaders/
+
+# Run the aria_streamer.py file
+python aria_streamer.py --data-path="/path/to/directory/containing/vrs/and/mps/files" --vrs-name="name_of_vrs_file" --dry-run=False --verbose=True
+```
+* Args:
+1. `--data-path` (Input: string): This is the path to the directory where VRS & MPS files reside. Make sure your VRS & MPS files for a trajectory co-exist in the same folder.
+2. `vrs-file` (Input: string): This is the name of the VRS file. Ignore the `.vrs` in the name of the file. For eg. if the name of VRS file is `sample_trajectory.vrs`, then the input will be like `--vrs-file="sample_trajectory"`. This file will be searched for within the directory specified with `--data-path`
+3. `--dry-run` (Input: bool): This is used to indicate if it should command robot to move or not. If dry run is true, then it will not send the commands to the robot to make it move. *But this will still require you to have robot watching the QR code for localizing itself in the system*.
+4. `--verbose` (Input: bool): This flag is for updating the visual stream with detections from both QR & object detectors.
 
 ## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is built upon Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments

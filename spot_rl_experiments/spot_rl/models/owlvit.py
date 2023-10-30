@@ -214,6 +214,13 @@ class OwlVit:
         labels_with_prefix = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.labels = labels_with_prefix
 
+    def process(self, img, return_image: bool = False):
+        """Interface method for compatibility with Aria data-loaders"""
+        if return_image:
+            return self.run_inference_and_return_img(img)
+        else:
+            return self.run_inference(img)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
