@@ -93,7 +93,7 @@ class ObjectDetectorWrapper(GenericDetector):
 
         return valid, score, stop, result_image
 
-    def _p1_demo_heuristics(
+    def _aria_fetch_demo_heuristics(
         self, detections, img_size=(512, 512)
     ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
         """*P1 Demo Specific*
@@ -159,7 +159,7 @@ class ObjectDetectorWrapper(GenericDetector):
             stop,
             updated_img_frame,
         ) = self._get_scored_object_detections(
-            img_frame, heuristic=self._p1_demo_heuristics
+            img_frame, heuristic=self._aria_fetch_demo_heuristics
         )
         if stop and stop["penguin_plush"]:
             print("Turning off object-detection")
