@@ -230,7 +230,7 @@ class AriaReader:
         frame_data = self.provider.get_image_data_by_index(stream_id, idx_of_interest)
         return frame_data[1].capture_timestamp_ns
 
-    def parse_camera_stream(
+    def process_camera_stream(
         self,
         stream_name: str,
         should_rectify: bool = True,
@@ -240,7 +240,7 @@ class AriaReader:
         object_labels: List[str] = None,
         reverse: bool = False,
     ) -> Dict[str, Any]:
-        """Parse linearly through a camera stream and return a dict of detections
+        """Process linearly through a camera stream and return a dict of detections
         Detection types supported:
         - April Tag
         - Object Detection
@@ -788,7 +788,7 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
         vrs_file_path=vrsfile, mps_file_path=data_path, verbose=verbose
     )
 
-    outputs = vrs_mps_streamer.parse_camera_stream(
+    outputs = vrs_mps_streamer.process_camera_stream(
         stream_name=STREAM1_NAME,
         detect_qr=True,
         detect_objects=True,
