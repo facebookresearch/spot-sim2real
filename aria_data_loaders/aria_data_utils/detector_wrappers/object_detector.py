@@ -7,19 +7,53 @@ from spot_rl.models.owlvit import OwlVit
 
 
 class ObjectDetectorWrapper(GenericDetector):
+    """
+    Wrapper over OwlVit class to detect object instances and score them based on heuristics
+
+    How to use:
+        1. Create an instance of this class
+        2. Call `process_frame` method with image as input & outputs dict as input
+
+    Example:
+        # Create an instance of ObjectDetectorWrapper
+        odw = ObjectDetectorWrapper()
+
+        # Enable detector
+        odw.enable_detector() # base class method
+
+        # Initialize detector
+        outputs = odw._init_object_detector(object_labels, verbose)
+
+        # Process image frame
+        updated_img_frame, outputs = odw.process_frame(img_frame, outputs, img_metadata)
+    """
+
     def __init__(self):
         super().__init__()
 
     def _init_object_detector(
-        self, object_labels: List[str], verbose: bool = None
+        self, object_labels: List[str], verbose: bool = True
     ) -> Dict[str, Any]:
-        """initialize object_detector by loading it to GPU and setting up the labels"""
+        """
+        Initialize object_detector by loading it to GPU and setting up the labels
+
+        Args:
+            object_labels (List[str]) : List of object labels
+            verbose (bool) : If True, modifies image frame to render detected objects
+
+        Returns:
+            outputs (Dict[str, Any]) : Dictionary of outputs
+            Manipulates following keys in the outputs dictionary:
+                - object_image_list (List[np.ndarray]) : List of decorated image frames
+                - object_image_metadata_list (List[Any]) : List of image metadata
+                - object_image_segment_list (List[int]) : List of image segment ids
+                - object_score_list (List[float]) : List of scores for each image frame
+        """
         assert self.is_enabled is True
-        # TODO: Decide VERBOSE
-        # if verbose is None:
-        #     verbose = self.verbose
+        self.verbose = verbose
+
         self.object_detector = OwlVit(
-            [object_labels], score_threshold=0.125, show_img=verbose
+            [object_labels], score_threshold=0.125, show_img=self.verbose
         )
         outputs: Dict[str, Any] = {}
         outputs["object_image_list"] = {obj_name: [] for obj_name in object_labels}
@@ -42,19 +76,24 @@ class ObjectDetectorWrapper(GenericDetector):
         - img: np.ndarray: image to run inference on
         - heuristic: function: function to score the detections
         Output:
-        - valid: bool: whether the img frame is valid or not
-        - score: float: score of the img frame (based on :heuristic:)
+        - valid: bool: whether the img frame is valid or not, False if no heuristic
+        - score: Dict: score of the img frame (based on :heuristic:), empty dict if no heuristic
+        - stop: Dict: condition representing whether to stop the detector or not, empty dict if no heuristic
         - result_image: np.ndarray: image with bounding boxes drawn on it
         """
+        valid = False
+        score = {}
+        stop = {}
         detections, result_image = self.object_detector.run_inference_and_return_img(
             img
         )
+
         if heuristic is not None:
             valid, score, stop = heuristic(detections)
 
         return valid, score, stop, result_image
 
-    def _p1_demo_heuristics(
+    def _aria_fetch_demo_heuristics(
         self, detections, img_size=(512, 512)
     ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
         """*P1 Demo Specific*
@@ -65,6 +104,15 @@ class ObjectDetectorWrapper(GenericDetector):
 
         Detections are expected to have the format:
         [["object_name", "confidence", "bbox"]]
+
+        Args:
+            detections (List[List[str, float, List[int]]]): List of detections
+            img_size (Tuple[int, int]): Size of the image frame
+
+        Returns:
+            valid (bool): Whether the img frame is valid or not
+            score (Dict[str, float]): Score of the img frame (based on :heuristic:)
+            stop (Dict[str, bool]): Whether to stop the detector or not
         """
         valid = False
         score = {}
@@ -87,29 +135,76 @@ class ObjectDetectorWrapper(GenericDetector):
 
         return valid, score, stop
 
-    def process_frame(self, img_frame: np.ndarray, outputs: Dict, img_metadata: Any):
-        assert self.is_enabled is True
+    def process_frame(self, img_frame: np.ndarray):
+        """
+        Process image frame to detect object instances and score them based on heuristics
+
+        Args:
+            img_frame (np.ndarray) : Image frame to process
+            outputs (Dict) : Dictionary of outputs (to be updated)
+            img_metadata (Any) : Image metadata
+
+        Returns:
+            updated_img_frame (np.ndarray) : Image frame with detections and text for visualization
+            object_scores (Dict[str, float]) : Dictionary of scores for each object in the image frame
+        """
+        # Do nothing if detector is not enabled
+        if self.is_enabled is False:
+            return img_frame, {}
 
         # FIXME: done for 1 specific object at the moment, extend for multiple
-        valid, score, stop, result_img = self._get_scored_object_detections(
-            img_frame, heuristic=self._p1_demo_heuristics
+        (
+            valid,
+            object_scores,
+            stop,
+            updated_img_frame,
+        ) = self._get_scored_object_detections(
+            img_frame, heuristic=self._aria_fetch_demo_heuristics
         )
         if stop and stop["penguin_plush"]:
             print("Turning off object-detection")
             self.disable_detector()
-        if valid:
-            # score_string = str(score["penguin_plush"]).replace(".", "_")
-            # plt.imsave(
-            #     f"./results/{frame_idx}_{valid}_{score_string}.jpg", result_img
-            # )
-            # print(f"saving valid img_frame, {score=}")
-            print(f"valid img_frame, {score}")
-            for object_name in score.keys():
+
+        # Ignore the score if the detections are not valid
+        if not valid:
+            object_scores = {}
+
+        return updated_img_frame, object_scores
+
+    def get_outputs(
+        self,
+        img_frame: np.ndarray,
+        outputs: Dict,
+        object_scores: Dict,
+        img_metadata: Any,
+    ) -> Tuple[np.ndarray, Dict]:
+        """
+        Update the outputs dictionary with the processed image frame and object score data
+
+        Args:
+            img_frame (np.ndarray) : Image frame to process
+            outputs (Dict) : Dictionary of outputs (to be updated)
+            score (Dict[str, float]) : Dictionary of scores for each object in the image frame
+            img_metadata (Any) : Image metadata
+
+        Returns:
+            img_frame (np.ndarray) : Image frame with detections and text for visualization
+            outputs (Dict) : Updated dictionary of outputs
+            Manipulates following keys in the outputs dictionary:
+                - object_image_list (List[np.ndarray]) : List of decorated image frames
+                - object_image_metadata_list (List[Any]) : List of image metadata
+                - object_image_segment_list (List[int]) : List of image segment ids
+                - object_score_list (List[float]) : List of scores for each image frame
+        """
+        if object_scores is not {}:
+            for object_name in object_scores.keys():
                 outputs["object_image_list"][object_name].append(img_frame)
-                outputs["object_score_list"][object_name].append(score[object_name])
+                outputs["object_score_list"][object_name].append(
+                    object_scores[object_name]
+                )
                 # TODO: following is not being used at the moment, clean-up if
                 # multi-object, multi-view logic seems to not require this
                 outputs["object_image_segment_list"][object_name].append(-1)
                 outputs["object_image_metadata_list"][object_name].append(img_metadata)
 
-        return result_img, outputs
+        return img_frame, outputs

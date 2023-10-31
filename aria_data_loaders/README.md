@@ -5,27 +5,39 @@ utilities](https://facebookresearch.github.io/projectaria_tools/docs/data_utilit
 This package implements data-loaders on top of these utilities to make multi-modal data
 access and processing easier.
 
-## Installation
+## Installation for use with Spot-Sim2Real
 
-Create the conda env:
+1. Activate the conda environment:
 
 ```bash
-conda create -n aria_env -y python=3.9
-conda activate aria_env
+conda activate spot_ros
 ```
 
-Install this package (will also install requirements)
+2. Installing FairOtag for QR code detection
+Run these commands from outside of spot-sim2real
+```bash
+git clone -b fairo_viz_subplots git@github.com:KavitShah1998/fairo.git
+cd fairo/perception/fairotag/
+pip install -e .
+```
+
+3. Install aria_data_loaders package (will also install requirements)
 
 ```bash
-# Make sure you are in the root of this repo
+# Make sure you are in the root of aria_data_loaders dir
 pip install -e .
 
 cd ../spot_rl_experiments/
 pip install -e .
 ```
 
-## Quickstart
+## Installation (for stand-alone use)
 
-Ensure that you have at least the VRS file output from Aria (optionally MPS outputs too).
+1. Create the conda env:
 
-See [ipython notebook]() for examples on how to use the interface.
+```bash
+conda create -n aria_env -y python=3.9
+conda activate aria_env
+```
+
+Follow steps 2 and 3 from above.

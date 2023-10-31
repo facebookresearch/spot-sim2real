@@ -102,7 +102,6 @@ def check_bbox_intersection(bbox1: List[int], bbox2: List[int]) -> bool:
         return True
 
 
-# @TODO: Maybe make position as Any?
 def decorate_img_with_text(img: np.ndarray, frame_name: str, position: np.ndarray):
     """
     Helper method to label image with text

@@ -4,8 +4,6 @@ import cv2.aruco as aruco
 import fairotag as frt
 import magnum as mn
 import sophus as sp
-
-# TODO: we dont need spot, remove
 from spot_wrapper.spot import Spot
 
 MARKER_LENGTH = 0.146
@@ -109,8 +107,7 @@ class AprilTagPoseEstimator:
         if len(markers) == 0:
             return image, None
 
-        # Currently only one marker is supported @TODO: Make it support multiple markers????
-        # assert len(markers) <= 1, "More than one marker detected"
+        # Currently only one marker is supported
         if len(markers) >= 1:
             print("More than one marker detected")
 
@@ -127,7 +124,6 @@ class AprilTagPoseEstimator:
         if should_render:
             image = self._cam_module.render_markers(image, markers=[marker])
 
-        # TODO: Remove all dependence on magnum inside aria streaming
         if magnum:
             return image, mn_camera_T_marker
         return image, sp_camera_T_marker

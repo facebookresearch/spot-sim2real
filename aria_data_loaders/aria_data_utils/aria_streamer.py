@@ -19,34 +19,7 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.models.owlvit import OwlVit
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
 
-"""
-dict = {
-    "file" : "Start_2m.vrs",
-    "2m" : 245,
-    "3m" : 334,
-    "4m" : 463,
-    "5m" : 574,
-}
-
-dict = {
-    "file" : "Start_1halfm.vrs",
-    "2m" : 238,
-    "3m" : 348,
-"4m" : 458
-    "5m" : 598,
-}
-
-dict = {
-    "file" : "Start_2m.vrs",
-    "2m" : 237,
-    "3m" : 337,
-    "4m" : 457,
-    "5m" : 581,
-}
-"""
-
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-# TODO: Clean up the following
 AXES_SCALE = 0.9
 STREAM1_NAME = "camera-rgb"
 STREAM2_NAME = "camera-slam-left"
@@ -56,18 +29,23 @@ FILTER_DIST = 2.4  # in meters (distance for valid detection)
 ############## Simple Helper Methods to keep code clean ##############
 
 
-# DEBUG FUNCTION. REMOVE LATER
-def take_snapshot(spot: Spot):
-    resp_head = spot.experiment(is_hand=False)
-    cv2_image_head_r = image_response_to_cv2(resp_head, reorient=True)
-
-    resp_hand = spot.experiment(is_hand=True)
-    cv2_image_hand = image_response_to_cv2(resp_hand, reorient=False)
-    cv2.imwrite("test_head_right_rgb1.jpg", cv2_image_head_r)
-    cv2.imwrite("test_hand_rgb1.jpg", cv2_image_hand)
-
-
 class AriaReader:
+    """
+    This class is used to read data from Aria VRS and MPS files
+    It can parse through a VRS stream and detect April tags and objects of interest too
+
+    For April tag detection, it uses the AprilTagPoseEstimator class (please refer to AprilTagPoseEstimator.py & AprilTagDetectorWrapper.py)
+    For object detection, it uses the Owl-VIT model (please refer to OwlVit.py & ObjectDetectorWrapper.py)
+
+    It also has a few helpers for image rectification, image rotation, image display, etc; and a few helpers to get VRS and MPS file streaming
+
+    Args:
+        vrs_file_path (str): Path to VRS file
+        mps_file_path (str): Path to MPS file
+        verbose (bool, optional): Verbosity flag. Defaults to False.
+
+    """
+
     def __init__(self, vrs_file_path: str, mps_file_path: str, verbose=False):
         assert vrs_file_path is not None and os.path.exists(
             vrs_file_path
@@ -76,15 +54,13 @@ class AriaReader:
             mps_file_path
         ), "Incorrect MPS dir path"
 
-        # TODO: Maybe rename this flag as we also have a config.VERBOSE flag (for logging) .. to avoid confusion
+        # Verbosity flag for updating images when passed through detectors (this is different from config.VERBOSE)
         self.verbose = verbose
 
         self.provider = data_provider.create_vrs_data_provider(vrs_file_path)
         assert self.provider is not None, "Cannot open VRS file"
 
         self.device_calib = self.provider.get_device_calibration()
-
-        # TODO: Condition check to ensure stream name is valid
 
         # April tag detector object
         self.april_tag_detection_wrapper = AprilTagDetectorWrapper()
@@ -230,24 +206,23 @@ class AriaReader:
         frame_data = self.provider.get_image_data_by_index(stream_id, idx_of_interest)
         return frame_data[1].capture_timestamp_ns
 
-    def process_camera_stream(
+    def parse_camera_stream(
         self,
         stream_name: str,
-        should_rectify: bool = True,
         detect_qr: bool = False,
         should_display: bool = True,
         detect_objects: bool = False,
         object_labels: List[str] = None,
+        iteration_range: Tuple[int, int] = None,
         reverse: bool = False,
     ) -> Dict[str, Any]:
-        """Process linearly through a camera stream and return a dict of detections
+        """Parse linearly through a camera stream and return a dict of detections
         Detection types supported:
         - April Tag
         - Object Detection
 
         Args:
             stream_name (str): Stream name
-            should_rectify (bool, optional): Boolean to indicate if fisheye images should be rectified. Defaults to True.
             detect_qr (bool, optional): Boolean to indicate if QR code (Dock ID) should be detected. Defaults to False.
             should_display (bool, optional): Boolean to indicate if image should be displayed. Defaults to True.
             detect_objects (bool, optional): Boolean to indicate if object detection should be performed. Defaults to False.
@@ -279,12 +254,11 @@ class AriaReader:
         )
         assert device_T_camera is not None
 
-        # Setup camera calibration parameters by over-writing self._src_calib_param & self._dst_calib_param if needed
-        if should_rectify:
-            self._src_calib_params = self.device_calib.get_camera_calib(stream_name)
-            self._dst_calib_params = calibration.get_linear_camera_calibration(
-                512, 512, 280, stream_name
-            )
+        # Setup camera calibration parameters by over-writing self._src_calib_param & self._dst_calib_param
+        self._src_calib_params = self.device_calib.get_camera_calib(stream_name)
+        self._dst_calib_params = calibration.get_linear_camera_calibration(
+            512, 512, 280, stream_name
+        )
 
         outputs: Dict[str, Any] = {}
 
@@ -303,7 +277,6 @@ class AriaReader:
 
         # Setup object detection (Owl-VIT) if needed
         if detect_objects:
-            # TODO: Pass self.verbose flag
             self.object_detection_wrapper.enable_detector()
             outputs.update(
                 self.object_detection_wrapper._init_object_detector(
@@ -314,12 +287,21 @@ class AriaReader:
         if should_display:
             self._create_display_window(stream_name)
 
+        # Logic for iterating through VRS stream
         num_frames = self.provider.get_num_data(stream_id)
-        # TODO: make this range updatable: min_frame_idx, max_frame_idx as args
+        iteration_delta = -1 if reverse else 1
+        if iteration_range is None:
+            iteration_range = (0, num_frames)
+
         if reverse:
-            custom_range = range(num_frames - 1, 0, -1)
+            start_frame = iteration_range[1] - 1
+            end_frame = iteration_range[0]
         else:
-            custom_range = range(0, num_frames)
+            start_frame = iteration_range[0]
+            end_frame = iteration_range[1] - 1
+        custom_range = range(start_frame, end_frame, iteration_delta)
+
+        # Iterate through VRS stream
         for frame_idx in custom_range:
             # Get image data for frame
             frame_data = self.provider.get_image_data_by_index(stream_id, frame_idx)
@@ -327,11 +309,11 @@ class AriaReader:
             img_metadata = frame_data[1]
 
             # Rectify current image frame
-            if should_rectify:  # TODO: ALWAYS TRUE
-                img = self._rectify_image(image=img)
+            img = self._rectify_image(image=img)
 
-            # Initialize camera_T_marker to None for current image frame
+            # Initialize camera_T_marker to None & object_scores to empty dict for current image frame
             camera_T_marker = None
+            object_scores = {}
 
             # Detect QR code in current image frame
             if detect_qr:
@@ -339,15 +321,15 @@ class AriaReader:
                     img,
                     camera_T_marker,
                 ) = self.april_tag_detection_wrapper.process_frame(
-                    img_frame=img, verbose=True
+                    img_frame=img
                 )  # type: ignore
 
             # Rotate current image frame
             img = self._rotate_img(img=img)
 
             if self.object_detection_wrapper.is_enabled:
-                (img, outputs) = self.object_detection_wrapper.process_frame(
-                    img_frame=img, outputs=outputs, img_metadata=img_metadata
+                (img, object_scores) = self.object_detection_wrapper.process_frame(
+                    img_frame=img
                 )
 
             # If april tag is detected, compute the transformation of marker in cpf frame
@@ -360,6 +342,15 @@ class AriaReader:
                     img_metadata=img_metadata,
                 )
 
+            # If object is detected, update the outputs
+            if object_scores is not {}:
+                img, outputs = self.object_detection_wrapper.get_outputs(
+                    img_frame=img,
+                    outputs=outputs,
+                    object_scores=object_scores,
+                    img_metadata=img_metadata,
+                )
+
             # Display current image frame
             if should_display:
                 self._display(img=img, stream_name=stream_name)
@@ -367,6 +358,9 @@ class AriaReader:
         return outputs
 
     def initialize_trajectory(self):
+        """
+        Initialize trajectory data from MPS file for easy access
+        """
         # frame(ariaWorld) is same as frame(device) at the start
 
         for i in range(len(self.mps_trajectory)):
@@ -381,48 +375,77 @@ class AriaReader:
             # self.quat_trajectory[i,:] = self.mps_trajectory[i].transform_world_device.quaternion()
         assert len(self.trajectory_s) == len(self.ariaWorld_T_device_trajectory)
 
-    # TODO: Can be optimized. This is making O(n^2)
-    def get_closest_mps_idx_to_timestamp_ns(self, timestamp_ns_of_interest: int):
+    def get_closest_mps_idx_to_timestamp_ns(self, timestamp_ns_of_interest: int) -> int:
+        """
+        Returns the index of the closest MPS timestamp to the VRS timestamp.
+        VRS & MPS timestamps are NOT 100% synced
+
+        Args:
+            timestamp_of_interest (int): VRS timestamp in nanoseconds
+
+        Returns:
+            mps_idx_of_interest (int): Index of closest MPS timestamp to given VRS timestamp
+        """
         # VRS timestamps are NOT 100% synced with MPS timestamps
         # So we find the closest MPS timestamp to the VRS timestamp
         mps_idx_of_interest = np.argmin(
             np.abs(self.trajectory_s * 1e9 - timestamp_ns_of_interest)
         )
 
-        # TODO: Change logic
         return mps_idx_of_interest
 
     def get_closest_ariaWorld_T_device_to_timestamp(
         self, timestamp_ns_of_interest: int
-    ):
+    ) -> sp.SE3:
         """
-        timestamp_of_interest -> nanoseconds
+        Returns the transformation of aria device frame to aria world frame at the
+        closest MPS timestamp to the given VRS timestamp.
+        VRS & MPS timestamps are NOT 100% synced
+
+        Args:
+            timestamp_of_interest (int): VRS timestamp in nanoseconds
+
+        Returns:
+            sp_transform_of_interest (sp.SE3): Transformation of aria device frame to aria world frame
         """
         mps_idx_of_interest = self.get_closest_mps_idx_to_timestamp_ns(
             timestamp_ns_of_interest
         )
-        sp_transform_of_interest = self.ariaWorld_T_device_trajectory[
+        ariaWorld_T_device_of_insterest = self.ariaWorld_T_device_trajectory[
             mps_idx_of_interest
         ]
-        return sp_transform_of_interest
+        return ariaWorld_T_device_of_insterest
 
     def get_avg_ariaWorld_T_marker(
         self,
-        img_list: List,
         img_metadata_list: List,
         device_T_marker_list: List,
         filter_dist: float = FILTER_DIST,
-        should_plot: bool = False,
     ) -> sp.SE3:
+        """
+        Returns the average transformation of aria world frame to marker frame
+
+        We get a device_T_marker for each frame in which marker is detected.
+        Depending on the frame rate of image capture, multiple frames may have captured the marker.
+        Averaging all transforms would be best way to compensate for any noise that may exist in any frame's detections
+        camera_T_marker is used to compute device_T_marker[i] and thus ariaWorld_T_marker[i].
+        Then we average all ariaWorld_T-marker to find average marker pose wrt ariaWorld.
+
+        NOTE: To compute average of SE3 matrix, we find the average of translation and rotation separately.
+              The average rotation is obtained by averaging the quaternions.
+        NOTE: Since multiple quaternions can represent the same rotation, we ensure that the 'w' component of the
+              quaternion is always positive for effective averaging.
+
+        Args:
+            img_metadata_list (List): List of image metadata
+            device_T_marker_list (List): List of Sophus SE3 transforms from Device frame to marker
+            filter_dist (float, optional): Distance threshold for valid detections. Defaults to FILTER_DIST.
+        """
         marker_position_list = []
         marker_quaternion_list = []
 
-        # For viz
-        ariaWorld_T_device_list = []
-        ariaWorld_T_marker_list = []
-        img_viz_list = []
-        for img, img_metadata, device_T_marker in zip(
-            img_list, img_metadata_list, device_T_marker_list
+        for img_metadata, device_T_marker in zip(
+            img_metadata_list, device_T_marker_list
         ):
             vrs_timestamp_of_interest_ns = (
                 img_metadata.capture_timestamp_ns
@@ -447,11 +470,6 @@ class AriaReader:
                     quat = -1.0 * quat
                 marker_quaternion_list.append(quat)
 
-                if should_plot:
-                    ariaWorld_T_device_list.append(ariaWorld_T_device)
-                    ariaWorld_T_marker_list.append(ariaWorld_T_marker)
-                    img_viz_list.append(img)
-
         marker_position_np = np.array(marker_position_list)
         avg_marker_position = np.mean(marker_position_np, axis=0)
 
@@ -461,20 +479,6 @@ class AriaReader:
         avg_ariaWorld_T_marker = sp.SE3(
             R.from_quat(avg_marker_quaternion).as_matrix(), avg_marker_position
         )
-
-        if should_plot:
-            assert len(marker_position_list) == len(ariaWorld_T_marker_list)
-
-            for i in range(len(marker_position_list)):
-                self.plot_rgb_and_trajectory(
-                    pose_list=[
-                        ariaWorld_T_marker_list[i],
-                        ariaWorld_T_device_list[i],
-                        avg_ariaWorld_T_marker,
-                    ],
-                    rgb=img_viz_list[i],
-                    traj_data=self.xyz_trajectory,
-                )
 
         return avg_ariaWorld_T_marker
 
@@ -650,6 +654,15 @@ class SpotQRDetector:
         data_size_for_avg: int = 10,
         filter_dist: float = 2.2,
     ):
+        """
+        Returns the average transformation of spot world frame to marker frame
+
+        We get a camera_T_marker for each frame in which marker is detected.
+        Depending on the frame rate of image capture, multiple frames may have captured the marker.
+        Averaging all transforms would be best way to compensate for any noise that may exist in any frame's detections
+        camera_T_marker is used to compute spot_T_marker[i] and thus spotWorld_T_marker[i].
+        Then we average all spotWorld_T-marker to find average marker pose wrt spotWorld.
+        """
         if spot_frame != "vision" and spot_frame != "odom":
             raise ValueError("base_frame should be either vision or odom")
         cv2.namedWindow("hand_image", cv2.WINDOW_AUTOSIZE)
@@ -788,23 +801,21 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
         vrs_file_path=vrsfile, mps_file_path=data_path, verbose=verbose
     )
 
-    outputs = vrs_mps_streamer.process_camera_stream(
+    outputs = vrs_mps_streamer.parse_camera_stream(
         stream_name=STREAM1_NAME,
         detect_qr=True,
         detect_objects=True,
         object_labels=["penguin_plush", "person", "hand"],
         reverse=True,
     )
-    tag_img_list = outputs["tag_image_list"]
+    # tag_img_list = outputs["tag_image_list"]
     tag_img_metadata_list = outputs["tag_image_metadata_list"]
     tag_device_T_marker_list = outputs["tag_device_T_marker_list"]
 
     avg_ariaWorld_T_marker = vrs_mps_streamer.get_avg_ariaWorld_T_marker(
-        tag_img_list,
         tag_img_metadata_list,
         tag_device_T_marker_list,
         filter_dist=FILTER_DIST,
-        should_plot=False,
     )
     print(avg_ariaWorld_T_marker)
 
@@ -873,29 +884,14 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
     #     block=True,
     # )
 
-    # TODO: make idx_of_interest as a dynamic variable (will come from object detection)
-    # vrs_timestamp_of_interest = outputs["object_image_metadata_list"]["penguin_plush"][
-    # best_idx
-    # ].capture_timestamp_ns
-    # vrs_timestamp_of_interest = vrs_mps_streamer.get_vrs_timestamp_from_img_idx(
-    #     stream_name=STREAM1_NAME, idx_of_interest=574
-    # )
-    # mps_idx_of_interest = vrs_mps_streamer.get_closest_mps_idx_to_timestamp_ns(
-    #     vrs_timestamp_of_interest
-    # )
-    # mps_idx_of_interest = -2500
-
     pose_of_interest = best_object_spotWorld_T_cpf
     position = pose_of_interest.translation()
     print(f" Going to - {position}")
-    breakpoint()
     if not dry_run:
         skill_manager = SpotSkillManager()
         skill_manager.nav(position[0], position[1], 0.0)
         skill_manager.pick("plush_penguin")
 
-
-# TODO: Record raw and rectified camera params for each camera in a config file
 
 if __name__ == "__main__":
     main()
