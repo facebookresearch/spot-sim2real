@@ -795,7 +795,16 @@ class SpotQRDetector:
 @click.option("--vrs-name", help="Name of the vrs file", type=str)
 @click.option("--dry-run", type=bool, default=False)
 @click.option("--verbose", type=bool, default=True)
-def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
+@click.option("--use-spot/--no-spot", default=True)
+@click.option("--object-labels", type=list, default=["smartphone"])
+def main(
+    data_path: str,
+    vrs_name: str,
+    dry_run: bool,
+    verbose: bool,
+    use_spot: bool,
+    object_labels: List[str],
+):
     vrsfile = os.path.join(data_path, vrs_name + ".vrs")
     vrs_mps_streamer = AriaReader(
         vrs_file_path=vrsfile, mps_file_path=data_path, verbose=verbose
@@ -805,7 +814,7 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
         stream_name=STREAM1_NAME,
         detect_qr=True,
         detect_objects=True,
-        object_labels=["penguin_plush", "person", "hand"],
+        object_labels=object_labels + ["person", "hand"],
         reverse=True,
     )
     # tag_img_list = outputs["tag_image_list"]
@@ -818,79 +827,113 @@ def main(data_path: str, vrs_name: str, dry_run: bool, verbose: bool):
         filter_dist=FILTER_DIST,
     )
     print(avg_ariaWorld_T_marker)
-
-    spot = Spot("ArmKeyboardTeleop")
-    spot_qr = SpotQRDetector(spot=spot)
-    (
-        avg_spotWorld_T_marker,
-        avg_spot_T_marker,
-    ) = spot_qr.get_avg_spotWorld_T_marker_HAND()
-
-    print(avg_spotWorld_T_marker)
-
     avg_marker_T_ariaWorld = avg_ariaWorld_T_marker.inverse()
-    avg_spotWorld_T_ariaWorld = avg_spotWorld_T_marker * avg_marker_T_ariaWorld
-    # avg_ariaWorld_T_spotWorld = avg_spotWorld_T_ariaWorld.inverse()
-
-    # avg_spot_T_ariaWorld = avg_spot_T_marker * avg_marker_T_ariaWorld
-    # avg_ariaWorld_T_spot = avg_spot_T_ariaWorld.inverse()
 
     # find best device location, wrt AriaWorld, for best scored object detection
     # FIXME: extend to multiple objects
 
-    best_idx = outputs["object_score_list"]["penguin_plush"].index(
-        max(outputs["object_score_list"]["penguin_plush"])
-    )
-    best_timestamp_ns = outputs["object_image_metadata_list"]["penguin_plush"][
-        best_idx
-    ].capture_timestamp_ns
-    best_object_ariaWorld_T_device = (
-        vrs_mps_streamer.get_closest_ariaWorld_T_device_to_timestamp(best_timestamp_ns)
-    )
+    # object detection metadata
+    best_object_frame_idx = {}
+    best_object_frame_timestamp_ns = {}
+    best_object_ariaWorld_T_device = {}
+    best_object_img = {}
+    for object_name in object_labels:
+        # TODO: what happens when object is not detected?
+        best_object_frame_idx[object_name] = outputs["object_score_list"][
+            object_name
+        ].index(max(outputs["object_score_list"][object_name]))
+        best_object_frame_timestamp_ns[object_name] = outputs[
+            "object_image_metadata_list"
+        ][object_name][best_object_frame_idx].capture_timestamp_ns
+        best_object_ariaWorld_T_device[
+            object_name
+        ] = vrs_mps_streamer.get_closest_ariaWorld_T_device_to_timestamp(
+            best_object_frame_timestamp_ns[object_name]
+        )
+        best_object_img[object_name] = outputs["object_image_list"][object_name][
+            best_object_frame_idx
+        ]  # FIXME:
 
-    best_object_spotWorld_T_cpf = (
-        avg_spotWorld_T_ariaWorld
-        * best_object_ariaWorld_T_device
-        * vrs_mps_streamer.device_T_cpf
-    )
-    spotWorld_xyz_trajectory = np.array(
-        [
-            (avg_spotWorld_T_ariaWorld * ariaWorld_T_device).translation()
-            for ariaWorld_T_device in vrs_mps_streamer.ariaWorld_T_device_trajectory
-        ]
-    )
-    vrs_mps_streamer.plot_rgb_and_trajectory(
-        pose_list=[
+    if use_spot:
+        spot = Spot("ArmKeyboardTeleop")
+        spot_qr = SpotQRDetector(spot=spot)
+        (
             avg_spotWorld_T_marker,
-            avg_spotWorld_T_ariaWorld * vrs_mps_streamer.device_T_cpf,
-            spot_qr.get_spot_a_T_b("vision", "body"),
-            # avg_spotWorld_T_ariaWorld * vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
-            best_object_spotWorld_T_cpf,
-        ],
-        rgb=np.zeros((10, 10, 3), dtype=np.uint8),
-        traj_data=spotWorld_xyz_trajectory,
-        block=False,
-    )
-    plt.show()
-    # vrs_mps_streamer.plot_rgb_and_trajectory(
-    #     pose_list=[
-    #         avg_ariaWorld_T_marker,
-    #         avg_ariaWorld_T_spotWorld,
-    #         avg_ariaWorld_T_spot,
-    #         vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
-    #     ],
-    #     rgb=np.zeros((10, 10, 3), dtype = np.uint8),
-    #     traj_data=vrs_mps_streamer.xyz_trajectory,
-    #     block=True,
-    # )
+            avg_spot_T_marker,
+        ) = spot_qr.get_avg_spotWorld_T_marker_HAND()
 
-    pose_of_interest = best_object_spotWorld_T_cpf
-    position = pose_of_interest.translation()
-    print(f" Going to - {position}")
-    if not dry_run:
-        skill_manager = SpotSkillManager()
-        skill_manager.nav(position[0], position[1], 0.0)
-        skill_manager.pick("plush_penguin")
+        print(avg_spotWorld_T_marker)
+
+        avg_spotWorld_T_ariaWorld = avg_spotWorld_T_marker * avg_marker_T_ariaWorld
+        avg_ariaWorld_T_spotWorld = avg_spotWorld_T_ariaWorld.inverse()
+
+        avg_spot_T_ariaWorld = avg_spot_T_marker * avg_marker_T_ariaWorld
+        avg_ariaWorld_T_spot = avg_spot_T_ariaWorld.inverse()
+
+        spotWorld_T_device_trajectory = np.array(
+            [
+                (avg_spotWorld_T_ariaWorld * ariaWorld_T_device).translation()
+                for ariaWorld_T_device in vrs_mps_streamer.ariaWorld_T_device_trajectory
+            ]
+        )
+
+        for i in range(len(object_labels)):
+            # choose the next object to pick
+            next_object = object_labels[i]
+
+            # get the best object pose in spotWorld frame
+            next_object_ariaWorld_T_device = best_object_ariaWorld_T_device[next_object]
+            next_object_spotWorld_T_cpf = (
+                avg_spotWorld_T_ariaWorld
+                * next_object_ariaWorld_T_device
+                * vrs_mps_streamer.device_T_cpf
+            )
+            vrs_mps_streamer.plot_rgb_and_trajectory(
+                pose_list=[
+                    avg_spotWorld_T_marker,
+                    avg_spotWorld_T_ariaWorld * vrs_mps_streamer.device_T_cpf,
+                    spot_qr.get_spot_a_T_b("vision", "body"),
+                    # avg_spotWorld_T_ariaWorld * vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
+                    next_object_spotWorld_T_cpf,
+                ],
+                rgb=np.zeros((10, 10, 3), dtype=np.uint8),
+                traj_data=spotWorld_T_device_trajectory,
+                block=False,
+            )
+            vrs_mps_streamer.plot_rgb_and_trajectory(
+                pose_list=[
+                    avg_ariaWorld_T_marker,
+                    avg_ariaWorld_T_spotWorld,
+                    avg_ariaWorld_T_spot,
+                    vrs_mps_streamer.ariaWorld_T_device_trajectory[
+                        -1
+                    ],  # TODO: replace with best object device pose
+                ],
+                rgb=np.zeros((10, 10, 3), dtype=np.uint8),
+                traj_data=vrs_mps_streamer.xyz_trajectory,
+                block=True,
+            )
+            pose_of_interest = next_object_spotWorld_T_cpf
+            position = pose_of_interest.translation()
+            print(f" Going to {next_object=} at {position=}")
+            if not dry_run:
+                skill_manager = SpotSkillManager()
+                skill_manager.nav(
+                    position[0], position[1], 0.0
+                )  # FIXME: get yaw from Aria Pose
+                skill_manager.pick(next_object)
+    if not use_spot:
+        vrs_mps_streamer.plot_rgb_and_trajectory(
+            pose_list=[
+                avg_ariaWorld_T_marker,
+                vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
+            ],
+            rgb=best_object_img
+            if best_object_img
+            else np.zeros((10, 10, 3), dtype=np.uint8),
+            traj_data=vrs_mps_streamer.xyz_trajectory,
+            block=True,
+        )
 
 
 if __name__ == "__main__":
