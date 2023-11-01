@@ -886,7 +886,7 @@ class Spot:
         mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
         return mn_transformation
 
-    def get_spot_a_T_b(self, a: str, b: str, tree=None) -> mn.Matrix4:
+    def get_magnum_Matrix4_spot_a_T_b(self, a: str, b: str, tree=None) -> mn.Matrix4:
         """
         Gets transformation from 'a' frame to 'b' frame such that a_T_b
         a & b takes string values of the name of the frames
