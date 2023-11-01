@@ -162,18 +162,6 @@ def non_max_suppression(
         i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         i = i[:max_det]  # limit detections
 
-        # # Experimental
-        # merge = False  # use merge-NMS
-        # if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
-        #     # Update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
-        #     from .metrics import box_iou
-        #     iou = box_iou(boxes[i], boxes) > iou_thres  # iou matrix
-        #     weights = iou * scores[None]  # box weights
-        #     x[i, :4] = torch.mm(weights, x[:, :4]).float() / weights.sum(1, keepdim=True)  # merged boxes
-        #     redundant = True  # require redundant detections
-        #     if redundant:
-        #         i = i[iou.sum(1) > 1]  # require redundancy
-
         output[xi] = x[i]
         if mps:
             output[xi] = output[xi].to(device)
@@ -350,8 +338,6 @@ if __name__ == "__main__":
     spot = Spot("YoloV8Predictor")
 
     image_sources = [
-        # Cam.FRONTRIGHT_DEPTH,
-        # Cam.FRONTLEFT_DEPTH,
         Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
         Cam.HAND_COLOR,
     ]
@@ -369,30 +355,4 @@ if __name__ == "__main__":
         print(imgs_list[-1].shape)
         detections, image_with_detections = yolov8predictor(imgs_list[-1], True)
         cam_stream.write(image_with_detections)
-        # cv2.imshow('Yolov8predictor',image_with_detections)
-
-        # Press Q on keyboard to  exit
-        # if cv2.waitKey(25) & 0xFF == ord('q'):break
     cam_stream.release()
-
-    # image = cv2.imread("yolov8images/dog_bike_car.jpg")
-    # detections, plot = yolov8predictor(image, visualize=True)
-    # #print(detections)
-    # save_filename = "yolov8images/yolov8_detections.png"
-    # cv2.imwrite(save_filename, plot)
-    # print(f"Image Written to {save_filename}")
-    # cap = cv2.VideoCapture("hand_rgb_record.avi")
-    # n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    # writecap = cv2.VideoWriter("hand_rgb_record_with_detections.avi", cv2.VideoWriter_fourcc(*'MPEG'), 20, (640, 480))
-
-    # for i in range(n_frames):
-    #     ret, frame = cap.read()
-    #     # if frame is read correctly ret is True
-    #     if not ret: break
-    #     #print(frame.shape, frame.dtype)
-    #     detections_i, plot_i = yolov8predictor(frame, visualize=True)
-    #     writecap.write(plot_i)
-
-    # cap.release()
-    # #cv2.destroyAllWindows()
-    # writecap.release()

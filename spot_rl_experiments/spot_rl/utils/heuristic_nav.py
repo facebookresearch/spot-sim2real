@@ -188,7 +188,7 @@ def push_forward_point_along_theta_by_offset(
     return (x, y)
 
 
-def get_me_arguments_for_image_search_fn(spot: Spot, angle):
+def get_arguments_for_image_search(spot: Spot, angle):
     """
     ImageSearch.search takes a lot of argumnents, this method prepares those
     """
@@ -401,5 +401,90 @@ class ImageSearch:
         return False, (None, None, None), rgb_img_vis
 
 
+def heuristic_object_navigation(
+    x: float,
+    y: float,
+    theta: float,
+    object_target: str,
+    image_search: ImageSearch = None,
+    save_cone_search_images: bool = True,
+    pull_back: bool = True,
+    skillmanager=None,
+):
+
+    if save_cone_search_images:
+        previously_saved_images = glob("imagesearch*.png")
+        for f in previously_saved_images:
+            os.remove(f)
+
+    if image_search is None:
+        image_search = ImageSearch(
+            corner_static_offset=0.5,
+            use_yolov8=False,
+            visualize=save_cone_search_images,
+        )
+    skillmanager.nav_controller.nav_env.enable_nav_by_hand()
+    (x, y) = (
+        pull_back_point_along_theta_by_offset(x, y, theta, 0.2) if pull_back else (x, y)
+    )
+    print(f"Nav targets adjusted on the theta direction ray {x, y, np.degrees(theta)}")
+    backup_steps = skillmanager.nav_controller.nav_env.max_episode_steps
+    skillmanager.nav_controller.nav_env.max_episode_steps = 50
+    skillmanager.nav(x, y, theta)
+    skillmanager.nav_controller.nav_env.max_episode_steps = backup_steps
+    spot: Spot = skillmanager.spot
+    spot.open_gripper()
+    gaze_arm_angles = deepcopy(skillmanager.pick_config.GAZE_ARM_JOINT_ANGLES)
+    spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
+    time.sleep(1.2)
+    found, (x, y, theta), visulize_img = image_search.search(
+        object_target, *get_arguments_for_image_search(spot, 0)
+    )
+    rate = 20  # control time taken to rotate the arm, higher the rotation higher is the time
+    if not found:
+        # start semi circle search
+        angle_interval = 20
+        semicircle_range = np.arange(-90, 110, angle_interval)
+        for i_a, angle in enumerate(semicircle_range):
+            print(f"Searching in {angle} cone")
+            angle_time = int(np.abs(gaze_arm_angles[0] - angle) / rate)
+            gaze_arm_angles[0] = angle
+            spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
+            time.sleep(1.2)
+            (
+                found,
+                (x, y, theta),
+                visulize_img,
+            ) = image_search.search(  # type : ignore
+                object_target, *get_arguments_for_image_search(spot, angle)
+            )
+            if save_cone_search_images:
+                cv2.imwrite(f"imagesearch_{angle}.png", visulize_img)
+            if found:
+                print(f"In Cone Search object found at {(x,y,theta)}")
+                break
+
+    else:
+        if save_cone_search_images:
+            cv2.imwrite("imagesearch_looking_forward.png", visulize_img)
+    angle_time = int(
+        np.abs(gaze_arm_angles[0] - skillmanager.pick_config.GAZE_ARM_JOINT_ANGLES[0])
+        / rate
+    )
+    spot.set_arm_joint_positions(
+        np.deg2rad(skillmanager.pick_config.GAZE_ARM_JOINT_ANGLES),
+        angle_time,
+    )
+    if found:
+        print(f"Nav goal after cone search {x, y, np.degrees(theta)}")
+        skillmanager.nav_controller.nav_env.max_episode_steps = 50
+        skillmanager.nav(x, y, theta)
+        skillmanager.nav_controller.nav_env.max_episode_steps = backup_steps
+    skillmanager.nav_controller.nav_env.disable_nav_by_hand()
+    return found
+
+
 if __name__ == "__main__":
-    print("Please see the example in tests/harware_tests/test_spot_to_aria.py")
+    print(
+        "Please see the example in spot_rl_experiments/experiments/skill_test/test_spot_to_aria.py"
+    )

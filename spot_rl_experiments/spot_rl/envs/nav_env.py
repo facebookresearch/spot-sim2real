@@ -191,25 +191,28 @@ class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
         super().__init__(config, spot)
         self._goal_xy = None
-        self._enable_nav_goal_change = False
-        self.backup_get_observation_by_base_fn = self.get_nav_observation
+        self._enable_nav_by_hand = False
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
 
-    def enable_nav_goal_change(self):
-        if not self._enable_nav_goal_change:
-            self._enable_nav_goal_change = True
+    def enable_nav_by_hand(self):
+        if not self._enable_nav_by_hand:
+            self._enable_nav_by_hand = True
             print(
                 f"{self.node_name} Enabling nav goal change get_nav_observation by base switched to get_nav_observation by hand fn"
             )
-            self.backup_get_observation_by_base_fn = self.get_nav_observation
+            self.backup_fn_of_get_nav_observation_that_operates_by_robot_base = (
+                self.get_nav_observation
+            )
             self.get_nav_observation = self.get_nav_observation_by_hand
 
-    def disable_nav_goal_change(self):
-        if self._enable_nav_goal_change:
-            self.get_nav_observation = self.backup_get_observation_by_base_fn
-            self._enable_nav_goal_change = False
+    def disable_nav_by_hand(self):
+        if self._enable_nav_by_hand:
+            self.get_nav_observation = (
+                self.backup_fn_of_get_nav_observation_that_operates_by_robot_base
+            )
+            self._enable_nav_by_hand = False
             print(
                 f"{self.node_name} Disabling nav goal change get_nav_observation by base fn restored"
             )
@@ -251,20 +254,8 @@ class SpotNavEnv(SpotBaseEnv):
         )
 
     def get_nav_observation_by_hand(self, goal_xy, goal_heading):
-        observations = {}
 
-        # Get visual observations
-        front_depth = self.msg_to_cv2(self.filtered_head_depth, "mono8")
-
-        front_depth = cv2.resize(
-            front_depth, (120 * 2, 212), interpolation=cv2.INTER_AREA
-        )
-        front_depth = np.float32(front_depth) / 255.0
-        # Add dimension for channel (unsqueeze)
-        front_depth = front_depth.reshape(*front_depth.shape[:2], 1)
-        observations["spot_right_depth"], observations["spot_left_depth"] = np.split(
-            front_depth, 2, 1
-        )
+        observations = self.get_head_depth()
 
         # Get rho theta observation
         x, y, yaw = self.get_hand_xy_theta()
