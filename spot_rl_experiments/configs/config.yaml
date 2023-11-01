@@ -5,7 +5,9 @@ WEIGHTS:
   # MIXER: "weights/sweep_17_SD_200_1651156250_ckpt.12.pth"
 # new
   # NAV: "weights/final_paper/nav_CUTOUT_WT_True_SD_300_ckpt.90.pth"
-  GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+  # GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+  # This is the config for the mobile gaze
+  GAZE: "weights/mobile_gaze/mg2ns_4.ckpt.1652.pth"
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
   # MIXER: "weights/final_gater_rnn_60_1.0_SD_300_1652203350_ckpt_55.pth"

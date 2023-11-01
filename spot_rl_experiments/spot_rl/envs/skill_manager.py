@@ -366,16 +366,10 @@ if __name__ == "__main__":
     spotskillmanager = SpotSkillManager()
 
     # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
-    spotskillmanager.nav("test_place_front")
-    spotskillmanager.place("test_place_front")
-
-    # Nav-Pick-Nav-Place sequence 2
-    spotskillmanager.nav("test_square_vertex3")
-    spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_left")
-    spotskillmanager.place("test_place_left")
+    spotskillmanager.nav("working_table")
+    spotskillmanager.pick("box")
+    spotskillmanager.nav("black_case")
+    spotskillmanager.place("black_case")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()
