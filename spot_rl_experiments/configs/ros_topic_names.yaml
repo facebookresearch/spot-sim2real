@@ -1,5 +1,6 @@
 HEAD_DEPTH: "/raw_head_depth"
 HAND_DEPTH: "/raw_hand_depth"
+HAND_DEPTH_UNSCALED: "/raw_hand_depth_unscaled"
 HAND_RGB: "/hand_rgb"
 
 COMPRESSED_IMAGES: "/compressed_images"

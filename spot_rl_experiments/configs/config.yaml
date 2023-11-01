@@ -9,7 +9,6 @@ WEIGHTS:
   MOBILE_GAZE_NET: "weights/mobile_gaze/mg97_2_latest_net.pytorch"
   MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg97_2_latest_action.pytorch"
   MOBILE_GAZE_STD: "weights/mobile_gaze/mg97_2_latest_std.pth"
-
   # Static place
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 

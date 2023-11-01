@@ -687,7 +687,7 @@ class SpotQRDetector:
         while len(marker_position_from_dock_list) < data_size_for_avg:
             print(f"Iterating - {len(marker_position_from_dock_list)}")
             is_marker_detected_from_hand_cam = False
-            img_response_hand = self.spot.get_hand_image()
+            img_response_hand = self.spot.get_hand_image()[0]
             img_hand = image_response_to_cv2(img_response_hand)
 
             (

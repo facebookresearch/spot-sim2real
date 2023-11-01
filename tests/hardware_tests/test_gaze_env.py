@@ -61,6 +61,7 @@ def test_gaze():
     assert len(test_result) == len(test_target_objects)
 
     # Assert for all elements in test_result, "success" is True
+    # I changed a comment
     print(f"Gaze Results: {test_result}")
     for each_gaze_result in test_result:
         assert each_gaze_result["success"] is True
