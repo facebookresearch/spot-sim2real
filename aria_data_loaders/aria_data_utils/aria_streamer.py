@@ -1,5 +1,5 @@
+import logging
 import os
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import click
@@ -358,6 +358,7 @@ class AriaReader:
             if should_display:
                 self._display(img=img, stream_name=stream_name)
 
+        cv2.destroyAllWindows()
         return outputs
 
     def initialize_trajectory(self):
@@ -489,7 +490,7 @@ class AriaReader:
 class SpotQRDetector:
     def __init__(self, spot: Spot):
         self.spot = spot
-        print("Done init")
+        print("...Spot initialized...")
 
     def _to_camera_metadata_dict(self, camera_intrinsics):
         """Converts a camera intrinsics proto to a 3x3 matrix as np.array"""
@@ -503,7 +504,6 @@ class SpotQRDetector:
         return intrinsics
 
     def _get_body_T_handcam(self, frame_tree_snapshot_hand):
-        # print(frame_tree_snapshot_hand)
         hand_bd_wrist_T_handcam_dict = (
             frame_tree_snapshot_hand.child_to_parent_edge_map.get(
                 "hand_color_image_sensor"
@@ -536,7 +536,6 @@ class SpotQRDetector:
         return sp.SE3(quat.to_matrix(), pos)
 
     def _get_body_T_headcam(self, frame_tree_snapshot_head):
-        # print(frame_tree_snapshot_head)
         head_bd_fr_T_frfe_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright_fisheye"
         ).parent_tform_child
@@ -572,7 +571,6 @@ class SpotQRDetector:
             raise ValueError("spot_frame should be either vision or odom")
         spot_world_frame = spot_frame
 
-        # print(frame_tree_snapshot_hand)
         hand_bd_wrist_T_handcam_dict = (
             frame_tree_snapshot_hand.child_to_parent_edge_map.get(
                 "hand_color_image_sensor"
@@ -611,7 +609,6 @@ class SpotQRDetector:
     ):
         spot_world_frame = "vision" if use_vision_as_world else "odom"
 
-        # print(frame_tree_snapshot_head)
         head_bd_fr_T_frfe_dict = frame_tree_snapshot_head.child_to_parent_edge_map.get(
             "frontright_fisheye"
         ).parent_tform_child
@@ -800,6 +797,7 @@ class SpotQRDetector:
 @click.option("--verbose", type=bool, default=True)
 @click.option("--use-spot/--no-spot", default=True)
 @click.option("--object-names", type=str, multiple=True, default=["smartphone"])
+@click.option("--qr/--no-qr", default=True)
 def main(
     data_path: str,
     vrs_name: str,
@@ -807,7 +805,10 @@ def main(
     verbose: bool,
     use_spot: bool,
     object_names: List[str],
+    qr: bool,
 ):
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("VRS_MPS_STREAMER")
     vrsfile = os.path.join(data_path, vrs_name + ".vrs")
     vrs_mps_streamer = AriaReader(
         vrs_file_path=vrsfile, mps_file_path=data_path, verbose=verbose
@@ -815,22 +816,25 @@ def main(
 
     outputs = vrs_mps_streamer.parse_camera_stream(
         stream_name=STREAM1_NAME,
-        detect_qr=True,
+        detect_qr=qr,
         detect_objects=True,
         object_labels=list(object_names),
         reverse=True,
     )
     # tag_img_list = outputs["tag_image_list"]
-    tag_img_metadata_list = outputs["tag_image_metadata_list"]
-    tag_device_T_marker_list = outputs["tag_device_T_marker_list"]
+    if qr:
+        tag_img_metadata_list = outputs["tag_image_metadata_list"]
+        tag_device_T_marker_list = outputs["tag_device_T_marker_list"]
 
-    avg_ariaWorld_T_marker = vrs_mps_streamer.get_avg_ariaWorld_T_marker(
-        tag_img_metadata_list,
-        tag_device_T_marker_list,
-        filter_dist=FILTER_DIST,
-    )
-    print(avg_ariaWorld_T_marker)
-    avg_marker_T_ariaWorld = avg_ariaWorld_T_marker.inverse()
+        avg_ariaWorld_T_marker = vrs_mps_streamer.get_avg_ariaWorld_T_marker(
+            tag_img_metadata_list,
+            tag_device_T_marker_list,
+            filter_dist=FILTER_DIST,
+        )
+        logger.debug(avg_ariaWorld_T_marker)
+        avg_marker_T_ariaWorld = avg_ariaWorld_T_marker.inverse()
+    else:
+        avg_ariaWorld_T_marker = sp.SE3()
 
     # find best device location, wrt AriaWorld, for best scored object detection
     # FIXME: extend to multiple objects
@@ -865,7 +869,7 @@ def main(
             avg_spot_T_marker,
         ) = spot_qr.get_avg_spotWorld_T_marker_HAND()
 
-        print(avg_spotWorld_T_marker)
+        logger.debug(avg_spotWorld_T_marker)
 
         avg_spotWorld_T_ariaWorld = avg_spotWorld_T_marker * avg_marker_T_ariaWorld
         avg_ariaWorld_T_spotWorld = avg_spotWorld_T_ariaWorld.inverse()
@@ -922,7 +926,7 @@ def main(
             )
             pose_of_interest = next_object_spotWorld_T_cpf
             position = pose_of_interest.translation()
-            print(f" Going to {next_object=} at {position=}")
+            logger.debug(f" Going to {next_object=} at {position=}")
             if not dry_run:
                 skill_manager = SpotSkillManager()
                 skill_manager.nav(
@@ -930,7 +934,7 @@ def main(
                 )  # FIXME: get yaw from Aria Pose
                 skill_manager.pick(next_object)
         else:
-            print(f"Showing {next_object=}")
+            logger.debug(f"Showing {next_object=}")
             vrs_mps_streamer.plot_rgb_and_trajectory(
                 pose_list=[
                     avg_ariaWorld_T_marker,

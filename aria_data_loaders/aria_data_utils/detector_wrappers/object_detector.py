@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -30,6 +31,7 @@ class ObjectDetectorWrapper(GenericDetector):
 
     def __init__(self):
         super().__init__()
+        self._logger = logging.getLogger("ObjectDetectorWrapper")
 
     def _init_object_detector(
         self, object_labels: List[str], verbose: bool = True
@@ -131,16 +133,18 @@ class ObjectDetectorWrapper(GenericDetector):
             )
             if "hand" in objects_in_frame and core_intersection != []:
                 for object_name in core_intersection:
-                    print(f"checking for intersection b/w: {object_name} and hand")
+                    self._logger.debug(
+                        f"checking for intersection b/w: {object_name} and hand"
+                    )
                     stop[object_name] = check_bbox_intersection(
                         detections[objects_in_frame.index(object_name)][2],
                         detections[objects_in_frame.index("hand")][2],
                     )
-                    print(f"Intersection: {stop[object_name]}")
+                    self._logger.debug(f"Intersection: {stop[object_name]}")
         core_detections = [det for det in detections if det[0] in self._core_objects]
         score = centered_heuristic(core_detections, image_size=img_size)
 
-        if len(detections) == 1 and detections[0][0] == "hand":
+        if len(detections) == 1 and detections[0][0] == "hand" or len(detections) == 0:
             valid = False
 
         return valid, score, stop
@@ -175,17 +179,21 @@ class ObjectDetectorWrapper(GenericDetector):
             # check which object we need to stop detection for
             for object_name in stop.keys():
                 if stop[object_name]:
-                    print(f"Turning off object-detection for {object_name}")
+                    self._logger.debug(
+                        f"Turning off object-detection for {object_name}"
+                    )
                     # delete object_name from labels and regenerate prompts
                     self._core_objects.remove(object_name)
-                    print(f"Remaining objects: {self._core_objects}")
+                    self._logger.debug(f"Remaining objects: {self._core_objects}")
                     if not self._core_objects:
                         self.disable_detector()
                     else:
                         self.object_detector.update_label(
                             [self._core_objects + self._meta_objects]
                         )
-                        print(f"Updated labels: {self.object_detector.labels}")
+                        self._logger.debug(
+                            f"Updated labels: {self.object_detector.labels}"
+                        )
 
         # Ignore the score if the detections are not valid
         if not valid:
