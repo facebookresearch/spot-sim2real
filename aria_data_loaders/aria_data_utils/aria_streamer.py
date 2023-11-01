@@ -215,6 +215,7 @@ class AriaReader:
         object_labels: List[str] = None,
         iteration_range: Tuple[int, int] = None,
         reverse: bool = False,
+        meta_objects: List[str] = ["hand"],
     ) -> Dict[str, Any]:
         """Parse linearly through a camera stream and return a dict of detections
         Detection types supported:
@@ -275,14 +276,16 @@ class AriaReader:
                 )
             )
 
-        # Setup object detection (Owl-VIT) if needed
+        # Setup object detection (Owl-ViT) if needed
         if detect_objects:
             self.object_detection_wrapper.enable_detector()
             outputs.update(
                 self.object_detection_wrapper._init_object_detector(
-                    object_labels, verbose=self.verbose
+                    object_labels + meta_objects, verbose=self.verbose
                 )
             )
+            self.object_detection_wrapper._core_objects = object_labels
+            self.object_detection_wrapper._meta_objects = meta_objects
 
         if should_display:
             self._create_display_window(stream_name)
@@ -796,14 +799,14 @@ class SpotQRDetector:
 @click.option("--dry-run", type=bool, default=False)
 @click.option("--verbose", type=bool, default=True)
 @click.option("--use-spot/--no-spot", default=True)
-@click.option("--object-labels", type=list, default=["smartphone"])
+@click.option("--object-names", type=str, multiple=True, default=["smartphone"])
 def main(
     data_path: str,
     vrs_name: str,
     dry_run: bool,
     verbose: bool,
     use_spot: bool,
-    object_labels: List[str],
+    object_names: List[str],
 ):
     vrsfile = os.path.join(data_path, vrs_name + ".vrs")
     vrs_mps_streamer = AriaReader(
@@ -814,7 +817,7 @@ def main(
         stream_name=STREAM1_NAME,
         detect_qr=True,
         detect_objects=True,
-        object_labels=object_labels + ["person", "hand"],
+        object_labels=list(object_names),
         reverse=True,
     )
     # tag_img_list = outputs["tag_image_list"]
@@ -837,22 +840,22 @@ def main(
     best_object_frame_timestamp_ns = {}
     best_object_ariaWorld_T_device = {}
     best_object_img = {}
-    for object_name in object_labels:
+    for object_name in object_names:
         # TODO: what happens when object is not detected?
         best_object_frame_idx[object_name] = outputs["object_score_list"][
             object_name
         ].index(max(outputs["object_score_list"][object_name]))
         best_object_frame_timestamp_ns[object_name] = outputs[
             "object_image_metadata_list"
-        ][object_name][best_object_frame_idx].capture_timestamp_ns
+        ][object_name][best_object_frame_idx[object_name]].capture_timestamp_ns
         best_object_ariaWorld_T_device[
             object_name
         ] = vrs_mps_streamer.get_closest_ariaWorld_T_device_to_timestamp(
             best_object_frame_timestamp_ns[object_name]
         )
         best_object_img[object_name] = outputs["object_image_list"][object_name][
-            best_object_frame_idx
-        ]  # FIXME:
+            best_object_frame_idx[object_name]
+        ]
 
     if use_spot:
         spot = Spot("ArmKeyboardTeleop")
@@ -877,12 +880,16 @@ def main(
             ]
         )
 
-        for i in range(len(object_labels)):
-            # choose the next object to pick
-            next_object = object_labels[i]
+    for i in range(len(object_names)):
+        # choose the next object to pick
+        next_object = object_names[i]
 
+        next_object_ariaWorld_T_device = best_object_ariaWorld_T_device[next_object]
+        next_object_ariaWorld_T_cpf = (
+            next_object_ariaWorld_T_device * vrs_mps_streamer.device_T_cpf
+        )
+        if use_spot:
             # get the best object pose in spotWorld frame
-            next_object_ariaWorld_T_device = best_object_ariaWorld_T_device[next_object]
             next_object_spotWorld_T_cpf = (
                 avg_spotWorld_T_ariaWorld
                 * next_object_ariaWorld_T_device
@@ -922,18 +929,19 @@ def main(
                     position[0], position[1], 0.0
                 )  # FIXME: get yaw from Aria Pose
                 skill_manager.pick(next_object)
-    if not use_spot:
-        vrs_mps_streamer.plot_rgb_and_trajectory(
-            pose_list=[
-                avg_ariaWorld_T_marker,
-                vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
-            ],
-            rgb=best_object_img
-            if best_object_img
-            else np.zeros((10, 10, 3), dtype=np.uint8),
-            traj_data=vrs_mps_streamer.xyz_trajectory,
-            block=True,
-        )
+        else:
+            print(f"Showing {next_object=}")
+            vrs_mps_streamer.plot_rgb_and_trajectory(
+                pose_list=[
+                    avg_ariaWorld_T_marker,
+                    next_object_ariaWorld_T_cpf,
+                ],
+                rgb=best_object_img[next_object]
+                if best_object_img
+                else np.zeros((10, 10, 3), dtype=np.uint8),
+                traj_data=vrs_mps_streamer.xyz_trajectory,
+                block=True,
+            )
 
 
 if __name__ == "__main__":

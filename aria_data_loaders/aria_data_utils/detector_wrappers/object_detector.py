@@ -64,6 +64,8 @@ class ObjectDetectorWrapper(GenericDetector):
             obj_name: [] for obj_name in object_labels
         }
         outputs["object_score_list"] = {obj_name: [] for obj_name in object_labels}
+        self._core_objects: list = None
+        self._meta_objects: list = None
         return outputs
 
     def _get_scored_object_detections(
@@ -97,7 +99,7 @@ class ObjectDetectorWrapper(GenericDetector):
         self, detections, img_size=(512, 512)
     ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
         """*P1 Demo Specific*
-        Heuristics to filter out unwanted and bad obejct detections. This heuristic
+        Heuristics to filter out unwanted and bad object detections. This heuristic
         scores each img frame based on (a) % of pixels occupied by object in the img frame
         and (b) proximity of bbox to image center. Further only those images are
         scored which have only the object detection without a hand in the img frame.
@@ -114,24 +116,32 @@ class ObjectDetectorWrapper(GenericDetector):
             score (Dict[str, float]): Score of the img frame (based on :heuristic:)
             stop (Dict[str, bool]): Whether to stop the detector or not
         """
-        valid = False
+        # FIXME: extend centered_heuristic for multiple objects, extend
+        # check_bbox_intersection logic for multiple objects
+        valid = True
         score = {}
         stop = {}
         # figure out if this is an interaction img frame
         if len(detections) > 1:
             objects_in_frame = [det[0] for det in detections]
-            # FIXME: only works for 1 object of interest right now, extend to multiple
-            if "hand" in objects_in_frame and "penguin_plush" in objects_in_frame:
-                print(f"checking for intersection b/w: {object}")
-                stop["penguin_plush"] = check_bbox_intersection(
-                    detections[objects_in_frame.index("penguin_plush")][2],
-                    detections[objects_in_frame.index("hand")][2],
-                )
-                print(f"Intersection: {stop}")
-        if len(detections) == 1:
-            if "penguin_plush" == detections[0][0]:
-                score["penguin_plush"] = centered_heuristic(detections)[0]
-                valid = True
+            # find intersection b/w object_in_frame and self._meta_objects and
+            # self._core_objects
+            core_intersection = list(
+                set(self._core_objects).intersection(set(objects_in_frame))
+            )
+            if "hand" in objects_in_frame and core_intersection != []:
+                for object_name in core_intersection:
+                    print(f"checking for intersection b/w: {object_name} and hand")
+                    stop[object_name] = check_bbox_intersection(
+                        detections[objects_in_frame.index(object_name)][2],
+                        detections[objects_in_frame.index("hand")][2],
+                    )
+                    print(f"Intersection: {stop[object_name]}")
+        core_detections = [det for det in detections if det[0] in self._core_objects]
+        score = centered_heuristic(core_detections, image_size=img_size)
+
+        if len(detections) == 1 and detections[0][0] == "hand":
+            valid = False
 
         return valid, score, stop
 
@@ -161,9 +171,21 @@ class ObjectDetectorWrapper(GenericDetector):
         ) = self._get_scored_object_detections(
             img_frame, heuristic=self._aria_fetch_demo_heuristics
         )
-        if stop and stop["penguin_plush"]:
-            print("Turning off object-detection")
-            self.disable_detector()
+        if stop != {}:
+            # check which object we need to stop detection for
+            for object_name in stop.keys():
+                if stop[object_name]:
+                    print(f"Turning off object-detection for {object_name}")
+                    # delete object_name from labels and regenerate prompts
+                    self._core_objects.remove(object_name)
+                    print(f"Remaining objects: {self._core_objects}")
+                    if not self._core_objects:
+                        self.disable_detector()
+                    else:
+                        self.object_detector.update_label(
+                            [self._core_objects + self._meta_objects]
+                        )
+                        print(f"Updated labels: {self.object_detector.labels}")
 
         # Ignore the score if the detections are not valid
         if not valid:
