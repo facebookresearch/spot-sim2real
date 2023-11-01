@@ -296,7 +296,9 @@ class MixerPolicy(RealPolicy):
 
 if __name__ == "__main__":
     gaze_policy = GazePolicy(
-        "weights/bbox_mask_5thresh_autograsp_shortrange_seed1_36.pth",
+        # "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
+        # "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4.ckpt.1652.pth",
+        "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_only_state_dict.pth",
         device="cpu",
     )
     gaze_policy.reset()
