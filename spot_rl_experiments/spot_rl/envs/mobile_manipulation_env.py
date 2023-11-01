@@ -285,9 +285,9 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
             grasp = self.should_grasp()
 
         if self.grasp_attempted:
-            max_joint_movement_key = "MAX_JOINT_MOVEMENT_2"
+            self.max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT_2
         else:
-            max_joint_movement_key = "MAX_JOINT_MOVEMENT"
+            self.max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT
 
         # Slow the base down if we are close to the nav target for grasp to limit blur
         if (
@@ -306,7 +306,6 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
             arm_action=arm_action,
             grasp=grasp,
             place=place,
-            max_joint_movement_key=max_joint_movement_key,
             disable_oa=disable_oa,
             *args,
             **kwargs,
