@@ -9,9 +9,20 @@ import numpy as np
 import torch
 from gym import spaces
 from gym.spaces import Dict as SpaceDict
-from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
-from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
-from habitat_baselines.utils.common import batch_obs
+
+try:
+    # The origin spot sim2real env
+    from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
+    from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
+
+except Exception:
+    # Based on the new habitat
+    import sys
+
+    sys.path.append("/Users/jimmytyyang/research/habitat-lab/habitat-lab")
+    sys.path.append("/Users/jimmytyyang/research/habitat-lab/habitat-baselines")
+    from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
+    from habitat_baselines.utils.common import batch_obs
 
 
 # Turn numpy observations into torch tensors for consumption by policy
@@ -31,7 +42,8 @@ class RealPolicy:
         observation_space,
         action_space,
         device,
-        policy_class=PointNavBaselinePolicy,
+        policy_class=None,  # PointNavBaselinePolicy,
+        config_path=None,
     ):
         print("Loading policy...")
         self.device = torch.device(device)
@@ -39,14 +51,22 @@ class RealPolicy:
             checkpoint = torch.load(checkpoint_path, map_location="cpu")
         else:
             checkpoint = checkpoint_path
-        breakpoint()
-        config = checkpoint["config"]
+
+        # Load the config
+        if config_path is not None:
+            config = torch.load(config_path, map_location="cpu")
+            config = config["config"]
+        else:
+            config = checkpoint["config"]
 
         """ Disable observation transforms for real world experiments """
-        config.defrost()
-        config.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS = []
-        config.freeze()
-        config.RL.POLICY["init"] = False
+        try:
+            config.defrost()
+            config.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS = []
+            config.freeze()
+            config.RL.POLICY["init"] = False
+        except Exception:
+            print("Does not support the old config")
 
         self.policy = policy_class.from_config(
             config=config,
@@ -58,9 +78,15 @@ class RealPolicy:
         self.policy.to(self.device)
 
         # Load trained weights into the policy
-        self.policy.load_state_dict(
-            {k[len("actor_critic.") :]: v for k, v in checkpoint["state_dict"].items()}
-        )
+        try:
+            self.policy.load_state_dict(
+                {
+                    k[len("actor_critic.") :]: v
+                    for k, v in checkpoint["state_dict"].items()
+                }
+            )
+        except Exception:
+            self.policy.load_state_dict(checkpoint["state_dict"])
 
         self.prev_actions = None
         self.test_recurrent_hidden_states = None
@@ -72,12 +98,20 @@ class RealPolicy:
 
     def reset(self):
         self.reset_ran = True
-        self.test_recurrent_hidden_states = torch.zeros(
-            1,  # The number of environments. Just one for real world.
-            self.policy.net.num_recurrent_layers,
-            self.config.RL.PPO.hidden_size,
-            device=self.device,
-        )
+        try:
+            self.test_recurrent_hidden_states = torch.zeros(
+                1,  # The number of environments. Just one for real world.
+                self.policy.net.num_recurrent_layers,
+                self.config.RL.PPO.hidden_size,
+                device=self.device,
+            )
+        except Exception:
+            self.test_recurrent_hidden_states = torch.zeros(
+                1,  # The number of environments. Just one for real world.
+                self.policy.net.num_recurrent_layers,
+                self.config.habitat_baselines.rl.ppo.hidden_size,
+                device=self.device,
+            )
 
         # We start an episode with 'done' being True (0 for 'not_done')
         self.not_done_masks = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
@@ -87,14 +121,26 @@ class RealPolicy:
         assert self.reset_ran, "You need to call .reset() on the policy first."
         batch = batch_obs([observations], device=self.device)
         with torch.no_grad():
-            _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
-                batch,
-                self.test_recurrent_hidden_states,
-                self.prev_actions,
-                self.not_done_masks,
-                deterministic=True,
-                actions_only=True,
-            )
+            try:
+                _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
+                    batch,
+                    self.test_recurrent_hidden_states,
+                    self.prev_actions,
+                    self.not_done_masks,
+                    deterministic=True,
+                    actions_only=True,
+                )
+            except Exception:
+                PolicyActionData = self.policy.act(
+                    batch,
+                    self.test_recurrent_hidden_states,
+                    self.prev_actions,
+                    self.not_done_masks,
+                    deterministic=True,
+                )
+                actions = PolicyActionData.actions
+                self.test_recurrent_hidden_states = PolicyActionData.rnn_hidden_states
+
         self.prev_actions.copy_(actions)
         self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)
 
@@ -122,6 +168,38 @@ class GazePolicy(RealPolicy):
         )
         action_space = spaces.Box(-1.0, 1.0, (4,))
         super().__init__(checkpoint_path, observation_space, action_space, device)
+
+
+class MobileGazePolicy(RealPolicy):
+    def __init__(self, checkpoint_path, config_path, device):
+        observation_space = SpaceDict(
+            {
+                "arm_depth_bbox_sensor": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(240, 228, 1),
+                    dtype=np.float32,
+                ),
+                "articulated_agent_arm_depth": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "joint": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(4,),
+                    dtype=np.float32,
+                ),
+            }
+        )
+        action_space = spaces.Box(-1.0, 1.0, (7,))
+        super().__init__(
+            checkpoint_path,
+            observation_space,
+            action_space,
+            device,
+            PointNavResNetPolicy,
+            config_path,
+        )
 
 
 class PlacePolicy(RealPolicy):
@@ -296,18 +374,16 @@ class MixerPolicy(RealPolicy):
 
 
 if __name__ == "__main__":
-    gaze_policy = GazePolicy(
-        # "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
-        # "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4.ckpt.1652.pth",
-        "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_only_state_dict.pth",
+    gaze_policy = MobileGazePolicy(
+        "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_only_state_dict.pth",
+        "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_only_config.pth",
         device="cpu",
     )
     gaze_policy.reset()
     observations = {
-        "arm_depth": np.zeros([240, 320, 1], dtype=np.float32),
-        "arm_depth_bbox": np.zeros([240, 320, 1], dtype=np.float32),
+        "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
+        "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
         "joint": np.zeros(4, dtype=np.float32),
-        "is_holding": np.zeros(1, dtype=np.float32),
     }
     actions = gaze_policy.act(observations)
     print("actions:", actions)
