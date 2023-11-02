@@ -167,7 +167,13 @@ class GazePolicy(RealPolicy):
             }
         )
         action_space = spaces.Box(-1.0, 1.0, (4,))
-        super().__init__(checkpoint_path, observation_space, action_space, device)
+        super().__init__(
+            checkpoint_path,
+            observation_space,
+            action_space,
+            device,
+            PointNavBaselinePolicy,
+        )
 
 
 class MobileGazePolicy(RealPolicy):
@@ -374,16 +380,30 @@ class MixerPolicy(RealPolicy):
 
 
 if __name__ == "__main__":
-    gaze_policy = MobileGazePolicy(
+    mobile_gaze_policy = MobileGazePolicy(
         "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_only_state_dict.pth",
         "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_only_config.pth",
         device="cpu",
     )
-    gaze_policy.reset()
+    mobile_gaze_policy.reset()
     observations = {
         "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
         "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
         "joint": np.zeros(4, dtype=np.float32),
+    }
+    actions = mobile_gaze_policy.act(observations)
+    print("actions:", actions)
+
+    gaze_policy = GazePolicy(
+        "weights/bbox_mask_5thresh_autograsp_shortrange_seed1_36.pth",
+        device="cpu",
+    )
+    gaze_policy.reset()
+    observations = {
+        "arm_depth": np.zeros([240, 320, 1], dtype=np.float32),
+        "arm_depth_bbox": np.zeros([240, 320, 1], dtype=np.float32),
+        "joint": np.zeros(4, dtype=np.float32),
+        "is_holding": np.zeros(1, dtype=np.float32),
     }
     actions = gaze_policy.act(observations)
     print("actions:", actions)
