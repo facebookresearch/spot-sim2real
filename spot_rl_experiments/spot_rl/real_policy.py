@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from gym import spaces
 from gym.spaces import Dict as SpaceDict
+from torch import Size, Tensor
 
 try:
     # The origin spot sim2real env
@@ -22,7 +23,7 @@ except Exception:
     sys.path.append("/Users/jimmytyyang/research/habitat-lab/habitat-lab")
     sys.path.append("/Users/jimmytyyang/research/habitat-lab/habitat-baselines")
     from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
-    from habitat_baselines.utils.common import batch_obs
+    from habitat_baselines.utils.common import GaussianNet, batch_obs
 
 
 # Turn numpy observations into torch tensors for consumption by policy
@@ -33,6 +34,17 @@ def to_tensor(v):
         return torch.from_numpy(v)
     else:
         return torch.tensor(v, dtype=torch.float)
+
+
+class CustomNormal(torch.distributions.normal.Normal):
+    def sample(self, sample_shape: Size = torch.Size()) -> Tensor:  # noqa: B008
+        return self.rsample(sample_shape)
+
+    def log_probs(self, actions) -> Tensor:
+        return super().log_prob(actions).sum(-1, keepdim=True)
+
+    def entropy(self) -> Tensor:
+        return super().entropy().sum(-1, keepdim=True)
 
 
 class RealPolicy:
@@ -58,6 +70,8 @@ class RealPolicy:
             config = config["config"]
         else:
             config = checkpoint["config"]
+
+        self.config = config
 
         """ Disable observation transforms for real world experiments """
         try:
@@ -131,6 +145,38 @@ class RealPolicy:
                     actions_only=True,
                 )
             except Exception:
+
+                # Using torch script to save the model
+                traced_cell = torch.jit.trace(
+                    self.policy.net,
+                    (
+                        batch,
+                        self.test_recurrent_hidden_states,
+                        self.prev_actions,
+                        self.not_done_masks,
+                    ),
+                    strict=False,
+                )
+                torch.jit.save(
+                    traced_cell,
+                    "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ts.pth",
+                )
+                # Using torch script to save action distribution
+                traced_cell_ad = torch.jit.trace(
+                    self.policy.action_distribution.mu_maybe_std,
+                    (torch.tensor(torch.zeros((1, 512)))),
+                    strict=False,
+                )
+                torch.jit.save(
+                    traced_cell_ad,
+                    "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ad_ts.pth",
+                )
+                # Using torch script to save std
+                torch.save(
+                    self.policy.action_distribution.std,
+                    "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_std.pth",
+                )
+
                 PolicyActionData = self.policy.act(
                     batch,
                     self.test_recurrent_hidden_states,
@@ -140,6 +186,7 @@ class RealPolicy:
                 )
                 actions = PolicyActionData.actions
                 self.test_recurrent_hidden_states = PolicyActionData.rnn_hidden_states
+                print("original hidden state:", PolicyActionData.rnn_hidden_states)
 
         self.prev_actions.copy_(actions)
         self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)
@@ -148,6 +195,52 @@ class RealPolicy:
         actions = actions.squeeze().cpu().numpy()
 
         return actions
+
+    def get_action(self, mu_maybe_std, std):
+        mu_maybe_std = mu_maybe_std.float()
+        mu = mu_maybe_std
+
+        mu = torch.tanh(mu)
+        std = torch.clamp(std, -5, 2)
+        std = torch.exp(std)
+
+        return CustomNormal(mu, std, validate_args=False)
+
+    def act_ts(self, observation):
+        """Using torchscript to run the model"""
+        # Using torch script to save the model
+        batch = batch_obs([observations], device=self.device)
+        loaded_trace = torch.jit.load(
+            "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ts.pth"
+        )
+        loaded_trace_ad = torch.jit.load(
+            "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ad_ts.pth"
+        )
+        load_std = torch.load(
+            "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_std.pth"
+        )
+        with torch.no_grad():
+            output_model = loaded_trace(
+                batch,
+                self.test_recurrent_hidden_states,
+                self.prev_actions,
+                self.not_done_masks,
+            )
+
+        features = output_model[0]
+        rnn_hidden_states = output_model[1]
+
+        with torch.no_grad():
+            features_ad = loaded_trace_ad(features)
+
+            action = self.get_action(features_ad, load_std)
+            action = action.mean
+
+        # action_distribution = GaussianNet(512,7, self.config["habitat_baselines"]["rl"]["policy"]["main_agent"]["action_dist"],)
+        # distribution = action_distribution(features)
+        # action = distribution.mean
+        # self.policy.action_distribution(features).mean
+        return action, rnn_hidden_states
 
 
 class GazePolicy(RealPolicy):
@@ -392,18 +485,42 @@ if __name__ == "__main__":
         "joint": np.zeros(4, dtype=np.float32),
     }
     actions = mobile_gaze_policy.act(observations)
-    print("actions:", actions)
+    original_recurrent_hidden_state = mobile_gaze_policy.test_recurrent_hidden_states
 
-    gaze_policy = GazePolicy(
-        "weights/bbox_mask_5thresh_autograsp_shortrange_seed1_36.pth",
-        device="cpu",
-    )
-    gaze_policy.reset()
-    observations = {
-        "arm_depth": np.zeros([240, 320, 1], dtype=np.float32),
-        "arm_depth_bbox": np.zeros([240, 320, 1], dtype=np.float32),
-        "joint": np.zeros(4, dtype=np.float32),
-        "is_holding": np.zeros(1, dtype=np.float32),
-    }
-    actions = gaze_policy.act(observations)
     print("actions:", actions)
+    print("Torch script method")
+
+    mobile_gaze_policy.reset()
+    ts_output = mobile_gaze_policy.act_ts(observations)
+    actions_ts = ts_output[0]
+    rnn_hidden_states = ts_output[1]
+
+    print("action:", actions_ts)
+
+    print("=====Comparsion=====")
+    print(
+        torch.sum(original_recurrent_hidden_state - rnn_hidden_states),
+        "<-should be zero!",
+    )
+    print(torch.sum(abs(actions_ts - actions)), "<-should be zero!")
+    #  out, rnn_hidden_states, aux_loss_state
+    # from habitat_baselines.utils.common import GaussianNet
+    # self.action_distribution = GaussianNet(
+    #     512, #self.net.output_size,
+    #     7,
+    #     config["habitat_baselines"]["rl"]["policy"]["main_agent"]["action_dist"],
+    # )
+
+    # gaze_policy = GazePolicy(
+    #     "weights/bbox_mask_5thresh_autograsp_shortrange_seed1_36.pth",
+    #     device="cpu",
+    # )
+    # gaze_policy.reset()
+    # observations = {
+    #     "arm_depth": np.zeros([240, 320, 1], dtype=np.float32),
+    #     "arm_depth_bbox": np.zeros([240, 320, 1], dtype=np.float32),
+    #     "joint": np.zeros(4, dtype=np.float32),
+    #     "is_holding": np.zeros(1, dtype=np.float32),
+    # }
+    # actions = gaze_policy.act(observations)
+    # print("actions:", actions)
