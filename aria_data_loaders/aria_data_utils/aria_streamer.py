@@ -904,7 +904,6 @@ def main(
                     avg_spotWorld_T_marker,
                     avg_spotWorld_T_ariaWorld * vrs_mps_streamer.device_T_cpf,
                     spot_qr.get_spot_a_T_b("vision", "body"),
-                    # avg_spotWorld_T_ariaWorld * vrs_mps_streamer.ariaWorld_T_device_trajectory[-1],
                     next_object_spotWorld_T_cpf,
                 ],
                 rgb=np.zeros((10, 10, 3), dtype=np.uint8),
@@ -916,9 +915,7 @@ def main(
                     avg_ariaWorld_T_marker,
                     avg_ariaWorld_T_spotWorld,
                     avg_ariaWorld_T_spot,
-                    vrs_mps_streamer.ariaWorld_T_device_trajectory[
-                        -1
-                    ],  # TODO: replace with best object device pose
+                    next_object_spotWorld_T_cpf,
                 ],
                 rgb=np.zeros((10, 10, 3), dtype=np.uint8),
                 traj_data=vrs_mps_streamer.xyz_trajectory,

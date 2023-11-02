@@ -176,6 +176,14 @@ class ObjectDetectorWrapper(GenericDetector):
             img_frame, heuristic=self._aria_fetch_demo_heuristics
         )
         if stop != {}:
+            # object-detection + checking for intersection b/w all objects and hand
+            # is a computationally expensive operation (happens inside
+            # _get_scored_object_detections()).
+            # For efficiency, in this code, we turn off object detection for the objects
+            # that have already been detected and their place location has been recorded
+            # This is done by removing the object_name from the labels and regenerating
+            # the prompts for the object detector.
+
             # check which object we need to stop detection for
             for object_name in stop.keys():
                 if stop[object_name]:
