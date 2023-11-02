@@ -9,21 +9,11 @@ import numpy as np
 import torch
 from gym import spaces
 from gym.spaces import Dict as SpaceDict
+from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
+from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
+from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
+from habitat_baselines.utils.common import GaussianNet, batch_obs
 from torch import Size, Tensor
-
-try:
-    # The origin spot sim2real env
-    from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
-    from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
-
-except Exception:
-    # Based on the new habitat
-    import sys
-
-    sys.path.append("/Users/jimmytyyang/research/habitat-lab/habitat-lab")
-    sys.path.append("/Users/jimmytyyang/research/habitat-lab/habitat-baselines")
-    from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
-    from habitat_baselines.utils.common import GaussianNet, batch_obs
 
 
 # Turn numpy observations into torch tensors for consumption by policy
@@ -54,76 +44,78 @@ class RealPolicy:
         observation_space,
         action_space,
         device,
-        policy_class=None,  # PointNavBaselinePolicy,
-        config_path=None,
+        policy_class=PointNavBaselinePolicy,
+        is_hab3_policy=False,
     ):
         print("Loading policy...")
         self.device = torch.device(device)
-        if isinstance(checkpoint_path, str):
-            checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        if is_hab3_policy:
+            # Hab3 policy loading
+            # Load the policy using torch script
+            self.policy = {}
+            self.policy["net"] = torch.jit.load(checkpoint_path["net"])
+            self.policy["action_dist"] = torch.jit.load(checkpoint_path["action_dis"])
+            self.policy["std"] = torch.load(checkpoint_path["std"])
         else:
-            checkpoint = checkpoint_path
+            if isinstance(checkpoint_path, str):
+                checkpoint = torch.load(checkpoint_path, map_location="cpu")
+            else:
+                checkpoint = checkpoint_path
 
         # Load the config
-        if config_path is not None:
-            config = torch.load(config_path, map_location="cpu")
-            config = config["config"]
-        else:
+        if not is_hab3_policy:
             config = checkpoint["config"]
 
-        self.config = config
-
         """ Disable observation transforms for real world experiments """
-        try:
+        if not is_hab3_policy:
             config.defrost()
             config.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS = []
             config.freeze()
             config.RL.POLICY["init"] = False
-        except Exception:
-            print("Does not support the old config")
 
-        self.policy = policy_class.from_config(
-            config=config,
-            observation_space=observation_space,
-            action_space=action_space,
-        )
-        print("Actor-critic architecture:", self.policy)
-        # Move it to the device
-        self.policy.to(self.device)
+            self.policy = policy_class.from_config(
+                config=config,
+                observation_space=observation_space,
+                action_space=action_space,
+            )
+            print("Actor-critic architecture:", self.policy)
+            # Move it to the device
+            self.policy.to(self.device)
 
-        # Load trained weights into the policy
-        try:
+            # Load trained weights into the policy
             self.policy.load_state_dict(
                 {
                     k[len("actor_critic.") :]: v
                     for k, v in checkpoint["state_dict"].items()
                 }
             )
-        except Exception:
-            self.policy.load_state_dict(checkpoint["state_dict"])
 
         self.prev_actions = None
         self.test_recurrent_hidden_states = None
         self.not_done_masks = None
-        self.config = config
+        if is_hab3_policy:
+            self.config = None
+        else:
+            self.config = config
         self.num_actions = action_space.shape[0]
         self.reset_ran = False
+        self.is_hab3_policy = is_hab3_policy
         print("Policy loaded.")
 
     def reset(self):
         self.reset_ran = True
-        try:
+        if not self.is_hab3_policy:
             self.test_recurrent_hidden_states = torch.zeros(
                 1,  # The number of environments. Just one for real world.
                 self.policy.net.num_recurrent_layers,
                 self.config.RL.PPO.hidden_size,
                 device=self.device,
             )
-        except Exception:
+        else:
             self.test_recurrent_hidden_states = torch.zeros(
                 1,  # The number of environments. Just one for real world.
-                self.policy.net.num_recurrent_layers,
-                self.config.habitat_baselines.rl.ppo.hidden_size,
+                4,
+                512,
                 device=self.device,
             )
 
@@ -131,72 +123,8 @@ class RealPolicy:
         self.not_done_masks = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
         self.prev_actions = torch.zeros(1, self.num_actions, device=self.device)
 
-    def act(self, observations):
-        assert self.reset_ran, "You need to call .reset() on the policy first."
-        batch = batch_obs([observations], device=self.device)
-        with torch.no_grad():
-            try:
-                _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
-                    batch,
-                    self.test_recurrent_hidden_states,
-                    self.prev_actions,
-                    self.not_done_masks,
-                    deterministic=True,
-                    actions_only=True,
-                )
-            except Exception:
-
-                # Using torch script to save the model
-                traced_cell = torch.jit.trace(
-                    self.policy.net,
-                    (
-                        batch,
-                        self.test_recurrent_hidden_states,
-                        self.prev_actions,
-                        self.not_done_masks,
-                    ),
-                    strict=False,
-                )
-                torch.jit.save(
-                    traced_cell,
-                    "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ts.pth",
-                )
-                # Using torch script to save action distribution
-                traced_cell_ad = torch.jit.trace(
-                    self.policy.action_distribution.mu_maybe_std,
-                    (torch.tensor(torch.zeros((1, 512)))),
-                    strict=False,
-                )
-                torch.jit.save(
-                    traced_cell_ad,
-                    "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ad_ts.pth",
-                )
-                # Using torch script to save std
-                torch.save(
-                    self.policy.action_distribution.std,
-                    "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_std.pth",
-                )
-
-                PolicyActionData = self.policy.act(
-                    batch,
-                    self.test_recurrent_hidden_states,
-                    self.prev_actions,
-                    self.not_done_masks,
-                    deterministic=True,
-                )
-                actions = PolicyActionData.actions
-                self.test_recurrent_hidden_states = PolicyActionData.rnn_hidden_states
-                print("original hidden state:", PolicyActionData.rnn_hidden_states)
-
-        self.prev_actions.copy_(actions)
-        self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)
-
-        # GPU/CPU torch tensor -> numpy
-        actions = actions.squeeze().cpu().numpy()
-
-        return actions
-
     def get_action(self, mu_maybe_std, std):
+        """The final transformation of the action given inputs"""
         mu_maybe_std = mu_maybe_std.float()
         mu = mu_maybe_std
 
@@ -206,41 +134,45 @@ class RealPolicy:
 
         return CustomNormal(mu, std, validate_args=False)
 
-    def act_ts(self, observation):
-        """Using torchscript to run the model"""
-        # Using torch script to save the model
+    def act(self, observations):
+        assert self.reset_ran, "You need to call .reset() on the policy first."
         batch = batch_obs([observations], device=self.device)
-        loaded_trace = torch.jit.load(
-            "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ts.pth"
-        )
-        loaded_trace_ad = torch.jit.load(
-            "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_ad_ts.pth"
-        )
-        load_std = torch.load(
-            "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_std.pth"
-        )
         with torch.no_grad():
-            output_model = loaded_trace(
-                batch,
-                self.test_recurrent_hidden_states,
-                self.prev_actions,
-                self.not_done_masks,
-            )
+            if not self.is_hab3_policy:
+                _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
+                    batch,
+                    self.test_recurrent_hidden_states,
+                    self.prev_actions,
+                    self.not_done_masks,
+                    deterministic=True,
+                    actions_only=True,
+                )
+            else:
+                # Using torch script to save the model
+                with torch.no_grad():
+                    output_model = self.policy["net"](
+                        batch,
+                        self.test_recurrent_hidden_states,
+                        self.prev_actions,
+                        self.not_done_masks,
+                    )
 
-        features = output_model[0]
-        rnn_hidden_states = output_model[1]
+                features = output_model[0]
+                self.test_recurrent_hidden_states = output_model[1]
 
-        with torch.no_grad():
-            features_ad = loaded_trace_ad(features)
+                with torch.no_grad():
+                    raw_actions = self.get_action(
+                        self.policy["action_dist"](features), self.policy["std"]
+                    )
+                    actions = raw_actions.mean
 
-            action = self.get_action(features_ad, load_std)
-            action = action.mean
+        self.prev_actions.copy_(actions)
+        self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)
 
-        # action_distribution = GaussianNet(512,7, self.config["habitat_baselines"]["rl"]["policy"]["main_agent"]["action_dist"],)
-        # distribution = action_distribution(features)
-        # action = distribution.mean
-        # self.policy.action_distribution(features).mean
-        return action, rnn_hidden_states
+        # GPU/CPU torch tensor -> numpy
+        actions = actions.squeeze().cpu().numpy()
+
+        return actions
 
 
 class GazePolicy(RealPolicy):
@@ -265,12 +197,11 @@ class GazePolicy(RealPolicy):
             observation_space,
             action_space,
             device,
-            PointNavBaselinePolicy,
         )
 
 
 class MobileGazePolicy(RealPolicy):
-    def __init__(self, checkpoint_path, config_path, device):
+    def __init__(self, checkpoint_path, device):
         observation_space = SpaceDict(
             {
                 "arm_depth_bbox_sensor": spaces.Box(
@@ -296,8 +227,7 @@ class MobileGazePolicy(RealPolicy):
             observation_space,
             action_space,
             device,
-            PointNavResNetPolicy,
-            config_path,
+            is_hab3_policy=True,
         )
 
 
@@ -473,9 +403,18 @@ class MixerPolicy(RealPolicy):
 
 
 if __name__ == "__main__":
+    ckpt_dict = {}
+    ckpt_dict[
+        "net"
+    ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ts.pth"
+    ckpt_dict[
+        "action_dis"
+    ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
+    ckpt_dict[
+        "std"
+    ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_std.pth"
     mobile_gaze_policy = MobileGazePolicy(
-        "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_only_state_dict.pth",
-        "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_latest_only_config.pth",
+        ckpt_dict,
         device="cpu",
     )
     mobile_gaze_policy.reset()
@@ -485,42 +424,18 @@ if __name__ == "__main__":
         "joint": np.zeros(4, dtype=np.float32),
     }
     actions = mobile_gaze_policy.act(observations)
-    original_recurrent_hidden_state = mobile_gaze_policy.test_recurrent_hidden_states
-
     print("actions:", actions)
-    print("Torch script method")
 
-    mobile_gaze_policy.reset()
-    ts_output = mobile_gaze_policy.act_ts(observations)
-    actions_ts = ts_output[0]
-    rnn_hidden_states = ts_output[1]
-
-    print("action:", actions_ts)
-
-    print("=====Comparsion=====")
-    print(
-        torch.sum(original_recurrent_hidden_state - rnn_hidden_states),
-        "<-should be zero!",
+    gaze_policy = GazePolicy(
+        "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
+        device="cpu",
     )
-    print(torch.sum(abs(actions_ts - actions)), "<-should be zero!")
-    #  out, rnn_hidden_states, aux_loss_state
-    # from habitat_baselines.utils.common import GaussianNet
-    # self.action_distribution = GaussianNet(
-    #     512, #self.net.output_size,
-    #     7,
-    #     config["habitat_baselines"]["rl"]["policy"]["main_agent"]["action_dist"],
-    # )
-
-    # gaze_policy = GazePolicy(
-    #     "weights/bbox_mask_5thresh_autograsp_shortrange_seed1_36.pth",
-    #     device="cpu",
-    # )
-    # gaze_policy.reset()
-    # observations = {
-    #     "arm_depth": np.zeros([240, 320, 1], dtype=np.float32),
-    #     "arm_depth_bbox": np.zeros([240, 320, 1], dtype=np.float32),
-    #     "joint": np.zeros(4, dtype=np.float32),
-    #     "is_holding": np.zeros(1, dtype=np.float32),
-    # }
-    # actions = gaze_policy.act(observations)
-    # print("actions:", actions)
+    gaze_policy.reset()
+    observations = {
+        "arm_depth": np.zeros([240, 320, 1], dtype=np.float32),
+        "arm_depth_bbox": np.zeros([240, 320, 1], dtype=np.float32),
+        "joint": np.zeros(4, dtype=np.float32),
+        "is_holding": np.zeros(1, dtype=np.float32),
+    }
+    actions = gaze_policy.act(observations)
+    print("actions:", actions)
