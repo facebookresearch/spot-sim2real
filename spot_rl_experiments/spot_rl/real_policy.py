@@ -39,6 +39,7 @@ class RealPolicy:
             checkpoint = torch.load(checkpoint_path, map_location="cpu")
         else:
             checkpoint = checkpoint_path
+        breakpoint()
         config = checkpoint["config"]
 
         """ Disable observation transforms for real world experiments """
