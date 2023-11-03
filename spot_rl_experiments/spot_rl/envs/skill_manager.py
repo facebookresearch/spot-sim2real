@@ -77,7 +77,8 @@ class SpotSkillManager:
 
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
-
+        # TODO: hack: use this line to debug
+        # self.gaze_controller.execute(["box"])
         # Power on the robot
         self.spot.power_robot()
 
@@ -373,10 +374,10 @@ if __name__ == "__main__":
     spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 
     # Nav-Pick-Nav-Place sequence 1
-    # spotskillmanager.nav("working_table")
+    spotskillmanager.nav("working_table")
     spotskillmanager.pick("box")
-    # spotskillmanager.nav("black_case")
-    # spotskillmanager.place("black_case")
+    spotskillmanager.nav("black_case")
+    spotskillmanager.place("black_case")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()
