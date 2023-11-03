@@ -68,7 +68,10 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self):
+    def __init__(self, use_mobile_pick=False):
+        # Process the meta parameters
+        self._use_mobile_pick = use_mobile_pick
+
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
 
@@ -117,7 +120,11 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
-        self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
+        self.gaze_controller = GazeController(
+            config=self.pick_config,
+            spot=self.spot,
+            use_mobile_pick=self._use_mobile_pick,
+        )
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
         )
@@ -363,13 +370,13 @@ class SpotSkillManager:
 
 
 if __name__ == "__main__":
-    spotskillmanager = SpotSkillManager()
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 
     # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("working_table")
+    # spotskillmanager.nav("working_table")
     spotskillmanager.pick("box")
-    spotskillmanager.nav("black_case")
-    spotskillmanager.place("black_case")
+    # spotskillmanager.nav("black_case")
+    # spotskillmanager.place("black_case")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()
