@@ -403,6 +403,7 @@ class MixerPolicy(RealPolicy):
 
 
 if __name__ == "__main__":
+    # Loading Hab3 policy
     ckpt_dict = {}
     ckpt_dict[
         "net"
@@ -426,6 +427,7 @@ if __name__ == "__main__":
     actions = mobile_gaze_policy.act(observations)
     print("actions:", actions)
 
+    # Loading the old policy
     gaze_policy = GazePolicy(
         "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
         device="cpu",
