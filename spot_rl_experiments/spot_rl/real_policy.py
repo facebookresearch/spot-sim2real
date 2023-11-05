@@ -280,6 +280,29 @@ class NavPolicy(RealPolicy):
         super().__init__(checkpoint_path, observation_space, action_space, device)
 
 
+class SocialNavPolicy(RealPolicy):
+    def __init__(self, checkpoint_path, device):
+        observation_space = SpaceDict(
+            {
+                "articulated_agent_arm_depth": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "spot_head_stereo_depth_sensor": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "humanoid_detector_sensor": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(240, 228, 1),
+                    dtype=np.float32,
+                ),
+            }
+        )
+        # Linear, angular, and horizontal velocity (in that order)
+        action_space = spaces.Box(-1.0, 1.0, (2,))
+        super().__init__(checkpoint_path, observation_space, action_space, device)
+
+
 class MixerPolicy(RealPolicy):
     def __init__(
         self,
