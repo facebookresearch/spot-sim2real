@@ -414,15 +414,9 @@ class MixerPolicy(RealPolicy):
 if __name__ == "__main__":
     # Loading Hab3 policy
     ckpt_dict = {}
-    ckpt_dict[
-        "net"
-    ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ts.pth"
-    ckpt_dict[
-        "action_dis"
-    ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
-    ckpt_dict[
-        "std"
-    ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_std.pth"
+    ckpt_dict["net"] = "weights/mobile_gaze/mg3ns_4_latest_ts.pth"
+    ckpt_dict["action_dis"] = "weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
+    ckpt_dict["std"] = "weights/mobile_gaze/mg3ns_4_latest_std.pth"
     mobile_gaze_policy = MobileGazePolicy(
         ckpt_dict,
         device="cpu",
@@ -438,7 +432,7 @@ if __name__ == "__main__":
 
     # Loading the old policy
     gaze_policy = GazePolicy(
-        "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
+        "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
         device="cpu",
     )
     gaze_policy.reset()

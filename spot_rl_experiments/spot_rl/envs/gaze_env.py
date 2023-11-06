@@ -112,15 +112,9 @@ class GazeController:
         if use_mobile_pick:
             # TODO: hack: move all the checkpoint path into the gaze config
             ckpt_dict = {}
-            ckpt_dict[
-                "net"
-            ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ts.pth"
-            ckpt_dict[
-                "action_dis"
-            ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
-            ckpt_dict[
-                "std"
-            ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_std.pth"
+            ckpt_dict["net"] = config.WEIGHTS.MOBILE_GAZE_NET
+            ckpt_dict["action_dis"] = config.WEIGHTS.MOBILE_GAZE_ACTION_DIS
+            ckpt_dict["std"] = config.WEIGHTS.MOBILE_GAZE_STD
             # TODO: hack: using gpu has an issue for jit loading policy
             self.policy = MobileGazePolicy(ckpt_dict, device="cpu")
         else:

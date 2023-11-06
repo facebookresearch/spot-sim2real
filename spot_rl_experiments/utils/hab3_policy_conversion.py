@@ -4,6 +4,7 @@
 
 # This is the script that loads a pretrained policy from a checkpoint and convert it to torch script format
 
+import sys
 from collections import OrderedDict
 
 import numpy as np
@@ -12,6 +13,7 @@ from gym import spaces
 from gym.spaces import Dict as SpaceDict
 from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
 from habitat_baselines.utils.common import GaussianNet, batch_obs
+from spot_rl.utils.utils import get_default_parser
 from torch import Size, Tensor
 
 
@@ -219,25 +221,46 @@ class MobileGazePolicy(RealPolicy):
         )
 
 
+def parse_arguments(args=sys.argv[1:]):
+    parser = get_default_parser()
+    parser.add_argument(
+        "-t", "--target-hab3-policy", type=str, help="name of the target hab3 policy"
+    )
+    parser.add_argument(
+        "-n",
+        "--net",
+        type=str,
+        help="where to save torch script file for the net",
+    )
+    parser.add_argument(
+        "-a",
+        "--action-distribution",
+        type=str,
+        help="where to save torch script file for the action distribution",
+    )
+    parser.add_argument(
+        "-s",
+        "--std",
+        type=str,
+        help="where to save torch script file for the std",
+    )
+    args = parser.parse_args(args=args)
+
+    return args
+
+
 if __name__ == "__main__":
     """Script for loading the hab3-trained policy and convert it into a torchscript file.
     To run this script, you have to in hab3 conda enviornment with a latest habitat-sim"""
+    args = parse_arguments()
     # The save location of the policy
     save_path = {}
     # This should be your target hab3 policy
-    save_path[
-        "target_hab3_policy"
-    ] = "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4.ckpt.1653.pth"
+    save_path["target_hab3_policy"] = args.target_hab3_policy
     # The following should be the target save path in the local disk
-    save_path[
-        "net"
-    ] = "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_1653_ts.pth"
-    save_path[
-        "action_distribution"
-    ] = "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_1653_ad_ts.pth"
-    save_path[
-        "std"
-    ] = "/Users/jimmytyyang/Downloads/mobile_gaze_ckpt_1101/mg3ns_4_1653_std.pth"
+    save_path["net"] = args.net
+    save_path["action_distribution"] = args.action_distribution
+    save_path["std"] = args.std
 
     # The originl hab3 trained policy
     mobile_gaze_policy = MobileGazePolicy(
