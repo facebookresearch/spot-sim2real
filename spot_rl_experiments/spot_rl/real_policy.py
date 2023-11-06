@@ -27,6 +27,8 @@ def to_tensor(v):
 
 
 class CustomNormal(torch.distributions.normal.Normal):
+    """A custom normal distribution that allows us to use a custom log_prob function. It is introduced in habitat3"""
+
     def sample(self, sample_shape: Size = torch.Size()) -> Tensor:  # noqa: B008
         return self.rsample(sample_shape)
 

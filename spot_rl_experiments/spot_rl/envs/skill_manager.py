@@ -77,8 +77,7 @@ class SpotSkillManager:
 
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
-        # TODO: hack: use this line to debug
-        # self.gaze_controller.execute(["box"])
+
         # Power on the robot
         self.spot.power_robot()
 

@@ -110,18 +110,17 @@ class GazeController:
 
         # Setup
         if use_mobile_pick:
-            # TODO: hack: move all the checkpoint path into the gaze config
             ckpt_dict = {}
             ckpt_dict["net"] = config.WEIGHTS.MOBILE_GAZE_NET
             ckpt_dict["action_dis"] = config.WEIGHTS.MOBILE_GAZE_ACTION_DIS
             ckpt_dict["std"] = config.WEIGHTS.MOBILE_GAZE_STD
-            # TODO: hack: using gpu has an issue for jit loading policy
+            # TODO: Use GPU version has an issue for jit loading policy
             self.policy = MobileGazePolicy(ckpt_dict, device="cpu")
         else:
             self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
         self.policy.reset()
 
-        self.gaze_env = SpotGazeEnv(config, spot)
+        self.gaze_env = SpotGazeEnv(config, spot, use_mobile_pick)
 
     def reset_env_and_policy(self, target_obj_name):
         """
@@ -158,22 +157,12 @@ class GazeController:
             observations = self.reset_env_and_policy(target_obj_name=target_object)
             done = False
             start_time = time.time()
-            # TODO: hack: Better way to transform the policy. We need to edit the observation so that we can use mobile gaze
-            if self._use_mobile_pick:
-                origin_observations = {}
-                origin_observations["arm_depth_bbox_sensor"] = observations[
-                    "arm_depth_bbox"
-                ]
-                origin_observations["articulated_agent_arm_depth"] = observations[
-                    "arm_depth"
-                ]
-                origin_observations["joint"] = observations["joint"]
-                observations = origin_observations
             self.gaze_env.say(f"Gaze at target object - {target_object}")
+
             while not done:
                 action = self.policy.act(observations)
                 if self._use_mobile_pick:
-                    # TODO: hack: move the following to something more organized
+                    # The first four elements are for the arm; and the last two elements are for the base
                     observations, _, done, _ = self.gaze_env.step(
                         arm_action=action[0:4], base_action=action[4:6]
                     )
@@ -201,9 +190,10 @@ class GazeController:
 
 
 class SpotGazeEnv(SpotBaseEnv):
-    def __init__(self, config, spot):
+    def __init__(self, config, spot, use_mobile_pick):
         super().__init__(config, spot)
         self.target_obj_name = None
+        self._use_mobile_pick = use_mobile_pick
 
     def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
@@ -236,6 +226,18 @@ class SpotGazeEnv(SpotBaseEnv):
             "arm_depth": arm_depth,
             "arm_depth_bbox": arm_depth_bbox,
         }
+
+        # Overwrite the observation to get the mobile gaze observations
+        if self._use_mobile_pick:
+            mobile_gaze_observations = {}
+            mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
+                "arm_depth_bbox"
+            ]
+            mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
+                "arm_depth"
+            ]
+            mobile_gaze_observations["joint"] = observations["joint"]
+            observations = mobile_gaze_observations
 
         return observations
 
