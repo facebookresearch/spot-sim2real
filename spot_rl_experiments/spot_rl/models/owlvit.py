@@ -6,6 +6,7 @@
 # mypy: ignore-errors
 import argparse
 import time
+from typing import List
 
 import cv2
 import torch
@@ -210,7 +211,11 @@ class OwlVit:
 
         return img
 
-    def update_label(self, labels):
+    def update_label(self, labels: List[List[str]]):
+        """Update labels that need to be detected
+
+        New labels should be in the format [[label1, label2, ...]]
+        """
         labels_with_prefix = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.labels = labels_with_prefix
 
