@@ -929,10 +929,13 @@ def main(
             position = pose_of_interest.translation()
 
             # Find the angle made by CPF's z axis with spotWorld's x axis
-            # as robot should orient to the CPF's z axis
+            # as robot should orient to the CPF's z axis. First 3 elements of
+            # column 3 from spotWorld_T_cpf represents cpf's z axis in spotWorld frame
             cpf_z_axis_in_spotWorld = pose_of_interest.matrix()[:3, 2]
+            # Project cpf's z axis onto xy plane of spotWorld frame by ignoring z component
+            xy_plane_projection_array = np.array([1.0, 1.0, 0.0])
             projected_cpf_z_axis_in_spotWorld_xy = np.multiply(
-                cpf_z_axis_in_spotWorld, np.array([1.0, 1.0, 0.0])
+                cpf_z_axis_in_spotWorld, xy_plane_projection_array
             )
             orientation = float(
                 np.arctan2(
