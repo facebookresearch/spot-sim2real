@@ -7,9 +7,9 @@ WEIGHTS:
   # NAV: "weights/final_paper/nav_CUTOUT_WT_True_SD_300_ckpt.90.pth"
   GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
   # The model for the mobile gaze with net/action distribution/std
-  MOBILE_GAZE_NET: "weights/final_paper/mobile_gaze/mg3ns_4_1653_ts.pth"
-  MOBILE_GAZE_ACTION_DIS: "weights/final_paper/mobile_gaze/mg3ns_4_1653_ad_ts.pth"
-  MOBILE_GAZE_STD: "weights/final_paper/mobile_gaze/mg3ns_4_1653_std.pth"
+  MOBILE_GAZE_NET: "weights/mobile_gaze/mg3ns_4_1653_ts.pth"
+  MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg3ns_4_1653_ad_ts.pth"
+  MOBILE_GAZE_STD: "weights/mobile_gaze/mg3ns_4_1653_std.pth"
   # This is the config for the mobile gaze
   # GAZE: "weights/mobile_gaze/mg3ns_4.ckpt.1652.pth"
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"

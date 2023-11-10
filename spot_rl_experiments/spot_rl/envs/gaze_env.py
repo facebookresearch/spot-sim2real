@@ -8,6 +8,7 @@ import sys
 import time
 from typing import Dict, List
 
+import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.real_policy import GazePolicy, MobileGazePolicy
@@ -163,13 +164,21 @@ class GazeController:
                 action = self.policy.act(observations)
                 if self._use_mobile_pick:
                     # The first four elements are for the arm; and the last two elements are for the base
+                    arm_action = action[0:4]
+                    base_action = action[4:6]
+                    # TODO: hack
+                    base_action[0] = base_action[0] * 0.4
+                    base_action[1] = base_action[1] * 0.4
+                    print("arm_action", arm_action)
+                    print("base_action", base_action)
+                    if np.isnan(np.array(arm_action)).any():
+                        breakpoint()
                     observations, _, done, _ = self.gaze_env.step(
-                        arm_action=action[0:4], base_action=action[4:6]
+                        arm_action=arm_action, base_action=base_action
                     )
                 else:
                     observations, _, done, _ = self.gaze_env.step(arm_action=action)
             self.gaze_env.say("Gaze finished")
-
             # Ask user for feedback about the success of the gaze and update the "success" flag accordingly
             success_status_from_user_feedback = True
             if take_user_input:
