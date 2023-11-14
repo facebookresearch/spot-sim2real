@@ -8,9 +8,10 @@ import sys
 import time
 from typing import Dict, List
 
+import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_rl.real_policy import GazePolicy
+from spot_rl.real_policy import GazePolicy, MobileGazePolicy
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
@@ -103,15 +104,24 @@ class GazeController:
             spot.shutdown(should_dock=True)
     """
 
-    def __init__(self, config, spot):
+    def __init__(self, config, spot, use_mobile_pick=False):
         self.config = config
         self.spot = spot
+        self._use_mobile_pick = use_mobile_pick
 
-        # Setup
-        self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
+        if use_mobile_pick:
+            # Load the necessary checkpoints
+            ckpt_dict = {}
+            ckpt_dict["net"] = config.WEIGHTS.MOBILE_GAZE_NET
+            ckpt_dict["action_dis"] = config.WEIGHTS.MOBILE_GAZE_ACTION_DIS
+            ckpt_dict["std"] = config.WEIGHTS.MOBILE_GAZE_STD
+            # Use config.device as the device for mobile gaze policy
+            self.policy = MobileGazePolicy(ckpt_dict, device=config.DEVICE)
+        else:
+            self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
         self.policy.reset()
 
-        self.gaze_env = SpotGazeEnv(config, spot)
+        self.gaze_env = SpotGazeEnv(config, spot, use_mobile_pick)
 
     def reset_env_and_policy(self, target_obj_name):
         """
@@ -149,11 +159,21 @@ class GazeController:
             done = False
             start_time = time.time()
             self.gaze_env.say(f"Gaze at target object - {target_object}")
+
             while not done:
                 action = self.policy.act(observations)
-                observations, _, done, _ = self.gaze_env.step(arm_action=action)
+                if self._use_mobile_pick:
+                    # The first four elements are for the arm; and the last two elements are for the base
+                    arm_action = action[0:4]
+                    base_action = action[4:6]
+                    # Check if arm_action contains NaN values
+                    assert not np.isnan(np.array(arm_action)).any()
+                    observations, _, done, _ = self.gaze_env.step(
+                        arm_action=arm_action, base_action=base_action
+                    )
+                else:
+                    observations, _, done, _ = self.gaze_env.step(arm_action=action)
             self.gaze_env.say("Gaze finished")
-
             # Ask user for feedback about the success of the gaze and update the "success" flag accordingly
             success_status_from_user_feedback = True
             if take_user_input:
@@ -174,9 +194,10 @@ class GazeController:
 
 
 class SpotGazeEnv(SpotBaseEnv):
-    def __init__(self, config, spot):
+    def __init__(self, config, spot, use_mobile_pick):
         super().__init__(config, spot)
         self.target_obj_name = None
+        self._use_mobile_pick = use_mobile_pick
 
     def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
@@ -197,10 +218,33 @@ class SpotGazeEnv(SpotBaseEnv):
         grasp = self.should_grasp()
 
         observations, reward, done, info = super().step(
-            base_action, arm_action, grasp, place
+            base_action,
+            arm_action,
+            grasp,
+            place,
+            max_joint_movement_key="MAX_JOINT_MOVEMENT_MOBILE_GAZE"
+            if self._use_mobile_pick
+            else "MAX_JOINT_MOVEMENT",
+            max_lin_dist_mobile_gaze="MAX_LIN_DIST_MOBILE_GAZE"
+            if self._use_mobile_pick
+            else None,
+            max_ang_dist_mobile_gaze="MAX_ANG_DIST_MOBILE_GAZE"
+            if self._use_mobile_pick
+            else None,
         )
-
         return observations, reward, done, info
+
+    def get_mobile_gaze_observations(self, observations):
+        """Get the mobile gaze observations"""
+        mobile_gaze_observations = {}
+        mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
+            "arm_depth_bbox"
+        ]
+        mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
+            "arm_depth"
+        ]
+        mobile_gaze_observations["joint"] = observations["joint"]
+        return mobile_gaze_observations
 
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
@@ -209,6 +253,9 @@ class SpotGazeEnv(SpotBaseEnv):
             "arm_depth": arm_depth,
             "arm_depth_bbox": arm_depth_bbox,
         }
+
+        if self._use_mobile_pick:
+            observations = self.get_mobile_gaze_observations(observations)
 
         return observations
 
