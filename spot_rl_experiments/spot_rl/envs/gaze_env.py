@@ -166,9 +166,6 @@ class GazeController:
                     # The first four elements are for the arm; and the last two elements are for the base
                     arm_action = action[0:4]
                     base_action = action[4:6]
-                    # Scale the base linear and angular velocity
-                    base_action[0] = base_action[0] * self.config.BASE_MOVE_SCALE
-                    base_action[1] = base_action[1] * self.config.BASE_MOVE_SCALE
                     # Check if arm_action contains NaN values
                     assert not np.isnan(np.array(arm_action)).any()
                     observations, _, done, _ = self.gaze_env.step(
@@ -221,9 +218,20 @@ class SpotGazeEnv(SpotBaseEnv):
         grasp = self.should_grasp()
 
         observations, reward, done, info = super().step(
-            base_action, arm_action, grasp, place
+            base_action,
+            arm_action,
+            grasp,
+            place,
+            max_joint_movement_key="MAX_JOINT_MOVEMENT_MOBILE_GAZE"
+            if self._use_mobile_pick
+            else "MAX_JOINT_MOVEMENT",
+            max_lin_dist_mobile_gaze="MAX_LIN_DIST_MOBILE_GAZE"
+            if self._use_mobile_pick
+            else None,
+            max_ang_dist_mobile_gaze="MAX_ANG_DIST_MOBILE_GAZE"
+            if self._use_mobile_pick
+            else None,
         )
-
         return observations, reward, done, info
 
     def get_mobile_gaze_observations(self, observations):
