@@ -55,18 +55,15 @@ class RealPolicy:
             # Hab3 policy loading
             # Load the policy using torch script
             self.policy = {}
-            if self.device.type == "cuda":
-                self.policy["net"] = torch.jit.load(checkpoint_path["net"]).cuda()
-                self.policy["action_dist"] = torch.jit.load(
-                    checkpoint_path["action_dis"]
-                ).cuda()
-                self.policy["std"] = torch.load(checkpoint_path["std"]).cuda()
-            else:
-                self.policy["net"] = torch.jit.load(checkpoint_path["net"])
-                self.policy["action_dist"] = torch.jit.load(
-                    checkpoint_path["action_dis"]
-                )
-                self.policy["std"] = torch.load(checkpoint_path["std"])
+            self.policy["net"] = torch.jit.load(
+                checkpoint_path["net"], map_location=self.device
+            )
+            self.policy["action_dist"] = torch.jit.load(
+                checkpoint_path["action_dis"], map_location=self.device
+            )
+            self.policy["std"] = torch.load(
+                checkpoint_path["std"], map_location=self.device
+            )
         else:
             if isinstance(checkpoint_path, str):
                 checkpoint = torch.load(checkpoint_path, map_location="cpu")

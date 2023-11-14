@@ -293,4 +293,4 @@ if __name__ == "__main__":
     print("actions_ts:", ts_actions)
     print("recurrent_hidden_state:", ts_rnn_hidden_states)
 
-    print("Please make sure the two methods are the same!")
+    print("Please make sure the two methods are the same!...")

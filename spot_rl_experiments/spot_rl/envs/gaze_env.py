@@ -109,14 +109,14 @@ class GazeController:
         self.spot = spot
         self._use_mobile_pick = use_mobile_pick
 
-        # Setup
         if use_mobile_pick:
+            # Load the necessary checkpoints
             ckpt_dict = {}
             ckpt_dict["net"] = config.WEIGHTS.MOBILE_GAZE_NET
             ckpt_dict["action_dis"] = config.WEIGHTS.MOBILE_GAZE_ACTION_DIS
             ckpt_dict["std"] = config.WEIGHTS.MOBILE_GAZE_STD
-            # TODO: Use GPU version has an issue for jit loading policy
-            self.policy = MobileGazePolicy(ckpt_dict, device="cpu")
+            # Use config.device as the device for mobile gaze policy
+            self.policy = MobileGazePolicy(ckpt_dict, device=config.DEVICE)
         else:
             self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
         self.policy.reset()
@@ -166,13 +166,11 @@ class GazeController:
                     # The first four elements are for the arm; and the last two elements are for the base
                     arm_action = action[0:4]
                     base_action = action[4:6]
-                    # TODO: hack
-                    base_action[0] = base_action[0] * 0.4
-                    base_action[1] = base_action[1] * 0.4
-                    print("arm_action", arm_action)
-                    print("base_action", base_action)
-                    if np.isnan(np.array(arm_action)).any():
-                        breakpoint()
+                    # Scale the base linear and angular velocity
+                    base_action[0] = base_action[0] * self.config.BASE_MOVE_SCALE
+                    base_action[1] = base_action[1] * self.config.BASE_MOVE_SCALE
+                    # Check if arm_action contains NaN values
+                    assert not np.isnan(np.array(arm_action)).any()
                     observations, _, done, _ = self.gaze_env.step(
                         arm_action=arm_action, base_action=base_action
                     )
@@ -228,6 +226,18 @@ class SpotGazeEnv(SpotBaseEnv):
 
         return observations, reward, done, info
 
+    def get_mobile_gaze_observations(self, observations):
+        """Get the mobile gaze observations"""
+        mobile_gaze_observations = {}
+        mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
+            "arm_depth_bbox"
+        ]
+        mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
+            "arm_depth"
+        ]
+        mobile_gaze_observations["joint"] = observations["joint"]
+        return mobile_gaze_observations
+
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
         observations = {
@@ -236,17 +246,8 @@ class SpotGazeEnv(SpotBaseEnv):
             "arm_depth_bbox": arm_depth_bbox,
         }
 
-        # Overwrite the observation to get the mobile gaze observations
         if self._use_mobile_pick:
-            mobile_gaze_observations = {}
-            mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
-                "arm_depth_bbox"
-            ]
-            mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
-                "arm_depth"
-            ]
-            mobile_gaze_observations["joint"] = observations["joint"]
-            observations = mobile_gaze_observations
+            observations = self.get_mobile_gaze_observations(observations)
 
         return observations
 
