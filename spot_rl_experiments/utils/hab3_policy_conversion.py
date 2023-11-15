@@ -53,7 +53,7 @@ class RealPolicy:
         self.device = torch.device(device)
 
         # Load the checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        checkpoint = torch.load(checkpoint_path, map_location=str(self.device))
 
         # Load the config
         config = checkpoint["config"]
@@ -117,7 +117,7 @@ class RealPolicy:
         # Using torch script to save action distribution
         traced_cell_ad = torch.jit.trace(
             self.policy.action_distribution.mu_maybe_std,
-            (torch.tensor(torch.zeros((1, 512)))),
+            (torch.tensor(torch.zeros((1, 512))).to(self.device)),
             strict=False,
         )
         torch.jit.save(traced_cell_ad, save_path["action_distribution"])
@@ -127,9 +127,11 @@ class RealPolicy:
 
         print("Save (1) net (2) action distribution (3) std")
 
-        self.ts_net = torch.jit.load(save_path["net"])
-        self.ts_action_dis = torch.jit.load(save_path["action_distribution"])
-        self.std = torch.load(save_path["std"])
+        self.ts_net = torch.jit.load(save_path["net"], map_location=str(self.device))
+        self.ts_action_dis = torch.jit.load(
+            save_path["action_distribution"], map_location=str(self.device)
+        )
+        self.std = torch.load(save_path["std"], map_location=str(self.device))
         print("Load the torchscrip policy successfully")
 
     def act(self, observations):
@@ -167,7 +169,7 @@ class RealPolicy:
 
         return CustomNormal(mu, std, validate_args=False)
 
-    def act_ts(self, observation):
+    def act_ts(self, observations):
         """Using torchscript to run the model"""
         assert self.ts_net is not None, "Please load the torchscript policy first!"
 
@@ -252,6 +254,7 @@ def parse_arguments(args=sys.argv[1:]):
 if __name__ == "__main__":
     """Script for loading the hab3-trained policy and convert it into a torchscript file.
     To run this script, you have to in hab3 conda enviornment with a latest habitat-sim"""
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     args = parse_arguments()
     # The save location of the policy
     save_path = {}
@@ -265,7 +268,7 @@ if __name__ == "__main__":
     # The originl hab3 trained policy
     mobile_gaze_policy = MobileGazePolicy(
         save_path["target_hab3_policy"],
-        device="cpu",
+        device=device,
     )
     mobile_gaze_policy.reset()
 

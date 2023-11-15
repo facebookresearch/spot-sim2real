@@ -413,12 +413,12 @@ class MixerPolicy(RealPolicy):
 if __name__ == "__main__":
     # Loading Hab3 policy
     ckpt_dict = {}
-    ckpt_dict["net"] = "weights/mobile_gaze/mg3ns_4_latest_ts.pth"
-    ckpt_dict["action_dis"] = "weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
-    ckpt_dict["std"] = "weights/mobile_gaze/mg3ns_4_latest_std.pth"
+    ckpt_dict["net"] = "weights/mobile_gaze/mg3ns_4_1653_ts.pth"
+    ckpt_dict["action_dis"] = "weights/mobile_gaze/mg3ns_4_1653_ad_ts.pth"
+    ckpt_dict["std"] = "weights/mobile_gaze/mg3ns_4_1653_std.pth"
     mobile_gaze_policy = MobileGazePolicy(
         ckpt_dict,
-        device="cpu",
+        device="cuda",
     )
     mobile_gaze_policy.reset()
     observations = {
@@ -429,6 +429,7 @@ if __name__ == "__main__":
     actions = mobile_gaze_policy.act(observations)
     print("actions:", actions)
 
+    """
     # Loading the old policy
     gaze_policy = GazePolicy(
         "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
@@ -443,3 +444,4 @@ if __name__ == "__main__":
     }
     actions = gaze_policy.act(observations)
     print("actions:", actions)
+    """
