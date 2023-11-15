@@ -46,9 +46,9 @@ ASSERT_CENTERING: True
 # 2m/s in simulation is effective 0.5m/s. Then per control period 0.5s, the effective distance is 0.25m
 # 2rad/s in simulation is effective 0.5rad/s. Then per control period is 0.5s, the effective distance is 0.25rad
 # 0.01667rad in simulation per step (4/120). The per control period is 0.5s, the effective displacement is 0.01667*0.5*120/4=0.25rad
-MAX_LIN_DIST_MOBILE_GAZE: 0.25 # meters
-MAX_ANG_DIST_MOBILE_GAZE: 14.32394 # degrees = 0.25rad
-MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.25 # rad = 14.32 degrees
+MAX_LIN_DIST_MOBILE_GAZE: 0.1 #0.25 # meters
+MAX_ANG_DIST_MOBILE_GAZE: 0.1 #0.25 #14.32394 # degrees = 0.25rad
+MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.25 #0.25 # rad = 14.32 degrees
 
 # Place env
 EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
