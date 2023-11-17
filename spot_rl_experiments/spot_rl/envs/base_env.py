@@ -42,6 +42,7 @@ from spot_wrapper.spot import Spot, wrap_heading
 from std_msgs.msg import Float32, String
 
 MAX_CMD_DURATION = 5
+TRAVLE_TIME_JOINT_BASE_ARM_CONTROL = 5  # 5 for the base; and 1/2*0.9 = 0.45 for the arm
 GRASP_VIS_DIR = osp.join(
     osp.dirname(osp.dirname(osp.abspath(__file__))), "grasp_visualizations"
 )
@@ -345,11 +346,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 base_action = (
                     np.array(base_action) * self.slowdown_base
                 )  # / self.ctrl_hz
+                print("Slow down...")
             if base_action is not None and arm_action is not None:
+                print("input base_action velocity:", base_action)
+                print("input arm_action:", arm_action)
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,
-                    MAX_CMD_DURATION,
+                    travel_time=TRAVLE_TIME_JOINT_BASE_ARM_CONTROL,
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif base_action is not None:
