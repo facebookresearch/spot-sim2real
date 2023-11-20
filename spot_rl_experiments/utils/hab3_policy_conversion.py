@@ -4,6 +4,7 @@
 
 # This is the script that loads a pretrained policy from a checkpoint and convert it to torch script format
 
+import argparse
 import sys
 from collections import OrderedDict
 
@@ -13,7 +14,6 @@ from gym import spaces
 from gym.spaces import Dict as SpaceDict
 from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
 from habitat_baselines.utils.common import GaussianNet, batch_obs
-from spot_rl.utils.utils import get_default_parser
 from torch import Size, Tensor
 
 
@@ -193,26 +193,50 @@ class RealPolicy:
 
 
 class MobileGazePolicy(RealPolicy):
-    def __init__(self, checkpoint_path, device):
-        observation_space = SpaceDict(
-            {
-                "arm_depth_bbox_sensor": spaces.Box(
-                    low=np.finfo(np.float32).min,
-                    high=np.finfo(np.float32).max,
-                    shape=(240, 228, 1),
-                    dtype=np.float32,
-                ),
-                "articulated_agent_arm_depth": spaces.Box(
-                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
-                ),
-                "joint": spaces.Box(
-                    low=np.finfo(np.float32).min,
-                    high=np.finfo(np.float32).max,
-                    shape=(4,),
-                    dtype=np.float32,
-                ),
-            }
-        )
+    def __init__(self, checkpoint_path, device, use_stereo_pair_camera):
+        if use_stereo_pair_camera:
+            observation_space = SpaceDict(
+                {
+                    "arm_depth_bbox_sensor": spaces.Box(
+                        low=np.finfo(np.float32).min,
+                        high=np.finfo(np.float32).max,
+                        shape=(240, 228, 1),
+                        dtype=np.float32,
+                    ),
+                    "articulated_agent_arm_depth": spaces.Box(
+                        low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                    ),
+                    "spot_head_stereo_depth_sensor": spaces.Box(
+                        low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                    ),
+                    "joint": spaces.Box(
+                        low=np.finfo(np.float32).min,
+                        high=np.finfo(np.float32).max,
+                        shape=(4,),
+                        dtype=np.float32,
+                    ),
+                }
+            )
+        else:
+            observation_space = SpaceDict(
+                {
+                    "arm_depth_bbox_sensor": spaces.Box(
+                        low=np.finfo(np.float32).min,
+                        high=np.finfo(np.float32).max,
+                        shape=(240, 228, 1),
+                        dtype=np.float32,
+                    ),
+                    "articulated_agent_arm_depth": spaces.Box(
+                        low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                    ),
+                    "joint": spaces.Box(
+                        low=np.finfo(np.float32).min,
+                        high=np.finfo(np.float32).max,
+                        shape=(4,),
+                        dtype=np.float32,
+                    ),
+                }
+            )
         action_space = spaces.Box(-1.0, 1.0, (7,))
         super().__init__(
             checkpoint_path,
@@ -224,7 +248,7 @@ class MobileGazePolicy(RealPolicy):
 
 
 def parse_arguments(args=sys.argv[1:]):
-    parser = get_default_parser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "-t", "--target-hab3-policy", type=str, help="name of the target hab3 policy"
     )
@@ -246,6 +270,12 @@ def parse_arguments(args=sys.argv[1:]):
         type=str,
         help="where to save torch script file for the std",
     )
+    parser.add_argument(
+        "--use-stereo-pair-camera",
+        action="store_true",
+        default=False,
+        help="If true, we add stereo pair camera into the observations",
+    )
     args = parser.parse_args(args=args)
 
     return args
@@ -255,6 +285,7 @@ if __name__ == "__main__":
     """Script for loading the hab3-trained policy and convert it into a torchscript file.
     To run this script, you have to in hab3 conda enviornment with a latest habitat-sim"""
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("device:", device)
     args = parse_arguments()
     # The save location of the policy
     save_path = {}
@@ -269,15 +300,24 @@ if __name__ == "__main__":
     mobile_gaze_policy = MobileGazePolicy(
         save_path["target_hab3_policy"],
         device=device,
+        use_stereo_pair_camera=args.use_stereo_pair_camera,
     )
     mobile_gaze_policy.reset()
 
     # Get the observation space
-    observations = {
-        "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-        "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
-        "joint": np.zeros(4, dtype=np.float32),
-    }
+    if args.use_stereo_pair_camera:
+        observations = {
+            "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
+            "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
+            "spot_head_stereo_depth_sensor": np.zeros([240, 228, 1], dtype=np.float32),
+            "joint": np.zeros(4, dtype=np.float32),
+        }
+    else:
+        observations = {
+            "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
+            "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
+            "joint": np.zeros(4, dtype=np.float32),
+        }
 
     # Noraml way in hab3 to get the action
     actions = mobile_gaze_policy.act(observations)
