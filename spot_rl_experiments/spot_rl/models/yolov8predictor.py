@@ -1,3 +1,8 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
 # Code contains minimal ports from the YOLOV8 official github repo & the example such that we don't break habitat lab environment,
 # Flow explaination - > Export yolov8 model in torchscript with fixed imagesize, this is a wrapper that will preprocess image to that fixed image size then pass through the network,
 # post process predictions (nms, scaling, etc)

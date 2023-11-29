@@ -11,24 +11,53 @@ from typing import List
 import cv2
 import torch
 from PIL import Image
-from transformers import OwlViTForObjectDetection, OwlViTProcessor
 
 
 class OwlVit:
-    def __init__(self, labels, score_threshold, show_img):
+    def __init__(
+        self,
+        labels,
+        score_threshold,
+        show_img,
+        version: int = 1,
+    ):
+        if version < 1 or version > 2:
+            raise ValueError(f"OWL-ViT version can only be 1 or 2. Received: {version}")
+        self._version = version
         # self.device = torch.device('cpu')
         self.device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
+        if version == 1:
+            # Version protected import for OwlVIT
+            from transformers import OwlViTForObjectDetection, OwlViTProcessor
 
-        self.model = OwlViTForObjectDetection.from_pretrained(
-            "google/owlvit-base-patch32",
-            torch_dtype=torch.bfloat16,
-        )
+            # Init model
+            self.model = OwlViTForObjectDetection.from_pretrained(
+                "google/owlvit-base-patch32",
+                torch_dtype=torch.bfloat16,
+            )
+
+            # Init processor
+            self.processor = OwlViTProcessor.from_pretrained(
+                "google/owlvit-base-patch32"
+            )
+        else:
+            # Version protected import for OwlV2
+            from transformers import Owlv2ForObjectDetection, Owlv2Processor
+
+            # Init model
+            self.model = Owlv2ForObjectDetection.from_pretrained(
+                "google/owlv2-base-patch16-ensemble",
+                torch_dtype=torch.bfloat16,
+            )
+
+            # Init processor
+            self.processor = Owlv2Processor.from_pretrained(
+                "google/owlv2-base-patch16-ensemble"
+            )
         self.model.eval()
         self.model.to(self.device)
-
-        self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
 
         self.prefix = "an image of a"
         self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
@@ -53,9 +82,14 @@ class OwlVit:
             outputs = self.model(**inputs)
 
         # Convert outputs (bounding boxes and class logits) to COCO API
-        results = self.processor.post_process(
-            outputs=outputs, target_sizes=target_sizes
-        )
+        if self._version == 1:
+            results = self.processor.post_process(
+                outputs=outputs, target_sizes=target_sizes
+            )
+        else:
+            results = self.processor.post_process_object_detection(
+                outputs=outputs, target_sizes=target_sizes
+            )
         # img = img.to('cpu')
 
         if self.show_img:
@@ -77,9 +111,14 @@ class OwlVit:
             outputs = self.model(**inputs)
 
         # Convert outputs (bounding boxes and class logits) to COCO API
-        results = self.processor.post_process(
-            outputs=outputs, target_sizes=target_sizes
-        )
+        if self._version == 1:
+            results = self.processor.post_process(
+                outputs=outputs, target_sizes=target_sizes
+            )
+        else:
+            results = self.processor.post_process_object_detection(
+                outputs=outputs, target_sizes=target_sizes
+            )
         # img = img.to('cpu')
         # if self.show_img:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
@@ -236,7 +275,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--file",
         type=str,
-        default="/home/akshara/spot/spot_rl_experiments/spot_rl/grasp_visualizations/1650841878.2699108.png",
+        default="./input_image.jpg",
     )
     parser.add_argument("--score_threshold", type=float, default=0.1)
     parser.add_argument("--show_img", type=bool, default=True)

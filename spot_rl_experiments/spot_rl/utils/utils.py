@@ -23,6 +23,11 @@ ros_topics = CN()
 ros_topics.set_new_allowed(True)
 ros_topics.merge_from_file(ROS_TOPICS)
 
+ROS_FRAMES = osp.join(configs_dir, "ros_frame_names.yaml")
+ros_frames = CN()
+ros_frames.set_new_allowed(True)
+ros_frames.merge_from_file(ROS_FRAMES)
+
 
 def get_waypoint_yaml(waypoint_file=WAYPOINTS_YAML):
     with open(waypoint_file) as f:

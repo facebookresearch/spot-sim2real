@@ -24,7 +24,12 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
+import rospy
 import sophus as sp
+from aria_data_utils.conversions import (
+    bd_SE3Pose_to_ros_Pose,
+    bd_SE3Pose_to_ros_TransformStamped,
+)
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -58,7 +63,9 @@ from bosdyn.client.robot_command import (
 )
 from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
+from geometry_msgs.msg import Pose, TransformStamped
 from google.protobuf import wrappers_pb2
+from spot_rl.utils.utils import ros_frames as rf
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -78,12 +85,12 @@ except KeyError:
     raise RuntimeError(env_err_msg.format(var_name="SPOT_IP"))
 
 ARM_6DOF_NAMES = [
-    "arm0.sh0",
-    "arm0.sh1",
-    "arm0.el0",
-    "arm0.el1",
-    "arm0.wr0",
-    "arm0.wr1",
+    rf.SPOT_ARM_SHOULDER_0,
+    rf.SPOT_ARM_SHOULDER_1,
+    rf.SPOT_ARM_ELBOW_0,
+    rf.SPOT_ARM_ELBOW_1,
+    rf.SPOT_ARM_WRIST_0,
+    rf.SPOT_ARM_WRIST_1,
 ]
 
 HOME_TXT = osp.join(osp.dirname(osp.abspath(__file__)), "home.txt")
@@ -820,71 +827,37 @@ class Spot:
         cam_intrinsics = image_response.source.pinhole.intrinsics
         return cam_intrinsics
 
-    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
-    @staticmethod
-    def convert_transformation_from_sophus_to_magnum(
-        sp_transformation: sp.SE3,
-    ) -> mn.Matrix4:
+    def get_ros_TransformStamped_vision_T_body(
+        self, frame_tree_snapshot
+    ) -> TransformStamped:
         """
-        First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
-        Then convert rvec and tvec to Magnum pose
+        Generates vision_T_body transform as a ROS TransformStamped message from the FrameTreeSnapshot
 
         Args:
-            sp_transformation (sp.SE3): Sophus transformation matrix
+            frame_tree_snapshot (FrameTreeSnapshot): FrameTreeSnapshot from which to extract the vision_T_body transform
 
         Returns:
-            mn_tranformation (mn.Matrix4): 4x4 pose matrix
+            ros_TransformStamped_vision_T_body (TransformStamped): ROS TransformStamped message containing the vision_T_body transform
         """
-        tvec = sp_transformation.translation()
-        rvec = sp_transformation.so3().log()
+        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+        ros_TransformStamped_vision_T_body = bd_SE3Pose_to_ros_TransformStamped(
+            bd_se3=vision_tform_body, parent_frame=rf.SPOT_WORLD, child_frame=rf.SPOT
+        )
+        return ros_TransformStamped_vision_T_body
 
-        # DEBUGGING
-        # print(f"Spot - tvec: {type(tvec)}")
-        # print(f"Spot - rvec: {rvec}")
-
-        assert rvec.shape == (3,) and tvec.shape == (3,)
-
-        # Get rotation angle as norm of rvec
-        angle = np.linalg.norm(rvec)
-
-        # Get unit axis of rotation
-        axis = rvec / angle
-
-        # Get rotation matrix from angle and axis
-        rotation_matrix = mn.Quaternion.rotation(
-            mn.Rad(angle), mn.Vector3(axis)
-        ).to_matrix()
-
-        # Get pose matrix from rotation matrix and translation vector
-        mn_tranformation = mn.Matrix4.from_(rotation_matrix, tvec)
-
-        # DEBUGGING
-        # print(f"spot - sophus tf - {sp_transformation}")
-        # print(f"spot - magnum tf - {mn_tranformation}")
-        return mn_tranformation
-
-    # MAYBE WE DONT NEED THIS IN SPOT.PY???????
-    def convert_transformation_from_BD_to_magnum(self, bd_transformation_dict: dict):
+    def get_ros_Pose_vision_T_body(self, frame_tree_snapshot) -> Pose:
         """
-        Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
+        Generates vision_T_body transform as a ROS Pose message from the FrameTreeSnapshot
 
         Args:
-            bd_transformation_dict (dict): Bosdyn transformation dictionary
+            frame_tree_snapshot (FrameTreeSnapshot): FrameTreeSnapshot from which to extract the vision_T_body transform
 
         Returns:
-            mn_tranformation_dict (dict): Magnum transformation dictionary
+            ros_Pose_vision_T_body (Pose): ROS Pose message containing the vision_T_body transform
         """
-        # Assert bd_transformation_dict has "position" and "rotation" keys
-        # assert "position" in bd_transformation_dict.keys() and "rotation" in bd_transformation_dict.keys()
-        pos = bd_transformation_dict.position
-        rot = bd_transformation_dict.rotation
-        quat = quaternion.quaternion(rot.w, rot.x, rot.y, rot.z)
-
-        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
-        translation = mn.Vector3(pos.x, pos.y, pos.z)
-
-        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
-        return mn_transformation
+        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+        ros_Pose_vision_T_body = bd_SE3Pose_to_ros_Pose(bd_se3=vision_tform_body)
+        return ros_Pose_vision_T_body
 
     def get_magnum_Matrix4_spot_a_T_b(self, a: str, b: str, tree=None) -> mn.Matrix4:
         """
