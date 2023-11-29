@@ -24,6 +24,7 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
+import rospy
 import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (
@@ -36,7 +37,7 @@ from bosdyn.api import (
     synchronized_command_pb2,
     trajectory_pb2,
 )
-from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, Vec2
+from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, SE3Pose, Vec2
 from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.client import math_helpers
 from bosdyn.client.docking import blocking_dock_robot, blocking_undock
@@ -89,7 +90,6 @@ HOME_TXT = osp.join(osp.dirname(osp.abspath(__file__)), "home.txt")
 
 # Get Spot DOCK ID
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
-
 
 class SpotCamIds:
     r"""Enumeration of types of cameras."""
