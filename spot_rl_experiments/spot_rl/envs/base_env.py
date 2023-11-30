@@ -272,7 +272,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 success = self.attempt_grasp()
                 if success:
                     # Just leave the object on the receptacle if desired
-                    if self.config.DONT_PICK_UP:
+                    if self.config.DONT_PICK_UP or True:
                         print("open_gripper in don't pick up")
                         self.spot.open_gripper()
                     self.grasp_attempted = True

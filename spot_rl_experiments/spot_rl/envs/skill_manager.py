@@ -370,16 +370,25 @@ class SpotSkillManager:
 
 
 if __name__ == "__main__":
+    from spot_rl.utils.utils import map_user_input_to_boolean
+
     spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 
     # Nav-Pick-Nav-Place sequence 1
     # test_white_table_right
     # test_white_table_left
     # test_white_table
-    spotskillmanager.nav("test_white_table_left")
-    spotskillmanager.pick("cup")
-    spotskillmanager.nav("black_case")
-    spotskillmanager.place("black_case")
+    contnue = True
+    while contnue:
+        spotskillmanager.nav("pos4")
+        # spotskillmanager.spot.set_arm_joint_positions(np.deg2rad(spotskillmanager.pick_config.GAZE_ARM_JOINT_ANGLES), 1)
+        # break
+        x = input("Press Enter to continue to mobile gaze ")
+        spotskillmanager.pick("toy_lion")
+        spotskillmanager.spot.open_gripper()
+        contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
+    # spotskillmanager.nav("black_case")
+    # spotskillmanager.place("black_case")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()

@@ -163,11 +163,24 @@ class GazeController:
             while not done:
                 action = self.policy.act(observations)
                 if self._use_mobile_pick:
+                    arm_action, base_action = None, None
                     # The first four elements are for the arm; and the last two elements are for the base
-                    arm_action = action[0:4]
-                    base_action = action[4:6]
+                    if len(action) == 7:
+                        arm_action = action[0:4]
+                        base_action = action[4:6]
+                    elif len(action) == 5:
+                        arm_action = action[:4]
+                    elif len(action) == 8:
+                        print(f"Action Selection, {action}")
+                        action_selection = action[0]
+                        if action_selection > 0.0:
+                            arm_action = action[1:5]
+                        else:
+                            print("Base action selection")
+                            base_action = action[5:7]
+
                     # Check if arm_action contains NaN values
-                    assert not np.isnan(np.array(arm_action)).any()
+                    # assert not np.isnan(np.array(arm_action)).any()
                     observations, _, done, _ = self.gaze_env.step(
                         arm_action=arm_action, base_action=base_action
                     )
