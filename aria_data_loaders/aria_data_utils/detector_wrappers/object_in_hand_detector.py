@@ -2,6 +2,8 @@ import os
 
 import numpy as np
 from aria_data_utils.detector_wrappers.generic_detector_interface import GenericDetector
+from model.faster_rcnn.resnet import resnet
+from model.faster_rcnn.vgg16 import vgg16
 
 
 class ObjectInHandDetectorWrapper(GenericDetector):
@@ -15,3 +17,7 @@ class ObjectInHandDetectorWrapper(GenericDetector):
         #TODO:
         """
         pass
+
+
+if __name__ == "__main__":
+    obj = ObjectInHandDetectorWrapper()
