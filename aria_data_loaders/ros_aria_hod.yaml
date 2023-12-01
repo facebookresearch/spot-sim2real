@@ -440,19 +440,31 @@ dependencies:
   - zstd=1.5.5=hfc55251_0
   - zziplib=0.13.69=h27826a3_1
   - pip:
+      - click==8.1.7
       - cython==3.0.6
       - easydict==1.11
+      - filelock==3.13.1
+      - fsspec==2023.10.0
+      - gtsam==4.1.1
+      - huggingface-hub==0.19.4
       - jinja2==3.1.2
       - markupsafe==2.1.3
       - matplotlib==3.7.4
       - msgpack==1.0.7
+      - opencv-contrib-python==4.6.0.66
       - opencv-python==4.8.1.78
       - pascal-voc-writer==0.1.4
       - projectaria-client-sdk==1.0.2
       - projectaria-tools==1.2.0
       - protobuf==4.25.1
+      - pybind11==2.11.1
+      - regex==2023.10.3
+      - safetensors==0.4.1
       - scipy==1.10.1
+      - sophuspy==0.0.8
       - tensorboardx==2.6.2.2
       - termcolor==2.3.0
+      - tokenizers==0.15.0
       - tqdm==4.66.1
+      - transformers==4.35.2
 prefix: /home/priparashar/mambaforge/envs/handobj_new
