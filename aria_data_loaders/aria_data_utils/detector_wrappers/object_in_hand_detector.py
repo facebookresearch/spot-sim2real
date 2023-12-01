@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from aria_data_utils.detector_wrappers.generic_detector_interface import GenericDetector
 
@@ -5,6 +7,7 @@ from aria_data_utils.detector_wrappers.generic_detector_interface import Generic
 class ObjectInHandDetectorWrapper(GenericDetector):
     def __init__(self) -> None:
         super().__init__()
+        # self._pkg_path = os.path.dirname(a_module.__file__)
 
     def process_frame(self, frame: np.ndarray):
         """
