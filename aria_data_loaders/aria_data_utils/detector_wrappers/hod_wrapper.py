@@ -4,8 +4,8 @@ import model as hand_object_detector
 import numpy as np
 import torch
 from aria_data_utils.detector_wrappers.generic_detector_interface import GenericDetector
-from aria_data_utils.perception.object_in_hand_detector import setup_network
-from model.faster_rcnn.faster_rcnn import _fasterRCNN
+from aria_data_utils.perception.object_in_hand_detector import setup_hod_network
+from hand_object_detector.faster_rcnn.faster_rcnn import _fasterRCNN
 
 
 class ObjectInHandDetectorWrapper(GenericDetector):
@@ -20,17 +20,19 @@ class ObjectInHandDetectorWrapper(GenericDetector):
         self._class_agnostic = class_agnostic
         self._POOLING_MODE = None
 
-        self.fasterrcnn: _fasterRCNN = None
+        self.faster_rcnn: _fasterRCNN = None
         if not os.path.exists(self._model_path):
             raise Exception("There is no model file at " + self._model_path)
         pascal_classes = np.asarray(["__background__", "targetobject", "hand"])
         set_cfgs = ["ANCHOR_SCALES", "[8, 16, 32, 64]", "ANCHOR_RATIOS", "[0.5, 1, 2]"]
 
         # setup self.fasterRCNN network
-        self.fasterRCNN = self._setup_network(pascal_classes, set_cfgs)
+        self.faster_rcnn, self._POOLING_MODE = self._setup_network(
+            pascal_classes, set_cfgs
+        )
 
     def _setup_network(self, pascal_classes, set_cfgs):
-        return setup_network(
+        return setup_hod_network(
             pascal_classes=pascal_classes,
             cfgs=set_cfgs,
             model_path=self._model_path,
@@ -43,6 +45,7 @@ class ObjectInHandDetectorWrapper(GenericDetector):
         100DOH detector fires on the input image and returns:
         #TODO:
         """
+
         pass
 
 

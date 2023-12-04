@@ -1,12 +1,13 @@
 from typing import Any, Tuple
 
+import numpy as np
 import torch
 from model.faster_rcnn.faster_rcnn import _fasterRCNN
 from model.faster_rcnn.resnet import resnet
 from model.faster_rcnn.vgg16 import vgg16
 
 
-def setup_network(
+def setup_hod_network(
     pascal_classes, cfgs, model_path, net: str = "vgg16", class_agnostic: bool = False
 ) -> Tuple[_fasterRCNN, Any]:
     fasterRCNN: _fasterRCNN = None  # type: ignore
@@ -50,3 +51,10 @@ def setup_network(
     fasterRCNN.eval()
 
     return fasterRCNN, POOLING_MODE
+
+
+def predict_hod(frame: np.ndarray, faster_rcnn: _fasterRCNN = None):
+    """
+    Given a fasterRCNN model run prediction query on it and return the output
+    """
+    pass
