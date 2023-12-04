@@ -148,7 +148,7 @@ class RealPolicy:
             )
             actions = PolicyActionData.actions
             self.test_recurrent_hidden_states = PolicyActionData.rnn_hidden_states
-            print("original hidden state:", PolicyActionData.rnn_hidden_states)
+            # print("original hidden state:", PolicyActionData.rnn_hidden_states)
 
         self.prev_actions.copy_(actions)
         self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)
@@ -335,5 +335,7 @@ if __name__ == "__main__":
 
     print("actions_ts:", ts_actions)
     print("recurrent_hidden_state:", ts_rnn_hidden_states)
-
+    print(
+        f"Are actions from net & torchscript net same ? {torch.allclose(torch.from_numpy(actions).to(device), ts_actions)}, are recurrent hidden states same ? {torch.allclose(recurrent_hidden_state, ts_rnn_hidden_states)}",
+    )
     print("Please make sure the two methods are the same!...")

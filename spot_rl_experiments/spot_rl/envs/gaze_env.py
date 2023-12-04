@@ -166,17 +166,18 @@ class GazeController:
                     arm_action, base_action = None, None
                     # The first four elements are for the arm; and the last two elements are for the base
                     if len(action) == 7:
+                        # first 4 are arm actions, then 2 are base actions & last bit is unused
                         arm_action = action[0:4]
                         base_action = action[4:6]
                     elif len(action) == 5:
+                        # Don't have base action, first 4 are are arm action & last bit is unsused
                         arm_action = action[:4]
                     elif len(action) == 8:
-                        print(f"Action Selection, {action}")
+                        # First bit tells whether to take arm action or base action, then 4 are arm action, then 2 are base action & last bit unused
                         action_selection = action[0]
                         if action_selection > 0.0:
                             arm_action = action[1:5]
                         else:
-                            print("Base action selection")
                             base_action = action[5:7]
 
                     # Check if arm_action contains NaN values
