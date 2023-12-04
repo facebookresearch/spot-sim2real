@@ -10,9 +10,7 @@ import rospy
 from aria_data_utils.aria_sdk_utils import update_iptables
 from aria_data_utils.conversions import ros_pose_to_sophus
 from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
-from aria_data_utils.detector_wrappers.object_in_hand_detector import (
-    ObjectInHandDetectorWrapper,
-)
+from aria_data_utils.detector_wrappers.hod_wrapper import ObjectInHandDetectorWrapper
 from cairo import Device
 from geometry_msgs.msg import PoseStamped
 from projectaria_tools.core.calibration import (
@@ -172,8 +170,6 @@ class AriaLiveReader(aria.StreamingClientObserver):
         Initialize the object in hand detector
         """
         self.object_in_hand_detector = ObjectInHandDetectorWrapper()
-        # focal_lengths = self._dst_calib_params.get_focal_lengths()
-        return outputs
 
 
 @click.command()
