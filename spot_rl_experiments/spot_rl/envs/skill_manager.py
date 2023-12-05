@@ -68,7 +68,10 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self):
+    def __init__(self, use_mobile_pick=False):
+        # Process the meta parameters
+        self._use_mobile_pick = use_mobile_pick
+
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
 
@@ -117,7 +120,11 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
-        self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
+        self.gaze_controller = GazeController(
+            config=self.pick_config,
+            spot=self.spot,
+            use_mobile_pick=self._use_mobile_pick,
+        )
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
         )
@@ -363,19 +370,17 @@ class SpotSkillManager:
 
 
 if __name__ == "__main__":
-    spotskillmanager = SpotSkillManager()
+    from spot_rl.utils.utils import map_user_input_to_boolean
 
-    # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
-    spotskillmanager.nav("test_place_front")
-    spotskillmanager.place("test_place_front")
-
-    # Nav-Pick-Nav-Place sequence 2
-    spotskillmanager.nav("test_square_vertex3")
-    spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_left")
-    spotskillmanager.place("test_place_left")
+    # Testing Mobile Gaze
+    contnue = True
+    while contnue:
+        spotskillmanager = SpotSkillManager(use_mobile_pick=True)
+        spotskillmanager.nav("nyc_mg_pos1")
+        x = input("Press Enter to continue to mobile gaze ")
+        spotskillmanager.pick("cup")
+        spotskillmanager.spot.open_gripper()
+        contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()

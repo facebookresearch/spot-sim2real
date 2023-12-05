@@ -6,6 +6,21 @@ WEIGHTS:
 # new
   # NAV: "weights/final_paper/nav_CUTOUT_WT_True_SD_300_ckpt.90.pth"
   GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+  # The model for the mobile gaze with net/action distribution/std
+  MOBILE_GAZE_NET: "weights/mobile_gaze/mg97_2_latest_net.pytorch"
+  MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg97_2_latest_action.pytorch"
+  MOBILE_GAZE_STD: "weights/mobile_gaze/mg97_2_latest_std.pth"
+  # MOBILE_GAZE_NET: "weights/mobile_gaze/mg98_3_1760_net.pytorch"
+  # MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg98_3_1760_action.pytorch"
+  # MOBILE_GAZE_STD: "weights/mobile_gaze/mg98_3_1760_std.pth"
+  # MOBILE_GAZE_NET: "weights/mobile_gaze/mg98_2_1842_net.pytorch"
+  # MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg98_2_1842_action.pytorch"
+  # MOBILE_GAZE_STD: "weights/mobile_gaze/mg98_2_1842_std.pth"
+  # MOBILE_GAZE_NET: "weights/mobile_gaze/mg98_1_1701_net.pytorch"
+  # MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg98_1_1701_action.pytorch"
+  # MOBILE_GAZE_STD: "weights/mobile_gaze/mg98_1_1701_std.pth"
+  # This is the config for the mobile gaze
+  # GAZE: "weights/mobile_gaze/mg3ns_4.ckpt.1652.pth"
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
   # MIXER: "weights/final_gater_rnn_60_1.0_SD_300_1652203350_ckpt_55.pth"
@@ -30,11 +45,21 @@ USE_HEAD_CAMERA: True
 
 # Gaze env
 CENTER_TOLERANCE: 0.3
-OBJECT_LOCK_ON_NEEDED: 3
-DONT_PICK_UP: False
+OBJECT_LOCK_ON_NEEDED: 5
+DONT_PICK_UP: True
 ASSERT_CENTERING: True
 
-# Place env
+# Mobile Gaze env
+# During training, the base velocity is 2m/s and the angular velocity is 2rad/s.
+# And the video is playing at 30FPS, with the simulation freqency being 120Hz.
+# 2m/s in simulation is effective 0.5m/s. Then per control period 0.5s, the effective distance is 0.25m
+# 2rad/s in simulation is effective 0.5rad/s. Then per control period is 0.5s, the effective distance is 0.25rad
+# 0.01667rad in simulation per step (4/120). The per control period is 0.5s, the effective displacement is 0.01667*0.5*120/4=0.25rad
+MAX_LIN_DIST_MOBILE_GAZE: 0 #0.1 # meters for mg97_2 we don't have linear base movement & following parameters works the best
+MAX_ANG_DIST_MOBILE_GAZE: 0.085 #0.085 #0.25 #14.32394 # degrees = 0.25rad
+MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.08 #0.25 # rad = 14.32 degrees
+
+# Plac
 EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
 SUCC_XY_DIST: 0.1
 SUCC_Z_DIST: 0.20
@@ -45,7 +70,7 @@ MAX_ANG_DIST: 15.0  # degrees
 
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
-MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (6 deg)
+MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
