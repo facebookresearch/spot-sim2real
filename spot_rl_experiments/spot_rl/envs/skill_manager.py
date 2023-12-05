@@ -376,7 +376,7 @@ if __name__ == "__main__":
     contnue = True
     while contnue:
         spotskillmanager = SpotSkillManager(use_mobile_pick=True)
-        spotskillmanager.nav("nyc_mg_pos6")
+        spotskillmanager.nav("nyc_mg_pos1")
         x = input("Press Enter to continue to mobile gaze ")
         spotskillmanager.pick("cup")
         spotskillmanager.spot.open_gripper()

@@ -74,8 +74,11 @@ def rescale_actions(actions, action_thresh=0.05, silence_only=False):
 
     # Remap action scaling to compensate for silenced values
     action_offsets = np.ones_like(actions) * action_thresh
+    print("action_offsets 1:", action_offsets)
     action_offsets[actions < 0] = -action_offsets[actions < 0]
+    print("action_offsets 2:", action_offsets)
     action_offsets[actions == 0] = 0
+    print("action_offsets 3:", action_offsets)
     actions = (actions - np.array(action_offsets)) / (1.0 - action_thresh)
 
     return actions
@@ -330,7 +333,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 base_action = None
                 self.prev_base_moved = False
         if arm_action is not None:
-            arm_action = rescale_actions(arm_action)
+            # For the mobile pick, we need to remove this; but gaze needs this
+            # arm_action = rescale_actions(arm_action)
             if np.count_nonzero(arm_action) > 0:
                 arm_action *= self.config[max_joint_movement_key]
                 arm_action = self.current_arm_pose + pad_action(arm_action)

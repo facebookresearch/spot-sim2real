@@ -45,7 +45,7 @@ USE_HEAD_CAMERA: True
 
 # Gaze env
 CENTER_TOLERANCE: 0.3
-OBJECT_LOCK_ON_NEEDED: 10
+OBJECT_LOCK_ON_NEEDED: 5
 DONT_PICK_UP: True
 ASSERT_CENTERING: True
 
@@ -56,8 +56,8 @@ ASSERT_CENTERING: True
 # 2rad/s in simulation is effective 0.5rad/s. Then per control period is 0.5s, the effective distance is 0.25rad
 # 0.01667rad in simulation per step (4/120). The per control period is 0.5s, the effective displacement is 0.01667*0.5*120/4=0.25rad
 MAX_LIN_DIST_MOBILE_GAZE: 0 #0.1 # meters for mg97_2 we don't have linear base movement & following parameters works the best
-MAX_ANG_DIST_MOBILE_GAZE: 0 #0.25 #14.32394 # degrees = 0.25rad
-MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.07 #0.25 # rad = 14.32 degrees
+MAX_ANG_DIST_MOBILE_GAZE: 0.085 #0.085 #0.25 #14.32394 # degrees = 0.25rad
+MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.08 #0.25 # rad = 14.32 degrees
 
 # Plac
 EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
