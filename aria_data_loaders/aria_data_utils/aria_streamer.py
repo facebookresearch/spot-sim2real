@@ -921,14 +921,33 @@ def main(
                 traj_data=vrs_mps_streamer.xyz_trajectory,
                 block=True,
             )
+
+            # Get the position and orientation of the object of interest in spotWorld frame
             pose_of_interest = next_object_spotWorld_T_cpf
+
+            # Position is obtained from the translation component of the pose
             position = pose_of_interest.translation()
-            logger.debug(f" Going to {next_object=} at {position=}")
+
+            # Find the angle made by CPF's z axis with spotWorld's x axis
+            # as robot should orient to the CPF's z axis. First 3 elements of
+            # column 3 from spotWorld_T_cpf represents cpf's z axis in spotWorld frame
+            cpf_z_axis_in_spotWorld = pose_of_interest.matrix()[:3, 2]
+            # Project cpf's z axis onto xy plane of spotWorld frame by ignoring z component
+            xy_plane_projection_array = np.array([1.0, 1.0, 0.0])
+            projected_cpf_z_axis_in_spotWorld_xy = np.multiply(
+                cpf_z_axis_in_spotWorld, xy_plane_projection_array
+            )
+            orientation = float(
+                np.arctan2(
+                    projected_cpf_z_axis_in_spotWorld_xy[1],
+                    projected_cpf_z_axis_in_spotWorld_xy[0],
+                )
+            )  # tan^-1(y/x)
+
+            logger.debug(f" Going to {next_object=} at {position=}, {orientation=}")
             if not dry_run:
                 skill_manager = SpotSkillManager()
-                skill_manager.nav(
-                    position[0], position[1], 0.0
-                )  # FIXME: get yaw from Aria Pose
+                skill_manager.nav(position[0], position[1], orientation)
                 skill_manager.pick(next_object)
         else:
             logger.debug(f"Showing {next_object=}")
