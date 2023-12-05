@@ -237,7 +237,7 @@ class MobileGazePolicy(RealPolicy):
                     ),
                 }
             )
-        action_space = spaces.Box(-1.0, 1.0, (7,))
+        action_space = spaces.Box(-1.0, 1.0, (8,))
         super().__init__(
             checkpoint_path,
             observation_space,

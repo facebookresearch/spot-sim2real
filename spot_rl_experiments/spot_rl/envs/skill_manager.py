@@ -372,14 +372,13 @@ class SpotSkillManager:
 if __name__ == "__main__":
     from spot_rl.utils.utils import map_user_input_to_boolean
 
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
-
     # Testing Mobile Gaze
     contnue = True
     while contnue:
-        spotskillmanager.nav("pos4")
+        spotskillmanager = SpotSkillManager(use_mobile_pick=True)
+        spotskillmanager.nav("nyc_mg_pos6")
         x = input("Press Enter to continue to mobile gaze ")
-        spotskillmanager.pick("toy_lion")
+        spotskillmanager.pick("cup")
         spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
