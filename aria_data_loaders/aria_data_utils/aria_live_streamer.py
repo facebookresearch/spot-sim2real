@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import aria.sdk as aria
 import click
@@ -10,7 +10,7 @@ import rospy
 from aria_data_utils.aria_sdk_utils import update_iptables
 from aria_data_utils.conversions import ros_pose_to_sophus
 from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
-from aria_data_utils.detector_wrappers.hod_wrapper import ObjectInHandDetectorWrapper
+from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
 from cairo import Device
 from geometry_msgs.msg import PoseStamped
 from projectaria_tools.core.calibration import (
@@ -21,22 +21,31 @@ from projectaria_tools.core.calibration import (
 from projectaria_tools.core.sensor_data import ImageDataRecord
 
 
-class AriaLiveReader(aria.StreamingClientObserver):
+class AriaLiveReader:
     """
     Class to livestream frames and pose data from Aria
     """
 
-    def __init__(self) -> None:
+    def __init__(self, verbose: bool = False) -> None:
         super().__init__()
+        self.verbose = verbose
+        self._in_index = 0
+        self._out_index = 0
+        self._is_connected = False
         self.aria_pose_sub = rospy.Subscriber(
             "/pose_dynamics", PoseStamped, self.on_pose_received
         )
+        self.pose_of_interest_publisher = rospy.Publisher(
+            "/pose_of_interest", PoseStamped, queue_size=10
+        )
+
         self.aria_pose = None
+        self.aria_ros_pose = None
         self.aria_rgb_frame = None
         aria.set_log_level(aria.Level.Info)
 
         # 1. Create StreamingClient instance
-        self._latest_frame: Dict[str, Any] = {}
+        self._latest_frame: Dict[str, Any] = None
         self._sensors_calib_json = None
         self._sensors_calib = None
         self._rgb_calib_params: Optional[aria_core.calibration.CameraCalibration] = None
@@ -48,6 +57,8 @@ class AriaLiveReader(aria.StreamingClientObserver):
         Connect to Aria
         """
         self.device.streaming_manager.streaming_client.subscribe()  # type: ignore
+        self._is_connected = True
+        rospy.loginfo("Connected to Aria")
 
     def _setup_aria(self) -> Tuple[aria.Device, aria.DeviceClient]:
         # get a device client and configure it
@@ -93,13 +104,41 @@ class AriaLiveReader(aria.StreamingClientObserver):
 
         return device, device_client
 
+    def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
+        """
+        Rotate image in multiples of 90d degrees
+
+        Args:
+            img (np.ndarray): Image to be rotated
+            k (int, optional): Number of times to rotate by 90 degrees. Defaults to 3.
+
+        Returns:
+            np.ndarray: Rotated image
+        """
+        img = np.ascontiguousarray(
+            np.rot90(img, k=num_of_rotation)
+        )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
+        return img
+
     def on_image_received(self, image: np.ndarray, record: ImageDataRecord):
-        rospy.loginfo("Received image")
-        self.aria_rgb_frame = image
+        if self._is_connected:
+            rospy.logdebug("Received image")
+            self.aria_rgb_frame = image
 
     def on_pose_received(self, msg: PoseStamped):
-        rospy.loginfo("Received pose")
-        self.aria_pose = ros_pose_to_sophus(msg.pose)
+        if self._is_connected:
+            rospy.logdebug("Received pose")
+            self.aria_pose = ros_pose_to_sophus(msg.pose)
+            self.aria_ros_pose = msg
+
+    def publish_pose_of_interest(self, pose: PoseStamped):
+        """
+        Publishes current pose of Aria as a pose of interest for Spot
+        """
+        pose.header.stamp = rospy.Time().now()
+        pose.header.seq = self._out_index
+        self.pose_of_interest_publisher.publish(pose)
+        self._out_index += 1
 
     def get_frame(self) -> Optional[dict]:
         """
@@ -120,10 +159,12 @@ class AriaLiveReader(aria.StreamingClientObserver):
         aria_rect_rgb = distort_by_calibration(
             self.aria_rgb_frame, self._dst_calib_params, self._rgb_calib_params
         )  # type: ignore
-        aria_rect_rgb = np.rot90(aria_rect_rgb, -1)
+        aria_rot_rect_rgb = self._rotate_img(aria_rect_rgb)
         self._latest_frame = {
-            "image": aria_rect_rgb,
+            "raw_image": aria_rect_rgb,
+            "image": aria_rot_rect_rgb,
             "pose": self.aria_pose,
+            "ros_pose": self.aria_ros_pose,
             "timestamp": rospy.Time.now(),
         }
 
@@ -131,23 +172,35 @@ class AriaLiveReader(aria.StreamingClientObserver):
         """
         Disconnect from Aria
         """
+        self._is_connected = False
         self.device.streaming_manager.streaming_client.unsubscribe()  # type: ignore
         self.device_client.disconnect(self.device)  # type: ignore
 
     def process_frame(
-        self, frame: dict, detect_qr: bool = True, detect_hand_object: bool = True
-    ) -> dict:
+        self,
+        frame: dict,
+        detect_qr: bool = False,
+        detect_hand_object: bool = False,
+        object_label="milk bottle",
+    ):
         """
         Process the frame
         """
         output = {}
+
         if detect_qr:
-            output.update(self.april_tag_detector.process_frame(frame))
+            self.april_tag_detector.process_frame(frame["raw_image"])
+            # TODO: @kavitshah logic for averaging april tag pose
 
         if detect_hand_object:
-            output.update(self.object_in_hand_detector.process_frame(frame))
-
-        return output
+            output, object_scores = self.object_detector.process_frame_online(
+                np.copy(frame["image"])
+            )
+            if object_label in object_scores.keys():
+                if self.verbose:
+                    plt.imsave(f"frame_{self._in_index}.jpg", output)
+                self.publish_pose_of_interest(frame["ros_pose"])
+        self._in_index += 1
 
     def initialize_april_tag_detector(self, outputs: dict = {}):
         """
@@ -165,33 +218,50 @@ class AriaLiveReader(aria.StreamingClientObserver):
         )
         return outputs
 
-    def initialize_object_in_hand_detector(self, outputs: dict = {}):
+    def initialize_object_detector(self, outputs: dict = {}, object_labels: list = []):
         """
         Initialize the object in hand detector
         """
-        self.object_in_hand_detector = ObjectInHandDetectorWrapper()
+        self.object_detector = ObjectDetectorWrapper()
+        self.object_detector.enable_detector()
+        meta_objects: List[str] = []
+        outputs.update(
+            self.object_detector._init_object_detector(
+                object_labels + meta_objects,
+                verbose=self.verbose,
+                version=2,
+            )
+        )
+        self.object_detector._core_objects = object_labels
+        self.object_detector._meta_objects = meta_objects
 
 
 @click.command()
 @click.option("--do-update-iptables", is_flag=True, type=bool, default=False)
 def main(do_update_iptables: bool):
     rospy.init_node("aria_live_reader")
+    rospy.logwarn("Starting up ROS node")
     if do_update_iptables:
         update_iptables()
     else:
         rospy.logwarn("Not updating iptables")
+    object_name = "ketchup"
 
     rate = rospy.Rate(5)
-    aria_object = AriaLiveReader()
-    aria_object.connect()
+    aria_object = AriaLiveReader(verbose=True)
     # aria_object.initialize_april_tag_detector()
-    # aria_object.initialize_object_in_hand_detector()
+    aria_object.initialize_object_detector(object_labels=[object_name])
+    aria_object.connect()
     while not rospy.is_shutdown():
         frame = aria_object.get_frame()
         if frame is not None:
-            _ = aria_object.process_frame(frame)
+            rospy.loginfo(f"Got frame: {frame.keys()}")
+            _ = aria_object.process_frame(
+                frame, detect_hand_object=True, object_label=object_name
+            )
         rate.sleep()
-    aria.disconnect()
+    aria_object.disconnect()
+    rospy.logwarn("Disconnecting and shutting down the node")
 
 
 if __name__ == "__main__":
