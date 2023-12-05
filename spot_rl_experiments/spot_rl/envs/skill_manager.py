@@ -372,6 +372,7 @@ class SpotSkillManager:
 if __name__ == "__main__":
     from spot_rl.utils.utils import map_user_input_to_boolean
 
+    # Apt waypoints
     pick_targets = {
         "kitchen": (
             3.8482142244527835,
