@@ -19,7 +19,9 @@ from projectaria_tools.core.calibration import (
     get_linear_camera_calibration,
 )
 from projectaria_tools.core.sensor_data import ImageDataRecord
+import cv2
 
+import sophus as sp
 
 class AriaLiveReader:
     """
@@ -50,6 +52,7 @@ class AriaLiveReader:
         self._sensors_calib = None
         self._rgb_calib_params: Optional[aria_core.calibration.CameraCalibration] = None
         self._dst_calib_params: Optional[aria_core.calibration.CameraCalibration] = None
+        self.device_T_camera: Optional[sp.SE3] = None
         self.device, self.device_client = self._setup_aria()
 
     def connect(self):
@@ -81,6 +84,9 @@ class AriaLiveReader:
         self._rgb_calib_params = self._sensors_calib.get_camera_calib("camera-rgb")  # type: ignore
         self._dst_calib_params = get_linear_camera_calibration(
             512, 512, 280, "camera-rgb"
+        )
+        self.device_T_camera = sp.SE3(
+            self._sensors_calib.get_transform_device_sensor("camera-rgb").to_matrix()
         )
 
         # Configure subscription to listen to Aria's RGB stream.
@@ -140,7 +146,7 @@ class AriaLiveReader:
         self.pose_of_interest_publisher.publish(pose)
         self._out_index += 1
 
-    def get_frame(self) -> Optional[dict]:
+    def get_frame(self) -> Optional[Dict[str, Any]]:
         """
         Get the latest frame from Aria
         frame is a dict with keys:
@@ -148,17 +154,14 @@ class AriaLiveReader:
             - 'pose': the pose of the aria device in CPF frame
             - 'timestamp': the timestamp of the frame
         """
-        self.update_frame()
-        return self._latest_frame
+        return self.update_frame()
 
     def update_frame(self):
         if self.aria_rgb_frame is None:
             return None
         if self.aria_pose is None:
             return None
-        aria_rect_rgb = distort_by_calibration(
-            self.aria_rgb_frame, self._dst_calib_params, self._rgb_calib_params
-        )  # type: ignore
+        aria_rect_rgb = self._rectify_image(self.aria_rgb_frame)  # type: ignore
         aria_rot_rect_rgb = self._rotate_img(aria_rect_rgb)
         self._latest_frame = {
             "raw_image": aria_rect_rgb,
@@ -176,31 +179,84 @@ class AriaLiveReader:
         self.device.streaming_manager.streaming_client.unsubscribe()  # type: ignore
         self.device_client.disconnect(self.device)  # type: ignore
 
+
+    def _rectify_image(self, image: np.ndarray) -> np.ndarray:
+        """
+        Rectify fisheye image based upon camera calibration parameters
+        Ensure you have set self._src_calib_param & self._dst_calib_param
+
+        Args:
+            image (np.ndarray): Image to be rectified or undistorted
+
+        Returns:
+            np.ndarray: Rectified image
+        """
+        assert self._rgb_calib_params is not None and self._dst_calib_params is not None
+        print(self._dst_calib_params)
+        print(self._rgb_calib_params)
+        aria_rect_rgb = distort_by_calibration(image, self._dst_calib_params, self._rgb_calib_params
+        )  # type: ignore
+        return aria_rect_rgb
+
+    def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
+        """
+        Rotate image in multiples of 90d degrees
+
+        Args:
+            img (np.ndarray): Image to be rotated
+            k (int, optional): Number of times to rotate by 90 degrees. Defaults to 3.
+
+        Returns:
+            np.ndarray: Rotated image
+        """
+        img = np.ascontiguousarray(
+            np.rot90(img, k=num_of_rotation)
+        )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
+        return img
+
     def process_frame(
         self,
         frame: dict,
+        outputs:dict,
         detect_qr: bool = False,
         detect_hand_object: bool = False,
         object_label="milk bottle",
-    ):
+    ) -> Tuple[np.ndarray, dict]:
         """
         Process the frame
         """
-        output = {}
-
+        # Initialize camera_T_marker to None & object_scores to empty dict for current image frame
+        camera_T_marker = None
+        object_scores = {}
+        
+        viz_img = frame.get("image")
         if detect_qr:
-            self.april_tag_detector.process_frame(frame["raw_image"])
+            (viz_img, camera_T_marker) = self.april_tag_detector.process_frame(img_frame=frame.get("raw_image"))  # type: ignore
+            # Rotate current image frame
+            viz_img = self._rotate_img(img=viz_img)
             # TODO: @kavitshah logic for averaging april tag pose
+
+        if camera_T_marker is not None:
+            device_T_marker = self.device_T_camera * camera_T_marker
+            viz_img, outputs = self.april_tag_detector.get_outputs(
+                img_frame=viz_img,
+                outputs=outputs,
+                device_T_marker=device_T_marker,
+                timestamp=frame.get("timestamp"),
+                img_metadata=None,
+            )
+
 
         if detect_hand_object:
             output, object_scores = self.object_detector.process_frame_online(
-                np.copy(frame["image"])
+                np.copy(frame.get("image"))
             )
             if object_label in object_scores.keys():
                 if self.verbose:
                     plt.imsave(f"frame_{self._in_index}.jpg", output)
-                self.publish_pose_of_interest(frame["ros_pose"])
+                self.publish_pose_of_interest(frame.get("ros_pose"))
         self._in_index += 1
+        return viz_img, outputs
 
     def initialize_april_tag_detector(self, outputs: dict = {}):
         """
@@ -248,17 +304,22 @@ def main(do_update_iptables: bool):
     object_name = "ketchup"
 
     rate = rospy.Rate(5)
+    outputs = {}
+    cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
     aria_object = AriaLiveReader(verbose=True)
-    # aria_object.initialize_april_tag_detector()
+    aria_object.initialize_april_tag_detector(outputs=outputs)
     aria_object.initialize_object_detector(object_labels=[object_name])
     aria_object.connect()
     while not rospy.is_shutdown():
         frame = aria_object.get_frame()
         if frame is not None:
             rospy.loginfo(f"Got frame: {frame.keys()}")
-            _ = aria_object.process_frame(
-                frame, detect_hand_object=True, object_label=object_name
+            image, outputs = aria_object.process_frame(
+                frame, outputs=outputs, detect_qr=True, detect_hand_object=True, object_label=object_name
             )
+
+            cv2.imshow("Image", image[:, :, ::-1])
+            cv2.waitKey(1)
         rate.sleep()
     aria_object.disconnect()
     rospy.logwarn("Disconnecting and shutting down the node")
