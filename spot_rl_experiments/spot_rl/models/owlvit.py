@@ -6,6 +6,7 @@
 # mypy: ignore-errors
 import argparse
 import time
+from typing import List
 
 import cv2
 import torch
@@ -210,9 +211,20 @@ class OwlVit:
 
         return img
 
-    def update_label(self, labels):
+    def update_label(self, labels: List[List[str]]):
+        """Update labels that need to be detected
+
+        New labels should be in the format [[label1, label2, ...]]
+        """
         labels_with_prefix = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.labels = labels_with_prefix
+
+    def process(self, img, return_image: bool = False):
+        """Interface method for compatibility with Aria data-loaders"""
+        if return_image:
+            return self.run_inference_and_return_img(img)
+        else:
+            return self.run_inference(img)
 
 
 if __name__ == "__main__":

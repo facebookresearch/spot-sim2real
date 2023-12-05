@@ -153,6 +153,18 @@ def map_user_input_to_boolean(prompt):
             print("Please enter a valid input - y, yes, n or no")
 
 
+def conditional_print(message: str, verbose: bool = False):
+    """
+    Print the message if the verbose flag is set to True
+
+    Args:
+        message (str): Message to be printed if verbose is True (can also be f-string)
+        verbose (bool): Flag to determine whether to print the message or not
+    """
+    if verbose:
+        print(message)
+
+
 class FixSizeOrderedDict(OrderedDict):
     def __init__(self, *args, maxlen=0, **kwargs):
         self._maxlen = maxlen
