@@ -68,7 +68,7 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self):
+    def __init__(self, should_stand_on_start: bool = True):
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
 
@@ -76,7 +76,10 @@ class SpotSkillManager:
         self.__initiate_controllers()
 
         # Power on the robot
-        self.spot.power_robot()
+        if should_stand_on_start:
+            self.spot.power_robot()
+        else:
+            self.spot.power_on()
 
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
@@ -294,7 +297,9 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, x: float, y: float, z: float) -> Tuple[bool, str]:  # noqa
+    def place(  # noqa
+        self, x: float, y: float, z: float, is_local: bool = False
+    ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
 
@@ -315,7 +320,9 @@ class SpotSkillManager:
         result = None
         try:
             place_target_tuple = (x, y, z)
-            result = self.place_controller.execute([place_target_tuple])
+            result = self.place_controller.execute(
+                [place_target_tuple], is_local
+            )  # TODO: Test if this works in PlaceController
         except Exception:
             message = "Error encountered while placing"
             conditional_print(message=message, verbose=self.verbose)

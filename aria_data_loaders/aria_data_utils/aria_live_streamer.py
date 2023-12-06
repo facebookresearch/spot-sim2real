@@ -20,7 +20,7 @@ from aria_data_utils.conversions import (
 from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
 from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
 from cairo import Device
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped
 from nav_msgs.msg import Odometry
 from projectaria_tools.core.calibration import (
     device_calibration_from_json_string,
@@ -28,11 +28,11 @@ from projectaria_tools.core.calibration import (
     get_linear_camera_calibration,
 )
 from projectaria_tools.core.sensor_data import ImageDataRecord
-from tf2_ros import StaticTransformBroadcaster
-from geometry_msgs.msg import Pose
 from scipy.spatial.transform import Rotation
+from tf2_ros import StaticTransformBroadcaster
 
-FILTER_DIST = 2.4 # in meters (distance for valid detection)
+FILTER_DIST = 2.4  # in meters (distance for valid detection)
+
 
 class AriaLiveReader:
     """
@@ -76,9 +76,13 @@ class AriaLiveReader:
         self.static_tf_broadcaster = StaticTransformBroadcaster()
 
         # Maintain a list of all poses where qr code is detected (w.r.t ariaWorld)
-        self.marker_positions_list = []  # type: List[np.ndarray] # List of  position as np.ndarray (x, y, z)
-        self.marker_quaternion_list = []  # type: List[np.ndarray] # List of quaternions as np.ndarray (x, y, z, w)
-        self.fix_list_length = 10 # TODO: Add this to config
+        self.marker_positions_list = (
+            []
+        )  # type: List[np.ndarray] # List of  position as np.ndarray (x, y, z)
+        self.marker_quaternion_list = (
+            []
+        )  # type: List[np.ndarray] # List of quaternions as np.ndarray (x, y, z, w)
+        self.fix_list_length = 10  # TODO: Add this to config
         self.avg_ariaWorld_T_marker = None  # type: Optional[sp.SE3]
 
     def connect(self):
@@ -271,7 +275,9 @@ class AriaLiveReader:
             device_T_marker = self.device_T_camera * camera_T_marker
             ariaWorld_T_device = frame.get("device_pose")
 
-            avg_ariaWorld_T_marker = self.get_running_avg_ariaWorld_T_marker(ariaWorld_T_device=ariaWorld_T_device, device_T_marker=device_T_marker)
+            avg_ariaWorld_T_marker = self.get_running_avg_ariaWorld_T_marker(
+                ariaWorld_T_device=ariaWorld_T_device, device_T_marker=device_T_marker
+            )
 
             if avg_ariaWorld_T_marker is not None:
                 avg_marker_T_ariaWorld = avg_ariaWorld_T_marker.inverse()
@@ -279,7 +285,9 @@ class AriaLiveReader:
                 # Publish marker pose in ariaWorld frame
                 self.static_tf_broadcaster.sendTransform(
                     generate_TransformStamped_a_T_b_from_spSE3(
-                        avg_marker_T_ariaWorld, parent_frame="marker", child_frame="ariaWorld"
+                        avg_marker_T_ariaWorld,
+                        parent_frame="marker",
+                        child_frame="ariaWorld",
                     )
                 )
 
@@ -382,9 +390,13 @@ class AriaLiveReader:
             self.marker_quaternion_list.append(quat)
 
             # Compute the average transformation as new data got appended
-            self.avg_ariaWorld_T_marker = compute_avg_spSE3_from_nplist(a_T_b_position_list=self.marker_positions_list, a_T_b_quaternion_list=self.marker_quaternion_list)
+            self.avg_ariaWorld_T_marker = compute_avg_spSE3_from_nplist(
+                a_T_b_position_list=self.marker_positions_list,
+                a_T_b_quaternion_list=self.marker_quaternion_list,
+            )
 
         return self.avg_ariaWorld_T_marker
+
 
 @click.command()
 @click.option("--do-update-iptables", is_flag=True, type=bool, default=False)
