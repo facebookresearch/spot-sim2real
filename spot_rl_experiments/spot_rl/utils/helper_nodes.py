@@ -8,10 +8,12 @@ import time
 
 import numpy as np
 import rospy
+from nav_msgs.msg import Odometry
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import say
 from std_msgs.msg import Float32MultiArray, String
+from tf2_ros import StaticTransformBroadcaster
 
 NAV_POSE_BUFFER_LEN = 1
 
@@ -29,9 +31,20 @@ class SpotRosProprioceptionPublisher:
         self.nav_pose_buff = None
         self.buff_idx = 0
 
+        # Instantiate static transform broadcaster for publishing spot to spotWorld transform
+        self.static_tf_broadcaster = StaticTransformBroadcaster()
+
+        # broadcast spot odometry to visualize path in rviz
+        self.odom_broadcaster = rospy.Publisher(
+            rt.ODOM_TOPIC, Odometry, queue_size=1, latch=True
+        )
+
     def publish_msgs(self):
         st = time.time()
         robot_state = self.spot.get_robot_state()
+
+        robot_kinematic_snapshot_tree = robot_state.kinematic_state.transforms_snapshot
+
         msg = Float32MultiArray()
         xy_yaw = self.spot.get_xy_yaw(robot_state=robot_state, use_boot_origin=True)
         if self.nav_pose_buff is None:
@@ -59,6 +72,21 @@ class SpotRosProprioceptionPublisher:
         # Limit publishing to 10 Hz max
         if time.time() - self.last_publish > 1 / 10:
             self.pub.publish(msg)
+            # publish spot to spotWorld transform as ROS TF
+            self.static_tf_broadcaster.sendTransform(
+                self.spot.get_vision_tform_body_TransformStamped(
+                    robot_kinematic_snapshot_tree
+                )
+            )
+            # publish pose as ROS Odometry
+            msg = Odometry()
+            pose = self.spot.get_vision_T_body_Pose(robot_kinematic_snapshot_tree)
+            msg.pose = pose
+            msg.header.stamp = rospy.Time.now()
+            msg.child_frame_id = "spot"
+            msg.header.frame_id = "spotWorld"
+            self.odom_broadcaster.publish(msg)
+            # Log publish rate
             rospy.loginfo(
                 f"[spot_ros_proprioception_node]: "
                 "Proprioception retrieval / publish time: "

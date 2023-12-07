@@ -692,13 +692,19 @@ class SpotQRDetector:
 
             (
                 img_rend_hand,
-                hand_mn_handcam_T_marker,
+                hand_sp_handcam_T_marker,
             ) = hand_cam_pose_estimator.detect_markers_and_estimate_pose(
                 img_hand, should_render=True
             )
 
-            if hand_mn_handcam_T_marker is not None:
+            hand_mn_handcam_T_marker = None
+            if hand_sp_handcam_T_marker is not None:
                 print("Trackedddd")
+                hand_mn_handcam_T_marker = (
+                    Spot.convert_transformation_from_sophus_to_magnum(
+                        sp_transformation=hand_sp_handcam_T_marker
+                    )
+                )
                 is_marker_detected_from_hand_cam = True
 
             # Spot - spotWorld_T_handcam computation
