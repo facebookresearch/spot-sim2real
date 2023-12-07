@@ -7,21 +7,7 @@ import cv2
 import numpy as np
 import rospy
 import sophus as sp
-from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
-from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
-from aria_data_utils.image_utils import decorate_img_with_text
-from aria_data_utils.perception.april_tag_pose_estimator import AprilTagPoseEstimator
-from bosdyn.client.frame_helpers import get_a_tform_b
-from fairotag.scene import Scene
-from geometry_msgs.msg import Pose, PoseStamped, TransformStamped
-from matplotlib import pyplot as plt
-from projectaria_tools.core import calibration, data_provider, mps
-from scipy.spatial.transform import Rotation as R
-from spot_rl.envs.skill_manager import SpotSkillManager
-from spot_rl.models.owlvit import OwlVit
-from spot_wrapper.spot import (
-    Spot,
-    SpotCamIds,
+from aria_data_utils.conversions import (
     generate_PoseStamped_a_T_b_from_spSE3,
     generate_spSE3_a_T_b_from_PoseStamped,
     generate_spSE3_a_T_b_from_TransformStamped,
@@ -29,6 +15,19 @@ from spot_wrapper.spot import (
     image_response_to_cv2,
     xyt2sophus,
 )
+from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
+from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
+from aria_data_utils.image_utils import decorate_img_with_text
+from aria_data_utils.perception.april_tag_pose_estimator import AprilTagPoseEstimator
+from bosdyn.client.frame_helpers import get_a_tform_b
+from fairotag.scene import Scene
+from geometry_msgs.msg import Pose, PoseStamped
+from matplotlib import pyplot as plt
+from projectaria_tools.core import calibration, data_provider, mps
+from scipy.spatial.transform import Rotation as R
+from spot_rl.envs.skill_manager import SpotSkillManager
+from spot_rl.models.owlvit import OwlVit
+from spot_wrapper.spot import Spot, SpotCamIds
 from std_msgs.msg import Bool
 from tf2_ros import (
     ConnectivityException,
@@ -41,11 +40,6 @@ from tf2_ros.transform_listener import TransformListener
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 FILTER_DIST = 2.4  # in meters (distance for valid detection)
-
-############## Simple Helper Methods to keep code clean ##############
-
-
-######################################################################
 
 
 class SpotQRDetector:
