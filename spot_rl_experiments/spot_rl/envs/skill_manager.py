@@ -410,7 +410,7 @@ if __name__ == "__main__":
     # place_to = "sofa"
     # Testing Mobile Gaze
     contnue = True
-    i: int = 2
+    i: int = 0
     n: int = len(pick_targets)
     pick_targets_keys = list(pick_targets.keys())
     while contnue and i < 3:

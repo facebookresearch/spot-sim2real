@@ -42,7 +42,7 @@ def parse_arguments(args=sys.argv[1:]):
 
 
 def construct_config_for_gaze(
-    file_path=None, opts=[], dont_pick_up=False, max_episode_steps=None
+    file_path=None, opts=[], dont_pick_up=True, max_episode_steps=None
 ):
     """
     Constructs and updates the config for gaze

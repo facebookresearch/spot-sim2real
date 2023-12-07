@@ -81,7 +81,7 @@ class SpotRosProprioceptionPublisher:
             # publish pose as ROS Odometry
             msg = Odometry()
             pose = self.spot.get_vision_T_body_Pose(robot_kinematic_snapshot_tree)
-            msg.pose = pose
+            msg.pose.pose = pose
             msg.header.stamp = rospy.Time.now()
             msg.child_frame_id = "spot"
             msg.header.frame_id = "spotWorld"
