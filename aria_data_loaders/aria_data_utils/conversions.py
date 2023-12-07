@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import rospy
 import sophus as sp
@@ -174,11 +175,15 @@ def matrix3x4_to_sophus(np_matrix: np.ndarray) -> sp.SE3:
     return sp.SE3(rotation, translation)
 
 
-def compute_avg_spSE3_from_nplist(a_T_b_position_list: List[np.ndarray], a_T_b_quaternion_list: List[np.ndarray]) -> Optional[sp.SE3]:
+def compute_avg_spSE3_from_nplist(
+    a_T_b_position_list: List[np.ndarray], a_T_b_quaternion_list: List[np.ndarray]
+) -> Optional[sp.SE3]:
     """
     Computes the average transformation of aria world frame to marker frame
     """
-    assert len(a_T_b_position_list) == len(a_T_b_quaternion_list), "Position and Quaternion lists must be equal length"
+    assert len(a_T_b_position_list) == len(
+        a_T_b_quaternion_list
+    ), "Position and Quaternion lists must be equal length"
 
     if len(a_T_b_position_list) == 0:
         return None
