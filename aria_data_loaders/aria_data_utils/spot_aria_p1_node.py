@@ -466,7 +466,9 @@ class SpotAriaP1Node:
 
         return (position[0], position[1], orientation)
 
-    def get_nav_pose_to_wearer(self, aria_pose: sp.SE3) -> Tuple[float, float, float]:
+    def get_nav_pose_to_wearer(
+        self, aria_pose: sp.SE3, shift_offset: float = 0.6
+    ) -> Tuple[float, float, float]:
         """
         Simple logic to select a point 1 m in front of the wearer, rotated towards them
         aria_pose is in ARIA CPF frame
@@ -492,7 +494,7 @@ class SpotAriaP1Node:
         x, y, theta = position[0], position[1], rotation
 
         # push fwd this point along theta
-        offset = 1.0
+        offset = shift_offset
         x += offset * np.cos(theta)
         y += offset * np.sin(theta)
         # rotate theta by pi
