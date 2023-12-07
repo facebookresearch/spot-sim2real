@@ -26,6 +26,7 @@ import numpy as np
 import quaternion
 import rospy
 import sophus as sp
+from aria_data_utils.conversions import sophus_to_ros_pose
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -61,7 +62,7 @@ from bosdyn.util import seconds_to_duration
 
 ############################################################################
 # TODO: Move to transform_utils.py
-from geometry_msgs.msg import PoseStamped, TransformStamped
+from geometry_msgs.msg import Pose, PoseStamped, TransformStamped
 from google.protobuf import wrappers_pb2
 from scipy.spatial.transform import Rotation as R
 
@@ -1016,6 +1017,10 @@ class Spot:
         return generate_TransformStamped_a_T_b_from_SE3Pose(
             a_Tform_b=vision_tform_body, parent_frame="spotWorld", child_frame="spot"
         )
+
+    def get_vision_T_body_Pose(self, frame_tree_snapshot) -> Pose:
+        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+        return sophus_to_ros_pose(vision_tform_body)
 
 
 class SpotLease:
