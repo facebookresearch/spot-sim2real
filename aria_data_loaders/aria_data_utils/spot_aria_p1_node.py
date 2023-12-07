@@ -292,7 +292,8 @@ class SpotAriaP1Node:
     def __init__(self, spot: Spot, verbose=False):
         # Get Spot Skill Manager
         self.skill_manager = SpotSkillManager(
-            should_stand_on_start=False
+            should_stand_on_start=False,
+            use_mobile_pick=True,
         )  # @FIXME: NEED THIS HERE AS IT INITIALIZES A Ros-node which we need here after
 
         spot_qr = SpotQRDetector(spot=spot)

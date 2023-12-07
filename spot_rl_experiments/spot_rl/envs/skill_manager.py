@@ -306,7 +306,9 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, x: float, y: float, z: float) -> Tuple[bool, str]:  # noqa
+    def place(  # noqa
+        self, x: float, y: float, z: float, is_local: bool = False
+    ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
 
@@ -327,7 +329,9 @@ class SpotSkillManager:
         result = None
         try:
             place_target_tuple = (x, y, z)
-            result = self.place_controller.execute([place_target_tuple])
+            result = self.place_controller.execute(
+                [place_target_tuple], is_local=is_local
+            )
         except Exception:
             message = "Error encountered while placing"
             conditional_print(message=message, verbose=self.verbose)

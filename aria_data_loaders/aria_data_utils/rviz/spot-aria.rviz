@@ -12,7 +12,6 @@ Panels:
         - /Pose2
         - /Odometry1/Shape1
         - /Pose3
-        - /Pose4
         - /Marker1
         - /Odometry2/Shape1
       Splitter Ratio: 0.5
@@ -193,13 +192,13 @@ Visualization Manager:
       Unreliable: false
       Value: true
     - Class: rviz/Marker
-      Enabled: false
+      Enabled: true
       Marker Topic: /aria_pose_of_interest_marker
       Name: Marker
       Namespaces:
         {}
-      Queue Size: 100
-      Value: false
+      Queue Size: 5
+      Value: true
     - Angle Tolerance: 0.10000000149011612
       Class: rviz/Odometry
       Covariance:
@@ -271,17 +270,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 3.1013407707214355
-        Y: -1.6743953227996826
-        Z: -1.658559799194336
+        X: 4.449529647827148
+        Y: -0.44126495718955994
+        Z: -1.6599293947219849
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.5597963333129883
+      Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
-      Yaw: 0.0053981589153409
+      Yaw: 0.0003981590270996094
     Saved: ~
 Window Geometry:
   Displays:
