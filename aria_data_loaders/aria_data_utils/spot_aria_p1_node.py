@@ -340,7 +340,7 @@ class SpotAriaP1Node:
             rospy.sleep(0.5)
         try:
             transform_stamped_spotWorld_T_ariaWorld = self._tf_buffer.lookup_transform(
-                target_frame="spotWorld", source_frame="ariaWorld", time=rospy.Time(0)
+                target_frame="ariaWorld", source_frame="spotWorld", time=rospy.Time(0)
             )
         except (LookupException, ConnectivityException, ExtrapolationException):
             raise RuntimeError("Unable to lookup transform from ariaWorld to spotWorld")
