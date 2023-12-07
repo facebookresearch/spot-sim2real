@@ -8,6 +8,7 @@ import time
 
 import numpy as np
 import rospy
+from nav_msgs.msg import Odometry
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import say
@@ -32,6 +33,11 @@ class SpotRosProprioceptionPublisher:
 
         # Instantiate static transform broadcaster for publishing spot to spotWorld transform
         self.static_tf_broadcaster = StaticTransformBroadcaster()
+
+        # broadcast spot odometry to visualize path in rviz
+        self.odom_broadcaster = rospy.Publisher(
+            rt.ODOM_TOPIC, Odometry, queue_size=1, latch=True
+        )
 
     def publish_msgs(self):
         st = time.time()
@@ -66,11 +72,21 @@ class SpotRosProprioceptionPublisher:
         # Limit publishing to 10 Hz max
         if time.time() - self.last_publish > 1 / 10:
             self.pub.publish(msg)
+            # publish spot to spotWorld transform as ROS TF
             self.static_tf_broadcaster.sendTransform(
                 self.spot.get_vision_tform_body_TransformStamped(
                     robot_kinematic_snapshot_tree
                 )
             )
+            # publish pose as ROS Odometry
+            msg = Odometry()
+            pose = self.spot.get_vision_T_body_Pose(robot_kinematic_snapshot_tree)
+            msg.pose = pose
+            msg.header.stamp = rospy.Time.now()
+            msg.child_frame_id = "spot"
+            msg.header.frame_id = "spotWorld"
+            self.odom_broadcaster.publish(msg)
+            # Log publish rate
             rospy.loginfo(
                 f"[spot_ros_proprioception_node]: "
                 "Proprioception retrieval / publish time: "
