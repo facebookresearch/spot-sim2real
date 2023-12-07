@@ -64,6 +64,7 @@ class RealPolicy:
             config=config,
             observation_space=observation_space,
             action_space=action_space,
+            agent_name="agent_0",
         )
 
         print("Actor-critic architecture:", self.policy)
@@ -71,7 +72,10 @@ class RealPolicy:
         self.policy.to(self.device)
 
         # Load trained weights into the policy
-        self.policy.load_state_dict(checkpoint["state_dict"])
+        try:
+            self.policy.load_state_dict(checkpoint["state_dict"])
+        except Exception:
+            self.policy.load_state_dict(checkpoint[0]["state_dict"])
 
         self.prev_actions = None
         self.test_recurrent_hidden_states = None
@@ -247,6 +251,31 @@ class MobileGazePolicy(RealPolicy):
         )
 
 
+class SocalNavPolicy(RealPolicy):
+    def __init__(self, checkpoint_path, device, use_stereo_pair_camera):
+        observation_space = SpaceDict(
+            {
+                "articulated_agent_arm_depth": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "spot_head_stereo_depth_sensor": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "humanoid_detector_sensor": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+            }
+        )
+        action_space = spaces.Box(-1.0, 1.0, (2,))
+        super().__init__(
+            checkpoint_path,
+            observation_space,
+            action_space,
+            device,
+            PointNavResNetPolicy,
+        )
+
+
 def parse_arguments(args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -297,7 +326,7 @@ if __name__ == "__main__":
     save_path["std"] = args.std
 
     # The originl hab3 trained policy
-    mobile_gaze_policy = MobileGazePolicy(
+    mobile_gaze_policy = SocalNavPolicy(
         save_path["target_hab3_policy"],
         device=device,
         use_stereo_pair_camera=args.use_stereo_pair_camera,
@@ -305,19 +334,11 @@ if __name__ == "__main__":
     mobile_gaze_policy.reset()
 
     # Get the observation space
-    if args.use_stereo_pair_camera:
-        observations = {
-            "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-            "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
-            "spot_head_stereo_depth_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-            "joint": np.zeros(4, dtype=np.float32),
-        }
-    else:
-        observations = {
-            "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-            "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
-            "joint": np.zeros(4, dtype=np.float32),
-        }
+    observations = {
+        "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
+        "spot_head_stereo_depth_sensor": np.zeros([240, 228, 1], dtype=np.float32),
+        "humanoid_detector_sensor": np.zeros([240, 228, 1], dtype=np.float32),
+    }
 
     # Noraml way in hab3 to get the action
     actions = mobile_gaze_policy.act(observations)
