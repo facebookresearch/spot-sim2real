@@ -28,8 +28,10 @@ from projectaria_tools.core.calibration import (
     get_linear_camera_calibration,
 )
 from projectaria_tools.core.sensor_data import ImageDataRecord
+from pytest import mark
 from scipy.spatial.transform import Rotation
 from tf2_ros import StaticTransformBroadcaster
+from visualization_msgs.msg import Marker
 
 FILTER_DIST = 2.4  # in meters (distance for valid detection)
 
@@ -56,6 +58,9 @@ class AriaLiveReader:
         )
         self.aria_cpf_publisher = rospy.Publisher(
             "/aria_current_pose", PoseStamped, queue_size=10
+        )
+        self.pose_of_interest_marker_publisher = rospy.Publisher(
+            "/aria_pose_of_interest_marker", Marker, queue_size=10
         )
 
         self.aria_pose = None
@@ -183,11 +188,12 @@ class AriaLiveReader:
             msg.pose = self.aria_ros_pose
             self.aria_cpf_publisher.publish(msg)
 
-    def publish_pose_of_interest(self, pose: Pose):
+    def publish_pose_of_interest(self, pose: Pose, marker_scale: float = 0.1):
         """
         Publishes current pose of Aria as a pose of interest for Spot
         """
 
+        # publish as pose for detail
         pose_stamped = PoseStamped()
         pose_stamped.header.stamp = rospy.Time().now()
         pose_stamped.header.seq = self._out_index
@@ -195,6 +201,25 @@ class AriaLiveReader:
         pose_stamped.pose = pose
 
         self.pose_of_interest_publisher.publish(pose_stamped)
+
+        # publish as marker for interpretability
+        marker = Marker()
+        marker.header.stamp = rospy.Time().now()
+        marker.header.frame_id = "ariaWorld"
+        marker.id = self._out_index
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.pose = pose
+        marker.scale.x = marker_scale
+        marker.scale.y = marker_scale
+        marker.scale.z = marker_scale
+        marker.color.a = 1.0
+        marker.color.r = 0.5
+        marker.color.g = 0.5
+        marker.color.b = 0.0
+
+        self.pose_of_interest_marker_publisher.publish(marker)
+
         self._out_index += 1
 
     def get_frame(self) -> Optional[Dict[str, Any]]:
