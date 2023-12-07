@@ -12,7 +12,6 @@ from aria_data_utils.conversions import (
     generate_spSE3_a_T_b_from_PoseStamped,
     generate_spSE3_a_T_b_from_TransformStamped,
     generate_TransformStamped_a_T_b_from_spSE3,
-    image_response_to_cv2,
     xyt2sophus,
 )
 from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
@@ -27,7 +26,7 @@ from projectaria_tools.core import calibration, data_provider, mps
 from scipy.spatial.transform import Rotation as R
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.models.owlvit import OwlVit
-from spot_wrapper.spot import Spot, SpotCamIds
+from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
 from std_msgs.msg import Bool
 from tf2_ros import (
     ConnectivityException,
@@ -59,7 +58,27 @@ class SpotQRDetector:
         return intrinsics
 
     def _get_body_T_handcam(self, frame_tree_snapshot_hand):
-        raise RuntimeError("This method is not used anymore. Please use get_spot_a_T_b")
+        hand_bd_wrist_T_handcam_dict = (
+            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
+                "hand_color_image_sensor"
+            ).parent_tform_child
+        )
+        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnum(
+            hand_bd_wrist_T_handcam_dict
+        )
+
+        hand_bd_body_T_wrist_dict = (
+            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
+                "arm0.link_wr1"
+            ).parent_tform_child
+        )
+        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnum(
+            hand_bd_body_T_wrist_dict
+        )
+
+        hand_mn_body_T_handcam = hand_mn_body_T_wrist @ hand_mn_wrist_T_handcam
+
+        return hand_mn_body_T_handcam
 
     def get_spot_a_T_b(self, a: str, b: str) -> sp.SE3:
         frame_tree_snapshot = (
@@ -162,14 +181,19 @@ class SpotQRDetector:
 
             (
                 img_rend_hand,
-                hand_mn_handcam_T_marker,
+                hand_sp_handcam_T_marker,
             ) = hand_cam_pose_estimator.detect_markers_and_estimate_pose(
                 img_hand, should_render=True
             )
 
-            if hand_mn_handcam_T_marker is not None:
+            if hand_sp_handcam_T_marker is not None:
                 print("Trackedddd")
                 is_marker_detected_from_hand_cam = True
+                hand_mn_handcam_T_marker = (
+                    Spot.convert_transformation_from_sophus_to_magnum(
+                        hand_sp_handcam_T_marker
+                    )
+                )
 
             # Spot - spotWorld_T_handcam computation
             frame_tree_snapshot_hand = img_response_hand.shot.transforms_snapshot
@@ -287,6 +311,8 @@ class SpotAriaP1Node:
         self._goto_pose_pub_for_place = rospy.Publisher(
             "/goto_pose_for_place", PoseStamped, queue_size=10
         )
+        self.goto_nav_pose_for_pick = None
+        self.goto_nav_pose_for_place = None
 
         # Publish marker w.r.t spotWorld transforms for 5 seconds so it can be seen in rviz
         start_time = rospy.Time.now()
@@ -368,16 +394,14 @@ class SpotAriaP1Node:
                 print("Got both poses Will Start Nav-Pick-Nav-Place")
 
                 # Nav to Pose of interest (Aria's cpf frame when it saw the object)
-                nav_loc_for_pick = self.get_nav_pose_to_object(
-                    self.spotWorld_T_aria_pose_of_interest
-                )
+                nav_loc_for_pick = self.goto_nav_pose_for_pick
                 rospy.loginfo(f"Nav loc for pick: {nav_loc_for_pick}")
 
                 # Pick the object
                 pick_object = "bottle"
 
                 # Nav to Pose of interest (Aria wearer's last location)
-                nav_loc_for_place = self.get_nav_pose_to_wearer(self.spotWorld_T_aria)
+                nav_loc_for_place = self.goto_nav_pose_for_place
                 rospy.loginfo(f"Nav loc for place: {nav_loc_for_place}")
                 # Place the object
                 place_loc = self.get_place_pose_to_wearer(self.spotWorld_T_aria)
@@ -409,6 +433,20 @@ class SpotAriaP1Node:
         self.spotWorld_T_aria = self.spotWorld_T_ariaWorld * ariaWorld_T_aria
         rospy.logdebug(f"Got {self.spotWorld_T_aria}")
 
+        self.goto_nav_pose_for_place = self.get_nav_pose_to_wearer(
+            self.spotWorld_T_aria
+        )
+
+        # Publish place pose in spotWorld frame for 2 seconds so it can be seen in rviz
+        self._goto_pose_pub_for_place.publish(
+            generate_PoseStamped_a_T_b_from_spSE3(
+                a_Tform_b=xyt2sophus(
+                    np.asarray(self.goto_nav_pose_for_place, dtype=np.float32)
+                ),
+                parent_frame="spotWorld",
+            )
+        )
+
     def ariaWorld_T_aria_pose_of_interest_callback(self, msg):
         """
         TODO: Add docstring
@@ -419,6 +457,19 @@ class SpotAriaP1Node:
             self.spotWorld_T_ariaWorld * ariaWorld_T_aria_pose_of_interest
         )
         rospy.logdebug(f"Got {self.spotWorld_T_aria_pose_of_interest}")
+
+        self.goto_nav_pose_for_pick = self.get_nav_pose_to_object(
+            self.spotWorld_T_aria_pose_of_interest
+        )
+        # Publish pick pose in spotWorld frame for 2 seconds so it can be seen in rviz
+        self._goto_pose_pub_for_pick.publish(
+            generate_PoseStamped_a_T_b_from_spSE3(
+                a_Tform_b=xyt2sophus(
+                    np.asarray(self.goto_nav_pose_for_pick, dtype=np.float32)
+                ),
+                parent_frame="spotWorld",
+            )
+        )
 
     def get_nav_pose_to_object(self, aria_pose: sp.SE3) -> Tuple[float, float, float]:
         """
@@ -444,19 +495,6 @@ class SpotAriaP1Node:
                 projected_cpf_z_axis_in_spotWorld_xy[0],
             )
         )  # tan^-1(y/x)
-
-        # Publish pick pose in spotWorld frame for 2 seconds so it can be seen in rviz
-        start_time = rospy.Time.now()
-        while rospy.Time.now() - start_time < rospy.Duration(2.0):
-            self._goto_pose_pub_for_pick.publish(
-                generate_PoseStamped_a_T_b_from_spSE3(
-                    a_Tform_b=xyt2sophus(
-                        np.array([position[0], position[1], orientation])
-                    ),
-                    parent_frame="spotWorld",
-                )
-            )
-            rospy.sleep(0.1)
 
         return (position[0], position[1], orientation)
 
@@ -494,18 +532,7 @@ class SpotAriaP1Node:
         # rotate theta by pi
         theta += np.pi
 
-        # Publish place pose in spotWorld frame for 2 seconds so it can be seen in rviz
-        start_time = rospy.Time.now()
-        while rospy.Time.now() - start_time < rospy.Duration(2.0):
-            self._goto_pose_pub_for_place.publish(
-                generate_PoseStamped_a_T_b_from_spSE3(
-                    a_Tform_b=xyt2sophus(np.array([x, y, theta])),
-                    parent_frame="spotWorld",
-                )
-            )
-            rospy.sleep(0.1)
-
-        return x, y, theta
+        return (x, y, theta)
 
     def get_place_pose_to_wearer(self, aria_pose: sp.SE3) -> Tuple[float, float, float]:
         """
