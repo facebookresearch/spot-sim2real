@@ -6,27 +6,50 @@
 # mypy: ignore-errors
 import argparse
 import time
+from typing import List
 
 import cv2
 import torch
 from PIL import Image
-from transformers import OwlViTForObjectDetection, OwlViTProcessor
+from transformers import (
+    Owlv2ForObjectDetection,
+    Owlv2Processor,
+    OwlViTForObjectDetection,
+    OwlViTProcessor,
+)
 
 
 class OwlVit:
-    def __init__(self, labels, score_threshold, show_img):
+    def __init__(
+        self,
+        labels,
+        score_threshold,
+        show_img,
+        version: int = 1,
+    ):
+        if version < 1 or version > 2:
+            raise ValueError(f"OWL-ViT version can only be 1 or 2. Received: {version}")
+        self._version = version
         # self.device = torch.device('cpu')
         self.device = (
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
-
-        self.model = OwlViTForObjectDetection.from_pretrained(
-            "google/owlvit-base-patch32"
-        )
+        if version == 1:
+            self.model = OwlViTForObjectDetection.from_pretrained(
+                "google/owlvit-base-patch32"
+            )
+            self.processor = OwlViTProcessor.from_pretrained(
+                "google/owlvit-base-patch32"
+            )
+        else:
+            self.processor = Owlv2Processor.from_pretrained(
+                "google/owlv2-base-patch16-ensemble"
+            )
+            self.model = Owlv2ForObjectDetection.from_pretrained(
+                "google/owlv2-base-patch16-ensemble"
+            )
         self.model.eval()
         self.model.to(self.device)
-
-        self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
 
         self.prefix = "an image of a"
         self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
@@ -51,9 +74,14 @@ class OwlVit:
             outputs = self.model(**inputs)
 
         # Convert outputs (bounding boxes and class logits) to COCO API
-        results = self.processor.post_process(
-            outputs=outputs, target_sizes=target_sizes
-        )
+        if self._version == 1:
+            results = self.processor.post_process(
+                outputs=outputs, target_sizes=target_sizes
+            )
+        else:
+            results = self.processor.post_process_object_detection(
+                outputs=outputs, target_sizes=target_sizes
+            )
         # img = img.to('cpu')
 
         if self.show_img:
@@ -75,9 +103,14 @@ class OwlVit:
             outputs = self.model(**inputs)
 
         # Convert outputs (bounding boxes and class logits) to COCO API
-        results = self.processor.post_process(
-            outputs=outputs, target_sizes=target_sizes
-        )
+        if self._version == 1:
+            results = self.processor.post_process(
+                outputs=outputs, target_sizes=target_sizes
+            )
+        else:
+            results = self.processor.post_process_object_detection(
+                outputs=outputs, target_sizes=target_sizes
+            )
         # img = img.to('cpu')
         # if self.show_img:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
@@ -210,7 +243,11 @@ class OwlVit:
 
         return img
 
-    def update_label(self, labels):
+    def update_label(self, labels: List[List[str]]):
+        """Update labels that need to be detected
+
+        New labels should be in the format [[label1, label2, ...]]
+        """
         labels_with_prefix = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.labels = labels_with_prefix
 

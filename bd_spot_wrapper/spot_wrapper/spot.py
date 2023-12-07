@@ -24,7 +24,9 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
+import rospy
 import sophus as sp
+from aria_data_utils.conversions import sophus_to_ros_pose, generate_TransformStamped_a_T_b_from_SE3Pose
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -36,7 +38,7 @@ from bosdyn.api import (
     synchronized_command_pb2,
     trajectory_pb2,
 )
-from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, Vec2
+from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, SE3Pose, Vec2
 from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.client import math_helpers
 from bosdyn.client.docking import blocking_dock_robot, blocking_undock
@@ -58,6 +60,7 @@ from bosdyn.client.robot_command import (
 from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
 from google.protobuf import wrappers_pb2
+from geometry_msgs.msg import Pose
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -862,6 +865,16 @@ class Spot:
 
         mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
         return mn_transformation
+
+    def get_vision_tform_body_TransformStamped(self, frame_tree_snapshot):
+        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+        return generate_TransformStamped_a_T_b_from_SE3Pose(
+            a_Tform_b=vision_tform_body, parent_frame="spotWorld", child_frame="spot"
+        )
+
+    def get_vision_T_body_Pose(self, frame_tree_snapshot) -> Pose:
+        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+        return sophus_to_ros_pose(vision_tform_body)
 
 
 class SpotLease:

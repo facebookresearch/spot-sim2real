@@ -1,5 +1,5 @@
 import math
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -67,13 +67,13 @@ def calculate_iou(box1: np.ndarray, box2: np.ndarray) -> float:
 
 def centered_heuristic(
     detections: list, pixel_wt: float = 0.65, image_size: Tuple[int, int] = (512, 512)
-) -> List[float]:
+) -> Dict[str, float]:
     """Given one instance of object detection from OWL-ViT, calculate the graspability
     score.
     graspability_score = w1 * (%_of_object_pixels) + w2 * (dist_bbox_from_img_center)
     """
     center_wt = 1 - pixel_wt
-    scores = []
+    scores = {}
     for det in detections:
         xmin, ymin, xmax, ymax = det[2][0], det[2][1], det[2][2], det[2][3]
         bbox_center = ((xmin + xmax) // 2, (ymin + ymax) // 2)
@@ -84,7 +84,7 @@ def centered_heuristic(
         img_area = image_size[0] * image_size[1]
         percent_object_pixels = bbox_area / img_area
         score = pixel_wt * percent_object_pixels + center_wt * dist_from_center
-        scores.append(score.item())
+        scores[det[0]] = score.item()
     return scores
 
 

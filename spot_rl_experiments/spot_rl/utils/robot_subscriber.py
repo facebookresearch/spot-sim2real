@@ -36,6 +36,7 @@ class SpotRobotSubscriberMixin:
 
     def __init__(self, spot=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        rospy.loginfo(f"name - {self.node_name}")
         rospy.init_node(self.node_name, disable_signals=True)
         self.cv_bridge = CvBridge()
 
