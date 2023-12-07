@@ -511,6 +511,8 @@ class SpotAriaP1Node:
         # as robot should orient to the CPF's z axis. First 3 elements of
         # column 3 from spotWorld_T_cpf represents cpf's z axis in spotWorld frame
         cpf_z_axis_in_spotWorld = aria_pose.matrix()[:3, 2]
+        x_component = cpf_z_axis_in_spotWorld[0]
+        y_component = cpf_z_axis_in_spotWorld[1]
 
         # Project cpf's z axis onto xy plane of spotWorld frame by ignoring z component
         xy_plane_projection_array = np.array([1.0, 1.0, 0.0])
@@ -526,9 +528,8 @@ class SpotAriaP1Node:
         x, y, theta = position[0], position[1], rotation
 
         # push fwd this point along theta
-        offset = shift_offset
-        x += offset * np.cos(theta)
-        y += offset * np.sin(theta)
+        x += shift_offset * x_component
+        y += shift_offset * y_component
         # rotate theta by pi
         theta += np.pi
 
