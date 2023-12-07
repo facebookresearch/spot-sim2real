@@ -26,7 +26,10 @@ import numpy as np
 import quaternion
 import rospy
 import sophus as sp
-from aria_data_utils.conversions import sophus_to_ros_pose, generate_TransformStamped_a_T_b_from_SE3Pose
+from aria_data_utils.conversions import (
+    generate_TransformStamped_a_T_b_from_SE3Pose,
+    sophus_to_ros_pose,
+)
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -59,8 +62,8 @@ from bosdyn.client.robot_command import (
 )
 from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
-from google.protobuf import wrappers_pb2
 from geometry_msgs.msg import Pose
+from google.protobuf import wrappers_pb2
 
 # Get Spot password and IP address
 env_err_msg = (
