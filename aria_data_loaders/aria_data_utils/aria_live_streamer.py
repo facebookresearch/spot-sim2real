@@ -214,9 +214,9 @@ class AriaLiveReader:
         marker.scale.y = marker_scale
         marker.scale.z = marker_scale
         marker.color.a = 1.0
-        marker.color.r = 0.5
-        marker.color.g = 0.5
-        marker.color.b = 0.0
+        marker.color.r = 0.45
+        marker.color.g = 0.95
+        marker.color.b = 0.2
 
         self.pose_of_interest_marker_publisher.publish(marker)
 
