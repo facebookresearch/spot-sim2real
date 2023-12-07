@@ -443,11 +443,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             f"gh: {np.rad2deg(observations['goal_heading'][0]):.2f}\t"
         )
 
-    def get_nav_observation(self, goal_xy, goal_heading):
+    def get_nav_observation(self, goal_xy=None, goal_heading=None, is_social_nav=False):
         observations = {}
 
         # Get visual observations
         front_depth = self.msg_to_cv2(self.filtered_head_depth, "mono8")
+
+        # Social nav images uses different size for the steoro camera
+        if is_social_nav:
+            front_depth = cv2.resize(
+                front_depth, (120 * 2, 228), interpolation=cv2.INTER_AREA
+            )
+        else:
+            front_depth = cv2.resize(
+                front_depth, (120 * 2, 212), interpolation=cv2.INTER_AREA
+            )
 
         front_depth = cv2.resize(
             front_depth, (120 * 2, 212), interpolation=cv2.INTER_AREA
@@ -455,24 +465,38 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         front_depth = np.float32(front_depth) / 255.0
         # Add dimension for channel (unsqueeze)
         front_depth = front_depth.reshape(*front_depth.shape[:2], 1)
-        observations["spot_right_depth"], observations["spot_left_depth"] = np.split(
-            front_depth, 2, 1
-        )
 
-        # Get rho theta observation
-        curr_xy = np.array([self.x, self.y], dtype=np.float32)
-        rho = np.linalg.norm(curr_xy - goal_xy)
-        theta = wrap_heading(
-            np.arctan2(goal_xy[1] - self.y, goal_xy[0] - self.x) - self.yaw
-        )
-        rho_theta = np.array([rho, theta], dtype=np.float32)
+        # Get the spot observation
+        if is_social_nav:
+            # In yaml, we have the following observation for social nav
+            # articulated_agent_arm_depth
+            # spot_head_stereo_depth_sensor
+            # humanoid_detector_sensor
+            arm_depth, arm_depth_bbox = self.get_gripper_images()
+            observations["articulated_agent_arm_depth"] = arm_depth
+            observations["spot_head_stereo_depth_sensor"] = front_depth
+            observations["humanoid_detector_sensor"] = arm_depth_bbox
 
-        # Get goal heading observation
-        goal_heading_ = -np.array(
-            [wrap_heading(goal_heading - self.yaw)], dtype=np.float32
-        )
-        observations["target_point_goal_gps_and_compass_sensor"] = rho_theta
-        observations["goal_heading"] = goal_heading_
+        else:
+            (
+                observations["spot_right_depth"],
+                observations["spot_left_depth"],
+            ) = np.split(front_depth, 2, 1)
+
+            # Get rho theta observation
+            curr_xy = np.array([self.x, self.y], dtype=np.float32)
+            rho = np.linalg.norm(curr_xy - goal_xy)
+            theta = wrap_heading(
+                np.arctan2(goal_xy[1] - self.y, goal_xy[0] - self.x) - self.yaw
+            )
+            rho_theta = np.array([rho, theta], dtype=np.float32)
+
+            # Get goal heading observation
+            goal_heading_ = -np.array(
+                [wrap_heading(goal_heading - self.yaw)], dtype=np.float32
+            )
+            observations["target_point_goal_gps_and_compass_sensor"] = rho_theta
+            observations["goal_heading"] = goal_heading_
 
         return observations
 

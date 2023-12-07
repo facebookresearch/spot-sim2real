@@ -8,7 +8,11 @@ from typing import Tuple
 import numpy as np
 from multimethod import multimethod
 from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
-from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
+from spot_rl.envs.nav_env import (
+    SocialNavController,
+    WaypointController,
+    construct_config_for_nav,
+)
 from spot_rl.envs.place_env import PlaceController, construct_config_for_place
 from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
@@ -125,6 +129,11 @@ class SpotSkillManager:
             spot=self.spot,
             use_mobile_pick=self._use_mobile_pick,
         )
+        self.socnav_controller = SocialNavController(
+            config=self.nav_config,
+            spot=self.spot,
+            should_record_trajectories=True,
+        )
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
         )
@@ -222,6 +231,21 @@ class SpotSkillManager:
             message = "Successfully reached the target pose by default"
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+
+    def social_nav(self) -> Tuple[bool, str]:  # noqa
+        """Perform social navigation in which the robot finds and follows humans
+        Returns:
+            bool: True if pick was successful, False otherwise
+            str: Message indicating the status of the pick
+        """
+
+        try:
+            _ = self.socnav_controller.execute()
+        except Exception:
+            message = "Error encountered while navigating"
+            conditional_print(message=message, verbose=self.verbose)
+            return False, message
+        return True, "Finished social navigation"
 
     def pick(self, pick_target: str = None) -> Tuple[bool, str]:
         """
@@ -377,7 +401,7 @@ if __name__ == "__main__":
     while contnue:
         spotskillmanager = SpotSkillManager(use_mobile_pick=True)
         spotskillmanager.spot.open_gripper()
-        # spotskillmanager.socnav("nyc_mg_pos1")
+        spotskillmanager.social_nav()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown
