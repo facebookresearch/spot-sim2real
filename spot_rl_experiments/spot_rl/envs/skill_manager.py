@@ -8,7 +8,11 @@ from typing import Tuple
 import numpy as np
 from multimethod import multimethod
 from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
-from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
+from spot_rl.envs.nav_env import (
+    SocialNavController,
+    WaypointController,
+    construct_config_for_nav,
+)
 from spot_rl.envs.place_env import PlaceController, construct_config_for_place
 from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
@@ -68,13 +72,17 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self):
+    def __init__(self, use_mobile_pick=False):
+        # Process the meta parameters
+        self._use_mobile_pick = use_mobile_pick
+
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
 
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
-
+        # TODO: hack: use this line to debug
+        # self.gaze_controller.execute(["box"])
         # Power on the robot
         self.spot.power_robot()
 
@@ -117,7 +125,17 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
-        self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
+        # TODO: tidy up the nav config
+        self.socnav_controller = SocialNavController(
+            config=self.nav_config,
+            spot=self.spot,
+            should_record_trajectories=True,
+        )
+        self.gaze_controller = GazeController(
+            config=self.pick_config,
+            spot=self.spot,
+            use_mobile_pick=self._use_mobile_pick,
+        )
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
         )
@@ -215,6 +233,21 @@ class SpotSkillManager:
             message = "Successfully reached the target pose by default"
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+
+    def social_nav(self) -> Tuple[bool, str]:  # noqa
+        """Perform social navigation in which the robot finds and follows humans
+        Returns:
+            bool: True if pick was successful, False otherwise
+            str: Message indicating the status of the pick
+        """
+
+        try:
+            _ = self.socnav_controller.execute()
+        except Exception:
+            message = "Error encountered while navigating"
+            conditional_print(message=message, verbose=self.verbose)
+            return False, message
+        return True, "Finished social navigation"
 
     def pick(self, pick_target: str = None) -> Tuple[bool, str]:
         """
@@ -363,19 +396,14 @@ class SpotSkillManager:
 
 
 if __name__ == "__main__":
-    spotskillmanager = SpotSkillManager()
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 
-    # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
-    spotskillmanager.nav("test_place_front")
-    spotskillmanager.place("test_place_front")
-
-    # Nav-Pick-Nav-Place sequence 2
-    spotskillmanager.nav("test_square_vertex3")
-    spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_left")
-    spotskillmanager.place("test_place_left")
+    # SocialNav-Nav-Pick-Nav-Place sequence 1
+    spotskillmanager.social_nav()
+    spotskillmanager.nav("working_table")
+    spotskillmanager.pick("box")
+    spotskillmanager.nav("black_case")
+    spotskillmanager.place("black_case")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()

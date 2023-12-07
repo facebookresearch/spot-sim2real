@@ -10,7 +10,7 @@ from typing import Dict, List
 
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_rl.real_policy import GazePolicy
+from spot_rl.real_policy import GazePolicy, MobileGazePolicy
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
@@ -103,12 +103,28 @@ class GazeController:
             spot.shutdown(should_dock=True)
     """
 
-    def __init__(self, config, spot):
+    def __init__(self, config, spot, use_mobile_pick=False):
         self.config = config
         self.spot = spot
+        self._use_mobile_pick = use_mobile_pick
 
         # Setup
-        self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
+        if use_mobile_pick:
+            # TODO: hack: move all the checkpoint path into the gaze config
+            ckpt_dict = {}
+            ckpt_dict[
+                "net"
+            ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ts.pth"
+            ckpt_dict[
+                "action_dis"
+            ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
+            ckpt_dict[
+                "std"
+            ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_std.pth"
+            # TODO: hack: using gpu has an issue for jit loading policy
+            self.policy = MobileGazePolicy(ckpt_dict, device="cpu")
+        else:
+            self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
         self.policy.reset()
 
         self.gaze_env = SpotGazeEnv(config, spot)
@@ -148,10 +164,27 @@ class GazeController:
             observations = self.reset_env_and_policy(target_obj_name=target_object)
             done = False
             start_time = time.time()
+            # TODO: hack: Better way to transform the policy. We need to edit the observation so that we can use mobile gaze
+            if self._use_mobile_pick:
+                origin_observations = {}
+                origin_observations["arm_depth_bbox_sensor"] = observations[
+                    "arm_depth_bbox"
+                ]
+                origin_observations["articulated_agent_arm_depth"] = observations[
+                    "arm_depth"
+                ]
+                origin_observations["joint"] = observations["joint"]
+                observations = origin_observations
             self.gaze_env.say(f"Gaze at target object - {target_object}")
             while not done:
                 action = self.policy.act(observations)
-                observations, _, done, _ = self.gaze_env.step(arm_action=action)
+                if self._use_mobile_pick:
+                    # TODO: hack: move the following to something more organized
+                    observations, _, done, _ = self.gaze_env.step(
+                        arm_action=action[0:4], base_action=action[4:6]
+                    )
+                else:
+                    observations, _, done, _ = self.gaze_env.step(arm_action=action)
             self.gaze_env.say("Gaze finished")
 
             # Ask user for feedback about the success of the gaze and update the "success" flag accordingly

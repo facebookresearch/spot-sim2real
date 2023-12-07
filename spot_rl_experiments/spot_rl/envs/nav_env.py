@@ -9,8 +9,9 @@ import time
 from typing import Dict, List
 
 import numpy as np
+import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_rl.real_policy import NavPolicy
+from spot_rl.real_policy import NavPolicy, SocialNavPolicy
 from spot_rl.utils.json_helpers import save_json_file
 from spot_rl.utils.utils import (
     construct_config,
@@ -184,19 +185,129 @@ class WaypointController:
         return robot_trajectories
 
 
+class SocialNavController:
+    """
+    SocialNavController is used to find and follow a human
+    """
+
+    def __init__(self, config, spot: Spot, should_record_trajectories=False) -> None:
+        self.config = config
+        self.spot = spot
+
+        # Record robot's trajectory (i.e. waypoints)
+        self.recording_in_progress = False
+        self.start_time = 0.0
+        self.record_robot_trajectories = should_record_trajectories
+
+        # Setup
+        # TODO: hack: move all the checkpoint path into the gaze config
+        ckpt_dict = {}
+        ckpt_dict[
+            "net"
+        ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ts.pth"
+        ckpt_dict[
+            "action_dis"
+        ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_ad_ts.pth"
+        ckpt_dict[
+            "std"
+        ] = "/home/jimmytyyang/research/spot-sim2real/spot_rl_experiments/weights/mobile_gaze/mg3ns_4_latest_std.pth"
+        self.policy = SocialNavPolicy(ckpt_dict, device="cpu")
+        self.policy.reset()
+
+        # Set the is_social_nav flag
+        self.nav_env = SpotNavEnv(config, self.spot, is_social_nav=True)
+
+    def reset_env_and_policy(self):
+        """
+        Resets the nav_env and policy
+
+        Returns:
+            observations: observations from the nav_env
+
+        """
+        # Set the navigation target to the human
+        observations = self.nav_env.reset(target_obj_name="human")
+        self.policy.reset()
+
+        return observations
+
+    def execute(self) -> List[List[Dict]]:
+        """
+        Executes the social navigation
+
+        Returns:
+            robot_trajectories: [[Dict]] where each Dict contains timestamp and pose of the robot, inner list contains trajectory for each nav_target and outer list is a collection of each of the nav_target's trajectory
+        """
+
+        robot_trajectories = []  # type: List[List[Dict]]
+
+        observations = self.reset_env_and_policy()
+        done = False
+
+        # List of Dicts to store trajectory for each of the nav_targets in nav_targets_list
+        robot_trajectory = []  # type: List[Dict]
+        time.sleep(1)
+
+        self.nav_env.say("Navigating to human")
+
+        # Set start time for recording before execution of 1st nav waypoint
+        if self.record_robot_trajectories and not self.recording_in_progress:
+            self.start_time = time.time()
+            self.recording_in_progress = True
+
+        # Execution Loop
+        while not done:
+            action = self.policy.act(observations)
+            observations, _, done, _ = self.nav_env.step(base_action=action)
+
+            # Record trajectories at every step if True
+            if self.record_robot_trajectories:
+                robot_trajectory.append(
+                    {
+                        "timestamp": time.time() - self.start_time,
+                        "pose": [
+                            self.nav_env.x,
+                            self.nav_env.y,
+                            np.rad2deg(self.nav_env.yaw),
+                        ],
+                    }
+                )
+        # Store the trajectory for each nav_target inside the List[robot_trajectory]
+        robot_trajectories.append(robot_trajectory)
+
+        # Return waypoints back
+        return robot_trajectories
+
+
 class SpotNavEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot):
+    def __init__(self, config, spot: Spot, is_social_nav=False):
         super().__init__(config, spot)
         self.goal_xy = None
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
+        self.is_social_nav = is_social_nav
 
-    def reset(self, goal_xy, goal_heading):
-        self.goal_xy = np.array(goal_xy, dtype=np.float32)
-        self.goal_heading = goal_heading
-        observations = super().reset()
-        assert len(self.goal_xy) == 2
+    def reset(self, goal_xy=None, goal_heading=None, target_obj_name=None):
+        if self.is_social_nav:
+            assert target_obj_name is not None
+            # Move arm to initial configuration
+            cmd_id = self.spot.set_arm_joint_positions(
+                positions=self.initial_arm_joint_angles, travel_time=1
+            )
+            self.spot.block_until_arm_arrives(cmd_id, timeout_sec=1)
+            print("Open gripper called in Nav Env")
+            self.spot.open_gripper()
+
+            # Update target object name as provided in config
+            observations = super().reset(target_obj_name=target_obj_name)
+            rospy.set_param("object_target", target_obj_name)
+        else:
+            assert goal_xy is not None and goal_heading is not None
+            self.goal_xy = np.array(goal_xy, dtype=np.float32)
+            self.goal_heading = goal_heading
+            observations = super().reset()
+            assert len(self.goal_xy) == 2
 
         return observations
 
@@ -207,7 +318,9 @@ class SpotNavEnv(SpotBaseEnv):
         return succ
 
     def get_observations(self):
-        return self.get_nav_observation(self.goal_xy, self.goal_heading)
+        return self.get_nav_observation(
+            self.goal_xy, self.goal_heading, self.is_social_nav
+        )
 
 
 if __name__ == "__main__":
