@@ -530,7 +530,7 @@ class SpotAriaP1Node:
         x += offset * np.cos(theta)
         y += offset * np.sin(theta)
         # rotate theta by pi
-        theta += np.pi
+        theta = (theta + np.pi) % (2 * np.pi)  # normalize theta!!
 
         return (x, y, theta)
 
