@@ -68,7 +68,9 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self, use_mobile_pick=False):
+    def __init__(
+        self, use_mobile_pick: bool = False, should_stand_on_start: bool = True
+    ):
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
 
@@ -79,7 +81,10 @@ class SpotSkillManager:
         self.__initiate_controllers()
 
         # Power on the robot
-        self.spot.power_robot()
+        if should_stand_on_start:
+            self.spot.power_robot()
+        else:
+            self.spot.power_on()
 
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
