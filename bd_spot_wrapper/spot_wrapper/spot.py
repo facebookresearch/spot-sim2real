@@ -27,8 +27,8 @@ import quaternion
 import rospy
 import sophus as sp
 from aria_data_utils.conversions import (
+    SE3Pose_to_ros_pose,
     generate_TransformStamped_a_T_b_from_SE3Pose,
-    sophus_to_ros_pose,
 )
 from bosdyn import geometry
 from bosdyn.api import (
@@ -41,7 +41,7 @@ from bosdyn.api import (
     synchronized_command_pb2,
     trajectory_pb2,
 )
-from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, SE3Pose, Vec2
+from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, Vec2
 from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.client import math_helpers
 from bosdyn.client.docking import blocking_dock_robot, blocking_undock
@@ -877,7 +877,7 @@ class Spot:
 
     def get_vision_T_body_Pose(self, frame_tree_snapshot) -> Pose:
         vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
-        return sophus_to_ros_pose(vision_tform_body)
+        return SE3Pose_to_ros_pose(vision_tform_body)
 
 
 class SpotLease:

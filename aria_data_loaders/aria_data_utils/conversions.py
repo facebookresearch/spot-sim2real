@@ -64,6 +64,23 @@ def sophus_to_ros_pose(se3: sp.SE3) -> Pose:
     return pose
 
 
+def SE3Pose_to_ros_pose(se3: SE3Pose) -> Pose:
+    """
+    Convert a SE3Pose to a ROS pose
+    """
+    pose = Pose()
+    translation = se3.position
+    quat = se3.rotation
+    pose.position.x = float(translation.x)
+    pose.position.y = float(translation.y)
+    pose.position.z = float(translation.z)
+    pose.orientation.x = float(quat.x)
+    pose.orientation.y = float(quat.y)
+    pose.orientation.z = float(quat.z)
+    pose.orientation.w = float(quat.w)
+    return pose
+
+
 def generate_TransformStamped_a_T_b_from_SE3Pose(
     a_Tform_b: SE3Pose, parent_frame: str, child_frame: str
 ) -> TransformStamped:
