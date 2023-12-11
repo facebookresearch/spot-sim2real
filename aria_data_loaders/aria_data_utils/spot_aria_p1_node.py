@@ -544,9 +544,9 @@ class SpotAriaP1Node:
         # TODO: Device this logic
         # return (2.079572916030884, 2.289151906967163, 0.7599455118179321)
         return (
-            0.8,
+            0.7,
             0.0,
-            0.8,
+            0.2,
         )  # This is constant place target in local frame (TODO: Please test)
 
     def run_nav_pick_nav_place(

@@ -135,6 +135,9 @@ class PlaceController:
         success_list = []
         for place_target in place_target_list:
             start_time = time.time()
+
+            self.place_env.say(f"Placing at {place_target}")
+
             if self.use_policies:
                 observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
@@ -276,7 +279,7 @@ if __name__ == "__main__":
     spot = Spot("RealPlaceEnv")
     with spot.get_lease(hijack=True):
         spot.power_robot()
-        place_controller = PlaceController(config, spot, use_policies=True)
+        place_controller = PlaceController(config, spot, use_policies=False)
         try:
             place_result = place_controller.execute(
                 place_target_list, args.target_is_local
