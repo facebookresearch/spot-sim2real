@@ -196,18 +196,6 @@ python aria_streamer.py --data-path="/path/to/directory/containing/vrs/and/mps/f
 3. `--dry-run` (Input: bool): This is used to indicate if it should command robot to move or not. If dry run is true, then it will not send the commands to the robot to make it move. *But this will still require you to have robot watching the QR code for localizing itself in the system*.
 4. `--verbose` (Input: bool): This flag is for updating the visual stream with detections from both QR & object detectors.
 
-## :eyeglasses: Exporting habitat-lab policies/networks in torchscript to load into spotsim2real environment without libraries & environment conflicts 
-You might want to train new policies or networks in [habitat-lab](https://github.com/facebookresearch/habitat-lab) however habitat-lab conda environment packages & spot-ros (used for spotsim2real) environment packages might create complications, version incompatabilities.
-Thus we recommend exporting model in IR (intermediate representation) torchscript module. Disentangling the deployment & development environment, providing freedom to the model trainer. Recently [Jimmy Yang](https://github.com/jimmytyyang) is deploying mobile-gaze policy that was trained in new version of habitat-lab & thus he made the [conversion script](https://github.com/facebookresearch/spot-sim2real/blob/d200deef1ca3f4608cb3f84b43672bda63a3ce0b/spot_rl_experiments/utils/hab3_policy_conversion.py)
-
-In general these are the simple steps you can follow for conversion
-
-1. Load the pytorch model with class files, <b>transfer the model on cuda</b>
-2. Pass the input tensor from the model & trace that forward pass using torch.jit.trace, usage example can be found [here](https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html)
-3. Save the traced model as modelXX.torchscript, replace modelXX with any name you want
-4. To load the model in spotsim2real use torch.jit.load(path_to_saved_.torchscript_model, map_location="cuda:0/cpu")
-
-We encountered cuda error when setting up the recent habitat-lab code, a recent version (2.2.1) of pytorch & CUDA 11.8 was installed, however the hardware driver was older than 11.8 thus torch.cuda.is_available() was False & showing driver old error to fix that first uninstall pytorch using command  in your habitat-lab conda env``` pip uninstall pytorch torchvision torchaudio ```  then run the following command in same habitat-lab env (this is the pytorch & cuda version we use for spot-sim2real/spot-ros env) ``` conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch ```
 
 ## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is built upon Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments

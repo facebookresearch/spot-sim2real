@@ -42,7 +42,7 @@ from spot_wrapper.spot import Spot, wrap_heading
 from std_msgs.msg import Float32, String
 
 MAX_CMD_DURATION = 5
-TRAVLE_TIME_JOINT_BASE_ARM_CONTROL = 5  # 5 for the base; and 1/2*0.9 = 0.45 for the arm
+TRAVLE_TIME_JOINT_BASE_ARM_CONTROL = 5
 GRASP_VIS_DIR = osp.join(
     osp.dirname(osp.dirname(osp.abspath(__file__))), "grasp_visualizations"
 )
