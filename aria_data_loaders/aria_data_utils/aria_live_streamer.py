@@ -28,7 +28,6 @@ from projectaria_tools.core.calibration import (
     get_linear_camera_calibration,
 )
 from projectaria_tools.core.sensor_data import ImageDataRecord
-from pytest import mark
 from scipy.spatial.transform import Rotation
 from tf2_ros import StaticTransformBroadcaster
 from visualization_msgs.msg import Marker
@@ -325,12 +324,12 @@ class AriaLiveReader:
             )
 
         if detect_hand_object:
-            output, object_scores = self.object_detector.process_frame_online(
-                np.copy(frame.get("image"))
+            viz_img, object_scores = self.object_detector.process_frame_online(
+                viz_img
             )
             if object_label in object_scores.keys():
                 if self.verbose:
-                    plt.imsave(f"frame_{self._in_index}.jpg", output)
+                    plt.imsave(f"frame_{self._in_index}.jpg", viz_img)
                 self.publish_pose_of_interest(frame.get("ros_pose"))
         self._in_index += 1
         return viz_img, outputs
