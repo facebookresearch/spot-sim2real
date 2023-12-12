@@ -42,6 +42,7 @@ from spot_wrapper.spot import Spot, wrap_heading
 from std_msgs.msg import Float32, String
 
 MAX_CMD_DURATION = 5
+TRAVLE_TIME_JOINT_BASE_ARM_CONTROL = 5  # 5 for the base; and 1/2*0.9 = 0.45 for the arm
 GRASP_VIS_DIR = osp.join(
     osp.dirname(osp.dirname(osp.abspath(__file__))), "grasp_visualizations"
 )
@@ -235,6 +236,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp=False,
         place=False,
         max_joint_movement_key="MAX_JOINT_MOVEMENT",
+        max_lin_dist_mobile_gaze=None,
+        max_ang_dist_mobile_gaze=None,
         nav_silence_only=True,
         disable_oa=None,
     ):
@@ -246,6 +249,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param place: whether to call the open_gripper() method
         :param max_joint_movement_key: max allowable displacement of arm joints
             (different for gaze and place)
+        :param max_lin_dist_mobile_gaze: maximum linear distance allowed for mobile gaze
+        :param max_ang_dist_mobile_gaze: maximum angular distance allowed for mobile gaze
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -303,8 +308,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             if np.count_nonzero(base_action) > 0:
                 # Command velocities using the input action
                 lin_dist, ang_dist = base_action
-                lin_dist *= self.max_lin_dist
-                ang_dist *= self.max_ang_dist
+                if max_lin_dist_mobile_gaze is not None:
+                    lin_dist *= self.config[max_lin_dist_mobile_gaze]
+                else:
+                    lin_dist *= self.max_lin_dist
+                if max_ang_dist_mobile_gaze is not None:
+                    ang_dist *= self.config[max_ang_dist_mobile_gaze]
+                else:
+                    ang_dist *= self.max_ang_dist
                 target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity
                 ctrl_period = 1 / self.ctrl_hz
@@ -335,11 +346,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 base_action = (
                     np.array(base_action) * self.slowdown_base
                 )  # / self.ctrl_hz
+                print("Slow down...")
             if base_action is not None and arm_action is not None:
+                print("input base_action velocity:", base_action)
+                print("input arm_action:", arm_action)
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,
-                    MAX_CMD_DURATION,
+                    travel_time=TRAVLE_TIME_JOINT_BASE_ARM_CONTROL,
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif base_action is not None:

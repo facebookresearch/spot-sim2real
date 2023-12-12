@@ -68,7 +68,12 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self):
+    def __init__(
+        self, use_mobile_pick: bool = False, should_stand_on_start: bool = True
+    ):
+        # Process the meta parameters
+        self._use_mobile_pick = use_mobile_pick
+
         # Create the spot object, init lease, and construct configs
         self.__init_spot()
 
@@ -76,7 +81,10 @@ class SpotSkillManager:
         self.__initiate_controllers()
 
         # Power on the robot
-        self.spot.power_robot()
+        if should_stand_on_start:
+            self.spot.power_robot()
+        else:
+            self.spot.power_on()
 
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
@@ -117,7 +125,11 @@ class SpotSkillManager:
             spot=self.spot,
             should_record_trajectories=True,
         )
-        self.gaze_controller = GazeController(config=self.pick_config, spot=self.spot)
+        self.gaze_controller = GazeController(
+            config=self.pick_config,
+            spot=self.spot,
+            use_mobile_pick=self._use_mobile_pick,
+        )
         self.place_controller = PlaceController(
             config=self.place_config, spot=self.spot, use_policies=False
         )
@@ -294,7 +306,9 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, x: float, y: float, z: float) -> Tuple[bool, str]:  # noqa
+    def place(  # noqa
+        self, x: float, y: float, z: float, is_local: bool = False
+    ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
 
@@ -315,7 +329,9 @@ class SpotSkillManager:
         result = None
         try:
             place_target_tuple = (x, y, z)
-            result = self.place_controller.execute([place_target_tuple])
+            result = self.place_controller.execute(
+                [place_target_tuple], is_local=is_local
+            )
         except Exception:
             message = "Error encountered while placing"
             conditional_print(message=message, verbose=self.verbose)
@@ -363,19 +379,56 @@ class SpotSkillManager:
 
 
 if __name__ == "__main__":
-    spotskillmanager = SpotSkillManager()
+    from spot_rl.utils.utils import map_user_input_to_boolean
 
-    # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
-    spotskillmanager.nav("test_place_front")
-    spotskillmanager.place("test_place_front")
-
-    # Nav-Pick-Nav-Place sequence 2
-    spotskillmanager.nav("test_square_vertex3")
-    spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_left")
-    spotskillmanager.place("test_place_left")
+    # Apt waypoint
+    pick_targets = {
+        "kitchen": (
+            3.8482142244527835,
+            -3.4519528625906206,
+            np.deg2rad(-89.14307672622927),
+        ),
+        "kitchen_-10": (
+            3.8482142244527835,
+            -3.4519528625906206,
+            np.deg2rad(-89.14307672622927 - 10.0),
+        ),
+        "kitchen_+10": (
+            3.8482142244527835,
+            -3.4519528625906206,
+            np.deg2rad(-89.14307672622927 + 10.0),
+        ),
+        "table": (4.979398852803741, 3.535594946585519, -0.008869974097951427),
+        "table_+10": (
+            4.979398852803741,
+            3.535594946585519,
+            np.deg2rad(np.rad2deg(-0.008869974097951427) + 15.0),
+        ),
+        "table_-10": (
+            4.979398852803741,
+            3.535594946585519,
+            np.deg2rad(np.rad2deg(-0.008869974097951427) - 15.0),
+        ),
+    }
+    # pick_from = "kitchen"
+    # place_to = "sofa"
+    # Testing Mobile Gaze
+    contnue = True
+    i: int = 0
+    n: int = len(pick_targets)
+    pick_targets_keys = list(pick_targets.keys())
+    while contnue and i < 3:
+        pick_from = pick_targets_keys[i]
+        i += 1
+        spotskillmanager = SpotSkillManager(use_mobile_pick=True)
+        spotskillmanager.nav(*pick_targets[pick_from])
+        x = input(f"Press Enter to continue to mobile gaze from {pick_from}")
+        # spotskillmanager.pick("toy_lion")
+        spotskillmanager.pick(
+            "cereal_box"
+        )  # if i < 3 else spotskillmanager.pick("toy_lion")
+        spotskillmanager.spot.open_gripper()
+        contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()
