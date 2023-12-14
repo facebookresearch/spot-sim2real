@@ -116,7 +116,9 @@ class GazeController:
             ckpt_dict["action_dis"] = config.WEIGHTS.MOBILE_GAZE_ACTION_DIS
             ckpt_dict["std"] = config.WEIGHTS.MOBILE_GAZE_STD
             # Use config.device as the device for mobile gaze policy
-            self.policy = MobileGazePolicy(ckpt_dict, device=config.DEVICE)
+            self.policy = MobileGazePolicy(
+                ckpt_dict, device=config.DEVICE, config=config
+            )
         else:
             self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
         self.policy.reset()
@@ -164,21 +166,9 @@ class GazeController:
                 action = self.policy.act(observations)
                 if self._use_mobile_pick:
                     arm_action, base_action = None, None
-                    # The first four elements are for the arm; and the last two elements are for the base
-                    if len(action) == 7:
-                        # first 4 are arm actions, then 2 are base actions & last bit is unused
-                        arm_action = action[0:4]
-                        base_action = action[4:6]
-                    elif len(action) == 5:
-                        # Don't have base action, first 4 are are arm action & last bit is unsused
-                        arm_action = action[:4]
-                    elif len(action) == 8:
-                        # First bit tells whether to take arm action or base action, then 4 are arm action, then 2 are base action & last bit unused
-                        action_selection = action[0]
-                        if action_selection > 0.0:
-                            arm_action = action[1:5]
-                        else:
-                            base_action = action[5:7]
+                    # first 4 are arm actions, then 2 are base actions & last bit is unused
+                    arm_action = action[0:4]
+                    base_action = action[4:6]
 
                     # Check if arm_action contains NaN values
                     # assert not np.isnan(np.array(arm_action)).any()
@@ -208,7 +198,7 @@ class GazeController:
 
 
 class SpotGazeEnv(SpotBaseEnv):
-    def __init__(self, config, spot, use_mobile_pick):
+    def __init__(self, config, spot, use_mobile_pick=False):
         super().__init__(config, spot)
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
@@ -248,8 +238,12 @@ class SpotGazeEnv(SpotBaseEnv):
         )
         return observations, reward, done, info
 
-    def get_mobile_gaze_observations(self, observations):
-        """Get the mobile gaze observations"""
+    def remap_observation_keys_for_hab3(self, observations):
+        """
+        Change observation keys as per hab3.
+
+        @INFO: Policies trained on older hab versions DON'T need remapping
+        """
         mobile_gaze_observations = {}
         mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
             "arm_depth_bbox"
@@ -268,8 +262,9 @@ class SpotGazeEnv(SpotBaseEnv):
             "arm_depth_bbox": arm_depth_bbox,
         }
 
+        # Remap observation keys for mobile gaze as it was trained with Habitat version3
         if self._use_mobile_pick:
-            observations = self.get_mobile_gaze_observations(observations)
+            observations = self.remap_observation_keys_for_hab3(observations)
 
         return observations
 

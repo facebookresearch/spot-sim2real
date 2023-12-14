@@ -196,7 +196,6 @@ python aria_streamer.py --data-path="/path/to/directory/containing/vrs/and/mps/f
 3. `--dry-run` (Input: bool): This is used to indicate if it should command robot to move or not. If dry run is true, then it will not send the commands to the robot to make it move. *But this will still require you to have robot watching the QR code for localizing itself in the system*.
 4. `--verbose` (Input: bool): This flag is for updating the visual stream with detections from both QR & object detectors.
 
-
 ## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is built upon Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments
 ](https://github.com/naokiyokoyama/spot_rl_experiments), and with new features (LLMs, pytest) and improving robustness.

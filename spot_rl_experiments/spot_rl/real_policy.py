@@ -4,6 +4,7 @@
 
 
 from collections import OrderedDict
+from typing import Any
 
 import numpy as np
 import torch
@@ -13,7 +14,9 @@ from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
 from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
 from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
 from habitat_baselines.utils.common import GaussianNet, batch_obs
+from spot_rl.utils.utils import construct_config
 from torch import Size, Tensor
+from yacs.config import CfgNode as CN
 
 
 # Turn numpy observations into torch tensors for consumption by policy
@@ -40,6 +43,18 @@ class CustomNormal(torch.distributions.normal.Normal):
 
 
 class RealPolicy:
+    """
+    RealPolicy is a baseclass for all the Policies (GazePolicy, NavPolicy, PlacePolicy, MobileGazePolicy, etc)
+    Inputs :
+    checkpoint_path: Str or Dict of strs denoting path to pytorch weights or torchscript model path
+    observation_space: required arg for initializing underlying PolicyClass (required for non torchscript models)
+    action_space: required arg for initializing underlying PolicyClass (required for non torchscript models)
+    device: cpu or gpu
+    policy_class: Name of the underlying PolicyClass, default=PointNavBaselinePolicy
+    is_hab3_policy: Boolean, True/False, deafult=False, Flags denote whether the undelying policy will be loaded as torchscript model or normal Pytorch class,
+    More info on spot_rl_experiments/utils/README.md
+    """
+
     def __init__(
         self,
         checkpoint_path,
@@ -48,13 +63,14 @@ class RealPolicy:
         device,
         policy_class=PointNavBaselinePolicy,
         is_hab3_policy=False,
+        config: CN = (),
     ):
         print("Loading policy...")
         self.device = torch.device(device)
         if is_hab3_policy:
             # Hab3 policy loading
             # Load the policy using torch script
-            self.policy = {}
+            self.policy: Any = {}
             self.policy["net"] = torch.jit.load(
                 checkpoint_path["net"], map_location=self.device
             )
@@ -70,12 +86,10 @@ class RealPolicy:
             else:
                 checkpoint = checkpoint_path
 
-        # Load the config
-        if not is_hab3_policy:
+            # Load the config
             config = checkpoint["config"]
 
-        """ Disable observation transforms for real world experiments """
-        if not is_hab3_policy:
+            """ Disable observation transforms for real world experiments """
             config.defrost()
             config.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS = []
             config.freeze()
@@ -86,7 +100,6 @@ class RealPolicy:
                 observation_space=observation_space,
                 action_space=action_space,
             )
-            print("Actor-critic architecture:", self.policy)
             # Move it to the device
             self.policy.to(self.device)
 
@@ -98,13 +111,11 @@ class RealPolicy:
                 }
             )
 
+        print("Loaded Actor-critic architecture")
         self.prev_actions = None
         self.test_recurrent_hidden_states = None
         self.not_done_masks = None
-        if is_hab3_policy:
-            self.config = None
-        else:
-            self.config = config
+        self.config = config
         self.num_actions = action_space.shape[0]
         self.reset_ran = False
         self.is_hab3_policy = is_hab3_policy
@@ -122,8 +133,8 @@ class RealPolicy:
         else:
             self.test_recurrent_hidden_states = torch.zeros(
                 1,  # The number of environments. Just one for real world.
-                4,
-                512,
+                self.config.get("MOBILE_GAZE_NUM_RECURRENT_LAYERS", 4),
+                self.config.get("MOBILE_GAZE_RL_PPO_HIDDEN_SIZE", 512),
                 device=self.device,
             )
 
@@ -131,14 +142,10 @@ class RealPolicy:
         self.not_done_masks = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
         self.prev_actions = torch.zeros(1, self.num_actions, device=self.device)
 
-    def get_action(self, mu_maybe_std, std):
+    def get_action_distribution(self, mu_maybe_std, std):
         """The final transformation of the action given inputs"""
-        mu_maybe_std = mu_maybe_std.float()
-        mu = mu_maybe_std
-
-        mu = torch.tanh(mu)
-        std = torch.clamp(std, -5, 2)
-        std = torch.exp(std)
+        mu = torch.tanh(mu_maybe_std.float())
+        std = torch.exp(torch.clamp(std, -5, 2))
 
         return CustomNormal(mu, std, validate_args=False)
 
@@ -169,7 +176,7 @@ class RealPolicy:
                 self.test_recurrent_hidden_states = output_model[1]
 
                 with torch.no_grad():
-                    raw_actions = self.get_action(
+                    raw_actions = self.get_action_distribution(
                         self.policy["action_dist"](features), self.policy["std"]
                     )
                     actions = raw_actions.mean
@@ -184,7 +191,7 @@ class RealPolicy:
 
 
 class GazePolicy(RealPolicy):
-    def __init__(self, checkpoint_path, device):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
             {
                 "arm_depth": spaces.Box(
@@ -199,17 +206,16 @@ class GazePolicy(RealPolicy):
                 ),
             }
         )
-        action_space = spaces.Box(-1.0, 1.0, (4,))
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("GAZE_ACTION_SPACE_LENGTH", 4),)
+        )
         super().__init__(
-            checkpoint_path,
-            observation_space,
-            action_space,
-            device,
+            checkpoint_path, observation_space, action_space, device, config
         )
 
 
 class MobileGazePolicy(RealPolicy):
-    def __init__(self, checkpoint_path, device):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
             {
                 "arm_depth_bbox_sensor": spaces.Box(
@@ -229,7 +235,9 @@ class MobileGazePolicy(RealPolicy):
                 ),
             }
         )
-        action_space = spaces.Box(-1.0, 1.0, (7,))
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("MOBILE_GAZE_ACTION_SPACE_LENGTH", 7),)
+        )
         super().__init__(
             checkpoint_path,
             observation_space,
@@ -240,7 +248,7 @@ class MobileGazePolicy(RealPolicy):
 
 
 class PlacePolicy(RealPolicy):
-    def __init__(self, checkpoint_path, device):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
             {
                 "joint": spaces.Box(low=0.0, high=1.0, shape=(4,), dtype=np.float32),
@@ -249,12 +257,14 @@ class PlacePolicy(RealPolicy):
                 ),
             }
         )
-        action_space = spaces.Box(-1.0, 1.0, (4,))
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("PLACE_ACTION_SPACE_LENGTH", 4),)
+        )
         super().__init__(checkpoint_path, observation_space, action_space, device)
 
 
 class NavPolicy(RealPolicy):
-    def __init__(self, checkpoint_path, device):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
             {
                 "spot_left_depth": spaces.Box(
@@ -275,7 +285,9 @@ class NavPolicy(RealPolicy):
             }
         )
         # Linear, angular, and horizontal velocity (in that order)
-        action_space = spaces.Box(-1.0, 1.0, (2,))
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("NAV_ACTION_SPACE_LENGTH", 2),)
+        )
         super().__init__(checkpoint_path, observation_space, action_space, device)
 
 
@@ -411,8 +423,9 @@ class MixerPolicy(RealPolicy):
 
 
 if __name__ == "__main__":
+    config = construct_config()
     gaze_policy = GazePolicy(
-        "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth",
+        config.WEIGHTS.GAZE,
         device="cpu",
     )
     gaze_policy.reset()

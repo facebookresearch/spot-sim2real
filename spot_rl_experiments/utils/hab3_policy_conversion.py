@@ -5,16 +5,20 @@
 # This is the script that loads a pretrained policy from a checkpoint and convert it to torch script format
 
 import argparse
+import importlib
 import sys
 from collections import OrderedDict
+from typing import Any
 
 import numpy as np
 import torch
 from gym import spaces
 from gym.spaces import Dict as SpaceDict
-from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
-from habitat_baselines.utils.common import GaussianNet, batch_obs
+
+# from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
+from habitat_baselines.utils.common import batch_obs
 from torch import Size, Tensor
+from yacs.config import CfgNode as CN
 
 
 # Turn numpy observations into torch tensors for consumption by policy
@@ -40,7 +44,16 @@ class CustomNormal(torch.distributions.normal.Normal):
         return super().entropy().sum(-1, keepdim=True)
 
 
-class RealPolicy:
+class PolicyConverter:
+    """
+    This is PolicyConverter class which will load the given policyclass in Pytorch & convert to torchscript model
+    checkpoint_path: weights checkpoint .pth file path
+    observation_space
+    action_space
+    device: cpu/gpu
+    policy_class: PolicyClass that needs to be initialized & converted
+    """
+
     def __init__(
         self,
         checkpoint_path,
@@ -98,8 +111,10 @@ class RealPolicy:
         self.not_done_masks = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
         self.prev_actions = torch.zeros(1, self.num_actions, device=self.device)
 
-    def convert_from_hab3_via_torchscript(self, save_path, observations):
-        """This is the function that converts hab3 trained policy using the torchscript"""
+    def convert_from_pytorch_to_torchscript(self, save_path, observations):
+        """This is the function that converts hab3 trained policy using the torchscript
+        Uses torch.jit.trace method to trace the forward pass of the Pytorch model & saves the corresponding torchscript model at given save_path
+        """
         # Using torch script to save the model
         batch = batch_obs([observations], device=self.device)
         traced_cell = torch.jit.trace(
@@ -125,14 +140,12 @@ class RealPolicy:
         # Using torch script to save std
         torch.save(self.policy.action_distribution.std, save_path["std"])
 
-        print("Save (1) net (2) action distribution (3) std")
-
         self.ts_net = torch.jit.load(save_path["net"], map_location=str(self.device))
         self.ts_action_dis = torch.jit.load(
             save_path["action_distribution"], map_location=str(self.device)
         )
         self.std = torch.load(save_path["std"], map_location=str(self.device))
-        print("Load the torchscrip policy successfully")
+        print("Load the torchscript policy successfully")
 
     def act(self, observations):
         """Use the noraml way to get action"""
@@ -192,93 +205,118 @@ class RealPolicy:
         return action, rnn_hidden_states
 
 
-class MobileGazePolicy(RealPolicy):
-    def __init__(self, checkpoint_path, device, use_stereo_pair_camera):
-        if use_stereo_pair_camera:
-            observation_space = SpaceDict(
-                {
-                    "arm_depth_bbox_sensor": spaces.Box(
-                        low=np.finfo(np.float32).min,
-                        high=np.finfo(np.float32).max,
-                        shape=(240, 228, 1),
-                        dtype=np.float32,
-                    ),
-                    "articulated_agent_arm_depth": spaces.Box(
-                        low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
-                    ),
-                    "spot_head_stereo_depth_sensor": spaces.Box(
-                        low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
-                    ),
-                    "joint": spaces.Box(
-                        low=np.finfo(np.float32).min,
-                        high=np.finfo(np.float32).max,
-                        shape=(4,),
-                        dtype=np.float32,
-                    ),
-                }
-            )
-        else:
-            observation_space = SpaceDict(
-                {
-                    "arm_depth_bbox_sensor": spaces.Box(
-                        low=np.finfo(np.float32).min,
-                        high=np.finfo(np.float32).max,
-                        shape=(240, 228, 1),
-                        dtype=np.float32,
-                    ),
-                    "articulated_agent_arm_depth": spaces.Box(
-                        low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
-                    ),
-                    "joint": spaces.Box(
-                        low=np.finfo(np.float32).min,
-                        high=np.finfo(np.float32).max,
-                        shape=(4,),
-                        dtype=np.float32,
-                    ),
-                }
-            )
-        action_space = spaces.Box(-1.0, 1.0, (7,))
-        super().__init__(
-            checkpoint_path,
-            observation_space,
-            action_space,
-            device,
-            PointNavResNetPolicy,
-        )
-
-
 def parse_arguments(args=sys.argv[1:]):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--target-hab3-policy", type=str, help="name of the target hab3 policy"
-    )
-    parser.add_argument(
-        "-n",
-        "--net",
+        "-c",
+        "--conversion_params_yaml_path",
         type=str,
-        help="where to save torch script file for the net",
-    )
-    parser.add_argument(
-        "-a",
-        "--action-distribution",
-        type=str,
-        help="where to save torch script file for the action distribution",
-    )
-    parser.add_argument(
-        "-s",
-        "--std",
-        type=str,
-        help="where to save torch script file for the std",
-    )
-    parser.add_argument(
-        "--use-stereo-pair-camera",
-        action="store_true",
-        default=False,
-        help="If true, we add stereo pair camera into the observations",
+        required=True,
+        help="Path to conversion parameters.yaml file",
     )
     args = parser.parse_args(args=args)
-
     return args
+
+
+def convert_from_pytorch_to_torchscript(conversion_params_yaml_path: str):
+    """
+    Accepts path to params yaml file
+    Converts given pytorch policy to torchscript
+    Checks if both the models produces same output
+    """
+    config = CN()
+    config.set_new_allowed(True)
+    config.merge_from_file(conversion_params_yaml_path)
+
+    # The save location of the policy
+    save_path = {}
+    # This should be your target hab3 policy
+    save_path["target_hab3_policy"] = config.TARGET_HAB3_POLICY_PATH
+    # The following should be the target save path in the local disk
+    save_path["net"] = config.OUTPUT_NET_SAVE_PATH
+    save_path["action_distribution"] = config.OUTPUT_ACTION_DST_SAVE_PATH
+    save_path["std"] = config.OUTPUT_ACTION_STD_SAVE_PATH
+
+    # import the Habitat Policy
+    module_path: Any = str(config.MODEL_CLASS_NAME).split(".")
+    policy_class_name, module_path = module_path[-1], ".".join(module_path[:-1])
+    module = importlib.import_module(module_path)
+    policy_class = getattr(module, policy_class_name)
+
+    # create observations & observation space from OBSERVATIONS_DICT
+    observation_space: dict = {}
+    observations: dict = {}
+
+    for key, shape in dict(config.OBSERVATIONS_DICT).items():
+        # if normal case don't include spot_head_stereo_depth_sensor key
+        if not config.USE_STEREO_PAIR_CAMERA and "stereo" in key:
+            continue
+        if (
+            "spot_head_stereo_depth_sensor" in key
+            or "articulated_agent_arm_depth" in key
+        ):
+            low, high = 0.0, 1.0
+        else:
+            low, high = np.finfo(np.float32).min, np.finfo(np.float32).max
+        observation_space[key] = spaces.Box(
+            low=low,
+            high=high,
+            shape=shape,
+            dtype=np.float32,
+        )
+        observations[key] = np.zeros(shape, dtype=np.float32)
+    # print({key:value.shape for key, value in observations.items()})
+    observation_space = SpaceDict(observation_space)
+    action_space = spaces.Box(-1.0, 1.0, (config.ACTION_SPACE_LENGTH,))
+
+    # The originl hab3 trained policy initialized in Pytorch
+    pytorchpolicyconverter = PolicyConverter(
+        checkpoint_path=save_path["target_hab3_policy"],
+        observation_space=observation_space,
+        action_space=action_space,
+        device=device,
+        policy_class=policy_class,
+    )
+    pytorchpolicyconverter.reset()
+
+    # Normal way in hab3 to get the action
+    # save Pytorch actions & reccurent hidden states to compare with torchscript actions & hidden states
+    actions_pytorch = pytorchpolicyconverter.act(observations)
+    recurrent_hidden_state_pytorch = pytorchpolicyconverter.test_recurrent_hidden_states
+
+    print("actions from pytorch model:", actions_pytorch)
+    print("recurrent_hidden_state from pytorch model:", recurrent_hidden_state_pytorch)
+
+    # Convert to torchscript model
+    pytorchpolicyconverter.convert_from_pytorch_to_torchscript(save_path, observations)
+    pytorchpolicyconverter.reset()
+
+    # Extract actions & hidden states from the torchscript model
+    (
+        actions_torchscript,
+        recurrent_hidden_state_torchscript,
+    ) = pytorchpolicyconverter.act_ts(observations)
+    print("actions from torchscript model:", actions_torchscript)
+    print(
+        "recurrent_hidden_state from torchscript model:",
+        recurrent_hidden_state_torchscript,
+    )
+    # Compare actions & rnn states from pytorch & torchscript model they should be pretty close
+    is_same_actions = torch.allclose(
+        torch.from_numpy(actions_pytorch).to(device), actions_torchscript
+    )
+    is_same_rnn_states = torch.allclose(
+        recurrent_hidden_state_pytorch, recurrent_hidden_state_torchscript
+    )
+    print(
+        f"Are actions from Pytorch & torchscript model same ? {is_same_actions}, are recurrent hidden states same ? {is_same_rnn_states}",
+    )
+    assert (
+        is_same_actions and is_same_rnn_states
+    ), f"Actions & RNN states were supposed to be same but found actions to be same? {is_same_actions} & rnn states to be same?{is_same_rnn_states}"
+    print(
+        f"Torchscipt net model saved at {save_path['net']}, action distribution saved at {save_path['action_distribution']} and std saved at {save_path['std']}"
+    )
 
 
 if __name__ == "__main__":
@@ -287,55 +325,4 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("device:", device)
     args = parse_arguments()
-    # The save location of the policy
-    save_path = {}
-    # This should be your target hab3 policy
-    save_path["target_hab3_policy"] = args.target_hab3_policy
-    # The following should be the target save path in the local disk
-    save_path["net"] = args.net
-    save_path["action_distribution"] = args.action_distribution
-    save_path["std"] = args.std
-
-    # The originl hab3 trained policy
-    mobile_gaze_policy = MobileGazePolicy(
-        save_path["target_hab3_policy"],
-        device=device,
-        use_stereo_pair_camera=args.use_stereo_pair_camera,
-    )
-    mobile_gaze_policy.reset()
-
-    # Get the observation space
-    if args.use_stereo_pair_camera:
-        observations = {
-            "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-            "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
-            "spot_head_stereo_depth_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-            "joint": np.zeros(4, dtype=np.float32),
-        }
-    else:
-        observations = {
-            "arm_depth_bbox_sensor": np.zeros([240, 228, 1], dtype=np.float32),
-            "articulated_agent_arm_depth": np.zeros([240, 228, 1], dtype=np.float32),
-            "joint": np.zeros(4, dtype=np.float32),
-        }
-
-    # Noraml way in hab3 to get the action
-    actions = mobile_gaze_policy.act(observations)
-    recurrent_hidden_state = mobile_gaze_policy.test_recurrent_hidden_states
-
-    print("actions:", actions)
-    print("recurrent_hidden_state:", recurrent_hidden_state)
-
-    print("Torch script method...")
-    mobile_gaze_policy.convert_from_hab3_via_torchscript(save_path, observations)
-    mobile_gaze_policy.reset()
-    ts_output = mobile_gaze_policy.act_ts(observations)
-    ts_actions = ts_output[0]
-    ts_rnn_hidden_states = ts_output[1]
-
-    print("actions_ts:", ts_actions)
-    print("recurrent_hidden_state:", ts_rnn_hidden_states)
-    print(
-        f"Are actions from net & torchscript net same ? {torch.allclose(torch.from_numpy(actions).to(device), ts_actions)}, are recurrent hidden states same ? {torch.allclose(recurrent_hidden_state, ts_rnn_hidden_states)}",
-    )
-    print("Please make sure the two methods are the same!...")
+    convert_from_pytorch_to_torchscript(args.conversion_params_yaml_path)
