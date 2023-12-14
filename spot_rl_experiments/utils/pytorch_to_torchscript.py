@@ -205,19 +205,6 @@ class PolicyConverter:
         return action, rnn_hidden_states
 
 
-def parse_arguments(args=sys.argv[1:]):
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--conversion_params_yaml_path",
-        type=str,
-        required=True,
-        help="Path to conversion parameters.yaml file",
-    )
-    args = parser.parse_args(args=args)
-    return args
-
-
 def convert_from_pytorch_to_torchscript(conversion_params_yaml_path: str):
     """
     Accepts path to params yaml file
@@ -317,6 +304,19 @@ def convert_from_pytorch_to_torchscript(conversion_params_yaml_path: str):
     print(
         f"Torchscipt net model saved at {save_path['net']}, action distribution saved at {save_path['action_distribution']} and std saved at {save_path['std']}"
     )
+
+
+def parse_arguments(args=sys.argv[1:]):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--conversion_params_yaml_path",
+        type=str,
+        required=True,
+        help="Path to conversion parameters.yaml file",
+    )
+    args = parser.parse_args(args=args)
+    return args
 
 
 if __name__ == "__main__":

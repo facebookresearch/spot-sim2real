@@ -2,6 +2,8 @@
 You might want to train new policies or networks in [habitat-lab](https://github.com/facebookresearch/habitat-lab). However, habitat-lab conda environment packages and spot-ros (used for spot-sim2real) environment packages might create version incompatabilities.
 Thus, we export a model in intermediate representation (IR) using torchscript module provided in Pytorch. Disentangling the deployment and development environment of a model, provides freedom to the model developer. We made a [conversion script](https://github.com/facebookresearch/spot-sim2real/blob/d200deef1ca3f4608cb3f84b43672bda63a3ce0b/spot_rl_experiments/utils/hab3_policy_conversion.py) to convert mobile-gaze policy that was trained in new version of habitat-lab to torchscript model.
 
+To use pytorch_to_torchscript.py , use ``` python pytorch_to_torchscipt.py -c conversionparams.py ``` add the relevant conversion parameters in conversionparams.yaml
+
 In general, these are the steps you can follow for conversion.
 
 1. Load the pytorch model with class files, <b>transfer the model on cuda</b>
