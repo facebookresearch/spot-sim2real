@@ -145,6 +145,7 @@ class RealPolicy:
 
     def get_action_distribution(self, mu_maybe_std, std):
         """The final transformation of the action given inputs"""
+        # We use mu_maybe_std to follow the convension of habitat-baselines
         mu = torch.tanh(mu_maybe_std.float())
         std = torch.exp(torch.clamp(std, -5, 2))
 
