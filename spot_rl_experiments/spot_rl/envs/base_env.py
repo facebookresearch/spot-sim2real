@@ -105,10 +105,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.num_steps = 0
         self.reset_ran = False
 
-        # Base action parameters
-        self.max_lin_dist = config.MAX_LIN_DIST
-        self.max_ang_dist = np.deg2rad(config.MAX_ANG_DIST)
-
         # Arm action parameters
         self.initial_arm_joint_angles = np.deg2rad(config.INITIAL_ARM_JOINT_ANGLES)
         self.arm_lower_limits = np.deg2rad(config.ARM_LOWER_LIMITS)
@@ -235,8 +231,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp=False,
         place=False,
         max_joint_movement_key="MAX_JOINT_MOVEMENT",
-        max_lin_dist_mobile_gaze=None,
-        max_ang_dist_mobile_gaze=None,
+        max_lin_dist_key="MAX_LIN_DIST",
+        max_ang_dist_key="MAX_ANG_DIST",
         nav_silence_only=True,
         disable_oa=None,
     ):
@@ -248,8 +244,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param place: whether to call the open_gripper() method
         :param max_joint_movement_key: max allowable displacement of arm joints
             (different for gaze and place)
-        :param max_lin_dist_mobile_gaze: maximum linear distance allowed for mobile gaze
-        :param max_ang_dist_mobile_gaze: maximum angular distance allowed for mobile gaze
+        :param max_lin_dist_key: maximum linear distance allowed if sepecify
+        :param max_ang_dist_key: maximum angular distance allowed if sepecify
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -301,6 +297,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             self.spot.open_gripper()
             time.sleep(0.3)
             self.place_attempted = True
+
         if base_action is not None:
             if nav_silence_only:
                 base_action = rescale_actions(base_action, silence_only=True)
@@ -309,14 +306,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             if np.count_nonzero(base_action) > 0:
                 # Command velocities using the input action
                 lin_dist, ang_dist = base_action
-                if max_lin_dist_mobile_gaze is not None:
-                    lin_dist *= self.config[max_lin_dist_mobile_gaze]
-                else:
-                    lin_dist *= self.max_lin_dist
-                if max_ang_dist_mobile_gaze is not None:
-                    ang_dist *= self.config[max_ang_dist_mobile_gaze]
-                else:
-                    ang_dist *= self.max_ang_dist
+
+                # Scale the linear and angular velocities
+                lin_dist *= self.config[max_lin_dist_key]
+                ang_dist *= np.deg2rad(self.config[max_ang_dist_key])
+
                 target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity
                 ctrl_period = 1 / self.ctrl_hz
@@ -349,8 +343,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 )  # / self.ctrl_hz
                 self.say("Slow down...")
             if base_action is not None and arm_action is not None:
-                self.say("input base_action velocity:", base_action)
-                self.say("input arm_action:", arm_action)
+                self.say("input base_action velocity:", arr2str(base_action))
+                self.say("input arm_action:", arr2str(arm_action))
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,

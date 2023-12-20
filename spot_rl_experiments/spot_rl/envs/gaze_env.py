@@ -229,12 +229,12 @@ class SpotGazeEnv(SpotBaseEnv):
             max_joint_movement_key="MAX_JOINT_MOVEMENT_MOBILE_GAZE"
             if self._use_mobile_pick
             else "MAX_JOINT_MOVEMENT",
-            max_lin_dist_mobile_gaze="MAX_LIN_DIST_MOBILE_GAZE"
+            max_lin_dist_key="MAX_LIN_DIST_MOBILE_GAZE"
             if self._use_mobile_pick
-            else None,
-            max_ang_dist_mobile_gaze="MAX_ANG_DIST_MOBILE_GAZE"
+            else "MAX_LIN_DIST",
+            max_ang_dist_key="MAX_ANG_DIST_MOBILE_GAZE"
             if self._use_mobile_pick
-            else None,
+            else "MAX_ANG_DIST",
         )
         return observations, reward, done, info
 

@@ -95,6 +95,7 @@ class RealPolicy:
             config.freeze()
             config.RL.POLICY["init"] = False
 
+            # Load the policy using policy class
             self.policy = policy_class.from_config(
                 config=config,
                 observation_space=observation_space,
@@ -210,7 +211,7 @@ class GazePolicy(RealPolicy):
             -1.0, 1.0, (config.get("GAZE_ACTION_SPACE_LENGTH", 4),)
         )
         super().__init__(
-            checkpoint_path, observation_space, action_space, device, config
+            checkpoint_path, observation_space, action_space, device, config=config
         )
 
 
@@ -243,6 +244,7 @@ class MobileGazePolicy(RealPolicy):
             observation_space,
             action_space,
             device,
+            config=config,
             is_hab3_policy=True,
         )
 

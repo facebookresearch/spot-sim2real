@@ -370,19 +370,30 @@ class SpotSkillManager:
 
 
 if __name__ == "__main__":
-    spotskillmanager = SpotSkillManager()
 
-    # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
-    spotskillmanager.nav("test_place_front")
-    spotskillmanager.place("test_place_front")
+    # We initialize the skill using SpotSkillManager.
+    # Note that if you want to use mobile gaze for pick,
+    # instead of static gaze, you need to do
+    # SpotSkillManager(use_mobile_pick=True)
+    # spotskillmanager = SpotSkillManager()
 
-    # Nav-Pick-Nav-Place sequence 2
-    spotskillmanager.nav("test_square_vertex3")
-    spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_left")
-    spotskillmanager.place("test_place_left")
+    # TODO: the folllowing code will be removed
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
+    spotskillmanager.nav("nyc_mg_pos1")
+    spotskillmanager.pick("cup")
+    breakpoint()
+
+    # # Nav-Pick-Nav-Place sequence 1
+    # spotskillmanager.nav("test_square_vertex1")
+    # spotskillmanager.pick("ball_plush")
+    # spotskillmanager.nav("test_place_front")
+    # spotskillmanager.place("test_place_front")
+
+    # # Nav-Pick-Nav-Place sequence 2
+    # spotskillmanager.nav("test_square_vertex3")
+    # spotskillmanager.pick("caterpillar_plush")
+    # spotskillmanager.nav("test_place_left")
+    # spotskillmanager.place("test_place_left")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()
