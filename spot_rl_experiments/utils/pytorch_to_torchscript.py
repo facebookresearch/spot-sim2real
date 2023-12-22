@@ -1,7 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
+# Code inspired from https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html
 # This is the script that loads a pretrained policy from a checkpoint and convert it to torch script format
 
 import argparse

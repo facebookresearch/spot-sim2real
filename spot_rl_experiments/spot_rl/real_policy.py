@@ -165,17 +165,17 @@ class RealPolicy:
                     actions_only=True,
                 )
             else:
-                # Using torch script to save the model
+                # Using torch script to load the model
                 with torch.no_grad():
-                    output_model = self.policy["net"](
+                    output_of_model = self.policy["net"](
                         batch,
                         self.test_recurrent_hidden_states,
                         self.prev_actions,
                         self.not_done_masks,
                     )
 
-                features = output_model[0]
-                self.test_recurrent_hidden_states = output_model[1]
+                features = output_of_model[0]
+                self.test_recurrent_hidden_states = output_of_model[1]
 
                 with torch.no_grad():
                     raw_actions = self.get_action_distribution(

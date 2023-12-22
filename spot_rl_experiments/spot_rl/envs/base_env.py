@@ -244,8 +244,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param place: whether to call the open_gripper() method
         :param max_joint_movement_key: max allowable displacement of arm joints
             (different for gaze and place)
-        :param max_lin_dist_key: maximum linear distance allowed if sepecify
-        :param max_ang_dist_key: maximum angular distance allowed if sepecify
+        :param max_lin_dist_key: maximum linear distance allowed if specified
+        :param max_ang_dist_key: maximum angular distance allowed if specified
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -253,9 +253,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
         grasp = grasp or self.config.GRASP_EVERY_STEP
-        self.say(
-            f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
-        )
+        if self.config.VERBOSE:
+            self.say(
+                f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
+            )
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
             time.sleep(0.5)
