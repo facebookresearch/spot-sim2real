@@ -124,18 +124,18 @@ class RealPolicy:
 
     def reset(self):
         self.reset_ran = True
-        if not self.is_hab3_policy:
+        if self.is_hab3_policy:
             self.test_recurrent_hidden_states = torch.zeros(
                 1,  # The number of environments. Just one for real world.
-                self.policy.net.num_recurrent_layers,
-                self.config.RL.PPO.hidden_size,
+                self.config.get("MOBILE_GAZE_NUM_RECURRENT_LAYERS", 4),
+                self.config.get("MOBILE_GAZE_RL_PPO_HIDDEN_SIZE", 512),
                 device=self.device,
             )
         else:
             self.test_recurrent_hidden_states = torch.zeros(
                 1,  # The number of environments. Just one for real world.
-                self.config.get("MOBILE_GAZE_NUM_RECURRENT_LAYERS", 4),
-                self.config.get("MOBILE_GAZE_RL_PPO_HIDDEN_SIZE", 512),
+                self.policy.net.num_recurrent_layers,
+                self.config.RL.PPO.hidden_size,
                 device=self.device,
             )
 
@@ -147,7 +147,13 @@ class RealPolicy:
         """The final transformation of the action given inputs"""
         # We use mu_maybe_std to follow the convension of habitat-baselines
         mu = torch.tanh(mu_maybe_std.float())
-        std = torch.exp(torch.clamp(std, -5, 2))
+        std = torch.exp(
+            torch.clamp(
+                std,
+                self.config.get("MIN_LOG_STD", -5),
+                self.config.get("MAX_LOG_STD", 2),
+            )
+        )
 
         return CustomNormal(mu, std, validate_args=False)
 
@@ -155,16 +161,7 @@ class RealPolicy:
         assert self.reset_ran, "You need to call .reset() on the policy first."
         batch = batch_obs([observations], device=self.device)
         with torch.no_grad():
-            if not self.is_hab3_policy:
-                _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
-                    batch,
-                    self.test_recurrent_hidden_states,
-                    self.prev_actions,
-                    self.not_done_masks,
-                    deterministic=True,
-                    actions_only=True,
-                )
-            else:
+            if self.is_hab3_policy:
                 # Using torch script to load the model
                 with torch.no_grad():
                     output_of_model = self.policy["net"](
@@ -182,6 +179,15 @@ class RealPolicy:
                         self.policy["action_dist"](features), self.policy["std"]
                     )
                     actions = raw_actions.mean
+            else:
+                _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
+                    batch,
+                    self.test_recurrent_hidden_states,
+                    self.prev_actions,
+                    self.not_done_masks,
+                    deterministic=True,
+                    actions_only=True,
+                )
 
         self.prev_actions.copy_(actions)
         self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)

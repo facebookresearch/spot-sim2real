@@ -9,7 +9,7 @@ WEIGHTS:
   MOBILE_GAZE_NET: "weights/mobile_gaze/mg97_2_latest_net.pytorch"
   MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg97_2_latest_action.pytorch"
   MOBILE_GAZE_STD: "weights/mobile_gaze/mg97_2_latest_std.pth"
-  
+
   # Static place
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
@@ -45,12 +45,14 @@ ASSERT_CENTERING: True
 GAZE_ACTION_SPACE_LENGTH: 4
 
 # Mobile Gaze env
-MAX_LIN_DIST_MOBILE_GAZE: 0 
+MAX_LIN_DIST_MOBILE_GAZE: 0
 MAX_ANG_DIST_MOBILE_GAZE: 5.73 # degrees
 MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.08 # radians
 MOBILE_GAZE_ACTION_SPACE_LENGTH: 7
 MOBILE_GAZE_NUM_RECURRENT_LAYERS: 4
 MOBILE_GAZE_RL_PPO_HIDDEN_SIZE: 512
+MIN_LOG_STD: -5 # Min log standard deviation for the normal action distribution
+MAX_LOG_STD: 2 # Max log standard deviation for the normal action distribution
 
 # Place env
 EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
