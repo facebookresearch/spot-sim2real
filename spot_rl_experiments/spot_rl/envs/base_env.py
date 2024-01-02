@@ -85,7 +85,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     no_raw = True
     proprioception = True
 
-    def __init__(self, config, spot: Spot, stopwatch=None):
+    def __init__(
+        self,
+        config,
+        spot: Spot,
+        stopwatch=None,
+        max_joint_movement_key="MAX_JOINT_MOVEMENT",
+        max_lin_dist_key="MAX_LIN_DIST",
+        max_ang_dist_key="MAX_ANG_DIST",
+    ):
+        """
+        :param max_joint_movement_key: max allowable displacement of arm joints
+            (different for gaze and place)
+        :param max_lin_dist_key: maximum linear distance allowed if specified
+        :param max_ang_dist_key: maximum angular distance allowed if specified
+        """
         self.detections_buffer = {
             k: FixSizeOrderedDict(maxlen=DETECTIONS_BUFFER_LEN)
             for k in ["detections", "filtered_depth", "viz"]
@@ -128,6 +142,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.slowdown_base = -1
         self.prev_base_moved = False
         self.should_end = False
+
+        # Neural network action scale
+        self._max_joint_movement_scale = self.config[max_joint_movement_key]
+        self._max_lin_dist_scale = self.config[max_lin_dist_key]
+        self._max_ang_dist_scale = self.config[max_ang_dist_key]
 
         # Text-to-speech
         self.tts_pub = rospy.Publisher(rt.TEXT_TO_SPEECH, String, queue_size=1)
@@ -180,6 +199,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def filtered_hand_rgb(self):
         return self.msgs[rt.HAND_RGB]
 
+    @property
+    def max_joint_movement_scale(self):
+        return self._max_joint_movement_scale
+
+    @max_joint_movement_scale.setter
+    def max_joint_movement_scale(self, value):
+        self._max_joint_movement_scale = value
+
     def detections_cb(self, msg):
         timestamp, detections_str = msg.data.split("|")
         self.detections_buffer["detections"][int(timestamp)] = detections_str
@@ -230,9 +257,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         arm_action=None,
         grasp=False,
         place=False,
-        max_joint_movement_key="MAX_JOINT_MOVEMENT",
-        max_lin_dist_key="MAX_LIN_DIST",
-        max_ang_dist_key="MAX_ANG_DIST",
         nav_silence_only=True,
         disable_oa=None,
     ):
@@ -242,10 +266,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param arm_action: np.array of radians denoting how each joint is to be moved
         :param grasp: whether to call the grasp_hand_depth() method
         :param place: whether to call the open_gripper() method
-        :param max_joint_movement_key: max allowable displacement of arm joints
-            (different for gaze and place)
-        :param max_lin_dist_key: maximum linear distance allowed if specified
-        :param max_ang_dist_key: maximum angular distance allowed if specified
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -309,8 +329,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 lin_dist, ang_dist = base_action
 
                 # Scale the linear and angular velocities
-                lin_dist *= self.config[max_lin_dist_key]
-                ang_dist *= np.deg2rad(self.config[max_ang_dist_key])
+                lin_dist *= self._max_lin_dist_scale
+                ang_dist *= np.deg2rad(self._max_ang_dist_scale)
 
                 target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity
@@ -328,7 +348,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if arm_action is not None:
             arm_action = rescale_actions(arm_action)
             if np.count_nonzero(arm_action) > 0:
-                arm_action *= self.config[max_joint_movement_key]
+                arm_action *= self._max_joint_movement_scale
                 arm_action = self.current_arm_pose + pad_action(arm_action)
                 arm_action = np.clip(
                     arm_action, self.arm_lower_limits, self.arm_upper_limits

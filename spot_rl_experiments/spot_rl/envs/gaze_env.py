@@ -199,7 +199,27 @@ class GazeController:
 
 class SpotGazeEnv(SpotBaseEnv):
     def __init__(self, config, spot, use_mobile_pick=False):
-        super().__init__(config, spot)
+        # Select suitable keys
+        max_joint_movement_key = (
+            "MAX_JOINT_MOVEMENT_MOBILE_GAZE"
+            if use_mobile_pick
+            else "MAX_JOINT_MOVEMENT"
+        )
+        max_lin_dist_key = (
+            "MAX_LIN_DIST_MOBILE_GAZE" if use_mobile_pick else "MAX_LIN_DIST"
+        )
+        max_ang_dist_key = (
+            "MAX_ANG_DIST_MOBILE_GAZE" if use_mobile_pick else "MAX_ANG_DIST"
+        )
+
+        super().__init__(
+            config,
+            spot,
+            stopwatch=None,
+            max_joint_movement_key=max_joint_movement_key,
+            max_lin_dist_key=max_lin_dist_key,
+            max_ang_dist_key=max_ang_dist_key,
+        )
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
 
@@ -221,27 +241,11 @@ class SpotGazeEnv(SpotBaseEnv):
     def step(self, base_action=None, arm_action=None, grasp=False, place=False):
         grasp = self.should_grasp()
 
-        # Select suitable keys
-        max_joint_movement_key = (
-            "MAX_JOINT_MOVEMENT_MOBILE_GAZE"
-            if self._use_mobile_pick
-            else "MAX_JOINT_MOVEMENT"
-        )
-        max_lin_dist_key = (
-            "MAX_LIN_DIST_MOBILE_GAZE" if self._use_mobile_pick else "MAX_LIN_DIST"
-        )
-        max_ang_dist_key = (
-            "MAX_ANG_DIST_MOBILE_GAZE" if self._use_mobile_pick else "MAX_ANG_DIST"
-        )
-
         observations, reward, done, info = super().step(
             base_action,
             arm_action,
             grasp,
             place,
-            max_joint_movement_key=max_joint_movement_key,
-            max_lin_dist_key=max_lin_dist_key,
-            max_ang_dist_key=max_ang_dist_key,
         )
         return observations, reward, done, info
 
