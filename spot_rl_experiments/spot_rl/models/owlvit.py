@@ -27,7 +27,11 @@ class OwlVit:
         self.model.eval()
         self.model.to(self.device)
 
-        self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
+        # self.processor = OwlViTProcessor.from_pretrained("google/owlvit-base-patch32")
+        self.processor = OwlViTProcessor.from_pretrained(
+            "/home/jimmytyyang/research/hf_model/owlvit-base-patch32",
+            local_files_only=True,
+        )
 
         self.prefix = "an image of a"
         self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]

@@ -240,7 +240,6 @@ class SpotGazeEnv(SpotBaseEnv):
 
     def step(self, base_action=None, arm_action=None, grasp=False, place=False):
         grasp = self.should_grasp()
-
         observations, reward, done, info = super().step(
             base_action,
             arm_action,

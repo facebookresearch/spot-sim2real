@@ -376,19 +376,21 @@ if __name__ == "__main__":
     # instead of static gaze, you need to do
     # SpotSkillManager(use_mobile_pick=True)
 
-    spotskillmanager = SpotSkillManager()
+    # TODO: Test the mobile gaze skills in NYC lab
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 
     # Nav-Pick-Nav-Place sequence 1
-    spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
-    spotskillmanager.nav("test_place_front")
-    spotskillmanager.place("test_place_front")
+    spotskillmanager.nav("nyc_mg_pos1")
+    spotskillmanager.pick("cup")
+    breakpoint()
+    # spotskillmanager.nav("test_place_front")
+    # spotskillmanager.place("test_place_front")
 
-    # Nav-Pick-Nav-Place sequence 2
-    spotskillmanager.nav("test_square_vertex3")
-    spotskillmanager.pick("caterpillar_plush")
-    spotskillmanager.nav("test_place_left")
-    spotskillmanager.place("test_place_left")
+    # # Nav-Pick-Nav-Place sequence 2
+    # spotskillmanager.nav("test_square_vertex3")
+    # spotskillmanager.pick("caterpillar_plush")
+    # spotskillmanager.nav("test_place_left")
+    # spotskillmanager.place("test_place_left")
 
     # Navigate to dock and shutdown
     spotskillmanager.dock()

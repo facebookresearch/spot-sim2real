@@ -340,6 +340,7 @@ class Spot:
         top_down_grasp=False,
         horizontal_grasp=False,
     ):
+
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
             height = image_response.shot.image.rows
@@ -354,6 +355,7 @@ class Spot:
             camera_model=image_response.source.pinhole,
             walk_gaze_mode=3,
         )
+
         if top_down_grasp or horizontal_grasp:
             if top_down_grasp:
                 # Add a constraint that requests that the x-axis of the gripper is
@@ -378,6 +380,8 @@ class Spot:
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=1)
 
             grasp.grasp_params.grasp_params_frame_name = VISION_FRAME_NAME
+            # Adding grasp parameters for palm or fingertip grasping
+            grasp.grasp_params.grasp_palm_to_fingertip = 0.5
             # Add the vector constraint to our proto.
             constraint = grasp.grasp_params.allowable_orientation.add()
             constraint.vector_alignment_with_tolerance.axis_on_gripper_ewrt_gripper.CopyFrom(
@@ -394,15 +398,35 @@ class Spot:
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
             pick_object_in_image=grasp
         )
+
         # Send the request
         cmd_response = self.manipulation_api_client.manipulation_api_command(
             manipulation_api_request=grasp_request
         )
 
+        # joint_move_command = arm_command_pb2.ArmJointMoveCommand.Request(
+        #     trajectory=arm_joint_traj
+        # )
+        # arm_command = arm_command_pb2.ArmCommand.Request(
+        #     arm_joint_move_command=joint_move_command
+        # )
+        # sync_arm = synchronized_command_pb2.SynchronizedCommand.Request(
+        #     arm_command=arm_command
+        # )
+        # arm_sync_robot_cmd = robot_command_pb2.RobotCommand(synchronized_command=sync_arm)
+        # return RobotCommandBuilder.build_synchro_command(arm_sync_robot_cmd)
+
+        # command_gripper = robot_command_pb2.RobotCommand()
+        # command_gripper.synchronized_command.gripper_command.claw_gripper_command.trajectory.points.add().point = -0.087
+        # command_gripper.synchronized_command.gripper_command.claw_gripper_command.maximum_torque.value = 0.0
+        # self.command_client.robot_command(command_gripper)
+
         # Get feedback from the robot (WILL BLOCK TILL COMPLETION)
         start_time = time.time()
         success = False
+        step_counter = 0
         while time.time() < start_time + timeout:
+            step_counter += 1
             feedback_request = manipulation_api_pb2.ManipulationApiFeedbackRequest(
                 manipulation_cmd_id=cmd_response.manipulation_cmd_id
             )
@@ -411,9 +435,9 @@ class Spot:
             response = self.manipulation_api_client.manipulation_api_feedback_command(
                 manipulation_api_feedback_request=feedback_request
             )
-
             print(
                 "Current grasp_point_in_image state: ",
+                step_counter,
                 manipulation_api_pb2.ManipulationFeedbackState.Name(
                     response.current_state
                 ),
@@ -437,6 +461,19 @@ class Spot:
                 break
 
             time.sleep(0.25)
+
+        # Reduce the torque applied to the gripper
+        if success:
+            print("apply min torque...")
+            command_gripper = robot_command_pb2.RobotCommand()
+            command_gripper.synchronized_command.gripper_command.claw_gripper_command.trajectory.points.add().point = (
+                -0.087
+            )
+            command_gripper.synchronized_command.gripper_command.claw_gripper_command.maximum_torque.value = (
+                0.0
+            )
+            self.command_client.robot_command(command_gripper)
+
         return success
 
     def grasp_hand_depth(self, *args, **kwargs):
@@ -763,6 +800,7 @@ class Spot:
                 dock_start_time = time.time()
                 while time.time() - dock_start_time < 2:
                     try:
+                        print("DOCK_ID:", DOCK_ID)
                         self.dock(dock_id=DOCK_ID, home_robot=True)
                     except Exception:
                         print("Dock not found... trying again")
