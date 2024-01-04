@@ -7,6 +7,10 @@ import time
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+from perception_and_utils.utils.generic_utils import (
+    conditional_print,
+    map_user_input_to_boolean,
+)
 from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
@@ -30,7 +34,6 @@ from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
     is_position_within_bounds,
 )
-from spot_rl.utils.utils import conditional_print, map_user_input_to_boolean
 
 # Import core classes
 from spot_wrapper.spot import Spot

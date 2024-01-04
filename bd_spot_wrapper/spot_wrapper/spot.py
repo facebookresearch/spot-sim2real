@@ -16,7 +16,7 @@ import os.path as osp
 import pdb
 import time
 from collections import OrderedDict
-from typing import List
+from typing import Dict, List
 
 import bosdyn.client
 import bosdyn.client.lease
@@ -25,7 +25,6 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
-import rospy
 import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (
@@ -65,6 +64,7 @@ from google.protobuf import wrappers_pb2
 from perception_and_utils.utils.conversions import (
     bd_SE3Pose_to_ros_Pose,
     bd_SE3Pose_to_ros_TransformStamped,
+    bd_SE3Pose_to_sophus_SE3,
 )
 from spot_rl.utils.utils import ros_frames as rf
 
@@ -123,6 +123,32 @@ class SpotCamIds:
     RIGHT_DEPTH = "right_depth"
     RIGHT_DEPTH_IN_VISUAL_FRAME = "right_depth_in_visual_frame"
     RIGHT_FISHEYE = "right_fisheye_image"
+
+
+# Maps SpotCamId (name of camera in spot) to
+# frame of respective camera as defined in spot
+SpotCamIdToFrameNameMap = {
+    SpotCamIds.BACK_DEPTH: "back",
+    SpotCamIds.BACK_DEPTH_IN_VISUAL_FRAME: "back_fisheye",
+    SpotCamIds.BACK_FISHEYE: "back_fisheye",
+    SpotCamIds.FRONTLEFT_DEPTH: "frontleft",
+    SpotCamIds.FRONTLEFT_DEPTH_IN_VISUAL_FRAME: "frontleft_fisheye",
+    SpotCamIds.FRONTLEFT_FISHEYE: "frontleft_fisheye",
+    SpotCamIds.FRONTRIGHT_DEPTH: "frontright",
+    SpotCamIds.FRONTRIGHT_DEPTH_IN_VISUAL_FRAME: "frontright_fisheye",
+    SpotCamIds.FRONTRIGHT_FISHEYE: "frontright_fisheye",
+    SpotCamIds.HAND_COLOR: "hand_color_image_sensor",
+    SpotCamIds.HAND_COLOR_IN_HAND_DEPTH_FRAME: "hand_depth_sensor",
+    SpotCamIds.HAND_DEPTH: "hand_depth_sensor",
+    SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME: "hand_color_image_sensor",
+    SpotCamIds.HAND: "hand_depth_sensor",
+    SpotCamIds.LEFT_DEPTH: "left",
+    SpotCamIds.LEFT_DEPTH_IN_VISUAL_FRAME: "left_fisheye",
+    SpotCamIds.LEFT_FISHEYE: "left_fisheye",
+    SpotCamIds.RIGHT_DEPTH: "right",
+    SpotCamIds.RIGHT_DEPTH_IN_VISUAL_FRAME: "right_fisheye",
+    SpotCamIds.RIGHT_FISHEYE: "right_fisheye",
+}  # type: Dict[SpotCamIds, str]
 
 
 # CamIds that need to be rotated by 270 degrees in order to appear upright
@@ -822,7 +848,9 @@ class Spot:
         )
         return img_resp
 
-    def get_camera_intrinsics(self, source, quality=None, pixel_format=None):
+    def get_camera_intrinsics(
+        self, sources: List[SpotCamIds], quality=None, pixel_format=None
+    ) -> List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]:
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -830,10 +858,13 @@ class Spot:
             should return its image with
         :return: list containing bosdyn image response objects
         """
-        image_response = self.get_image_responses(
-            [source], quality=quality, pixel_format=pixel_format
-        )[0]
-        cam_intrinsics = image_response.source.pinhole.intrinsics
+        image_responses = self.get_image_responses(
+            sources, quality=quality, pixel_format=pixel_format
+        )
+        cam_intrinsics = [
+            image_response.source.pinhole.intrinsics
+            for image_response in image_responses
+        ]  # type: List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]
         return cam_intrinsics
 
     def get_ros_TransformStamped_vision_T_body(
@@ -870,8 +901,8 @@ class Spot:
 
     def get_magnum_Matrix4_spot_a_T_b(self, a: str, b: str, tree=None) -> mn.Matrix4:
         """
-        Gets transformation from 'a' frame to 'b' frame such that a_T_b
-        a & b takes string values of the name of the frames
+        Gets transformation from 'a' frame to 'b' frame such that a_T_b.
+        `a` & `b` takes string values of the name of the frames
         tree is optional, its the kinematic transforms tree if none it will make new from robot's state
         image sources also give us kinematic transforms trees that can be sent here
         """
@@ -891,62 +922,23 @@ class Spot:
         mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
         return mn_transformation
 
-    # TODO: Remove this function in PR#118
-    @staticmethod
-    def convert_transformation_from_sophus_to_magnum(
-        sp_transformation: sp.SE3,
-    ) -> mn.Matrix4:
+    def get_sophus_SE3_spot_a_T_b(
+        self, frame_tree_snapshot: dict, a: str, b: str
+    ) -> sp.SE3:
         """
-        First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
-        Then convert rvec and tvec to Magnum pose
-
-        Args:
-            sp_transformation (sp.SE3): Sophus transformation matrix
-
-        Returns:
-            mn_tranformation (mn.Matrix4): 4x4 pose matrix
+        Gets transformation from `a` frame to `b` frame as a_T_b.
+        Takes in `a` & `b` as string names for the frames
+        Frame tree snapshot SHOULD be passed for frames other than `body`, `vision` or `odom`
+        Frame tree snapshot for any camera will be a part of image_response object received from that camera
         """
-        tvec = sp_transformation.translation()
-        rvec = sp_transformation.so3().log()
-
-        assert rvec.shape == (3,) and tvec.shape == (3,)
-
-        # Get rotation angle as norm of rvec
-        angle = np.linalg.norm(rvec)
-
-        # Get unit axis of rotation
-        axis = rvec / angle
-
-        # Get rotation matrix from angle and axis
-        rotation_matrix = mn.Quaternion.rotation(
-            mn.Rad(angle), mn.Vector3(axis)
-        ).to_matrix()
-
-        # Get pose matrix from rotation matrix and translation vector
-        mn_tranformation = mn.Matrix4.from_(rotation_matrix, tvec)
-
-        return mn_tranformation
-
-    # TODO: Remove this function in PR#118
-    def convert_transformation_from_BD_to_magnum(self, bd_transformation_dict: dict):
-        """
-        Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
-
-        Args:
-            bd_transformation_dict (dict): Bosdyn transformation dictionary
-
-        Returns:
-            mn_tranformation_dict (dict): Magnum transformation dictionary
-        """
-        pos = bd_transformation_dict.position
-        rot = bd_transformation_dict.rotation
-        quat = quaternion.quaternion(rot.w, rot.x, rot.y, rot.z)
-
-        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
-        translation = mn.Vector3(pos.x, pos.y, pos.z)
-
-        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
-        return mn_transformation
+        if frame_tree_snapshot is None:
+            frame_tree_snapshot = (
+                self.get_robot_state().kinematic_state.transforms_snapshot
+            )
+        se3_pose = get_a_tform_b(frame_tree_snapshot, a, b)
+        pos = se3_pose.get_translation()
+        quat = se3_pose.rotation.normalize()
+        return sp.SE3(quat.to_matrix(), pos)
 
 
 class SpotLease:

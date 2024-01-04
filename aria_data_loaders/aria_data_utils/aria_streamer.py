@@ -26,7 +26,7 @@ from scipy.spatial.transform import Rotation
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.spot import Spot
-from spot_wrapper.spot_qr_detector import SpotQRDetector
+from spot_wrapper.spot_qr_detector import SpotCamIds, SpotQRDetector
 
 AXES_SCALE = 0.9
 STREAM1_NAME = "camera-rgb"
@@ -71,10 +71,10 @@ class AriaReader:
         self.device_calib = self.provider.get_device_calibration()
 
         # April tag detector object
-        self.april_tag_detection_wrapper = AprilTagDetectorWrapper()
+        self.april_tag_detector = AprilTagDetectorWrapper()
 
         # Object detection object
-        self.object_detection_wrapper = ObjectDetectorWrapper()
+        self.object_detector = ObjectDetectorWrapper()
 
         # Aria device camera calibration parameters
         self._src_calib_params = None  # type: ignore
@@ -180,6 +180,72 @@ class AriaReader:
         frame_data = self.provider.get_image_data_by_index(stream_id, idx_of_interest)
         return frame_data[1].capture_timestamp_ns
 
+    def initialize_april_tag_detector(self, outputs: dict = {}):
+        """
+        Initialize the april tag detector
+
+        Args:
+            outputs (dict, optional): Dictionary of outputs from the april tag detector. Defaults to {}.
+
+        Updates:
+            - self.april_tag_detector: AprilTagDetectorWrapper object
+
+        Returns:
+            outputs (dict): Dictionary of outputs from the april tag detector with following keys:
+                - "tag_image_list" - List of np.ndarrays of images with detections
+                - "tag_image_metadata_list" - List of image metadata
+                - "tag_base_T_marker_list" - List of Sophus SE3 transforms from base frame to marker
+                                             where base is "device" frame for aria
+        """
+        focal_length_obj = self._dst_calib_params.get_focal_lengths()  # type:ignore
+        focal_lengths = (focal_length_obj[0].item(), focal_length_obj[1].item())
+
+        principal_point_obj = self._dst_calib_params.get_principal_point()  # type: ignore
+        principal_point = (
+            principal_point_obj["x"].item(),
+            principal_point_obj["y"].item(),
+        )
+
+        outputs.update(
+            self.april_tag_detector._init_april_tag_detector(
+                focal_lengths=focal_lengths, principal_point=principal_point
+            )
+        )
+        return outputs
+
+    def initialize_object_detector(
+        self, outputs: dict = {}, object_labels: list = [], meta_objects: List[str] = []
+    ):
+        """
+        Initialize the object detector
+
+        Args:
+            outputs (dict, optional): Dictionary of outputs from the object detector. Defaults to {}.
+            object_labels (list, optional): List of object labels to detect. Defaults to [].
+
+        Updates:
+            - self.object_detector: ObjectDetectorWrapper object
+
+        Returns:
+            outputs (dict): Dictionary of outputs from the object detector with following keys:
+                - "object_image_list" - List of np.ndarrays of images with detections
+                - "object_image_metadata_list" - List of image metadata
+                - "object_image_segment" - List of Int signifying which segment the image
+                    belongs to; smaller number means latter the segment time-wise
+                - "object_score_list" - List of Float signifying the detection score
+        """
+        outputs.update(
+            self.object_detector._init_object_detector(
+                object_labels + meta_objects,
+                verbose=self.verbose,
+                version=2,
+            )
+        )
+        self.object_detector._core_objects = object_labels
+        self.object_detector._meta_objects = meta_objects
+
+        return outputs
+
     def parse_camera_stream(
         self,
         stream_name: str,
@@ -208,7 +274,8 @@ class AriaReader:
         April tag outputs:
         - "tag_image_list" - List of np.ndarrays of images with detections
         - "tag_image_metadata_list" - List of image metadata
-        - "tag_device_T_marker_list" - List of Sophus SE3 transforms from Device frame to marker
+        - "tag_base_T_marker_list" - List of Sophus SE3 transforms from Device frame to marker
+                                     where base is "device" frame for aria
            CPF is the center frame of Aria with Z pointing out, X pointing up
            and Y pointing left
            Device frame is the base frame of Aria which is aligned with left-slam camera frame
@@ -239,27 +306,11 @@ class AriaReader:
 
         # Setup April tag detection by over-writing self._qr_pose_estimator if needed
         if detect_qr:
-            focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
-            principal_point = (
-                self._dst_calib_params.get_principal_point()  # type: ignore
-            )
-            self.april_tag_detection_wrapper.enable_detector()
-            outputs.update(
-                self.april_tag_detection_wrapper._init_april_tag_detector(
-                    focal_lengths=focal_lengths, principal_point=principal_point
-                )
-            )
+            outputs = self.initialize_april_tag_detector(outputs)
 
         # Setup object detection (Owl-ViT) if needed
         if detect_objects:
-            self.object_detection_wrapper.enable_detector()
-            outputs.update(
-                self.object_detection_wrapper._init_object_detector(
-                    object_labels + meta_objects, verbose=self.verbose
-                )
-            )
-            self.object_detection_wrapper._core_objects = object_labels
-            self.object_detection_wrapper._meta_objects = meta_objects
+            self.initialize_object_detector(outputs, object_labels, meta_objects)
 
         if should_display:
             cv2.namedWindow(
@@ -296,35 +347,30 @@ class AriaReader:
 
             # Detect QR code in current image frame
             if detect_qr:
-                (
-                    img,
-                    camera_T_marker,
-                ) = self.april_tag_detection_wrapper.process_frame(
+                (img, camera_T_marker,) = self.april_tag_detector.process_frame(
                     img_frame=img
                 )  # type: ignore
 
             # Rotate current image frame
             img = rotate_img(img=img, num_of_rotation=3)
 
-            if self.object_detection_wrapper.is_enabled:
-                (img, object_scores) = self.object_detection_wrapper.process_frame(
-                    img_frame=img
-                )
+            if self.object_detector.is_enabled:
+                (img, object_scores) = self.object_detector.process_frame(img_frame=img)
 
             # If april tag is detected, compute the transformation of marker in cpf frame
             if camera_T_marker is not None:
                 device_T_marker = device_T_camera * camera_T_marker
-                img, outputs = self.april_tag_detection_wrapper.get_outputs(
+                img, outputs = self.april_tag_detector.get_outputs(
                     img_frame=img,
                     outputs=outputs,
-                    device_T_marker=device_T_marker,
-                    timestamp=rospy.time.now(),
+                    base_T_marker=device_T_marker,
+                    timestamp=rospy.Time.now(),
                     img_metadata=img_metadata,
                 )
 
             # If object is detected, update the outputs
             if object_scores is not {}:
-                img, outputs = self.object_detection_wrapper.get_outputs(
+                img, outputs = self.object_detector.get_outputs(
                     img_frame=img,
                     outputs=outputs,
                     object_scores=object_scores,
@@ -504,11 +550,11 @@ def main(
     # tag_img_list = outputs["tag_image_list"]
     if qr:
         tag_img_metadata_list = outputs["tag_image_metadata_list"]
-        tag_device_T_marker_list = outputs["tag_device_T_marker_list"]
+        tag_base_T_marker_list = outputs["tag_base_T_marker_list"]
 
         avg_ariaWorld_T_marker = vrs_mps_streamer.get_avg_ariaWorld_T_marker(
             tag_img_metadata_list,
-            tag_device_T_marker_list,
+            tag_base_T_marker_list,
             filter_dist=FILTER_DIST,
         )
         logger.debug(avg_ariaWorld_T_marker)
@@ -543,11 +589,12 @@ def main(
 
     if use_spot:
         spot = Spot("ArmKeyboardTeleop")
-        spot_qr = SpotQRDetector(spot=spot)
+        cam_id = SpotCamIds.HAND_COLOR
+        spot_qr = SpotQRDetector(spot=spot, cam_ids=[cam_id])
         (
             avg_spotWorld_T_marker,
             avg_spot_T_marker,
-        ) = spot_qr.get_avg_spotWorld_T_marker_HAND()
+        ) = spot_qr.get_avg_spotWorld_T_marker(cam_id=cam_id)
 
         logger.debug(avg_spotWorld_T_marker)
 
@@ -583,7 +630,7 @@ def main(
                 pose_list=[
                     avg_spotWorld_T_marker,
                     avg_spotWorld_T_ariaWorld * vrs_mps_streamer.device_T_cpf,
-                    spot_qr.get_spot_a_T_b(rf.SPOT_WORLD_VISION, rf.SPOT_BODY),
+                    spot.get_sophus_SE3_spot_a_T_b(rf.SPOT_WORLD_VISION, rf.SPOT_BODY),
                     next_object_spotWorld_T_cpf,
                 ],
                 rgb=np.zeros((10, 10, 3), dtype=np.uint8),

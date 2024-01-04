@@ -9,6 +9,7 @@ MARKER: "marker"
 
 
 # Frames names specific to Spot
+SPOT_BODY: "body"
 SPOT_WORLD_ODOM: "odom"
 SPOT_WORLD_VISION: "vision"
 SPOT_ARM_SHOULDER_0: "arm0.sh0"

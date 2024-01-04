@@ -7,7 +7,9 @@ from typing import List, Tuple
 
 import cv2.aruco as aruco
 import fairotag as frt
+import numpy as np
 import sophus as sp
+from perception_and_utils.utils.generic_utils import conditional_print
 
 MARKER_LENGTH = 0.146
 
@@ -34,10 +36,15 @@ class AprilTagPoseEstimator:
         atpo.register_marker_ids([1, 2, 3])
 
         # Detect markers and estimate pose
-        image, mn_camera_T_marker = atpo.detect_markers_and_estimate_pose(image, should_render=True)
+        viz_image, mn_camera_T_marker = atpo.detect_markers_and_estimate_pose(image)
     """
 
-    def __init__(self, camera_intrinsics: dict, marker_length: float = MARKER_LENGTH):
+    def __init__(
+        self,
+        camera_intrinsics: dict,
+        marker_length: float = MARKER_LENGTH,
+        verbose: bool = True,
+    ):
         apriltag_dict = aruco.Dictionary_get(aruco.DICT_APRILTAG_36h11)
         self._cam_module = frt.CameraModule(dictionary=apriltag_dict)
 
@@ -53,6 +60,9 @@ class AprilTagPoseEstimator:
 
         # Registere marker IDs
         self._registered_marker_ids = []  # type: List[int]
+
+        # Verbose
+        self._verbose = verbose
 
     @staticmethod
     def _validate_camera_intrinsics(camera_intrinsics: dict) -> bool:
@@ -86,10 +96,13 @@ class AprilTagPoseEstimator:
                 self._registered_marker_ids.append(marker_id)
                 self._cam_module.register_marker_size(marker_id, self._marker_length)
             else:
-                print(f"Marker ID {marker_id} is already registered .. skipping")
+                conditional_print(
+                    f"Marker ID {marker_id} is already registered .. skipping",
+                    self._verbose,
+                )
 
     def detect_markers_and_estimate_pose(
-        self, image, should_render=False
+        self, image: np.ndarray
     ) -> Tuple[object, sp.SE3]:
         """
         Detect all registered markers in the given image frame
@@ -98,10 +111,9 @@ class AprilTagPoseEstimator:
 
         Args:
             image (np.ndarray) : Image on which markers need to be detected
-            should_render (bool) : If image should be updated with detected markers
 
         Returns:
-            image (np.ndarray) : Updated image after marking detections
+            viz_image (np.ndarray) : Updated image after marking detection if marker is detected
             camera_T_marker (sp.SE3) : SE3 matrix representing marker frame as detected in camera frame
         """
         markers = self._cam_module.detect_markers(image)
@@ -111,16 +123,16 @@ class AprilTagPoseEstimator:
 
         # Currently only one marker is supported
         if len(markers) >= 1:
-            print("More than one marker detected")
+            conditional_print("More than one marker detected", self._verbose)
 
         marker = markers[0]
         if marker.pose is None:
             return image, None
 
         # Pose of marker in camera frame expressed as SE3 (in Sophus Library)
-        sp_camera_T_marker = marker.pose
+        camera_T_marker = marker.pose
 
-        if should_render:
-            image = self._cam_module.render_markers(image, markers=[marker])
+        # Render marker on image
+        viz_image = self._cam_module.render_markers(image, markers=[marker])
 
-        return image, sp_camera_T_marker
+        return viz_image, camera_T_marker
