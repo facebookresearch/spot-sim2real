@@ -14,6 +14,16 @@ from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
     is_position_within_bounds,
 )
+from spot_rl.utils.heuristic_nav import (
+    ImageSearch,
+    cv2,
+    deepcopy,
+    get_me_arguments_for_image_search_fn,
+    glob,
+    os,
+    pull_back_point_along_theta_by_offset,
+    time,
+)
 from spot_rl.utils.utils import (
     conditional_print,
     get_waypoint_yaml,
@@ -68,12 +78,18 @@ class SpotSkillManager:
         spotskillmanager.place("test_place_front")
     """
 
-    def __init__(self, use_mobile_pick=False):
+    def __init__(
+        self,
+        nav_config=None,
+        pick_config=None,
+        place_config=None,
+        use_mobile_pick=False,
+    ):
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
 
         # Create the spot object, init lease, and construct configs
-        self.__init_spot()
+        self.__init_spot(nav_config, pick_config, place_config)
 
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers()
@@ -83,11 +99,12 @@ class SpotSkillManager:
 
         # Create a local waypoint dictionary
         self.waypoints_yaml_dict = get_waypoint_yaml()
+        self.verbose = True
 
     def __del__(self):
         pass
 
-    def __init_spot(self):
+    def __init_spot(self, nav_config=None, pick_config=None, place_config=None):
         """
         Initialize the Spot object, acquire lease, and construct configs
         """
@@ -103,9 +120,15 @@ class SpotSkillManager:
             exit(1)
 
         # Construct configs for nav, gaze, and place
-        self.nav_config = construct_config_for_nav()
-        self.pick_config = construct_config_for_gaze(max_episode_steps=350)
-        self.place_config = construct_config_for_place()
+        self.nav_config = construct_config_for_nav() if not nav_config else nav_config
+        self.pick_config = (
+            construct_config_for_gaze(max_episode_steps=350)
+            if not pick_config
+            else pick_config
+        )
+        self.place_config = (
+            construct_config_for_place() if not place_config else place_config
+        )
 
         # Set the verbose flag (from any of the configs)
         self.verbose = self.nav_config.VERBOSE
@@ -222,6 +245,111 @@ class SpotSkillManager:
             message = "Successfully reached the target pose by default"
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+
+    def nav_mobile_hueristic(
+        self,
+        x: float,
+        y: float,
+        theta: float,
+        object_target: str,
+        image_search: ImageSearch = None,
+        save_cone_search_images: bool = True,
+        pull_back: bool = True,
+    ) -> bool:
+        """
+        Perform Heuristic mobile navigation to the not very accurate pick target obtained from Aria glasses(x,y,theta)
+        Step 1 goto x,y,theta with head first navigation method
+        Step 2 search object_target using object detector in the list of -90 to 90 degrees (180 degrees) with 20 degrees interval
+        Step 3 If found update given x, y, theta with new
+        Step 4 Navigate to new x, y, theta in 50 steps
+        Step 5 turn off head first navigation
+        Step 6 Return Flag: bool signifying whether we found the object_target & whether is ready to pick ?
+
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+            theta (float): yaw for the nav target (in radians) specified in the world frame
+            object_target: str object to search
+            image_search : spot_rl.utils.heuristic_nav.ImageSearch, Optional, default=None, ImageSearch (object detector wrapper), if none creates a new one for you uses OwlVit
+            save_cone_search_images: bool, optional, default= True, saves image with detections in each search cone
+            pull_back : bool, optional, default=True, pulls back x,y along theta direction
+        Returns:
+            bool: True if navigation was successful, False otherwise, if True you are good to fire .pick metho
+
+        """
+        print(f"Original Nav targets {x, y, theta}")
+        if save_cone_search_images:
+            previously_saved_images = glob("imagesearch*.png")
+            for f in previously_saved_images:
+                os.remove(f)
+
+        if image_search is None:
+            image_search = ImageSearch(
+                corner_static_offset=0.5, use_yolov8=False, visualize=True
+            )
+        self.nav_controller.nav_env.enable_nav_goal_change()
+        (x, y) = (
+            pull_back_point_along_theta_by_offset(x, y, theta, 0.2)
+            if pull_back
+            else (x, y)
+        )
+        print(
+            f"Nav targets adjusted on the theta direction ray {x, y, np.degrees(theta)}"
+        )
+        backup_steps = self.nav_controller.nav_env.max_episode_steps
+        self.nav_controller.nav_env.max_episode_steps = 50
+        self.nav(x, y, theta)
+        self.nav_controller.nav_env.max_episode_steps = backup_steps
+        spot: Spot = self.spot
+        spot.open_gripper()
+        gaze_arm_angles = deepcopy(self.pick_config.GAZE_ARM_JOINT_ANGLES)
+        spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
+        time.sleep(1.2)
+        found, (x, y, theta), visulize_img = image_search.search(
+            object_target, *get_me_arguments_for_image_search_fn(spot, 0)
+        )
+        rate = 20  # control time taken to rotate the arm, higher the rotation higher is the time
+        if not found:
+            # start semi circle search
+            angle_interval = 20
+            semicircle_range = np.arange(-90, 110, angle_interval)
+            for i_a, angle in enumerate(semicircle_range):
+                print(f"Searching in {angle} cone")
+                angle_time = int(np.abs(gaze_arm_angles[0] - angle) / rate)
+                gaze_arm_angles[0] = angle
+                spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
+                time.sleep(1.2)
+                (
+                    found,
+                    (x, y, theta),
+                    visulize_img,
+                ) = image_search.search(  # type : ignore
+                    object_target, *get_me_arguments_for_image_search_fn(spot, angle)
+                )
+                if save_cone_search_images:
+                    cv2.imwrite(f"imagesearch_{angle}.png", visulize_img)
+                if found:
+                    print(f"In Cone Search object found at {(x,y,theta)}")
+                    break
+
+        else:
+            if save_cone_search_images:
+                cv2.imwrite("imagesearch_looking_forward.png", visulize_img)
+        angle_time = int(
+            np.abs(gaze_arm_angles[0] - self.pick_config.GAZE_ARM_JOINT_ANGLES[0])
+            / rate
+        )
+        spot.set_arm_joint_positions(
+            np.deg2rad(self.pick_config.GAZE_ARM_JOINT_ANGLES),
+            angle_time,
+        )
+        if found:
+            print(f"Nav goal after cone search {x, y, np.degrees(theta)}")
+            self.nav_controller.nav_env.max_episode_steps = 50
+            self.nav(x, y, theta)
+            self.nav_controller.nav_env.max_episode_steps = backup_steps
+        self.nav_controller.nav_env.disable_nav_goal_change()
+        return found
 
     def pick(self, pick_target: str = None) -> Tuple[bool, str]:
         """
