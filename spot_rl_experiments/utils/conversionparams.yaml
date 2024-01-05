@@ -1,0 +1,17 @@
+# Define the model class name
+MODEL_CLASS_NAME : "habitat_baselines.rl.ddppo.policy.resnet_policy.PointNavResNetPolicy"
+# Define the observation dict
+OBSERVATIONS_DICT:
+  arm_depth_bbox_sensor: [240, 228, 1]
+  articulated_agent_arm_depth: [240, 228, 1]
+  spot_head_stereo_depth_sensor: [240, 228, 1]
+  joint: [4,]
+# Define the action space output length
+ACTION_SPACE_LENGTH: 7
+# The path to load and save the models
+TARGET_HAB3_POLICY_PATH: "../weights/mobile_gaze/mg97_2_latest.pth"
+OUTPUT_NET_SAVE_PATH: "../weights/mobile_gaze/mg97_2_latest_net.pytorch"
+OUTPUT_ACTION_DST_SAVE_PATH: "../weights/mobile_gaze/mg97_2_latest_action.pytorch"
+OUTPUT_ACTION_STD_SAVE_PATH: "../weights/mobile_gaze/mg97_2_latest_std.pth"
+# If we want to use stereo pair camera for mobile gaze
+USE_STEREO_PAIR_CAMERA: False

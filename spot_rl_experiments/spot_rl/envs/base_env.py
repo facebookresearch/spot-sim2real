@@ -85,7 +85,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     no_raw = True
     proprioception = True
 
-    def __init__(self, config, spot: Spot, stopwatch=None):
+    def __init__(
+        self,
+        config,
+        spot: Spot,
+        stopwatch=None,
+        max_joint_movement_key="MAX_JOINT_MOVEMENT",
+        max_lin_dist_key="MAX_LIN_DIST",
+        max_ang_dist_key="MAX_ANG_DIST",
+    ):
+        """
+        :param max_joint_movement_key: max allowable displacement of arm joints
+            (different for gaze and place)
+        :param max_lin_dist_key: maximum linear distance allowed if specified
+        :param max_ang_dist_key: maximum angular distance allowed if specified
+        """
         self.detections_buffer = {
             k: FixSizeOrderedDict(maxlen=DETECTIONS_BUFFER_LEN)
             for k in ["detections", "filtered_depth", "viz"]
@@ -104,10 +118,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.max_episode_steps = config.MAX_EPISODE_STEPS
         self.num_steps = 0
         self.reset_ran = False
-
-        # Base action parameters
-        self.max_lin_dist = config.MAX_LIN_DIST
-        self.max_ang_dist = np.deg2rad(config.MAX_ANG_DIST)
 
         # Arm action parameters
         self.initial_arm_joint_angles = np.deg2rad(config.INITIAL_ARM_JOINT_ANGLES)
@@ -132,6 +142,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.slowdown_base = -1
         self.prev_base_moved = False
         self.should_end = False
+
+        # Neural network action scale
+        self._max_joint_movement_scale = self.config[max_joint_movement_key]
+        self._max_lin_dist_scale = self.config[max_lin_dist_key]
+        self._max_ang_dist_scale = self.config[max_ang_dist_key]
 
         # Text-to-speech
         self.tts_pub = rospy.Publisher(rt.TEXT_TO_SPEECH, String, queue_size=1)
@@ -184,6 +199,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def filtered_hand_rgb(self):
         return self.msgs[rt.HAND_RGB]
 
+    @property
+    def max_joint_movement_scale(self):
+        return self._max_joint_movement_scale
+
+    @max_joint_movement_scale.setter
+    def max_joint_movement_scale(self, value):
+        self._max_joint_movement_scale = value
+
     def detections_cb(self, msg):
         timestamp, detections_str = msg.data.split("|")
         self.detections_buffer["detections"][int(timestamp)] = detections_str
@@ -234,7 +257,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         arm_action=None,
         grasp=False,
         place=False,
-        max_joint_movement_key="MAX_JOINT_MOVEMENT",
         nav_silence_only=True,
         disable_oa=None,
     ):
@@ -244,8 +266,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param arm_action: np.array of radians denoting how each joint is to be moved
         :param grasp: whether to call the grasp_hand_depth() method
         :param place: whether to call the open_gripper() method
-        :param max_joint_movement_key: max allowable displacement of arm joints
-            (different for gaze and place)
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -253,14 +273,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
         grasp = grasp or self.config.GRASP_EVERY_STEP
-        print(f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}")
+        if self.config.VERBOSE:
+            print(
+                f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
+            )
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
             time.sleep(0.5)
             self.get_gripper_images(save_image=True)
 
             if self.curr_forget_steps == 0:
-                print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
+                if self.config.VERBOSE:
+                    print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
                 self.say("Grasping " + self.target_obj_name)
 
                 # The following cmd is blocking
@@ -295,6 +319,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             self.spot.open_gripper()
             time.sleep(0.3)
             self.place_attempted = True
+
         if base_action is not None:
             if nav_silence_only:
                 base_action = rescale_actions(base_action, silence_only=True)
@@ -303,8 +328,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             if np.count_nonzero(base_action) > 0:
                 # Command velocities using the input action
                 lin_dist, ang_dist = base_action
-                lin_dist *= self.max_lin_dist
-                ang_dist *= self.max_ang_dist
+
+                # Scale the linear and angular velocities
+                lin_dist *= self._max_lin_dist_scale
+                ang_dist *= np.deg2rad(self._max_ang_dist_scale)
+
                 target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity
                 ctrl_period = 1 / self.ctrl_hz
@@ -321,7 +349,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if arm_action is not None:
             arm_action = rescale_actions(arm_action)
             if np.count_nonzero(arm_action) > 0:
-                arm_action *= self.config[max_joint_movement_key]
+                arm_action *= self._max_joint_movement_scale
                 arm_action = self.current_arm_pose + pad_action(arm_action)
                 arm_action = np.clip(
                     arm_action, self.arm_lower_limits, self.arm_upper_limits
@@ -335,11 +363,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 base_action = (
                     np.array(base_action) * self.slowdown_base
                 )  # / self.ctrl_hz
+                print("Slow down...")
             if base_action is not None and arm_action is not None:
+                print("input base_action velocity:", arr2str(base_action))
+                print("input arm_action:", arr2str(arm_action))
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,
-                    MAX_CMD_DURATION,
+                    travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif base_action is not None:
