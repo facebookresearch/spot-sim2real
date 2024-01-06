@@ -209,14 +209,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
     def detections_cb(self, msg):
         timestamp, detections_str = msg.data.split("|")
-        self.detections_buffer["detections"][str(timestamp)] = detections_str
+        self.detections_buffer["detections"][int(timestamp)] = detections_str
 
     def img_callback(self, topic, msg):
         super().img_callback(topic, msg)
         if topic == rt.MASK_RCNN_VIZ_TOPIC:
-            self.detections_buffer["viz"][str(msg.header.stamp)] = msg
+            self.detections_buffer["viz"][int(msg.header.stamp.nsecs)] = msg
         elif topic == rt.FILTERED_HAND_DEPTH:
-            self.detections_buffer["filtered_depth"][str(msg.header.stamp)] = msg
+            self.detections_buffer["filtered_depth"][int(msg.header.stamp.nsecs)] = msg
 
     def say(self, *args):
         text = " ".join(args)
@@ -292,7 +292,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 if success:
                     # Just leave the object on the receptacle if desired
                     if self.config.DONT_PICK_UP:
-                        self.say("open_gripper in don't pick up")
+                        print("open_gripper in don't pick up")
                         self.spot.open_gripper()
                     self.grasp_attempted = True
                     arm_positions = np.deg2rad(self.config.PLACE_ARM_JOINT_ANGLES)
@@ -312,10 +312,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 if self.config.TERMINATE_ON_GRASP:
                     self.should_end = True
         elif place:
-            self.say("PLACE ACTION CALLED: Opening the gripper!")
+            print("PLACE ACTION CALLED: Opening the gripper!")
             if self.get_grasp_angle_to_xy() < np.deg2rad(30):
                 self.turn_wrist()
-                self.say("open gripper in place")
+                print("open gripper in place")
             self.spot.open_gripper()
             time.sleep(0.3)
             self.place_attempted = True
@@ -387,9 +387,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if self.prev_base_moved and base_action is None:
             self.spot.stand()
 
-        self.say(
-            f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}"
-        )
+        print(f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}")
 
         # Spin until enough time has passed during this step
         start_time = time.time()
@@ -402,7 +400,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     self.spot.set_base_velocity(base_action[0], 0, 0, MAX_CMD_DURATION)
                     target_yaw = None
         elif not (grasp or place):
-            self.say("!!!! NO ACTIONS CALLED: moving to next step !!!!")
+            print("!!!! NO ACTIONS CALLED: moving to next step !!!!")
             self.num_steps -= 1
 
         self.stopwatch.record("run_actions")
@@ -413,16 +411,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.stopwatch.record("get_observations")
 
         self.num_steps += 1
-        self.say(
+        print(
             f"****************************************************num_steps: {self.num_steps}"
         )
         timeout = self.num_steps >= self.max_episode_steps
         if timeout:
-            self.say(
-                f"Execution exceeded {self.max_episode_steps} steps. Timing out..."
-            )
+            print(f"Execution exceeded {self.max_episode_steps} steps. Timing out...")
         else:
-            self.say(f"Execution has not exceeded {self.max_episode_steps} steps.")
+            print(f"Execution has not exceeded {self.max_episode_steps} steps.")
         done = timeout or self.get_success(observations) or self.should_end
         self.ctrl_hz = self.config.CTRL_HZ  # revert ctrl_hz in case it slowed down
 

@@ -44,7 +44,6 @@ from bosdyn.client.frame_helpers import (
     GRAV_ALIGNED_BODY_FRAME_NAME,
     HAND_FRAME_NAME,
     VISION_FRAME_NAME,
-    get_a_tform_b,
     get_vision_tform_body,
 )
 from bosdyn.client.image import ImageClient, build_image_request
@@ -482,24 +481,6 @@ class Spot:
 
         return cmd_id
 
-    def get_global_from_local_based_on_input_T(
-        self, x_pos, y_pos, yaw, curr_x, curr_y, curr_yaw
-    ):
-        """Transform the point given the x,y,yaw location"""
-        coors = np.array([x_pos, y_pos, 1.0])
-        local_T_global = self._get_local_T_global(curr_x, curr_y, curr_yaw)
-        x, y, w = local_T_global.dot(coors)
-        global_x_pos, global_y_pos = x / w, y / w
-        global_yaw = wrap_heading(curr_yaw + yaw)
-        return global_x_pos, global_y_pos, global_yaw
-
-    def get_global_from_local(self, x_pos, y_pos, yaw):
-        """Local x, y, yaw locations given the base"""
-        curr_x, curr_y, curr_yaw = self.get_xy_yaw(use_boot_origin=True)
-        return self.get_global_from_local_based_on_input_T(
-            x_pos, y_pos, yaw, curr_x, curr_y, curr_yaw
-        )
-
     def set_base_position(
         self,
         x_pos,
@@ -530,10 +511,13 @@ class Spot:
                 obstacle_avoidance_padding=0.05,  # in meters
             ),
         )
+        curr_x, curr_y, curr_yaw = self.get_xy_yaw(use_boot_origin=True)
+        coors = np.array([x_pos, y_pos, 1.0])
         if relative:
-            global_x_pos, global_y_pos, global_yaw = self.get_global_from_local(
-                x_pos, y_pos, yaw
-            )
+            local_T_global = self._get_local_T_global(curr_x, curr_y, curr_yaw)
+            x, y, w = local_T_global.dot(coors)
+            global_x_pos, global_y_pos = x / w, y / w
+            global_yaw = wrap_heading(curr_yaw + yaw)
         else:
             global_x_pos, global_y_pos, global_yaw = self.xy_yaw_home_to_global(
                 x_pos, y_pos, yaw
@@ -790,21 +774,14 @@ class Spot:
             self.power_off()
 
     def get_hand_image(self, is_rgb=True):
-        """
-        Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
-        """
-        img_src = [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+        img_src = [SpotCamIds.HAND_COLOR]
 
-        pixel_format_rgb = (
-            image_pb2.Image.PIXEL_FORMAT_RGB_U8
-            if is_rgb
-            else image_pb2.Image.PIXEL_FORMAT_GREYSCALE_U8
-        )
-        pixel_format_depth = image_pb2.Image.PIXEL_FORMAT_DEPTH_U16
-        img_resp = self.get_image_responses(
-            img_src, pixel_format=[pixel_format_rgb, pixel_format_depth]
-        )
-        return img_resp
+        pixel_format = image_pb2.Image.PIXEL_FORMAT_RGB_U8
+        if not is_rgb:
+            pixel_format = image_pb2.Image.PIXEL_FORMAT_GREYSCALE_U8
+
+        img_resp = self.get_image_responses(img_src, pixel_format=pixel_format)
+        return img_resp[0]
 
     def get_camera_intrinsics(self, source, quality=None, pixel_format=None):
         """Retrieve images from Spot's cameras
@@ -883,29 +860,6 @@ class Spot:
         rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
         translation = mn.Vector3(pos.x, pos.y, pos.z)
 
-        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
-        return mn_transformation
-
-    def get_spot_a_T_b(self, a: str, b: str, tree=None) -> mn.Matrix4:
-        """
-        Gets transformation from 'a' frame to 'b' frame such that a_T_b
-        a & b takes string values of the name of the frames
-        tree is optional, its the kinematic transforms tree if none it will make new from robot's state
-        image sources also give us kinematic transforms trees that can be sent here
-        """
-        frame_tree_snapshot = (
-            self.get_robot_state().kinematic_state.transforms_snapshot
-            if tree is None
-            else tree
-        )
-        # BD api's function get_a_tform_b uses given transforms tree to make a_T_b
-        se3_pose = get_a_tform_b(frame_tree_snapshot, a, b)
-        # convert SE3Pose to magnum Matrix 4 transformation, seperate rotation & translation
-        pos = se3_pose.get_translation()
-        quat = se3_pose.rotation.normalize()
-        quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
-        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
-        translation = mn.Vector3(*pos)
         mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
         return mn_transformation
 

@@ -83,12 +83,7 @@ class SpotImagePublisher:
 
 class SpotLocalRawImagesPublisher(SpotImagePublisher):
     name = "spot_local_raw_images_publisher"
-    publisher_topics = [
-        rt.HEAD_DEPTH,
-        rt.HAND_DEPTH,
-        rt.HAND_RGB,
-        rt.HAND_DEPTH_UNSCALED,
-    ]
+    publisher_topics = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
     sources = [
         Cam.FRONTRIGHT_DEPTH,
         Cam.FRONTLEFT_DEPTH,
@@ -109,27 +104,24 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
 
         head_depth = self._scale_depth(head_depth, head_depth=True)
         hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
-        hand_depth_unscaled = imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME]
         hand_rgb = imgs[Cam.HAND_COLOR]
 
-        msgs = self.imgs_to_msgs(head_depth, hand_depth, hand_rgb, hand_depth_unscaled)
+        msgs = self.imgs_to_msgs(head_depth, hand_depth, hand_rgb)
 
         for topic, msg in zip(self.pubs.keys(), msgs):
             self.pubs[topic].publish(msg)
 
-    def imgs_to_msgs(self, head_depth, hand_depth, hand_rgb, hand_depth_unscaled):
+    def imgs_to_msgs(self, head_depth, hand_depth, hand_rgb):
         head_depth_msg = self.cv2_to_msg(head_depth, "mono8")
         hand_depth_msg = self.cv2_to_msg(hand_depth, "mono8")
         hand_rgb_msg = self.cv2_to_msg(hand_rgb, "bgr8")
-        hand_depth_unscaled_msg = self.cv2_to_msg(hand_depth_unscaled, "mono16")
 
         timestamp = rospy.Time.now()
         head_depth_msg.header = Header(stamp=timestamp)
         hand_depth_msg.header = Header(stamp=timestamp)
         hand_rgb_msg.header = Header(stamp=timestamp)
-        hand_depth_unscaled_msg.header = Header(stamp=timestamp)
 
-        return head_depth_msg, hand_depth_msg, hand_rgb_msg, hand_depth_unscaled_msg
+        return head_depth_msg, hand_depth_msg, hand_rgb_msg
 
     @staticmethod
     def _scale_depth(img, head_depth=False):
@@ -378,7 +370,7 @@ class OWLVITModel:
             bbox_xy_string = ";".join(detections)
         else:
             bbox_xy_string = "None"
-        detections_str = f"{str(timestamp)}|{bbox_xy_string}"
+        detections_str = f"{int(timestamp.nsecs)}|{bbox_xy_string}"
 
         return detections_str, viz_img
 
@@ -394,7 +386,7 @@ class MRCNNModel:
         pred = self.mrcnn.inference(img)
         if stopwatch is not None:
             stopwatch.record("mrcnn_secs")
-        detections_str = f"{int(timestamp)}|{pred2string(pred)}"
+        detections_str = f"{int(timestamp.nsecs)}|{pred2string(pred)}"
         viz_img = self.mrcnn.visualize_inference(img, pred)
         return detections_str, viz_img
 

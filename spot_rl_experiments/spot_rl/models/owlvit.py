@@ -22,8 +22,7 @@ class OwlVit:
         )
 
         self.model = OwlViTForObjectDetection.from_pretrained(
-            "google/owlvit-base-patch32",
-            torch_dtype=torch.bfloat16,
+            "google/owlvit-base-patch32"
         )
         self.model.eval()
         self.model.to(self.device)
@@ -63,7 +62,7 @@ class OwlVit:
 
         return self.get_most_confident_bounding_box_per_label(results)
 
-    def run_inference_and_return_img(self, img, vis_img_required=True):
+    def run_inference_and_return_img(self, img):
         """
         img: an open cv image in (H, W, C) format
         """
@@ -84,12 +83,9 @@ class OwlVit:
         # if self.show_img:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
 
-        return (
-            self.get_most_confident_bounding_box_per_label(results),
-            self.create_img_with_bounding_box(img, results)
-            if vis_img_required
-            else None,
-        )
+        return self.get_most_confident_bounding_box_per_label(
+            results
+        ), self.create_img_with_bounding_box(img, results)
 
     def show_img_with_overlaid_bounding_boxes(self, img, results):
         img = self.create_img_with_bounding_box(img, results)
