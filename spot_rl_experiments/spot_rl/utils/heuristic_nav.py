@@ -241,7 +241,7 @@ class ImageSearch:
         self.deblur_gan = get_deblurgan_model(config)
         self.yolov8predictor: YOLOV8Predictor = (
             YOLOV8Predictor(
-                "/home/tusharsangam/Desktop/spot-sim2real/spot_rl_experiments/weights/yolov8x.torchscript"
+                "/home/tusharsangam/Desktop/spot-sim2real/spot_rl_experiments/weights/torchscript/yolov8x.torchscript"
             )
             if use_yolov8
             else None
@@ -268,7 +268,7 @@ class ImageSearch:
 
         return img
 
-    def object_detection(self, rgb_img, object_target, angle):
+    def object_detection(self, rgb_img, object_target, angle):  # detection_str -
         if self.yolov8predictor:
             detections, _ = self.yolov8predictor(
                 self.preprocess_image(rgb_img, 1.0), False
@@ -423,20 +423,20 @@ def heuristic_object_navigation(
             use_yolov8=False,
             visualize=save_cone_search_images,
         )
-    skillmanager.nav_controller.nav_env.enable_nav_by_hand()
+
     (x, y) = (
         pull_back_point_along_theta_by_offset(x, y, theta, 0.2) if pull_back else (x, y)
     )
     print(f"Nav targets adjusted on the theta direction ray {x, y, np.degrees(theta)}")
-    backup_steps = skillmanager.nav_controller.nav_env.max_episode_steps
-    skillmanager.nav_controller.nav_env.max_episode_steps = 50
+
     skillmanager.nav(x, y, theta)
-    skillmanager.nav_controller.nav_env.max_episode_steps = backup_steps
+    skillmanager.nav_controller.nav_env.enable_nav_by_hand()
+
     spot: Spot = skillmanager.spot
     spot.open_gripper()
     gaze_arm_angles = deepcopy(skillmanager.pick_config.GAZE_ARM_JOINT_ANGLES)
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
-    time.sleep(1.2)
+    time.sleep(1.5)
     found, (x, y, theta), visulize_img = image_search.search(
         object_target, *get_arguments_for_image_search(spot, 0)
     )
@@ -450,7 +450,7 @@ def heuristic_object_navigation(
             angle_time = int(np.abs(gaze_arm_angles[0] - angle) / rate)
             gaze_arm_angles[0] = angle
             spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
-            time.sleep(1.2)
+            time.sleep(1.5)
             (
                 found,
                 (x, y, theta),
@@ -477,6 +477,7 @@ def heuristic_object_navigation(
     )
     if found:
         print(f"Nav goal after cone search {x, y, np.degrees(theta)}")
+        backup_steps = skillmanager.nav_controller.nav_env.max_episode_steps
         skillmanager.nav_controller.nav_env.max_episode_steps = 50
         skillmanager.nav(x, y, theta)
         skillmanager.nav_controller.nav_env.max_episode_steps = backup_steps
