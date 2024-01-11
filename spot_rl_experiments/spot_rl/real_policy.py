@@ -3,6 +3,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import math
+import pickle
 from collections import OrderedDict
 from typing import Any
 
@@ -19,29 +21,6 @@ from torch import Size, Tensor
 from yacs.config import CfgNode as CN
 
 
-# Turn numpy observations into torch tensors for consumption by policy
-def to_tensor(v):
-    if torch.is_tensor(v):
-        return v
-    elif isinstance(v, np.ndarray):
-        return torch.from_numpy(v)
-    else:
-        return torch.tensor(v, dtype=torch.float)
-
-
-class CustomNormal(torch.distributions.normal.Normal):
-    """A custom normal distribution that allows us to use a custom log_prob function. It is introduced in habitat3"""
-
-    def sample(self, sample_shape: Size = torch.Size()) -> Tensor:  # noqa: B008
-        return self.rsample(sample_shape)
-
-    def log_probs(self, actions) -> Tensor:
-        return super().log_prob(actions).sum(-1, keepdim=True)
-
-    def entropy(self) -> Tensor:
-        return super().entropy().sum(-1, keepdim=True)
-
-
 class RealPolicy:
     """
     RealPolicy is a baseclass for all the Policies (GazePolicy, NavPolicy, PlacePolicy, MobileGazePolicy, etc)
@@ -51,7 +30,7 @@ class RealPolicy:
     action_space: required arg for initializing underlying PolicyClass (required for non torchscript models)
     device: cpu or gpu
     policy_class: Name of the underlying PolicyClass, default=PointNavBaselinePolicy
-    is_hab3_policy: Boolean, True/False, deafult=False, Flags denote whether the undelying policy will be loaded as torchscript model or normal Pytorch class,
+    is_torchscript_policy: Boolean, True/False, deafult=False, Flags denote whether the undelying policy will be loaded as torchscript model or normal Pytorch class,
     More info on spot_rl_experiments/utils/README.md
     """
 
@@ -62,24 +41,23 @@ class RealPolicy:
         action_space,
         device,
         policy_class=PointNavBaselinePolicy,
-        is_hab3_policy=False,
-        config: CN = (),
     ):
         print("Loading policy...")
         self.device = torch.device(device)
-        if is_hab3_policy:
+        self.is_torchscript_policy = "torchscript" in checkpoint_path
+        if self.is_torchscript_policy:
             # Hab3 policy loading
             # Load the policy using torch script
-            self.policy: Any = {}
-            self.policy["net"] = torch.jit.load(
-                checkpoint_path["net"], map_location=self.device
+            extra_files = {"net_meta_dict.pkl": ""}
+            self.policy = torch.jit.load(
+                checkpoint_path, _extra_files=extra_files, map_location=self.device
             )
-            self.policy["action_dist"] = torch.jit.load(
-                checkpoint_path["action_dis"], map_location=self.device
+            self.network_meta_attributes = pickle.loads(
+                extra_files["net_meta_dict.pkl"]
             )
-            self.std_dict: dict = torch.load(checkpoint_path["std"])
-            print(f"Self.std_dict : {self.std_dict}")
-            self.policy["std"] = self.std_dict["std"].to(self.device)
+            print(
+                f"Extra files content loaded with torchscript_model {self.network_meta_attributes}"
+            )
         else:
             if isinstance(checkpoint_path, str):
                 checkpoint = torch.load(checkpoint_path, map_location="cpu")
@@ -111,24 +89,24 @@ class RealPolicy:
                     for k, v in checkpoint["state_dict"].items()
                 }
             )
+            self.config = config
 
         print("Loaded Actor-critic architecture")
         self.prev_actions = None
         self.test_recurrent_hidden_states = None
         self.not_done_masks = None
-        self.config = config
+
         self.num_actions = action_space.shape[0]
         self.reset_ran = False
-        self.is_hab3_policy = is_hab3_policy
         print("Policy loaded.")
 
     def reset(self):
         self.reset_ran = True
-        if self.is_hab3_policy:
+        if self.is_torchscript_policy:
             self.test_recurrent_hidden_states = torch.zeros(
                 1,  # The number of environments. Just one for real world.
-                self.std_dict.get("num_recurrent_layers", 4),
-                self.std_dict.get("RL_PPO_HIDDEN_SIZE", 512),
+                self.network_meta_attributes.get("num_recurrent_layers", 4),
+                self.network_meta_attributes.get("RL_PPO_HIDDEN_SIZE", 512),
                 device=self.device,
             )
         else:
@@ -143,42 +121,18 @@ class RealPolicy:
         self.not_done_masks = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
         self.prev_actions = torch.zeros(1, self.num_actions, device=self.device)
 
-    def get_action_distribution(self, mu_maybe_std, std):
-        """The final transformation of the action given inputs"""
-        # We use mu_maybe_std to follow the convension of habitat-baselines
-        mu = torch.tanh(mu_maybe_std.float())
-        std = torch.exp(
-            torch.clamp(
-                std,
-                self.std_dict.get("MIN_LOG_STD", -5),
-                self.std_dict.get("MAX_LOG_STD", 2),
-            )
-        )
-
-        return CustomNormal(mu, std, validate_args=False)
-
     def act(self, observations):
         assert self.reset_ran, "You need to call .reset() on the policy first."
         batch = batch_obs([observations], device=self.device)
         with torch.no_grad():
-            if self.is_hab3_policy:
+            if self.is_torchscript_policy:
                 # Using torch script to load the model
-                with torch.no_grad():
-                    output_of_model = self.policy["net"](
-                        batch,
-                        self.test_recurrent_hidden_states,
-                        self.prev_actions,
-                        self.not_done_masks,
-                    )
-
-                features = output_of_model[0]
-                self.test_recurrent_hidden_states = output_of_model[1]
-
-                with torch.no_grad():
-                    raw_actions = self.get_action_distribution(
-                        self.policy["action_dist"](features), self.policy["std"]
-                    )
-                    actions = raw_actions.mean
+                (actions, self.test_recurrent_hidden_states) = self.policy(
+                    batch,
+                    self.test_recurrent_hidden_states,
+                    self.prev_actions,
+                    self.not_done_masks,
+                )
             else:
                 _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
                     batch,
@@ -217,9 +171,7 @@ class GazePolicy(RealPolicy):
         action_space = spaces.Box(
             -1.0, 1.0, (config.get("GAZE_ACTION_SPACE_LENGTH", 4),)
         )
-        super().__init__(
-            checkpoint_path, observation_space, action_space, device, config=config
-        )
+        super().__init__(checkpoint_path, observation_space, action_space, device)
 
 
 class MobileGazePolicy(RealPolicy):
@@ -246,14 +198,7 @@ class MobileGazePolicy(RealPolicy):
         action_space = spaces.Box(
             -1.0, 1.0, (config.get("MOBILE_GAZE_ACTION_SPACE_LENGTH", 7),)
         )
-        super().__init__(
-            checkpoint_path,
-            observation_space,
-            action_space,
-            device,
-            config=config,
-            is_hab3_policy=True,
-        )
+        super().__init__(checkpoint_path, observation_space, action_space, device)
 
 
 class PlacePolicy(RealPolicy):
@@ -435,7 +380,7 @@ if __name__ == "__main__":
     config = construct_config()
     gaze_policy = GazePolicy(
         config.WEIGHTS.GAZE,
-        device="cpu",
+        device="cuda",
     )
     gaze_policy.reset()
     observations = {

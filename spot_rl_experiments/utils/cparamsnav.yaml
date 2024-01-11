@@ -1,0 +1,16 @@
+# Define the model class name
+MODEL_CLASS_NAME : "habitat_baselines.rl.ppo.policy.PointNavBaselinePolicy"
+# Define the observation dict
+OBSERVATIONS_DICT:
+  spot_left_depth: [[212, 120, 1], '0.0', '1.0', 'np.float32']
+  spot_right_depth: [[212, 120, 1], '0.0', '1.0', 'np.float32']
+  goal_heading: [[1,], '-np.pi', 'np.pi', 'np.float32']
+  target_point_goal_gps_and_compass_sensor: [[2,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
+# Define the action space output length
+ACTION_SPACE_LENGTH: 2
+# The path to load and save the models
+TARGET_HAB3_POLICY_PATH: "../weights/pth/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
+OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript"
+# If we want to use stereo pair camera for mobile gaze
+USE_STEREO_PAIR_CAMERA: False
+NEW_HABITAT_LAB_POLICY_OR_OLD: 'old'
