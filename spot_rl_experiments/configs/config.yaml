@@ -1,22 +1,22 @@
 WEIGHTS:
   # Regular Nav
-  NAV: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript" #"weights/pth/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
+  NAV: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript" #"weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
   
   # Static gaze
-  GAZE: "weights/torchscript/gaze_normal_32_seed100_1649708902_ckpt.38_combined_net.torchscript" #"weights/pth/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+  GAZE: "weights/torchscript/gaze_normal_32_seed100_1649708902_ckpt.38_combined_net.torchscript" #"weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
   # Mobile Gaze torchscript module files path
-  MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript" #"weights/pth/mg97_2_latest.pth"
+  MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
   
   # Static place
-  PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript" #"weights/pth/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
+  PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript" #"weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # ASC
-  MIXER: "weights/pth/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
+  MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
 
   # Mask-RCNN and Deblurgan for object detection
-  MRCNN: "weights/pth/ikea_apricot_large_only_model_0002999.pth"
-  MRCNN_50: "weights/pth/ikea_apricot_r50_normal_100_output_model_0003599.pth"
+  MRCNN: "weights/ikea_apricot_large_only_model_0002999.pth"
+  MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
   DEBLURGAN: "weights/fpn_inception.h5"
 
 DEVICE: "cuda:0"
