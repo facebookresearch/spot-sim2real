@@ -9,7 +9,13 @@ In general, these are the steps you can follow for conversion.
 1. Load the pytorch model with class files, <b>transfer the model on cuda</b>
 2. Pass some random input tensor to the model and trace it's forward pass using ```torch.jit.trace```, usage example can be found [here](https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html)
 3. Save the traced model as modelXX.torchscript, replace modelXX with desired name
-4. To load the model in spotsim2real use ```torch.jit.load(path/to/saved/torchscript/model, map_location="cuda:0/cpu")```
+4. To load the model in spotsim2real use ```torch.jit.load(path/to/saved/torchscript/model, map_location="cuda:0")```
+5. To download existing torchscript checkpoints run these commands from spot-sim2real folder 
+```
+cd spot_rl_experiments/weights
+git clone git clone https://huggingface.co/spaces/jimmytyyang/spot-sim2real-data
+unzip spot-sim2real-data/weight/torchscript.zip && rm -rf spot-sim2real-torchscript-data && cd ../..
+```
 
 ## Solving Pytorch & CUDA error in recent Habitat-lab version setup
 We encountered cuda error when setting up the recent habitat-lab version, it installs a recent version (2.2.1) of pytorch and CUDA 11.8. However, the hardware driver was older than 11.8 thus ```torch.cuda.is_available()``` was ```False``` and showing driver old error. 

@@ -184,6 +184,9 @@ git checkout main
 ## :eyeglasses: Run Spot-Aria project code
 Follow the steps in [the project documentation](./aria_data_loaders/README.md#scroll-steps-to-run-episodic-memory-robotic-fetch-demostration).
 
+## :star: Convert pytorch weights to torchscript
+To convert pytorch weights to torchscript, please follow [Torchscript Conversion Instructions.](./spot_rl_experiments/utils/README.md)
+
 ## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is built upon Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments
 ](https://github.com/naokiyokoyama/spot_rl_experiments), and with new features (LLMs, pytest) and improving robustness.

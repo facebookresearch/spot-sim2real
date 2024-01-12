@@ -125,7 +125,8 @@ git lfs install
 
 # Download weights (need only once)
 git clone https://huggingface.co/spaces/jimmytyyang/spot-sim2real-data
-unzip spot-sim2real-data/weight/weights.zip && rm -rf spot-sim2real-data && cd ../
+unzip spot-sim2real-data/weight/weights.zip && cd weights && uzip ../spot-sim2real-data/weight/torchscript.zip && cd ..
+rm -rf spot-sim2real-data && cd ../
 ```
 
 ### Setup MaskRCNN

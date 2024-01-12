@@ -1,16 +1,15 @@
 WEIGHTS:
   # Regular Nav
-  NAV: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
-
+  NAV: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript" #"weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
+  
   # Static gaze
-  GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+  GAZE: "weights/torchscript/gaze_normal_32_seed100_1649708902_ckpt.38_combined_net.torchscript" #"weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
   # Mobile Gaze torchscript module files path
-  MOBILE_GAZE_NET: "weights/mobile_gaze/mg97_2_latest_net.pytorch"
-  MOBILE_GAZE_ACTION_DIS: "weights/mobile_gaze/mg97_2_latest_action.pytorch"
-  MOBILE_GAZE_STD: "weights/mobile_gaze/mg97_2_latest_std.pth"
+  MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
+  
   # Static place
-  PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
+  PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript" #"weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # ASC
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
