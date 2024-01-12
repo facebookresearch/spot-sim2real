@@ -1,6 +1,7 @@
 **/__pycache__/**
 .vscode
 *.jpg
+*.png
 **/**.egg-info/**
 
 bd_spot_wrapper/spot_wrapper.egg-info/**

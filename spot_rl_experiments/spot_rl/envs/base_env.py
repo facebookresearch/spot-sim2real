@@ -387,9 +387,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if self.prev_base_moved and base_action is None:
             self.spot.stand()
 
-        self.say(
-            f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}"
-        )
+        print(f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}")
 
         # Spin until enough time has passed during this step
         start_time = time.time()
@@ -418,9 +416,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
         timeout = self.num_steps >= self.max_episode_steps
         if timeout:
-            self.say(
-                f"Execution exceeded {self.max_episode_steps} steps. Timing out..."
-            )
+            print(f"Execution exceeded {self.max_episode_steps} steps. Timing out...")
         else:
             self.say(f"Execution has not exceeded {self.max_episode_steps} steps.")
         done = timeout or self.get_success(observations) or self.should_end
@@ -460,7 +456,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             f"gh: {np.rad2deg(observations['goal_heading'][0]):.2f}\t"
         )
 
-    def get_nav_observation(self, goal_xy, goal_heading):
+    def get_head_depth(self):
         observations = {}
 
         # Get visual observations
@@ -475,6 +471,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         observations["spot_right_depth"], observations["spot_left_depth"] = np.split(
             front_depth, 2, 1
         )
+        return observations
+
+    def get_nav_observation(self, goal_xy, goal_heading):
+
+        observations = self.get_head_depth()
 
         # Get rho theta observation
         curr_xy = np.array([self.x, self.y], dtype=np.float32)
