@@ -303,9 +303,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     time.sleep(2)
 
                 # Revert joint positions after grasp
-                self.spot.set_arm_joint_positions(
-                    positions=arm_positions, travel_time=1.0
-                )
+                # We want to make sure the object stays in the original orientation after grasping
+                if not success:
+                    self.spot.set_arm_joint_positions(
+                        positions=arm_positions, travel_time=1.0
+                    )
+                else:
+                    _, rpy = self.spot.get_ee_pos_in_body_frame()
+                    xyz = np.array([0.5, 0.0, 0.35])
+                    self.spot.move_gripper_to_point(xyz, rpy)
+
                 # Wait for arm to return to position
                 time.sleep(1.0)
                 if self.config.TERMINATE_ON_GRASP:

@@ -378,11 +378,11 @@ if __name__ == "__main__":
 
     # TODO: Test the mobile gaze skills in NYC lab
     spotskillmanager = SpotSkillManager(use_mobile_pick=True)
-
     # Nav-Pick-Nav-Place sequence 1
+    # nyc_mg_pos1 or nyc_drawer_pos1
     spotskillmanager.nav("nyc_mg_pos1")
     spotskillmanager.pick("cup")
-    breakpoint()
+    spotskillmanager.nav("nyc_face_jimmy_desk")
     # spotskillmanager.nav("test_place_front")
     # spotskillmanager.place("test_place_front")
 
