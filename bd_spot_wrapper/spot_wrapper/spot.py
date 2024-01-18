@@ -603,8 +603,22 @@ class Spot:
         cmd = RobotCommandBuilder.synchro_sit_command()
         self.command_client.robot_command(cmd)
 
-    def get_arm_proprioception(self, robot_state=None):
+    def get_gripper_proprioception(self, robot_state=None):
         """Return state of each of the 6 joints of the arm"""
+        if robot_state is None:
+            robot_state = self.robot_state_client.get_robot_state()
+        gripper_joint_states = OrderedDict(
+            {
+                i.name[len("arm0.") :]: i
+                for i in robot_state.kinematic_state.joint_states
+                if i.name in ["arm0.f1x"]
+            }
+        )
+
+        return gripper_joint_states
+
+    def get_arm_proprioception(self, robot_state=None):
+        """Return state gripper of the arm"""
         if robot_state is None:
             robot_state = self.robot_state_client.get_robot_state()
         arm_joint_states = OrderedDict(
