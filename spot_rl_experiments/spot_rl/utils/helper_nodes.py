@@ -169,10 +169,10 @@ if __name__ == "__main__":
                 continue
 
             pressed_key_char = chr(pressed_key)
-            if pressed_key_char == "d":  # type: ignore
+            if pressed_key_char == "d":
                 print("end recording\n")
                 break
-            if pressed_key_char == "s":  # type: ignore
+            if pressed_key_char == "s":
                 print("start recording\n")
                 start_recording = True
 
