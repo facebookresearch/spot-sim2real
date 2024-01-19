@@ -15,10 +15,16 @@ import numpy as np
 import rospy
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
+from spot_wrapper.spot import SpotCamIds as Cam
+from spot_wrapper.spot import image_response_to_cv2, scale_depth_img
 from spot_wrapper.utils import say
 from std_msgs.msg import Float32MultiArray, String
 
 NAV_POSE_BUFFER_LEN = 1
+
+MAX_PUBLISH_FREQ = 20
+MAX_DEPTH = 3.5
+MAX_HAND_DEPTH = 1.7
 
 
 class SpotRosProprioceptionPublisher:
@@ -73,6 +79,14 @@ class SpotRosProprioceptionPublisher:
             self.last_publish = time.time()
 
 
+IMG_SOURCES = [
+    Cam.FRONTRIGHT_DEPTH,
+    Cam.FRONTLEFT_DEPTH,
+    Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+    Cam.HAND_COLOR,
+]
+
+
 class SpotRosProprioceptionSaver:
     def __init__(self, spot):
         rospy.init_node("spot_ros_proprioception_save_node", disable_signals=True)
@@ -86,6 +100,13 @@ class SpotRosProprioceptionSaver:
         self.nav_pose_buff = None
         self.buff_idx = 0
         self.data_list = []
+        self.data_image_list = []
+
+    def _scale_depth(self, img, head_depth=False):
+        img = scale_depth_img(
+            img, max_depth=MAX_DEPTH if head_depth else MAX_HAND_DEPTH
+        )
+        return np.uint8(img * 255.0)
 
     def publish_msgs(self):
         robot_state = self.spot.get_robot_state()
@@ -110,8 +131,18 @@ class SpotRosProprioceptionSaver:
         ee_rpy = ee_rpy.tolist()
         gripper_transform = ee_xyz + ee_rpy
 
+        # Get the hand rgb/depth image
+        image_responses = self.spot.get_image_responses(IMG_SOURCES, quality=100)
+        imgs_list = [image_response_to_cv2(r) for r in image_responses]
+        imgs = {k: v for k, v in zip(IMG_SOURCES, imgs_list)}
+        head_depth = np.hstack([imgs[Cam.FRONTRIGHT_DEPTH], imgs[Cam.FRONTLEFT_DEPTH]])
+        head_depth = self._scale_depth(head_depth, head_depth=True)
+        hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
+        hand_rgb = imgs[Cam.HAND_COLOR]
+
+        cur_time = time.time()
         msg.data = np.array(
-            [time.time()]
+            [cur_time]
             + list(xy_yaw)
             + [j.position.value for j in joints]
             + [j.position.value for j in gripper]
@@ -122,6 +153,7 @@ class SpotRosProprioceptionSaver:
         self.data_list.append(
             list(xy_yaw) + [j.position.value for j in joints] + gripper_transform
         )
+        self.data_image_list.append([cur_time, head_depth, hand_depth, hand_rgb])
 
 
 def raise_error(sig, frame):
@@ -177,9 +209,12 @@ if __name__ == "__main__":
                 start_recording = True
 
         print("Save the file...")
-        save_path = "/home/jimmytyyang/Downloads/open_drawer_data/open_drawer_v0.0.1"
+        save_path = "/home/jimmytyyang/Downloads/open_drawer_data/open_drawer_v0.0.2"
         with open(save_path + ".pkl", "wb") as handle:
             pickle.dump(saver.data_list, handle)
+
+        with open(save_path + ".pkl", "wb") as handle:
+            pickle.dump(saver.data_image_list, handle)
 
         with open(save_path + ".csv", "w", newline="") as csvfile:
             writer = csv.writer(
