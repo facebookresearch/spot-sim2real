@@ -104,7 +104,16 @@ conda config --env --add channels robostack
 conda config --env --set channel_priority strict
 ```
 
-### Setup bd_spot_wrapper
+### Setup Perception and Utils package
+
+```bash
+# Generate module
+cd perception_and_utils_root/
+pip install -e . && cd ../
+```
+If you see any issues related to `sophuspy` installation, please follow this [step](/installation/ISSUES.md#issues-with-installation-of-sophuspy) and return the above process.
+
+### Setup BD spot_wrapper package
 
 ```bash
 # Generate module
@@ -112,7 +121,7 @@ cd bd_spot_wrapper/ && python generate_executables.py
 pip install -e . && cd ../
 ```
 
-### Setup spot_rl_experiments
+### Setup Spot RL experiments package
 
 ```bash
 # Generate module
@@ -129,7 +138,7 @@ unzip spot-sim2real-data/weight/weights.zip && cd weights && uzip ../spot-sim2re
 rm -rf spot-sim2real-data && cd ../
 ```
 
-### Setup MaskRCNN
+### Setup MaskRCNN (as third-party)
 
 ```bash
 # Generate module
@@ -141,14 +150,14 @@ pip install -e detectron2 && cd ../../
 ```
 If you face any issues in this step, refer to [this section in ISSUES.md](/installation/ISSUES.md#issues-while-running-setuppy-for-detectron2)
 
-### Setup DeblurGAN
+### Setup DeblurGAN (as third-party)
 
 ```bash
 # Generate module
 cd third_party/DeblurGANv2/ && pip install -e . && cd ../../
 ```
 
-### Setup Habitat-lab
+### Setup Habitat-lab (as third-party)
 
 ```bash
 cd third_party/habitat-lab/

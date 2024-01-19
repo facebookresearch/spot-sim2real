@@ -7,9 +7,11 @@ from typing import Any, List
 import cv2
 import numpy as np
 import sophus as sp
-from aria_data_utils.image_utils import decorate_img_with_text
-from aria_data_utils.perception.april_tag_pose_estimator import AprilTagPoseEstimator
 from bosdyn.client.frame_helpers import get_a_tform_b
+from perception_and_utils.perception.april_tag_pose_estimator import (
+    AprilTagPoseEstimator,
+)
+from perception_and_utils.utils.image_utils import decorate_img_with_text_for_qr
 from scipy.spatial.transform import Rotation
 from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
@@ -155,8 +157,15 @@ class SpotQRDetector:
         while len(marker_position_from_dock_list) < data_size_for_avg:
             print(f"Iterating - {len(marker_position_from_dock_list)}")
             is_marker_detected_from_hand_cam = False
+
+            # Get Hand image - returns a list of BD ImageResponse objects for hand rgb and depth
             img_response_hand = self.spot.get_hand_image()
-            img_hand = image_response_to_cv2(img_response_hand)
+
+            # Obtain hand rgb image from list of BD ImageResponse objects
+            # More info on BD ImageResponse object can be found here -
+            # https://dev.bostondynamics.com/protos/bosdyn/api/proto_reference#bosdyn-api-ImageResponse
+            img_response_hand_rgb = img_response_hand[0]
+            img_hand = image_response_to_cv2(img_response_hand_rgb)
 
             (
                 img_rend_hand,
@@ -175,7 +184,7 @@ class SpotQRDetector:
                 )
 
             # Spot - spotWorld_T_handcam computation
-            frame_tree_snapshot_hand = img_response_hand.shot.transforms_snapshot
+            frame_tree_snapshot_hand = img_response_hand_rgb.shot.transforms_snapshot
             hand_mn_body_T_handcam = self._get_body_T_handcam(frame_tree_snapshot_hand)
             hand_mn_spotWorld_T_handcam = self._get_spotWorld_T_handcam(
                 frame_tree_snapshot_hand, spot_frame=spot_frame
@@ -190,10 +199,10 @@ class SpotQRDetector:
                     hand_mn_body_T_handcam @ hand_mn_handcam_T_marker
                 )
 
-                img_rend_hand = decorate_img_with_text(
+                img_rend_hand = decorate_img_with_text_for_qr(
                     img=img_rend_hand,
-                    frame_name=spot_world_frame,
-                    position=hand_mn_spotWorld_T_marker.translation,
+                    frame_name_str=spot_world_frame,
+                    qr_position=hand_mn_spotWorld_T_marker.translation,
                 )
 
                 dist = hand_mn_handcam_T_marker.translation.length()

@@ -70,7 +70,7 @@ def calculate_iou(box1: np.ndarray, box2: np.ndarray) -> float:
     return iou.item()
 
 
-def centered_heuristic(
+def centered_object_detection_heuristic(
     detections: list, pixel_wt: float = 0.65, image_size: Tuple[int, int] = (512, 512)
 ) -> Dict[str, float]:
     """Given one instance of object detection from OWL-ViT, calculate the graspability
@@ -107,9 +107,11 @@ def check_bbox_intersection(bbox1: List[int], bbox2: List[int]) -> bool:
         return True
 
 
-def decorate_img_with_text(img: np.ndarray, frame_name: str, position: np.ndarray):
+def decorate_img_with_text_for_qr(
+    img: np.ndarray, frame_name_str: str, qr_position: np.ndarray
+) -> np.ndarray:
     """
-    Helper method to label image with text
+    Helper method to add text to image upon QR detections
 
     Args:
         img (np.ndarray): Image to be labeled
@@ -117,10 +119,10 @@ def decorate_img_with_text(img: np.ndarray, frame_name: str, position: np.ndarra
         position (np.ndarray): Position of object in frame of reference
     """
     label_img(img, "Detected QR Marker", (50, 50), color=(0, 0, 255))
-    label_img(img, f"Frame = {frame_name}", (50, 75), color=(0, 0, 255))
-    label_img(img, f"X : {position[0]}", (50, 100), color=(0, 0, 255))
-    label_img(img, f"Y : {position[1]}", (50, 125), color=(0, 250, 0))
-    label_img(img, f"Z : {position[2]}", (50, 150), color=(250, 0, 0))
+    label_img(img, f"Frame = {frame_name_str}", (50, 75), color=(0, 0, 255))
+    label_img(img, f"X : {qr_position[0]}", (50, 100), color=(0, 0, 255))
+    label_img(img, f"Y : {qr_position[1]}", (50, 125), color=(0, 250, 0))
+    label_img(img, f"Z : {qr_position[2]}", (50, 150), color=(250, 0, 0))
 
     return img
 
@@ -158,3 +160,26 @@ def label_img(
         thickness,
         line_type,
     )
+
+
+def rotate_img(img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
+    """
+    Rotate image in multiples of 90 degrees in counterclockwise direction
+
+    Purely using np.rot90() raises an error. For some reason, it makes the image non-contiguous.
+    This method treats the image as a contiguous array after rotation, thus should be used for image rotations.
+
+    References
+        - https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
+        - https://stackoverflow.com/questions/23830618/python-opencv-typeerror-layout-of-the-output-array-incompatible-with-cvmat/50128836#50128836
+
+    Args:
+        img (np.ndarray): Image to be rotated
+        k (int, optional): Number of times to rotate by 90 degrees. Defaults to 3.
+                           -ve k value will rotate the image in clockwise direction.
+
+    Returns:
+        np.ndarray: Rotated image
+    """
+    img = np.ascontiguousarray(np.rot90(img, k=num_of_rotation))
+    return img

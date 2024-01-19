@@ -10,14 +10,14 @@ import click
 import numpy as np
 import rospy
 import sophus as sp
-from aria_data_utils.conversions import (
+from geometry_msgs.msg import PoseStamped
+from perception_and_utils.utils.conversions import (
     ros_PoseStamped_to_sp_SE3,
     ros_TransformStamped_to_sophus_SE3,
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
     xyt_to_sophus_SE3,
 )
-from geometry_msgs.msg import PoseStamped
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.spot import Spot
@@ -465,9 +465,16 @@ class EpisodicMemoryRoboticFetch:
 @click.option("--use-policies", type=bool, default=False)
 def main(verbose: bool, use_policies: bool):
     spot = Spot("EpisodicMemoryRoboticFetchNode")
-    _ = EpisodicMemoryRoboticFetch(
-        spot=spot, verbose=verbose, use_policies=use_policies
-    )
+
+    with spot.get_lease(hijack=True) as lease:
+        if lease is None:
+            raise RuntimeError("Could not get lease")
+        else:
+            rospy.loginfo("Acquired lease")
+
+        _ = EpisodicMemoryRoboticFetch(
+            spot=spot, verbose=verbose, use_policies=use_policies
+        )
 
 
 if __name__ == "__main__":

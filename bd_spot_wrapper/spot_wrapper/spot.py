@@ -16,6 +16,7 @@ import os.path as osp
 import pdb
 import time
 from collections import OrderedDict
+from typing import List
 
 import bosdyn.client
 import bosdyn.client.lease
@@ -26,10 +27,6 @@ import numpy as np
 import quaternion
 import rospy
 import sophus as sp
-from aria_data_utils.conversions import (
-    bd_SE3Pose_to_ros_Pose,
-    bd_SE3Pose_to_ros_TransformStamped,
-)
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -65,6 +62,10 @@ from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
 from geometry_msgs.msg import Pose, TransformStamped
 from google.protobuf import wrappers_pb2
+from perception_and_utils.utils.conversions import (
+    bd_SE3Pose_to_ros_Pose,
+    bd_SE3Pose_to_ros_TransformStamped,
+)
 from spot_rl.utils.utils import ros_frames as rf
 
 # Get Spot password and IP address
@@ -796,9 +797,17 @@ class Spot:
         finally:
             self.power_off()
 
-    def get_hand_image(self, is_rgb=True):
+    def get_hand_image(self, is_rgb: bool = True) -> List[image_pb2.ImageResponse]:
         """
-        Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
+        Gets hand raw rgb & depth and returns ImageResponse objects for both as a list
+        Information on ImageResponse objects can be found here:
+            https://dev.bostondynamics.com/protos/bosdyn/api/proto_reference#bosdyn-api-ImageResponse
+
+        Args:
+            is_rgb: bool indicating whether to return rgb or depth image
+
+        Returns:
+            img_resp: List of 2 elements as ImageResponse objects for rgb and depth images
         """
         img_src = [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
 
@@ -879,6 +888,63 @@ class Spot:
         quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
         rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
         translation = mn.Vector3(*pos)
+        mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
+        return mn_transformation
+
+    # TODO: Remove this function in PR#118
+    @staticmethod
+    def convert_transformation_from_sophus_to_magnum(
+        sp_transformation: sp.SE3,
+    ) -> mn.Matrix4:
+        """
+        First convert Sophus transformation matrix to 1D rvec and tvec np.arrays
+        Then convert rvec and tvec to Magnum pose
+
+        Args:
+            sp_transformation (sp.SE3): Sophus transformation matrix
+
+        Returns:
+            mn_tranformation (mn.Matrix4): 4x4 pose matrix
+        """
+        tvec = sp_transformation.translation()
+        rvec = sp_transformation.so3().log()
+
+        assert rvec.shape == (3,) and tvec.shape == (3,)
+
+        # Get rotation angle as norm of rvec
+        angle = np.linalg.norm(rvec)
+
+        # Get unit axis of rotation
+        axis = rvec / angle
+
+        # Get rotation matrix from angle and axis
+        rotation_matrix = mn.Quaternion.rotation(
+            mn.Rad(angle), mn.Vector3(axis)
+        ).to_matrix()
+
+        # Get pose matrix from rotation matrix and translation vector
+        mn_tranformation = mn.Matrix4.from_(rotation_matrix, tvec)
+
+        return mn_tranformation
+
+    # TODO: Remove this function in PR#118
+    def convert_transformation_from_BD_to_magnum(self, bd_transformation_dict: dict):
+        """
+        Convert the transformation dictionary from BosdynDynamics FrameTreeSnapshot's "parent_tform_child" to Magnum
+
+        Args:
+            bd_transformation_dict (dict): Bosdyn transformation dictionary
+
+        Returns:
+            mn_tranformation_dict (dict): Magnum transformation dictionary
+        """
+        pos = bd_transformation_dict.position
+        rot = bd_transformation_dict.rotation
+        quat = quaternion.quaternion(rot.w, rot.x, rot.y, rot.z)
+
+        rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
+        translation = mn.Vector3(pos.x, pos.y, pos.z)
+
         mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
         return mn_transformation
 

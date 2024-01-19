@@ -10,13 +10,19 @@ from typing import Any, Dict, List, Tuple
 import click
 import cv2
 import numpy as np
+import rospy
 import sophus as sp
-from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
-from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
 from fairotag.scene import Scene
 from matplotlib import pyplot as plt
+from perception_and_utils.perception.detector_wrappers.april_tag_detector import (
+    AprilTagDetectorWrapper,
+)
+from perception_and_utils.perception.detector_wrappers.object_detector import (
+    ObjectDetectorWrapper,
+)
+from perception_and_utils.utils.image_utils import rotate_img
 from projectaria_tools.core import calibration, data_provider, mps
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.spot import Spot
@@ -103,6 +109,9 @@ class AriaReader:
         # Record VRS timestamps of interest based upon user input during vrs parsing
         self.vrs_idx_of_interest_list = []  # type: List[Any]
 
+        # Name window suffix (for cv2 windows)
+        self.named_window_suffix = "Stream - "
+
     def plot_rgb_and_trajectory(
         self,
         pose_list: List[sp.SE3],
@@ -137,44 +146,7 @@ class AriaReader:
         plt_ax.plot(traj_data[:, 0], traj_data[:, 1], traj_data[:, 2])
         plt.show(block=block)
 
-    def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
-        """
-        Rotate image in multiples of 90d degrees
-
-        Args:
-            img (np.ndarray): Image to be rotated
-            k (int, optional): Number of times to rotate by 90 degrees. Defaults to 3.
-
-        Returns:
-            np.ndarray: Rotated image
-        """
-        img = np.ascontiguousarray(
-            np.rot90(img, k=num_of_rotation)
-        )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
-        return img
-
-    def _display(self, img: np.ndarray, stream_name: str, wait: int = 1):
-        """
-        Display image in a cv2 window
-
-        Args:
-            img (np.ndarray): Image to be displayed
-            stream_name (str): Stream name
-            wait (int, optional): Wait time in ms. Defaults to 1 ms
-        """
-        cv2.imshow(f"Stream - {stream_name}", cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        cv2.waitKey(wait)
-
-    def _create_display_window(self, stream_name: str):
-        """
-        Create a display window for image
-
-        Args:
-            stream_name (str): Stream name
-        """
-        cv2.namedWindow(f"Stream - {stream_name}", cv2.WINDOW_NORMAL)
-
-    def _rectify_image(self, image: np.ndarray) -> np.ndarray:
+    def rectify_aria_image(self, image: np.ndarray) -> np.ndarray:
         """
         Rectify fisheye image based upon camera calibration parameters
         Ensure you have set self._src_calib_param & self._dst_calib_param
@@ -290,7 +262,9 @@ class AriaReader:
             self.object_detection_wrapper._meta_objects = meta_objects
 
         if should_display:
-            self._create_display_window(stream_name)
+            cv2.namedWindow(
+                f"{self.named_window_suffix + stream_name}", cv2.WINDOW_NORMAL
+            )
 
         # Logic for iterating through VRS stream
         num_frames = self.provider.get_num_data(stream_id)
@@ -314,11 +288,11 @@ class AriaReader:
             img_metadata = frame_data[1]
 
             # Rectify current image frame
-            img = self._rectify_image(image=img)
+            img = self.rectify_aria_image(image=img)
 
             # Initialize camera_T_marker to None & object_scores to empty dict for current image frame
             camera_T_marker = None
-            object_scores = {}
+            object_scores = {}  # type: Dict[str, Any]
 
             # Detect QR code in current image frame
             if detect_qr:
@@ -330,7 +304,7 @@ class AriaReader:
                 )  # type: ignore
 
             # Rotate current image frame
-            img = self._rotate_img(img=img)
+            img = rotate_img(img=img, num_of_rotation=3)
 
             if self.object_detection_wrapper.is_enabled:
                 (img, object_scores) = self.object_detection_wrapper.process_frame(
@@ -344,6 +318,7 @@ class AriaReader:
                     img_frame=img,
                     outputs=outputs,
                     device_T_marker=device_T_marker,
+                    timestamp=rospy.time.now(),
                     img_metadata=img_metadata,
                 )
 
@@ -358,7 +333,11 @@ class AriaReader:
 
             # Display current image frame
             if should_display:
-                self._display(img=img, stream_name=stream_name)
+                cv2.imshow(
+                    f"{self.named_window_suffix + stream_name}",
+                    cv2.cvtColor(img, cv2.COLOR_BGR2RGB),
+                )
+                cv2.waitKey(1)
 
         cv2.destroyAllWindows()
         return outputs
@@ -469,7 +448,9 @@ class AriaReader:
             # Consider only those detections where detected marker is within a certain distance of the camera
             if dist < filter_dist:
                 marker_position_list.append(marker_position)
-                quat = R.from_matrix(ariaWorld_T_marker.rotationMatrix()).as_quat()
+                quat = Rotation.from_matrix(
+                    ariaWorld_T_marker.rotationMatrix()
+                ).as_quat()
 
                 # Ensure quaternion's w is always positive for effective averaging as multiple quaternions can represent the same rotation
                 if quat[3] > 0:
@@ -483,7 +464,7 @@ class AriaReader:
         avg_marker_quaternion = np.mean(marker_quaternion_np, axis=0)
 
         avg_ariaWorld_T_marker = sp.SE3(
-            R.from_quat(avg_marker_quaternion).as_matrix(), avg_marker_position
+            Rotation.from_quat(avg_marker_quaternion).as_matrix(), avg_marker_position
         )
 
         return avg_ariaWorld_T_marker

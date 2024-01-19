@@ -231,8 +231,8 @@ class SpotSkillManager:
         try:
             nav_target_tuple = (x, y, theta)
             result = self.nav_controller.execute([nav_target_tuple])
-        except Exception:
-            message = "Error encountered while navigating"
+        except Exception as e:
+            message = f"Error encountered while navigating - {e}"
             conditional_print(message=message, verbose=self.verbose)
             return False, message
 

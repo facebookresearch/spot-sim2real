@@ -242,3 +242,10 @@ Rerun `pip install -e detectron2` from the correct place in the repository (`rep
   1. Clear all caches from mamba - `mamba clean -f -a`
   2. Install spefic tensorflow version - `pip install tensorflow==2.9.0`
   3. Then retry running the same setup.py command
+
+## Issues with installation of sophuspy
+To install sophuspy in the existing spot_ros venv, please remove `sophus` and install `sophuspy`
+```bash
+pip uninstall sophus
+pip install sophuspy==0.0.8
+```
