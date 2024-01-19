@@ -89,18 +89,16 @@ IMG_SOURCES = [
 
 class SpotRosProprioceptionSaver:
     def __init__(self, spot):
-        rospy.init_node("spot_ros_proprioception_save_node", disable_signals=True)
         self.spot = spot
-
-        # Instantiate filtered image publishers
-        self.pub = rospy.Publisher(rt.ROBOT_STATE, Float32MultiArray, queue_size=1)
-        self.last_publish = time.time()
-        rospy.loginfo("[spot_ros_proprioception_save_node]: Publishing has started.")
-
         self.nav_pose_buff = None
         self.buff_idx = 0
         self.data_list = []
         self.data_image_list = []
+        self._parallel_inference_mode = True
+
+    def detections_cb(self, msg):
+        timestamp, detections_str = msg.data.split("|")
+        self.detections_buffer["detections"][int(timestamp)] = detections_str
 
     def _scale_depth(self, img, head_depth=False):
         img = scale_depth_img(
@@ -108,9 +106,10 @@ class SpotRosProprioceptionSaver:
         )
         return np.uint8(img * 255.0)
 
-    def publish_msgs(self):
+    def publish_msgs(self, start_time):
+        single_process_time = time.time()
         robot_state = self.spot.get_robot_state()
-        msg = Float32MultiArray()
+
         xy_yaw = self.spot.get_xy_yaw(robot_state=robot_state, use_boot_origin=True)
         if self.nav_pose_buff is None:
             self.nav_pose_buff = np.tile(xy_yaw, [NAV_POSE_BUFFER_LEN, 1])
@@ -132,28 +131,32 @@ class SpotRosProprioceptionSaver:
         gripper_transform = ee_xyz + ee_rpy
 
         # Get the hand rgb/depth image
-        image_responses = self.spot.get_image_responses(IMG_SOURCES, quality=100)
-        imgs_list = [image_response_to_cv2(r) for r in image_responses]
-        imgs = {k: v for k, v in zip(IMG_SOURCES, imgs_list)}
-        head_depth = np.hstack([imgs[Cam.FRONTRIGHT_DEPTH], imgs[Cam.FRONTLEFT_DEPTH]])
-        head_depth = self._scale_depth(head_depth, head_depth=True)
-        hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
-        hand_rgb = imgs[Cam.HAND_COLOR]
+        if self._parallel_inference_mode:
+            hand_depth, _ = self.spot.get_gripper_images()
+            hand_rgb, _ = self.spot.filtered_hand_rgb()
+            head_depth, _ = self.spot.filtered_head_depth()
+        else:
+            image_responses = self.spot.get_image_responses(IMG_SOURCES, quality=100)
+            imgs_list = [image_response_to_cv2(r) for r in image_responses]
+            imgs = {k: v for k, v in zip(IMG_SOURCES, imgs_list)}
+            head_depth = np.hstack(
+                [imgs[Cam.FRONTRIGHT_DEPTH], imgs[Cam.FRONTLEFT_DEPTH]]
+            )
+            head_depth = self._scale_depth(head_depth, head_depth=True)
+            hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
+            hand_rgb = imgs[Cam.HAND_COLOR]
 
-        cur_time = time.time()
-        msg.data = np.array(
+        cur_time = time.time() - start_time
+        self.data_list.append(
             [cur_time]
             + list(xy_yaw)
             + [j.position.value for j in joints]
-            + [j.position.value for j in gripper]
-            + gripper_transform,
-            dtype=np.float32,
-        )
-
-        self.data_list.append(
-            list(xy_yaw) + [j.position.value for j in joints] + gripper_transform
+            + +[j.position.value for j in gripper]
+            + gripper_transform
         )
         self.data_image_list.append([cur_time, head_depth, hand_depth, hand_rgb])
+
+        print("freq:", 1 / (time.time() - single_process_time), "HZ")
 
 
 def raise_error(sig, frame):
@@ -181,6 +184,7 @@ if __name__ == "__main__":
     elif args.save_proprioception:
         name = "SpotRosProprioceptionSaver"
         saver = SpotRosProprioceptionSaver(Spot(name))
+        start_time = time.time()
         # prepare the key to termination
         # Start in-terminal GUI
         stdscr = curses.initscr()
@@ -193,7 +197,7 @@ if __name__ == "__main__":
         while True:
             if start_recording:
                 print("recording\n")
-                saver.publish_msgs()
+                saver.publish_msgs(start_time)
 
             pressed_key = stdscr.getch()
             # Don't update if no key was pressed or we updated too recently
