@@ -13,6 +13,8 @@ import time
 
 import numpy as np
 import rospy
+from spot_rl.envs.base_env import SpotBaseEnv
+from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot
 from spot_wrapper.spot import SpotCamIds as Cam
@@ -96,6 +98,10 @@ class SpotRosProprioceptionSaver:
         self.data_image_list = []
         self._parallel_inference_mode = True
 
+        if self._parallel_inference_mode:
+            config = construct_config(opts=[])
+            self.base_env = SpotBaseEnv(config, self.spot)
+
     def detections_cb(self, msg):
         timestamp, detections_str = msg.data.split("|")
         self.detections_buffer["detections"][int(timestamp)] = detections_str
@@ -132,9 +138,12 @@ class SpotRosProprioceptionSaver:
 
         # Get the hand rgb/depth image
         if self._parallel_inference_mode:
-            hand_depth, _ = self.spot.get_gripper_images()
-            hand_rgb, _ = self.spot.filtered_hand_rgb()
-            head_depth, _ = self.spot.filtered_head_depth()
+            hand_depth, hand_rgb = self.base_env.get_arm_images()
+            head_depth = self.base_env.get_head_depth()
+            # Information about the images
+            # hand_depth: (240, 228, 1); max: 1.0; min: 0.02
+            # hand_rgb  : (480, 640, 3); max: 225; min: 0.0
+            # head_depth: (212, 240, 1); max: 1.0; min: 0.02
         else:
             image_responses = self.spot.get_image_responses(IMG_SOURCES, quality=100)
             imgs_list = [image_response_to_cv2(r) for r in image_responses]
@@ -151,12 +160,12 @@ class SpotRosProprioceptionSaver:
             [cur_time]
             + list(xy_yaw)
             + [j.position.value for j in joints]
-            + +[j.position.value for j in gripper]
+            + [j.position.value for j in gripper]
             + gripper_transform
         )
         self.data_image_list.append([cur_time, head_depth, hand_depth, hand_rgb])
 
-        print("freq:", 1 / (time.time() - single_process_time), "HZ")
+        print("Freq:", 1.0 / (time.time() - single_process_time), "hz")
 
 
 def raise_error(sig, frame):

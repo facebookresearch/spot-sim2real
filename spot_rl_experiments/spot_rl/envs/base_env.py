@@ -466,6 +466,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             f"gh: {np.rad2deg(observations['goal_heading'][0]):.2f}\t"
         )
 
+    def get_head_depth(self):
+        # Get visual observations
+        front_depth = self.msg_to_cv2(self.filtered_head_depth, "mono8")
+
+        front_depth = cv2.resize(
+            front_depth, (120 * 2, 212), interpolation=cv2.INTER_AREA
+        )
+        front_depth = np.float32(front_depth) / 255.0
+        # Add dimension for channel (unsqueeze)
+        front_depth = front_depth.reshape(*front_depth.shape[:2], 1)
+        return front_depth
+
     def get_nav_observation(self, goal_xy, goal_heading):
         observations = {}
 
@@ -511,6 +523,20 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
 
         return joints
+
+    def get_arm_images(self):
+        arm_depth = self.msg_to_cv2(self.filtered_hand_depth, "mono8")
+        # Crop out black vertical bars on the left and right edges of aligned depth img
+        arm_depth = arm_depth[:, LEFT_CROP:-RIGHT_CROP]
+        arm_depth = cv2.resize(
+            arm_depth, (NEW_WIDTH, NEW_HEIGHT), interpolation=cv2.INTER_AREA
+        )
+        arm_depth = arm_depth.reshape([*arm_depth.shape, 1])  # unsqueeze
+        arm_depth = np.float32(arm_depth) / 255.0
+
+        arm_rgb = self.msg_to_cv2(self.filtered_hand_rgb, "bgr8")
+
+        return arm_depth, arm_rgb
 
     def get_gripper_images(self, save_image=False):
         if self.grasp_attempted:
