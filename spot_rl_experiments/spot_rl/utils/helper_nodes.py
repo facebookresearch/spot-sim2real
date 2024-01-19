@@ -213,7 +213,7 @@ if __name__ == "__main__":
         with open(save_path + ".pkl", "wb") as handle:
             pickle.dump(saver.data_list, handle)
 
-        with open(save_path + ".pkl", "wb") as handle:
+        with open(save_path + "_image.pkl", "wb") as handle:
             pickle.dump(saver.data_image_list, handle)
 
         with open(save_path + ".csv", "w", newline="") as csvfile:
