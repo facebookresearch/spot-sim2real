@@ -1,3 +1,9 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
+import logging
 import os
 from typing import Any, Dict, Tuple
 
@@ -40,6 +46,7 @@ class AprilTagDetectorWrapper(GenericDetector):
 
     def __init__(self):
         super().__init__()
+        self.logger = logging.getLogger("AprilTagDetectorWrapper")
 
     def _init_april_tag_detector(
         self, focal_lengths: Any, principal_point: Any, verbose: bool = True
@@ -102,7 +109,7 @@ class AprilTagDetectorWrapper(GenericDetector):
 
         # Detect QR code and estimate marker pose wrt camera
         updated_img_frame, camera_T_marker = self._qr_pose_estimator.detect_markers_and_estimate_pose(  # type: ignore
-            image=img_frame, should_render=self.verbose, magnum=False
+            image=img_frame, should_render=self.verbose
         )
 
         return updated_img_frame, camera_T_marker
@@ -112,6 +119,7 @@ class AprilTagDetectorWrapper(GenericDetector):
         img_frame: np.ndarray,
         outputs: Dict,
         device_T_marker,
+        timestamp: int,
         img_metadata: Any,
     ) -> Tuple[np.ndarray, Dict]:
         """
@@ -138,13 +146,12 @@ class AprilTagDetectorWrapper(GenericDetector):
             frame_name="device",
             position=device_T_marker.translation(),
         )
-        print(
-            f"Time stamp with AprilTag Detections- {img_metadata.capture_timestamp_ns}"
-        )
+        self.logger.debug(f"Time stamp with AprilTag Detections- {timestamp}")
 
         # Append data to lists for return
         outputs["tag_image_list"].append(img)
-        outputs["tag_image_metadata_list"].append(img_metadata)
         outputs["tag_device_T_marker_list"].append(device_T_marker)
+        if img_metadata is not None:
+            outputs["tag_image_metadata_list"].append(img_metadata)
 
-        return img_frame, outputs
+        return img, outputs

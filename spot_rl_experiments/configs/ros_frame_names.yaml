@@ -1,0 +1,19 @@
+SPOT_WORLD: "spotWorld"
+SPOT: "spot"
+
+ARIA_WORLD: "ariaWorld"
+ARIA: "aria" # aria in cpf frame
+ARIA_DEVICE: "ariaDevice" # aria in device frame
+
+MARKER: "marker"
+
+
+# Frames names specific to Spot
+SPOT_WORLD_ODOM: "odom"
+SPOT_WORLD_VISION: "vision"
+SPOT_ARM_SHOULDER_0: "arm0.sh0"
+SPOT_ARM_SHOULDER_1: "arm0.sh1"
+SPOT_ARM_ELBOW_0: "arm0.el0"
+SPOT_ARM_ELBOW_1: "arm0.el1"
+SPOT_ARM_WRIST_0: "arm0.wr0"
+SPOT_ARM_WRIST_1: "arm0.wr1"

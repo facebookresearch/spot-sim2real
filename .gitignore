@@ -11,3 +11,5 @@ spot_rl_experiments/configs/waypoints.yaml
 
 **/grasp_visualizations/**
 **/temp_recordings/**
+
+**/**/.ipynb_checkpoints

@@ -1,3 +1,8 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
 import logging
 from typing import Any, Dict, List, Tuple
 
@@ -34,7 +39,11 @@ class ObjectDetectorWrapper(GenericDetector):
         self._logger = logging.getLogger("ObjectDetectorWrapper")
 
     def _init_object_detector(
-        self, object_labels: List[str], verbose: bool = True
+        self,
+        object_labels: List[str],
+        verbose: bool = True,
+        version: int = 1,
+        score_threshold: float = 0.125,
     ) -> Dict[str, Any]:
         """
         Initialize object_detector by loading it to GPU and setting up the labels
@@ -42,6 +51,8 @@ class ObjectDetectorWrapper(GenericDetector):
         Args:
             object_labels (List[str]) : List of object labels
             verbose (bool) : If True, modifies image frame to render detected objects
+            version (int) : Version of the object detector to use (supports 1 and 2)
+            score_threshold (float) : Confidence threshold for object detection
 
         Returns:
             outputs (Dict[str, Any]) : Dictionary of outputs
@@ -55,7 +66,10 @@ class ObjectDetectorWrapper(GenericDetector):
         self.verbose = verbose
 
         self.object_detector = OwlVit(
-            [object_labels], score_threshold=0.125, show_img=self.verbose
+            [object_labels],
+            score_threshold=score_threshold,
+            show_img=self.verbose,
+            version=version,
         )
         outputs: Dict[str, Any] = {}
         outputs["object_image_list"] = {obj_name: [] for obj_name in object_labels}
@@ -72,7 +86,7 @@ class ObjectDetectorWrapper(GenericDetector):
 
     def _get_scored_object_detections(
         self, img: np.ndarray, heuristic=None
-    ) -> Tuple[bool, Dict[str, float], Dict[str, bool], np.ndarray]:
+    ) -> Tuple[bool, Dict[str, Any], Dict[str, bool], np.ndarray]:
         """
         Detect object instances in the img frame. score them based on heuristics
         and return a tuple of (valid, score, result_image)
@@ -97,9 +111,40 @@ class ObjectDetectorWrapper(GenericDetector):
 
         return valid, score, stop, result_image
 
+    def _aria_online_heuristic(
+        self, detections, img_size=(512, 512), score_thresh=0.35
+    ) -> Tuple[bool, Dict[str, float], Dict[str, bool]]:
+        """*Online EMRoF Specific*
+        Simple heuristic where we detect only the objects of interest and score current
+        frame depending on the % of pixels occupied by the object in the image frame and
+        proximity of bbox to image center. This is then passed to the EMRoF algorithm.
+
+        Args:
+            detections (List[List[str, float, List[int]]]): List of detections
+            img_size (Tuple[int, int]): Size of the image frame
+            score_thresh (float): Confidence threshold for object detection
+
+        Returns:
+            valid (bool): Whether the img frame is valid or not
+            score (Dict[str, float]): Score of the img frame (based on :heuristic:)
+            stop (Dict[str, bool]): For backward compatibility, always empty
+        """
+        valid = False
+        stop: Dict[str, Any] = {}  # does not apply to this method
+        scores = {}
+        core_detections = [
+            det
+            for det in detections
+            if det[0] in self._core_objects and det[1] > score_thresh
+        ]
+        if core_detections:
+            scores = centered_heuristic(core_detections, image_size=img_size)
+            valid = True
+        return valid, scores, stop
+
     def _aria_fetch_demo_heuristics(
         self, detections, img_size=(512, 512)
-    ) -> Tuple[bool, Dict[str, bool], Dict[str, float]]:
+    ) -> Tuple[bool, Dict[str, float], Dict[str, bool]]:
         """*P1 Demo Specific*
         Heuristics to filter out unwanted and bad object detections. This heuristic
         scores each img frame based on (a) % of pixels occupied by object in the img frame
@@ -118,8 +163,6 @@ class ObjectDetectorWrapper(GenericDetector):
             score (Dict[str, float]): Score of the img frame (based on :heuristic:)
             stop (Dict[str, bool]): Whether to stop the detector or not
         """
-        # FIXME: extend centered_heuristic for multiple objects, extend
-        # check_bbox_intersection logic for multiple objects
         valid = True
         score = {}
         stop = {}
@@ -149,7 +192,7 @@ class ObjectDetectorWrapper(GenericDetector):
 
         return valid, score, stop
 
-    def process_frame(self, img_frame: np.ndarray):
+    def process_frame(self, img_frame: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Process image frame to detect object instances and score them based on heuristics
 
@@ -166,7 +209,28 @@ class ObjectDetectorWrapper(GenericDetector):
         if self.is_enabled is False:
             return img_frame, {}
 
-        # FIXME: done for 1 specific object at the moment, extend for multiple
+        (_, object_scores, _, updated_img_frame,) = self._get_scored_object_detections(
+            img_frame, heuristic=self._aria_online_heuristic
+        )
+        return updated_img_frame, object_scores
+
+    def process_frame_offline(self, img_frame: np.ndarray):
+        """
+        Process image frame to detect object instances and score them based on heuristics
+
+        Args:
+            img_frame (np.ndarray) : Image frame to process
+            outputs (Dict) : Dictionary of outputs (to be updated)
+            img_metadata (Any) : Image metadata
+
+        Returns:
+            updated_img_frame (np.ndarray) : Image frame with detections and text for visualization
+            object_scores (Dict[str, float]) : Dictionary of scores for each object in the image frame
+        """
+        # Do nothing if detector is not enabled
+        if self.is_enabled is False:
+            return img_frame, {}
+
         (
             valid,
             object_scores,

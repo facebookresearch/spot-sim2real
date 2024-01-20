@@ -44,6 +44,12 @@ def parse_arguments(args=sys.argv[1:]):
         action="store_true",
         help="whether the place target specified is in the local frame of the robot",
     )
+    parser.add_argument(
+        "-up",
+        "--use_policies",
+        action="store_true",
+        help="Whether to use policies or use BD API for place",
+    )
     args = parser.parse_args(args=args)
 
     return args
@@ -135,6 +141,9 @@ class PlaceController:
         success_list = []
         for place_target in place_target_list:
             start_time = time.time()
+
+            self.place_env.say(f"Placing at {place_target}")
+
             if self.use_policies:
                 observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
@@ -276,7 +285,7 @@ if __name__ == "__main__":
     spot = Spot("RealPlaceEnv")
     with spot.get_lease(hijack=True):
         spot.power_robot()
-        place_controller = PlaceController(config, spot, use_policies=True)
+        place_controller = PlaceController(config, spot, use_policies=args.use_policies)
         try:
             place_result = place_controller.execute(
                 place_target_list, args.target_is_local

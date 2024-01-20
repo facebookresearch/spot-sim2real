@@ -1,10 +1,13 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+
 from typing import List, Tuple
 
 import cv2.aruco as aruco
 import fairotag as frt
-import magnum as mn
 import sophus as sp
-from spot_wrapper.spot import Spot
 
 MARKER_LENGTH = 0.146
 
@@ -86,7 +89,7 @@ class AprilTagPoseEstimator:
                 print(f"Marker ID {marker_id} is already registered .. skipping")
 
     def detect_markers_and_estimate_pose(
-        self, image, should_render=False, magnum: bool = True
+        self, image, should_render=False
     ) -> Tuple[object, sp.SE3]:
         """
         Detect all registered markers in the given image frame
@@ -96,7 +99,6 @@ class AprilTagPoseEstimator:
         Args:
             image (np.ndarray) : Image on which markers need to be detected
             should_render (bool) : If image should be updated with detected markers
-            magnum (bool) : If return type for camera_T_marker should be from magnum or sophus
 
         Returns:
             image (np.ndarray) : Updated image after marking detections
@@ -117,13 +119,8 @@ class AprilTagPoseEstimator:
 
         # Pose of marker in camera frame expressed as SE3 (in Sophus Library)
         sp_camera_T_marker = marker.pose
-        mn_camera_T_marker = Spot.convert_transformation_from_sophus_to_magnum(
-            sp_camera_T_marker
-        )
 
         if should_render:
             image = self._cam_module.render_markers(image, markers=[marker])
 
-        if magnum:
-            return image, mn_camera_T_marker
         return image, sp_camera_T_marker

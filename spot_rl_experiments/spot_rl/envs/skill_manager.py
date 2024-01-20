@@ -33,7 +33,8 @@ class SpotSkillManager:
     Exposes skills like nav, pick, place, and dock as functions
 
     Args:
-        None
+        verbose (bool): Set verbosity status for printing msgs on terminal
+        use_policies (bool): Whether to use NN policy or BD API (currenly only place supports BD API)
 
     How to use:
         1. Create the SpotSkillManager object
@@ -74,19 +75,33 @@ class SpotSkillManager:
 
     def __init__(
         self,
+        spot: Spot = None,
         nav_config=None,
         pick_config=None,
         place_config=None,
         use_mobile_pick=False,
+        verbose: bool = True,
+        use_policies: bool = True,
     ):
+        # Set the verbose flag
+        self.verbose = verbose
+
+        # Create the spot object, init lease, and construct configs
+        self.spot: Spot = None  # will be initialized in __init_spot()
+
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
 
         # Create the spot object, init lease, and construct configs
-        self.__init_spot(nav_config, pick_config, place_config)
+        self.__init_spot(
+            spot=spot,
+            nav_config=nav_config,
+            pick_config=pick_config,
+            place_config=place_config,
+        )
 
         # Initiate the controllers for nav, gaze, and place
-        self.__initiate_controllers()
+        self.__initiate_controllers(use_policies=use_policies)
 
         # Power on the robot
         self.spot.power_robot()
@@ -98,20 +113,26 @@ class SpotSkillManager:
     def __del__(self):
         pass
 
-    def __init_spot(self, nav_config=None, pick_config=None, place_config=None):
+    def __init_spot(
+        self, spot: Spot = None, nav_config=None, pick_config=None, place_config=None
+    ):
         """
         Initialize the Spot object, acquire lease, and construct configs
         """
-        # Create Spot object
-        self.spot = Spot("RealSeqEnv")
+        if spot is None:
+            # Create Spot object
+            self.spot = Spot("SkillManagerSpot")
 
-        # Acquire spot's lease
-        self.lease = self.spot.get_lease(hijack=True)
-        if not self.lease:
-            conditional_print(
-                message="Failed to get lease for Spot. Exiting!", verbose=self.verbose
-            )
-            exit(1)
+            # Acquire spot's lease
+            self.lease = self.spot.get_lease(hijack=True)
+            if not self.lease:
+                conditional_print(
+                    message="Failed to get lease for Spot. Exiting!",
+                    verbose=self.verbose,
+                )
+                exit(1)
+        else:
+            self.spot = spot
 
         # Construct configs for nav, gaze, and place
         self.nav_config = construct_config_for_nav() if not nav_config else nav_config
@@ -124,10 +145,7 @@ class SpotSkillManager:
             construct_config_for_place() if not place_config else place_config
         )
 
-        # Set the verbose flag (from any of the configs)
-        self.verbose = self.nav_config.VERBOSE
-
-    def __initiate_controllers(self):
+    def __initiate_controllers(self, use_policies: bool = True):
         """
         Initiate the controllers for nav, gaze, and place
         """
@@ -143,7 +161,7 @@ class SpotSkillManager:
             use_mobile_pick=self._use_mobile_pick,
         )
         self.place_controller = PlaceController(
-            config=self.place_config, spot=self.spot, use_policies=False
+            config=self.place_config, spot=self.spot, use_policies=use_policies
         )
 
     def reset(self):
@@ -362,7 +380,9 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, x: float, y: float, z: float) -> Tuple[bool, str]:  # noqa
+    def place(  # noqa
+        self, x: float, y: float, z: float, is_local: bool = False
+    ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
 
@@ -383,7 +403,9 @@ class SpotSkillManager:
         result = None
         try:
             place_target_tuple = (x, y, z)
-            result = self.place_controller.execute([place_target_tuple])
+            result = self.place_controller.execute(
+                [place_target_tuple], is_local=is_local
+            )
         except Exception:
             message = "Error encountered while placing"
             conditional_print(message=message, verbose=self.verbose)
@@ -403,6 +425,13 @@ class SpotSkillManager:
             message = "Successfully reached the target position"
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+
+    def sit(self):
+        """
+        Sit the robot
+        This needs to be a separate function as lease is acquired within skill manager is not available outside of it.
+        """
+        self.spot.sit()
 
     def get_env(self):
         "Get the env for the ease of the access"

@@ -17,5 +17,6 @@ setuptools.setup(
         "click",
         "transformers",
         "projectaria-tools",
+        "projectaria_client_sdk",
     ],
 )
