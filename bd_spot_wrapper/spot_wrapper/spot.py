@@ -357,7 +357,8 @@ class Spot:
             camera_model=image_response.source.pinhole,
             walk_gaze_mode=3,
         )
-
+        print("top_down_grasp:", top_down_grasp)
+        print("horizontal_grasp:", horizontal_grasp)
         if top_down_grasp or horizontal_grasp:
             if top_down_grasp:
                 # Add a constraint that requests that the x-axis of the gripper is
@@ -383,7 +384,7 @@ class Spot:
 
             grasp.grasp_params.grasp_params_frame_name = VISION_FRAME_NAME
             # Adding grasp parameters for palm or fingertip grasping
-            grasp.grasp_params.grasp_palm_to_fingertip = 0.5
+            # grasp.grasp_params.grasp_palm_to_fingertip = 1.0
             # Add the vector constraint to our proto.
             constraint = grasp.grasp_params.allowable_orientation.add()
             constraint.vector_alignment_with_tolerance.axis_on_gripper_ewrt_gripper.CopyFrom(
@@ -465,7 +466,8 @@ class Spot:
             time.sleep(0.25)
 
         # Reduce the torque applied to the gripper
-        if success:
+        # Dot not apply min torque
+        if success and False:
             print("apply min torque...")
             command_gripper = robot_command_pb2.RobotCommand()
             command_gripper.synchronized_command.gripper_command.claw_gripper_command.trajectory.points.add().point = (
