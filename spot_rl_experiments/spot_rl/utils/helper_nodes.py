@@ -222,7 +222,7 @@ if __name__ == "__main__":
                 start_recording = True
 
         print("Save the file...")
-        save_path = "/home/jimmytyyang/Downloads/open_drawer_data/open_drawer_v0.0.2"
+        save_path = "/home/jimmytyyang/Downloads/open_drawer_data/open_drawer_v0.0.50"
         with open(save_path + ".pkl", "wb") as handle:
             pickle.dump(saver.data_list, handle)
 
