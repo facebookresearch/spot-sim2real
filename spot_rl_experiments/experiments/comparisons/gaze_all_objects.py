@@ -6,10 +6,15 @@
 import argparse
 import time
 
-from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
-from spot_rl.utils.utils import construct_config
+from spot_rl.skills.atomic_skills import Pick
+from spot_rl.utils.construct_configs import construct_config_for_gaze
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import say
+
+"""
+This script will gaze and attempt to pick at each object from the list of target objects - 3 times.
+Robot will move until the point of grasping it, but not take away the object
+"""
 
 names = ["ball", "penguin", "rubiks_cube", "lion", "toy_car", "yellow_truck"]
 
@@ -28,10 +33,15 @@ def main(spot, bd=False):
         config.MAX_EPISODE_STEPS = 150
 
     spot.power_robot()
-    gaze_controller = GazeController(config, spot)
+    gaze_controller = Pick(config, spot, use_mobile_pick=False)
     for _ in range(3):
         time.sleep(2)
-        gaze_controller.execute(target_object_list=names, take_user_input=False)
+        for name in names:
+            say(f"Looking at {name}")
+            goal_dict = {"target_object": name, "take_user_input": True}
+            _, fdbk_msg = gaze_controller.execute(goal_dict=goal_dict)
+            print(fdbk_msg)
+            time.sleep(2)
         time.sleep(2)
 
     spot.shutdown(should_dock=False)

@@ -6,6 +6,7 @@
 import argparse
 import time
 from collections import defaultdict
+from typing import Any, Dict
 
 import numpy as np
 from spot_rl.envs.nav_env import SpotNavEnv
@@ -13,6 +14,11 @@ from spot_rl.real_policy import NavPolicy
 from spot_rl.utils.utils import construct_config
 from spot_wrapper.spot import Spot, wrap_heading
 from spot_wrapper.utils import say
+
+"""
+This script is for comparing navigation between learned skill & BD api's straight line navigation
+Robot will move through the set of waypoints 3 times in learned as well as heuristic nav
+"""
 
 ROUTES = [
     ((6.0, 2.0, 0.0), (6.0, -1.0, 0.0)),
@@ -127,10 +133,14 @@ def learned_navigate(waypoint, policy, env, **kwargs):
     done = False
     policy.reset()
     traj = []
+    action_dict = {
+        "base_action": None,
+        "arm_action": None,
+    }  # type: Dict[str, Any]
     while not done:
         traj.append((time.time(), *env.spot.get_xy_yaw()))
-        action = policy.act(observations)
-        observations, _, done, _ = env.step(base_action=action)
+        action_dict["base_action"] = policy.act(observations)
+        observations, _, done, _ = env.step(action_dict=action_dict)
 
     return traj
 

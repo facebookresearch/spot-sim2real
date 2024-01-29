@@ -5,6 +5,7 @@
 
 
 import os
+from typing import Dict, List, Tuple
 
 import pytest
 from spot_rl.skills.atomic_skills import Pick
@@ -35,19 +36,11 @@ def init_test_config():
     return config
 
 
-def validate_pick_results(test_target_objects, test_result):
-    assert test_result is not None
-    assert len(test_result) == len(test_target_objects)
-    # Assert for all elements in test_result, "success" is True
-    print(f"Gaze Results: {test_result}")
-    for each_gaze_result in test_result:
-        assert each_gaze_result["success"] is True
-
-
-def validate_pick_feedback(feedback):
-    (status, message) = feedback
-    assert status is True
-    assert message == "Successfully picked the target object"
+def validate_pick_feedbacks(feedbacks: List[Tuple[bool, str]]):
+    for feedback in feedbacks:
+        (status, message) = feedback
+        assert status is True
+        assert message == "Successfully picked the target object"
 
 
 def test_gaze():
@@ -55,34 +48,28 @@ def test_gaze():
 
     test_target_objects = ["cup", "plush_lion", "plush_bear"]
     test_spot = Spot("GazeEnvHardwareTest_StaticGaze")
-    test_result = None
+    test_feedbacks = []  # type: List[Tuple[bool, str]]
     with test_spot.get_lease(hijack=True):
         test_spot.power_robot()
         gaze_controller = Pick(spot=test_spot, config=config, use_mobile_pick=False)
 
-        # Test gaze execution and verify the result
+        # Test gaze execution and verify the result + feedback
         try:
-            test_result = gaze_controller.execute_pick(
-                target_object_list=test_target_objects, take_user_input=True
-            )
-            validate_pick_results(
-                test_target_objects=test_target_objects, test_result=test_result
-            )
+            for target_object in test_target_objects:
+                goal_dict = {
+                    "target_object": target_object,
+                    "take_user_input": True,
+                }
+                test_feedbacks.append(gaze_controller.execute(goal_dict=goal_dict))
         except Exception:
             pytest.fail(
-                "Pytest raised an error while executing static Pick.execute_pick() from atomic_skills.py"
+                "Pytest raised an error while executing static Pick.execute_rl_loop() from atomic_skills.py"
             )
+        finally:
+            test_spot.shutdown(should_dock=False)
 
-        # Test mobile gaze execution and verify with feedback
-        try:
-            feedback = gaze_controller.execute(test_target_objects[0])
-            validate_pick_feedback(feedback)
-        except Exception:
-            pytest.fail(
-                "Pytest raised an error while executing static Pick.execute() from atomic_skills.py"
-            )
-
-        test_spot.shutdown(should_dock=False)
+        # Validate pick feedbacks
+        validate_pick_feedbacks(test_feedbacks)
 
 
 def test_mobile_gaze():
@@ -90,31 +77,25 @@ def test_mobile_gaze():
 
     test_target_objects = ["cup", "plush_lion", "plush_bear"]
     test_spot = Spot("GazeEnvHardwareTest_MobileGaze")
-    test_result = None
+    test_feedbacks = []  # type: List[Tuple[bool, str]]
     with test_spot.get_lease(hijack=True):
         test_spot.power_robot()
         gaze_controller = Pick(spot=test_spot, config=config, use_mobile_pick=True)
 
-        # Test mobile gaze execution and verify the result
+        # Test mobile gaze execution and verify the result + feedback
         try:
-            test_result = gaze_controller.execute_pick(
-                target_object_list=test_target_objects, take_user_input=True
-            )
-            validate_pick_results(
-                test_target_objects=test_target_objects, test_result=test_result
-            )
+            for target_object in test_target_objects:
+                goal_dict = {
+                    "target_object": target_object,
+                    "take_user_input": True,
+                }
+                test_feedbacks.append(gaze_controller.execute(goal_dict=goal_dict))
         except Exception:
             pytest.fail(
-                "Pytest raised an error while executing mobile Pick.execute_pick() from atomic_skills.py"
+                "Pytest raised an error while executing mobile Pick.execute_rl_loop() from atomic_skills.py"
             )
+        finally:
+            test_spot.shutdown(should_dock=False)
 
-        # Test mobile gaze execution and verify with feedback
-        try:
-            feedback = gaze_controller.execute(test_target_objects[0])
-            validate_pick_feedback(feedback)
-        except Exception:
-            pytest.fail(
-                "Pytest raised an error while executing mobile Pick.execute() from atomic_skills.py"
-            )
-
-        test_spot.shutdown(should_dock=False)
+        # Validate pick feedbacks
+        validate_pick_feedbacks(test_feedbacks)

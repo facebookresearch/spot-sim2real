@@ -4,7 +4,7 @@
 
 
 import sys
-from typing import Dict, List
+from typing import Any, Dict
 
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -42,7 +42,15 @@ class SpotGazeEnv(SpotBaseEnv):
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
         )
-        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=1)
+
+        # Block until arm arrives with incremental timeout for 3 attempts
+        timeout_sec = 1.0
+        max_allowed_timeout_sec = 3.0
+        status = False
+        while status is False and timeout_sec <= max_allowed_timeout_sec:
+            status = self.spot.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+            timeout_sec += 1.0
+
         print("Open gripper called in Gaze")
         self.spot.open_gripper()
 
@@ -52,14 +60,15 @@ class SpotGazeEnv(SpotBaseEnv):
 
         return observations
 
-    def step(self, base_action=None, arm_action=None, grasp=False, place=False):
+    def step(self, action_dict: Dict[str, Any]):
         grasp = self.should_grasp()
 
+        # Update the action_dict with grasp and place flags
+        action_dict["grasp"] = grasp
+        action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
+
         observations, reward, done, info = super().step(
-            base_action,
-            arm_action,
-            grasp,
-            place,
+            action_dict=action_dict,
         )
         return observations, reward, done, info
 

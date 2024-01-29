@@ -3,7 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 import numpy as np
 from multimethod import multimethod
@@ -156,7 +156,6 @@ class SpotSkillManager:
         self.nav_controller = Navigation(
             spot=self.spot,
             config=self.nav_config,
-            record_robot_trajectories=True,
         )
         self.gaze_controller = Pick(
             spot=self.spot,
@@ -225,8 +224,8 @@ class SpotSkillManager:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
-
-        status, message = self.nav_controller.execute((x, y, theta))
+        goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -274,18 +273,22 @@ class SpotSkillManager:
             angle_interval=self.nav_config.get("HEURISTIC_SEARCH_ANGLE_INTERVAL", 20),
         )
 
-    def pick(self, pick_target: str = None) -> Tuple[bool, str]:
+    def pick(self, target_obj_name: str = None) -> Tuple[bool, str]:
         """
         Perform the pick action on the pick target specified as string
 
         Args:
-            pick_target (str): Descriptive name of the pick target (eg: ball_plush)
+            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
 
         Returns:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
-        status, message = self.gaze_controller.execute(pick_target)
+        goal_dict = {
+            "target_object": target_obj_name,
+            "take_user_input": False,
+        }  # type: Dict[str, Any]
+        status, message = self.gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -334,15 +337,20 @@ class SpotSkillManager:
         Perform the place action on the place target specified as metric location
 
         Args:
-            x (float): x coordinate of the place target (in meters) specified in the world frame
-            y (float): y coordinate of the place target (in meters) specified in the world frame
-            z (float): z coordinate of the place target (in meters) specified in the world frame
+            x (float): x coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
+            y (float): y coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
+            z (float): z coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
+            is_local (bool): If True, place in the spot's body frame, else in the world frame
 
         Returns:
-            bool: True if place was successful, False otherwise
-            str: Message indicating the status of the place
+            status (bool): True if place was successful, False otherwise
+            message (str): Message indicating the status of the place
         """
-        status, message = self.place_controller.execute((x, y, z), is_local=is_local)
+        goal_dict = {
+            "place_target": (x, y, z),
+            "is_local": is_local,
+        }  # type: Dict[str, Any]
+        status, message = self.place_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 

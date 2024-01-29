@@ -54,7 +54,7 @@ INSTRUCTIONS = (
 def move_to_initial(spot):
     point = INITIAL_POINT
     rpy = INITIAL_RPY
-    spot.move_gripper_to_point(point, rpy, timeout_sec=1.5)
+    spot.move_gripper_to_point(point, rpy, timeout_sec=2)
     cement_arm_joints(spot)
 
     return point, rpy

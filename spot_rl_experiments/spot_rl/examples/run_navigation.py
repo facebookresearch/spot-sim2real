@@ -6,6 +6,7 @@
 import os
 import sys
 import time
+from typing import Dict, List
 
 from spot_rl.skills.atomic_skills import Navigation
 from spot_rl.utils.construct_configs import construct_config_for_nav
@@ -33,12 +34,6 @@ def parse_arguments(args=sys.argv[1:]):
         "--dock",
         action="store_true",
         help="make the robot dock after finishing navigation to all waypoints",
-    )
-    parser.add_argument(
-        "-rt",
-        "--record_trajectories",
-        action="store_true",
-        help="record robot's trajectories while navigating to all waypoints",
     )
     parser.add_argument(
         "-stp",
@@ -82,20 +77,19 @@ if __name__ == "__main__":
             f"The path for saving trajectories at {args.save_trajectories_path} either not specified or incorrect. Please provide a correct path"
         )
 
-    record_trajectories = (args.record_trajectories) or (
-        args.save_trajectories_path is not None
-    )
-
     spot = Spot("RealNavEnv")
     with spot.get_lease(hijack=True):
         spot.power_robot()
-        nav_controller = Navigation(
-            spot=spot, config=config, record_robot_trajectories=record_trajectories
-        )
+        nav_controller = Navigation(spot=spot, config=config)
+        robot_trajectories = []  # type: List[List[Dict]]
         try:
-            robot_trajectories = nav_controller.execute_nav(
-                nav_targets_list=nav_targets_list
-            )
+            for nav_target in nav_targets_list:
+                goal_dict = {"nav_target": nav_target}
+                nav_controller.execute(goal_dict=goal_dict)
+                robot_trajectories.append(nav_controller.get_most_recent_result_log())
+        except Exception as e:
+            print(f"Error encountered while navigating : {e}")
+            raise e
         finally:
             spot.shutdown(should_dock=args.dock)
 

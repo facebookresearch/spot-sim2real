@@ -4,6 +4,7 @@
 
 
 import time
+from typing import Any, Dict
 
 from spot_rl.envs.gaze_env import SpotGazeEnv
 from spot_rl.real_policy import GazePolicy
@@ -38,9 +39,13 @@ def main(spot):
         observations = env.reset(target_obj_id=target_id)
         done = False
         env.say("Looking for", object_id_to_object_name(target_id))
+        action_dict = {
+            "base_action": None,
+            "arm_action": None,
+        }  # type: Dict[str, Any]
         while not done:
-            action = policy.act(observations)
-            observations, _, done, _ = env.step(arm_action=action)
+            action_dict["arm_action"] = policy.act(observations)
+            observations, _, done, _ = env.step(action_dict=action_dict)
 
 
 if __name__ == "__main__":

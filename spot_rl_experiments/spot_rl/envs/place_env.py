@@ -3,6 +3,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
+from typing import Any, Dict
+
 import magnum as mn
 import numpy as np
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -30,7 +32,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.placed = False
         return observations
 
-    def step(self, place=False, *args, **kwargs):
+    def step(self, action_dict: Dict[str, Any], *args, **kwargs):
         gripper_pos_in_base_frame = self.get_gripper_position_in_base_frame_hab()
         place_target_in_base_frame = self.get_base_frame_place_target_hab()
         place = is_position_within_bounds(
@@ -41,7 +43,10 @@ class SpotPlaceEnv(SpotBaseEnv):
             convention="habitat",
         )
 
-        return super().step(place=place, *args, **kwargs)
+        # Update the action_dict with place flag
+        action_dict["place"] = place
+
+        return super().step(action_dict=action_dict, *args, **kwargs)
 
     def get_success(self, observations):
         return self.place_attempted

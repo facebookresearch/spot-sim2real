@@ -4,6 +4,7 @@
 
 
 import sys
+from typing import Dict, List
 
 from spot_rl.skills.atomic_skills import Pick
 from spot_rl.utils.construct_configs import construct_config_for_gaze
@@ -61,11 +62,22 @@ if __name__ == "__main__":
     print(f"Target_objects list - {target_objects_list}")
     with spot.get_lease(hijack=True):
         spot.power_robot()
-        gaze_controller = Pick(spot=spot, config=config)
+        gaze_controller = Pick(
+            spot=spot, config=config, use_mobile_pick=args.mobile_gaze
+        )
+        gaze_results = []  # type: List[Dict]
         try:
-            gaze_result = gaze_controller.execute_pick(
-                target_objects_list, take_user_input=True
-            )
-            print(gaze_result)
+            for target_object in target_objects_list:
+                goal_dict = {
+                    "target_object": target_object,
+                    "take_user_input": True,
+                }
+                gaze_controller.execute(goal_dict=goal_dict)
+                gaze_results.append(gaze_controller.get_most_recent_result_log())
+        except Exception as e:
+            print(f"Error encountered while picking - {e}")
+            raise e
         finally:
             spot.shutdown(should_dock=False)
+
+    print(f"Gaze results - {gaze_results}")
