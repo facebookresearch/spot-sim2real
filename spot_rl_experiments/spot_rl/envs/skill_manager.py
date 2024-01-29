@@ -7,12 +7,11 @@ from typing import Tuple
 
 import numpy as np
 from multimethod import multimethod
-from spot_rl.envs.gaze_env import GazeController, construct_config_for_gaze
-from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
-from spot_rl.envs.place_env import PlaceController, construct_config_for_place
-from spot_rl.utils.geometry_utils import (
-    is_pose_within_bounds,
-    is_position_within_bounds,
+from spot_rl.skills.atomic_skills import Navigation, Pick, Place
+from spot_rl.utils.construct_configs import (
+    construct_config_for_gaze,
+    construct_config_for_nav,
+    construct_config_for_place,
 )
 from spot_rl.utils.heuristic_nav import (
     ImageSearch,
@@ -25,6 +24,10 @@ from spot_rl.utils.utils import (
     place_target_from_waypoint,
 )
 from spot_wrapper.spot import Spot
+
+#
+# SKILL MANAGER is a collection of ALL SKILLS that spot exposes
+#
 
 
 class SpotSkillManager:
@@ -79,7 +82,7 @@ class SpotSkillManager:
         nav_config=None,
         pick_config=None,
         place_config=None,
-        use_mobile_pick=False,
+        use_mobile_pick: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -150,18 +153,20 @@ class SpotSkillManager:
         Initiate the controllers for nav, gaze, and place
         """
 
-        self.nav_controller = WaypointController(
+        self.nav_controller = Navigation(
+            spot=self.spot,
             config=self.nav_config,
-            spot=self.spot,
-            should_record_trajectories=True,
+            record_robot_trajectories=True,
         )
-        self.gaze_controller = GazeController(
-            config=self.pick_config,
+        self.gaze_controller = Pick(
             spot=self.spot,
+            config=self.pick_config,
             use_mobile_pick=self._use_mobile_pick,
         )
-        self.place_controller = PlaceController(
-            config=self.place_config, spot=self.spot, use_policies=use_policies
+        self.place_controller = Place(
+            spot=self.spot,
+            config=self.place_config,
+            use_policies=use_policies,
         )
 
     def reset(self):
@@ -221,40 +226,7 @@ class SpotSkillManager:
             str: Message indicating the status of the navigation
         """
 
-        conditional_print(
-            message=f"Navigating to x, y, theta : {x}, {y}, {theta}",
-            verbose=self.verbose,
-        )
-
-        result = None
-        nav_target_tuple = None
-        try:
-            nav_target_tuple = (x, y, theta)
-            result = self.nav_controller.execute([nav_target_tuple])
-        except Exception as e:
-            message = f"Error encountered while navigating - {e}"
-            conditional_print(message=message, verbose=self.verbose)
-            return False, message
-
-        # Make the angle from rad to deg
-        _nav_target_pose_deg = (
-            nav_target_tuple[0],
-            nav_target_tuple[1],
-            np.rad2deg(nav_target_tuple[2]),
-        )
-        check_navigation_suc = is_pose_within_bounds(
-            result[0][-1].get("pose"),
-            _nav_target_pose_deg,
-            self.nav_config.SUCCESS_DISTANCE,
-            self.nav_config.SUCCESS_ANGLE_DIST,
-        )
-
-        # Check for success and return appropriately
-        status = False
-        message = "Navigation failed to reach the target pose"
-        if check_navigation_suc:
-            status = True
-            message = "Successfully reached the target pose by default"
+        status, message = self.nav_controller.execute((x, y, theta))
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -313,32 +285,7 @@ class SpotSkillManager:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
-        conditional_print(
-            message=f"Received pick target request for - {pick_target}",
-            verbose=self.verbose,
-        )
-
-        if pick_target is None:
-            message = "No pick target specified, skipping pick"
-            conditional_print(message=message, verbose=self.verbose)
-            return False, message
-
-        conditional_print(message=f"Picking {pick_target}", verbose=self.verbose)
-
-        result = None
-        try:
-            result = self.gaze_controller.execute([pick_target])
-        except Exception:
-            message = "Error encountered while picking"
-            conditional_print(message=message, verbose=self.verbose)
-            return False, message
-
-        # Check for success and return appropriately
-        status = False
-        message = "Pick failed to pick the target object"
-        if result[0].get("success"):
-            status = True
-            message = "Successfully picked the target object"
+        status, message = self.gaze_controller.execute(pick_target)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -395,34 +342,7 @@ class SpotSkillManager:
             bool: True if place was successful, False otherwise
             str: Message indicating the status of the place
         """
-        conditional_print(
-            message=f"Place target object at x, y, z : {x}, {y}, {z}",
-            verbose=self.verbose,
-        )
-
-        result = None
-        try:
-            place_target_tuple = (x, y, z)
-            result = self.place_controller.execute(
-                [place_target_tuple], is_local=is_local
-            )
-        except Exception:
-            message = "Error encountered while placing"
-            conditional_print(message=message, verbose=self.verbose)
-            return False, message
-
-        # Check for success and return appropriately
-        status = False
-        message = "Place failed to reach the target position"
-        if is_position_within_bounds(
-            result[0].get("ee_pos"),
-            result[0].get("place_target"),
-            self.place_config.SUCC_XY_DIST,
-            self.place_config.SUCC_Z_DIST,
-            convention="spot",
-        ):
-            status = True
-            message = "Successfully reached the target position"
+        status, message = self.place_controller.execute((x, y, z), is_local=is_local)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -435,7 +355,7 @@ class SpotSkillManager:
 
     def get_env(self):
         "Get the env for the ease of the access"
-        return self.nav_controller.nav_env
+        return self.nav_controller.env
 
     def dock(self):
         # Stow back the arm
@@ -470,7 +390,7 @@ if __name__ == "__main__":
 
     # Nav-Pick-Nav-Place sequence 1
     spotskillmanager.nav("test_square_vertex1")
-    spotskillmanager.pick("ball_plush")
+    spotskillmanager.pick("plush bear")
     spotskillmanager.nav("test_place_front")
     spotskillmanager.place("test_place_front")
 

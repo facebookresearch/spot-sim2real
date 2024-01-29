@@ -9,7 +9,8 @@ from typing import Dict, List
 
 import numpy as np
 import pytest
-from spot_rl.envs.nav_env import WaypointController, construct_config_for_nav
+from spot_rl.skills.atomic_skills import Navigation
+from spot_rl.utils.construct_configs import construct_config_for_nav
 from spot_rl.utils.geometry_utils import compute_dtw_scores, is_pose_within_bounds
 from spot_rl.utils.json_helpers import load_json_files
 from spot_rl.utils.utils import get_waypoint_yaml, nav_target_from_waypoint
@@ -26,7 +27,7 @@ TEST_WAYPOINTS_YAML = os.path.join(test_configs_dir, "waypoints.yaml")
 TEST_CONFIGS_YAML = os.path.join(test_configs_dir, "config.yaml")
 
 
-def init_config():
+def init_test_config():
     """
     Initialize config object for Nav test
 
@@ -146,37 +147,9 @@ def extract_goal_poses_timestamps_steps_from_traj(traj):
     return test_pose_list, test_time_list, test_step_list
 
 
-def test_nav_square():
-    config = init_config()
-    test_waypoints_yaml_dict = get_waypoint_yaml(waypoint_file=TEST_WAYPOINTS_YAML)
-
-    test_waypoints = [
-        "test_square_vertex1",
-        "test_square_vertex2",
-        "test_square_vertex3",
-    ]
-    test_nav_targets_list = [
-        nav_target_from_waypoint(test_waypoint, test_waypoints_yaml_dict)
-        for test_waypoint in test_waypoints
-    ]
-
-    test_spot = Spot("NavEnvHardwareTest")
-    test_traj = None
-    with test_spot.get_lease(hijack=True):
-        test_spot.power_robot()
-        wp_controller = WaypointController(
-            config=config, spot=test_spot, should_record_trajectories=True
-        )
-
-        try:
-            test_traj = wp_controller.execute(nav_targets_list=test_nav_targets_list)
-        except Exception:
-            pytest.fail(
-                "Pytest raised an error while executing WaypointController.execute from test_nav_env.py"
-            )
-        finally:
-            test_spot.shutdown(should_dock=False)
-
+def validate_nav_trajectories(
+    test_traj, config, test_waypoints_yaml_dict, test_waypoints
+):
     assert test_traj is not []
     assert len(test_traj) == len(test_waypoints)
 
@@ -234,3 +207,56 @@ def test_nav_square():
     # Report DTW scores
     dtw_score_list = compute_dtw_scores(test_traj, ref_traj_set)
     print(f"DTW scores: {dtw_score_list}")
+
+
+def validate_nav_feedback(feedback):
+    (status, message) = feedback
+    assert status is True
+    assert message == "Successfully reached the target pose by default"
+
+
+def test_nav_square():
+    config = init_test_config()
+    test_waypoints_yaml_dict = get_waypoint_yaml(waypoint_file=TEST_WAYPOINTS_YAML)
+
+    test_waypoints = [
+        "test_square_vertex1",
+        "test_square_vertex2",
+        "test_square_vertex3",
+    ]
+    test_nav_targets_list = [
+        nav_target_from_waypoint(test_waypoint, test_waypoints_yaml_dict)
+        for test_waypoint in test_waypoints
+    ]
+
+    test_spot = Spot("NavEnvHardwareTest")
+    test_traj = None
+    with test_spot.get_lease(hijack=True):
+        test_spot.power_robot()
+        nav_controller = Navigation(
+            spot=test_spot, config=config, record_robot_trajectories=True
+        )
+
+        # Test navigation execution and verify with recorded trajectories
+        try:
+            test_traj = nav_controller.execute_nav(
+                nav_targets_list=test_nav_targets_list
+            )
+            validate_nav_trajectories(
+                test_traj, config, test_waypoints_yaml_dict, test_waypoints
+            )
+        except Exception:
+            pytest.fail(
+                "Pytest raised an error while executing Navigation.execute_nav() from atomic_skills.py"
+            )
+
+        # Test navigation execution and verify with feedback
+        try:
+            feedback = nav_controller.execute(test_nav_targets_list[0])
+            validate_nav_feedback(feedback)
+        except Exception:
+            pytest.fail(
+                "Pytest raised an error while executing Navigation.execute() from atomic_skills.py"
+            )
+
+        test_spot.shutdown(should_dock=False)

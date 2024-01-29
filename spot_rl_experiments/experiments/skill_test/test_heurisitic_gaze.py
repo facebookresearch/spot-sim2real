@@ -6,8 +6,8 @@
 import sys
 
 import numpy as np
-from spot_rl.envs.nav_env import construct_config_for_nav
 from spot_rl.envs.skill_manager import SpotSkillManager
+from spot_rl.utils.construct_configs import construct_config_for_nav
 from spot_rl.utils.heuristic_nav import heurisitic_object_search_and_navigation
 from spot_rl.utils.utils import get_default_parser, map_user_input_to_boolean
 
