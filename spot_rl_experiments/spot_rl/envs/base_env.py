@@ -259,6 +259,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         place=False,
         nav_silence_only=True,
         disable_oa=None,
+        ee_action=None,
+        gripper_action=None,
     ):
         """Moves the arm and returns updated observations
 
@@ -396,6 +398,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.say(
             f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}"
         )
+
+        if ee_action is not None:
+            update_period = 0.2
+            self.spot.move_gripper_to_point(
+                ee_action[0:3], ee_action[3:6], timeout_sec=update_period * 0.5
+            )
+
+        if gripper_action is not None:
+            if abs(gripper_action) > 0.785:
+                self.spot.open_gripper()
+            else:
+                self.spot.close_gripper()
 
         # Spin until enough time has passed during this step
         start_time = time.time()

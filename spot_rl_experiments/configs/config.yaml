@@ -21,6 +21,9 @@ WEIGHTS:
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
   DEBLURGAN: "weights/fpn_inception.h5"
 
+  # Open drawer torchscript modile files path
+  OPEN_DRAWER: "weights/open_drawer/ckpt.1737.torchscript"
+
 DEVICE: "cuda:0"
 USE_REMOTE_SPOT: False
 PARALLEL_INFERENCE_MODE: True
@@ -59,6 +62,9 @@ EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
 SUCC_XY_DIST: 0.1
 SUCC_Z_DIST: 0.20
 PLACE_ACTION_SPACE_LENGTH: 4
+
+# Open Drawer env
+OPEN_DRAWER_ACTION_SPACE_LENGTH: 7
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters

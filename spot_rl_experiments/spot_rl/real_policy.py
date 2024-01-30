@@ -67,19 +67,27 @@ class RealPolicy:
     ):
         print("Loading policy...")
         self.device = torch.device(device)
+        self._hab3_entire_net = False
         if is_hab3_policy:
             # Hab3 policy loading
             # Load the policy using torch script
             self.policy: Any = {}
-            self.policy["net"] = torch.jit.load(
-                checkpoint_path["net"], map_location=self.device
-            )
-            self.policy["action_dist"] = torch.jit.load(
-                checkpoint_path["action_dis"], map_location=self.device
-            )
-            self.policy["std"] = torch.load(
-                checkpoint_path["std"], map_location=self.device
-            )
+            if "entire_net" in checkpoint_path:
+                self.policy["entire_net"] = torch.jit.load(
+                    checkpoint_path["entire_net"], map_location=self.device
+                )
+                self._hab3_entire_net = True
+                self.currrnt_observation = None
+            else:
+                self.policy["net"] = torch.jit.load(
+                    checkpoint_path["net"], map_location=self.device
+                )
+                self.policy["action_dist"] = torch.jit.load(
+                    checkpoint_path["action_dis"], map_location=self.device
+                )
+                self.policy["std"] = torch.load(
+                    checkpoint_path["std"], map_location=self.device
+                )
         else:
             if isinstance(checkpoint_path, str):
                 checkpoint = torch.load(checkpoint_path, map_location="cpu")
@@ -162,23 +170,67 @@ class RealPolicy:
         batch = batch_obs([observations], device=self.device)
         with torch.no_grad():
             if self.is_hab3_policy:
-                # Using torch script to load the model
-                with torch.no_grad():
-                    output_of_model = self.policy["net"](
-                        batch,
-                        self.test_recurrent_hidden_states,
-                        self.prev_actions,
-                        self.not_done_masks,
-                    )
+                if self._hab3_entire_net:
+                    # Using torch script to load the model
+                    with torch.no_grad():
+                        if self.currrnt_observation is None:
+                            self.currrnt_observation = batch
+                            cur_len = 1
+                            self.not_done_masks = torch.zeros((1, 1), dtype=bool).to(
+                                self.device
+                            )
+                        else:
+                            self.currrnt_observation[
+                                "articulated_agent_arm_depth"
+                            ] = torch.cat(
+                                (
+                                    self.currrnt_observation[
+                                        "articulated_agent_arm_depth"
+                                    ],
+                                    batch["articulated_agent_arm_depth"],
+                                )
+                            )
+                            cur_len = self.currrnt_observation[
+                                "articulated_agent_arm_depth"
+                            ].shape[0]
+                            self.not_done_masks = torch.ones(
+                                (cur_len, 1), dtype=bool
+                            ).to(self.device)
+                            self.not_done_masks[0, 0] = False
 
-                features = output_of_model[0]
-                self.test_recurrent_hidden_states = output_of_model[1]
+                        rnn_build_seq_info = {
+                            "dims": torch.tensor([1, cur_len]),
+                            "is_first": torch.tensor(True),
+                            "old_context_length": torch.tensor(0),
+                        }
 
-                with torch.no_grad():
-                    raw_actions = self.get_action_distribution(
-                        self.policy["action_dist"](features), self.policy["std"]
-                    )
-                    actions = raw_actions.mean
+                        output_of_model = self.policy["entire_net"](
+                            self.currrnt_observation,
+                            torch.tensor([]).to(self.device),
+                            self.prev_actions,
+                            self.not_done_masks,
+                            rnn_build_seq_info,
+                        )
+                        actions = output_of_model[0][[-1]]
+                        self.test_recurrent_hidden_states = output_of_model[1]
+                else:
+                    # Using torch script to load the model
+                    with torch.no_grad():
+                        output_of_model = self.policy["net"](
+                            batch,
+                            self.test_recurrent_hidden_states,
+                            self.prev_actions,
+                            self.not_done_masks,
+                        )
+
+                    features = output_of_model[0]
+                    self.test_recurrent_hidden_states = output_of_model[1]
+
+                    with torch.no_grad():
+                        raw_actions = self.get_action_distribution(
+                            self.policy["action_dist"](features), self.policy["std"]
+                        )
+                        actions = raw_actions.mean
             else:
                 _, actions, _, self.test_recurrent_hidden_states = self.policy.act(
                     batch,
@@ -189,7 +241,10 @@ class RealPolicy:
                     actions_only=True,
                 )
 
-        self.prev_actions.copy_(actions)
+        if self._hab3_entire_net:
+            self.prev_actions = torch.cat((self.prev_actions, actions))
+        else:
+            self.prev_actions.copy_(actions)
         self.not_done_masks = torch.ones(1, 1, dtype=torch.bool, device=self.device)
 
         # GPU/CPU torch tensor -> numpy
@@ -298,6 +353,28 @@ class NavPolicy(RealPolicy):
             -1.0, 1.0, (config.get("NAV_ACTION_SPACE_LENGTH", 2),)
         )
         super().__init__(checkpoint_path, observation_space, action_space, device)
+
+
+class OpenDrawerPolicy(RealPolicy):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
+        observation_space = SpaceDict(
+            {
+                "articulated_agent_arm_depth": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+            }
+        )
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("OPEN_DRAWER_ACTION_SPACE_LENGTH", 7),)
+        )
+        super().__init__(
+            checkpoint_path,
+            observation_space,
+            action_space,
+            device,
+            config=config,
+            is_hab3_policy=True,
+        )
 
 
 class MixerPolicy(RealPolicy):
