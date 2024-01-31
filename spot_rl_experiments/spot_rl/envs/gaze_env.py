@@ -110,14 +110,8 @@ class GazeController:
         self._use_mobile_pick = use_mobile_pick
 
         if use_mobile_pick:
-            # Load the necessary checkpoints
-            ckpt_dict = {}
-            ckpt_dict["net"] = config.WEIGHTS.MOBILE_GAZE_NET
-            ckpt_dict["action_dis"] = config.WEIGHTS.MOBILE_GAZE_ACTION_DIS
-            ckpt_dict["std"] = config.WEIGHTS.MOBILE_GAZE_STD
-            # Use config.device as the device for mobile gaze policy
             self.policy = MobileGazePolicy(
-                ckpt_dict, device=config.DEVICE, config=config
+                config.WEIGHTS.MOBILE_GAZE, device=config.DEVICE, config=config
             )
         else:
             self.policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
