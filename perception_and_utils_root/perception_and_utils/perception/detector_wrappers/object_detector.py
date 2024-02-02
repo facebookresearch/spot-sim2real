@@ -7,8 +7,13 @@ import logging
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
-from aria_data_utils.detector_wrappers.generic_detector_interface import GenericDetector
-from aria_data_utils.image_utils import centered_heuristic, check_bbox_intersection
+from perception_and_utils.perception.detector_wrappers.generic_detector_interface import (
+    GenericDetector,
+)
+from perception_and_utils.utils.image_utils import (
+    centered_object_detection_heuristic,
+    check_bbox_intersection,
+)
 from spot_rl.models.owlvit import OwlVit
 
 
@@ -138,7 +143,9 @@ class ObjectDetectorWrapper(GenericDetector):
             if det[0] in self._core_objects and det[1] > score_thresh
         ]
         if core_detections:
-            scores = centered_heuristic(core_detections, image_size=img_size)
+            scores = centered_object_detection_heuristic(
+                core_detections, image_size=img_size
+            )
             valid = True
         return valid, scores, stop
 
@@ -185,7 +192,9 @@ class ObjectDetectorWrapper(GenericDetector):
                     )
                     self._logger.debug(f"Intersection: {stop[object_name]}")
         core_detections = [det for det in detections if det[0] in self._core_objects]
-        score = centered_heuristic(core_detections, image_size=img_size)
+        score = centered_object_detection_heuristic(
+            core_detections, image_size=img_size
+        )
 
         if len(detections) == 1 and detections[0][0] == "hand" or len(detections) == 0:
             valid = False

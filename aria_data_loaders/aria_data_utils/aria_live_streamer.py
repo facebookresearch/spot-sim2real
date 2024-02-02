@@ -15,25 +15,28 @@ import projectaria_tools.core as aria_core
 import rospy
 import sophus as sp
 from aria_data_utils.aria_sdk_utils import update_iptables
-from aria_data_utils.conversions import (
+from geometry_msgs.msg import Pose, PoseStamped
+from nav_msgs.msg import Odometry
+from perception_and_utils.perception.detector_wrappers.april_tag_detector import (
+    AprilTagDetectorWrapper,
+)
+from perception_and_utils.perception.detector_wrappers.object_detector import (
+    ObjectDetectorWrapper,
+)
+from perception_and_utils.utils.conversions import (
     np_matrix3x4_to_sophus_SE3,
     ros_Pose_to_sophus_SE3,
     sophus_SE3_to_ros_Pose,
     sophus_SE3_to_ros_TransformStamped,
 )
-from aria_data_utils.detector_wrappers.april_tag_detector import AprilTagDetectorWrapper
-from aria_data_utils.detector_wrappers.object_detector import ObjectDetectorWrapper
-from aria_data_utils.math_utils import get_running_avg_world_T_b
-from cairo import Device
-from geometry_msgs.msg import Pose, PoseStamped
-from nav_msgs.msg import Odometry
+from perception_and_utils.utils.image_utils import rotate_img
+from perception_and_utils.utils.math_utils import get_running_avg_a_T_b
 from projectaria_tools.core.calibration import (
     device_calibration_from_json_string,
     distort_by_calibration,
     get_linear_camera_calibration,
 )
 from projectaria_tools.core.sensor_data import ImageDataRecord
-from scipy.spatial.transform import Rotation
 from spot_rl.utils.utils import ros_frames as rf
 from tf2_ros import StaticTransformBroadcaster
 from visualization_msgs.msg import Marker
@@ -208,23 +211,6 @@ class AriaLiveReader:
 
         return device, device_client
 
-    def _rotate_img(self, img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
-        """
-        Rotate image in multiples of 90d degrees
-
-        Args:
-            img (np.ndarray): Image to be rotated
-            k (int, optional): Number of times to rotate by 90 degrees. Defaults to 3.
-
-        Returns:
-            np.ndarray: Rotated image
-        """
-        # TODO: move this out to utils package
-        img = np.ascontiguousarray(
-            np.rot90(img, k=num_of_rotation)
-        )  # GOD KNOW WHY THIS IS NEEDED -> https://github.com/clovaai/CRAFT-pytorch/issues/84#issuecomment-574683857
-        return img
-
     def on_image_received(self, image: np.ndarray, record: ImageDataRecord):
         """
         Callback for aria's streaming client object.
@@ -339,8 +325,14 @@ class AriaLiveReader:
             return None
         if self.aria_pose is None:
             return None
-        aria_rect_rgb = self._rectify_image(self.aria_rgb_frame)  # type: ignore
-        aria_rot_rect_rgb = self._rotate_img(aria_rect_rgb)
+        aria_rect_rgb = self.rectify_aria_image(self.aria_rgb_frame)  # type: ignore
+
+        # Rotate current rgb image from aria by 270 degrees in counterclockwise direction as
+        # all aria's images are 90 degrees rotated (in anticlockwise direction).
+        # Alternatively, you can also rotate the rgb image by 90 degrees in clockwise direction (num_of_rotation=-1)
+        aria_rot_rect_rgb = rotate_img(aria_rect_rgb, num_of_rotation=3)
+
+        # Compose frame dict for most recent frame
         latest_frame = {
             "raw_image": aria_rect_rgb,
             "image": aria_rot_rect_rgb,
@@ -352,7 +344,7 @@ class AriaLiveReader:
 
         return latest_frame
 
-    def _rectify_image(self, image: np.ndarray) -> np.ndarray:
+    def rectify_aria_image(self, image: np.ndarray) -> np.ndarray:
         """
         Rectify fisheye image based upon camera calibration parameters
         Ensure you have set self._src_calib_param & self._dst_calib_param
@@ -421,31 +413,31 @@ class AriaLiveReader:
         """
         # Initialize camera_T_marker to None & object_scores to empty dict for current image frame
         camera_T_marker = None
-        object_scores = {}
+        object_scores = {}  # type: Dict[str, Any]
 
         viz_img = frame.get("image")
         if detect_qr:
             (viz_img, camera_T_marker) = self.april_tag_detector.process_frame(img_frame=frame.get("raw_image"))  # type: ignore
             # Rotate current image frame
-            viz_img = self._rotate_img(img=viz_img)
+            viz_img = rotate_img(img=viz_img, num_of_rotation=3)
 
         if camera_T_marker is not None:
             device_T_marker = self.device_T_camera * camera_T_marker
             ariaWorld_T_device = frame.get("device_pose")
 
-            # Frame: world = ariaWorld
-            # Frame: a = device (aria's device / left slam camera frame)
+            # Frame: a = ariaWorld
+            # Frame: intermediate = device (aria's device / left slam camera frame)
             # Frame: b = marker / qr code
             (
                 self.marker_positions_list,
                 self.marker_quaternion_list,
                 self.avg_ariaWorld_T_marker,
-            ) = get_running_avg_world_T_b(
-                current_avg_world_T_b=self.avg_ariaWorld_T_marker,
-                world_T_b_position_list=self.marker_positions_list,
-                world_T_b_quaternion_list=self.marker_quaternion_list,
-                world_T_a=ariaWorld_T_device,
-                a_T_b=device_T_marker,
+            ) = get_running_avg_a_T_b(
+                current_avg_a_T_b=self.avg_ariaWorld_T_marker,
+                a_T_b_position_list=self.marker_positions_list,
+                a_T_b_quaternion_list=self.marker_quaternion_list,
+                a_T_intermediate=ariaWorld_T_device,
+                intermediate_T_b=device_T_marker,
             )
 
             if self.avg_ariaWorld_T_marker is not None:

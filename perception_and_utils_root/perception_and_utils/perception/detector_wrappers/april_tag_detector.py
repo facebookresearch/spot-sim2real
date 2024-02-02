@@ -9,9 +9,13 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 import sophus as sp
-from aria_data_utils.detector_wrappers.generic_detector_interface import GenericDetector
-from aria_data_utils.image_utils import decorate_img_with_text
-from aria_data_utils.perception.april_tag_pose_estimator import AprilTagPoseEstimator
+from perception_and_utils.perception.april_tag_pose_estimator import (
+    AprilTagPoseEstimator,
+)
+from perception_and_utils.perception.detector_wrappers.generic_detector_interface import (
+    GenericDetector,
+)
+from perception_and_utils.utils.image_utils import decorate_img_with_text_for_qr
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
@@ -141,10 +145,10 @@ class AprilTagDetectorWrapper(GenericDetector):
 
         """
         # Decorate image with text for visualization
-        img = decorate_img_with_text(
+        img = decorate_img_with_text_for_qr(
             img=img_frame,
-            frame_name="device",
-            position=device_T_marker.translation(),
+            frame_name_str="device",
+            qr_position=device_T_marker.translation(),
         )
         self.logger.debug(f"Time stamp with AprilTag Detections- {timestamp}")
 
