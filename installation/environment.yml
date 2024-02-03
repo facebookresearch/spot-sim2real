@@ -1,4 +1,4 @@
-name: spot_ros
+name: spot_ros_hab_llm
 channels:
   - pytorch
   - robostack
@@ -591,4 +591,4 @@ dependencies:
     - zipp==3.8.0
     - sophuspy
     - pybullet
-prefix: ~/miniconda3/envs/spot_ros
+prefix: ~/miniconda3/envs/spot_ros_hab_llm
