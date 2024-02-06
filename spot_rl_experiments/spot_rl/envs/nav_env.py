@@ -10,6 +10,7 @@ from typing import Dict, List
 
 import cv2
 import numpy as np
+import rospy
 from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -164,7 +165,7 @@ class WaypointController:
                 self.recording_in_progress = True
 
             # Execution Loop
-            while not done:
+            while not done and rospy.get_param("/skill_name", "None") == "Navigate":
                 action = self.policy.act(observations)
                 observations, _, done, _ = self.nav_env.step(base_action=action)
 
