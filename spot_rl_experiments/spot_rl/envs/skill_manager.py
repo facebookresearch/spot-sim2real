@@ -242,6 +242,7 @@ class SpotSkillManager:
             nav_target_tuple[1],
             np.rad2deg(nav_target_tuple[2]),
         )
+        print("nav: result:", result)
         check_navigation_suc = is_pose_within_bounds(
             result[0][-1].get("pose"),
             _nav_target_pose_deg,

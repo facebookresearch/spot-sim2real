@@ -8,6 +8,7 @@ import time
 
 import magnum as mn
 import numpy as np
+import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.real_policy import PlacePolicy
 from spot_rl.utils.generate_place_goal import get_global_place_target
@@ -148,7 +149,7 @@ class PlaceController:
                 observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
 
-                while not done:
+                while not done and rospy.get_param("/skill_name", "None") == "Place":
                     action = self.policy.act(observations)
                     observations, _, done, _ = self.place_env.step(arm_action=action)
 

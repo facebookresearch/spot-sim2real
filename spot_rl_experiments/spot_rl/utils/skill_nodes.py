@@ -30,9 +30,9 @@ class SpotRosSkillExecutor:
         if skill_name == "Navigate":
             succeded, msg = self.spotskillmanager.nav(skill_input)
         elif skill_name == "Pick":
-            succeded, msg = self.spotskillmanager.place(skill_input)
-        elif skill_name == "place":
             succeded, msg = self.spotskillmanager.pick(skill_input)
+        elif skill_name == "Place":
+            succeded, msg = self.spotskillmanager.place(skill_input)
 
 
 def main():

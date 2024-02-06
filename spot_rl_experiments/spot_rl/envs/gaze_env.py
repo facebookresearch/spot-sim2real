@@ -156,7 +156,7 @@ class GazeController:
             start_time = time.time()
             self.gaze_env.say(f"Gaze at target object - {target_object}")
 
-            while not done:
+            while not done and rospy.get_param("/skill_name", "None") == "Pick":
                 action = self.policy.act(observations)
                 if self._use_mobile_pick:
                     arm_action, base_action = None, None
