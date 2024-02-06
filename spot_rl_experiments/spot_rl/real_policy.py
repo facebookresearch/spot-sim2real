@@ -11,9 +11,8 @@ import numpy as np
 import torch
 from gym import spaces
 from gym.spaces import Dict as SpaceDict
-from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
-from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
-from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
+
+# TODO: remove all the habitat-baselines and only load torch script
 from habitat_baselines.utils.common import GaussianNet, batch_obs
 from spot_rl.utils.utils import construct_config
 from torch import Size, Tensor
@@ -39,7 +38,7 @@ class RealPolicy:
         observation_space,
         action_space,
         device,
-        policy_class=PointNavBaselinePolicy,
+        policy_class=None,
     ):
         print("Loading policy...")
         self.device = torch.device(device)
@@ -300,7 +299,7 @@ class MixerPolicy(RealPolicy):
             observation_space,
             action_space,
             device,
-            policy_class=NavGazeMixtureOfExpertsMask,
+            policy_class=None,
         )
         self.not_done = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
         self.moe_actions = None
