@@ -20,6 +20,7 @@ from spot_rl.utils.geometry_utils import (
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
+    get_skill_name_input_from_ros,
     get_waypoint_yaml,
     place_target_from_waypoint,
 )
@@ -139,6 +140,7 @@ class PlaceController:
                 - place_target (np.array([x,y,z])): Place target in base frame
                 - ee_pos (np.array([x,y,z])): End effector position in base frame
         """
+        start_skill_name, start_skill_input = get_skill_name_input_from_ros()
         success_list = []
         for place_target in place_target_list:
             start_time = time.time()
@@ -149,9 +151,17 @@ class PlaceController:
                 observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
 
-                while not done and rospy.get_param("/skill_name", "None") == "Place":
+                while not done:
                     action = self.policy.act(observations)
                     observations, _, done, _ = self.place_env.step(arm_action=action)
+                    # Check if we still want to do skill
+                    # We terminate the skill if skill changes or its input
+                    skill_name, skill_input = get_skill_name_input_from_ros()
+                    if (
+                        skill_name != start_skill_name
+                        or skill_input != start_skill_input
+                    ):
+                        done = True
 
             else:
                 # Get reset arm position (Is there a better way to do this without using place_env?????????????)

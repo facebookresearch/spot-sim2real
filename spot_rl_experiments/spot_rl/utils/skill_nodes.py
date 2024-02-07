@@ -13,6 +13,7 @@ import numpy as np
 import rospy
 import tqdm
 from spot_rl.envs.skill_manager import SpotSkillManager
+from spot_rl.utils.utils import get_skill_name_input_from_ros
 from spot_rl.utils.utils import ros_topics as rt
 
 
@@ -22,17 +23,23 @@ class SpotRosSkillExecutor:
 
     def execute_skills(self):
         # Get the current skill name
-        skill_name = rospy.get_param("/skill_name", "None")
-        skill_input = rospy.get_param("/skill_input", "None")
+
+        skill_name, skill_input = get_skill_name_input_from_ros()
         print(f"skill_name {skill_name} skill_input {skill_input}")
 
         # Select the skill to execute
         if skill_name == "Navigate":
             succeded, msg = self.spotskillmanager.nav(skill_input)
+            if succeded:
+                rospy.set_param("/skill_name_input", "None,None")
         elif skill_name == "Pick":
             succeded, msg = self.spotskillmanager.pick(skill_input)
+            if succeded:
+                rospy.set_param("/skill_name_input", "None,None")
         elif skill_name == "Place":
             succeded, msg = self.spotskillmanager.place(skill_input)
+            if succeded:
+                rospy.set_param("/skill_name_input", "None,None")
 
 
 def main():
@@ -41,8 +48,8 @@ def main():
     _ = parser.parse_args()
 
     # Clean up the ros parameters
-    rospy.set_param("/skill_name", "None")
-    rospy.set_param("/skill_input", "None")
+    rospy.set_param("/skill_name_input", "None,None")
+
     # Call the skill manager
     spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 

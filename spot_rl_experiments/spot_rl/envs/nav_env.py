@@ -19,6 +19,7 @@ from spot_rl.utils.json_helpers import save_json_file
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
+    get_skill_name_input_from_ros,
     get_waypoint_yaml,
     nav_target_from_waypoint,
 )
@@ -147,6 +148,7 @@ class WaypointController:
         Returns:
             robot_trajectories: [[Dict]] where each Dict contains timestamp and pose of the robot, inner list contains trajectory for each nav_target and outer list is a collection of each of the nav_target's trajectory
         """
+        start_skill_name, start_skill_input = get_skill_name_input_from_ros()
 
         robot_trajectories = []  # type: List[List[Dict]]
         for nav_target in nav_targets_list:
@@ -165,7 +167,7 @@ class WaypointController:
                 self.recording_in_progress = True
 
             # Execution Loop
-            while not done and rospy.get_param("/skill_name", "None") == "Navigate":
+            while not done:
                 action = self.policy.act(observations)
                 observations, _, done, _ = self.nav_env.step(base_action=action)
 
@@ -181,6 +183,13 @@ class WaypointController:
                             ],
                         }
                     )
+
+                # Check if we still want to do skill
+                # We terminate the skill if skill changes or its input
+                skill_name, skill_input = get_skill_name_input_from_ros()
+                if skill_name != start_skill_name or skill_input != start_skill_input:
+                    done = True
+
             # Store the trajectory for each nav_target inside the List[robot_trajectory]
             robot_trajectories.append(robot_trajectory)
 

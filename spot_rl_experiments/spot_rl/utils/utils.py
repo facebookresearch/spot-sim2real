@@ -8,6 +8,7 @@ import os.path as osp
 from collections import OrderedDict
 
 import numpy as np
+import rospy
 import yaml
 from yacs.config import CfgNode as CN
 
@@ -168,6 +169,22 @@ def conditional_print(message: str, verbose: bool = False):
     """
     if verbose:
         print(message)
+
+
+def get_skill_name_input_from_ros():
+    """
+    Get the ros parameters to check the current skill execution
+    """
+    skill_name_input = rospy.get_param("/skill_name_input", "None,None")
+    skill_name_input = skill_name_input.split(",")
+    if len(skill_name_input) == 2:
+        skill_name = skill_name_input[0]
+        skill_input = skill_name_input[1]
+    else:
+        skill_name = "None"
+        skill_input = "None"
+
+    return skill_name, skill_input
 
 
 class FixSizeOrderedDict(OrderedDict):

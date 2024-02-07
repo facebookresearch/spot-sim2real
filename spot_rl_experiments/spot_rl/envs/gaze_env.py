@@ -15,6 +15,7 @@ from spot_rl.real_policy import GazePolicy, MobileGazePolicy
 from spot_rl.utils.utils import (
     construct_config,
     get_default_parser,
+    get_skill_name_input_from_ros,
     map_user_input_to_boolean,
 )
 from spot_wrapper.spot import Spot
@@ -148,6 +149,7 @@ class GazeController:
         Returns:
             gaze_success_list (list): List of dictionaries containing the target object name, time taken and success
         """
+        start_skill_name, start_skill_input = get_skill_name_input_from_ros()
         gaze_success_list = []
         print(f"Target object list : {target_object_list}")
         for target_object in target_object_list:
@@ -156,7 +158,7 @@ class GazeController:
             start_time = time.time()
             self.gaze_env.say(f"Gaze at target object - {target_object}")
 
-            while not done and rospy.get_param("/skill_name", "None") == "Pick":
+            while not done:
                 action = self.policy.act(observations)
                 if self._use_mobile_pick:
                     arm_action, base_action = None, None
@@ -169,6 +171,13 @@ class GazeController:
                     )
                 else:
                     observations, _, done, _ = self.gaze_env.step(arm_action=action)
+
+                # Check if we still want to do skill
+                # We terminate the skill if skill changes or its input
+                skill_name, skill_input = get_skill_name_input_from_ros()
+                if skill_name != start_skill_name or skill_input != start_skill_input:
+                    done = True
+
             self.gaze_env.say("Gaze finished")
             # Ask user for feedback about the success of the gaze and update the "success" flag accordingly
             success_status_from_user_feedback = True
