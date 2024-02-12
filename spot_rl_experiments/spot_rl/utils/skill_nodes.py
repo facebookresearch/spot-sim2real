@@ -20,6 +20,7 @@ from spot_rl.utils.utils import ros_topics as rt
 class SpotRosSkillExecutor:
     def __init__(self, spotskillmanager):
         self.spotskillmanager = spotskillmanager
+        self._cur_skill_name_input = None
 
     def execute_skills(self):
         # Get the current skill name
@@ -29,17 +30,20 @@ class SpotRosSkillExecutor:
 
         # Select the skill to execute
         if skill_name == "Navigate":
+            rospy.set_param("/skill_name_suc_msg", "None,None,None")
             succeded, msg = self.spotskillmanager.nav(skill_input)
-            if succeded:
-                rospy.set_param("/skill_name_input", "None,None")
+            rospy.set_param("/skill_name_input", "None,None")
+            rospy.set_param("/skill_name_suc_msg", f"{skill_name},{succeded},{msg}")
         elif skill_name == "Pick":
+            rospy.set_param("/skill_name_suc_msg", "None,None,None")
             succeded, msg = self.spotskillmanager.pick(skill_input)
-            if succeded:
-                rospy.set_param("/skill_name_input", "None,None")
+            rospy.set_param("/skill_name_input", "None,None")
+            rospy.set_param("/skill_name_suc_msg", f"{skill_name},{succeded},{msg}")
         elif skill_name == "Place":
+            rospy.set_param("/skill_name_suc_msg", "None,None,None")
             succeded, msg = self.spotskillmanager.place(skill_input)
-            if succeded:
-                rospy.set_param("/skill_name_input", "None,None")
+            rospy.set_param("/skill_name_input", "None,None")
+            rospy.set_param("/skill_name_suc_msg", f"{skill_name},{succeded},{msg}")
 
 
 def main():
@@ -49,6 +53,7 @@ def main():
 
     # Clean up the ros parameters
     rospy.set_param("/skill_name_input", "None,None")
+    rospy.set_param("/skill_name_suc_msg", "None,None,None")
 
     # Call the skill manager
     spotskillmanager = SpotSkillManager(use_mobile_pick=True)

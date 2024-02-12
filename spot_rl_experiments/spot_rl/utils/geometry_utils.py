@@ -166,10 +166,11 @@ def is_position_within_bounds(
 
     if convention == "spot":
         is_within_linear_xy_bounds = (
-            np.linalg.norm(test_position[:2] - target_position[:2]) < xy_dist_threshold
+            np.linalg.norm(test_position[:2] - target_position[:2])
+            < xy_dist_threshold * 1.25
         )
         is_within_linear_z_bounds = (
-            abs(test_position[2] - target_position[2]) < z_dist_threshold
+            abs(test_position[2] - target_position[2]) < z_dist_threshold * 1.25
         )
     elif convention == "habitat":
         is_within_linear_xy_bounds = (
