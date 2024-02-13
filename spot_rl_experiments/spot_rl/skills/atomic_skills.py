@@ -78,7 +78,9 @@ class Navigation:
         self.record_robot_trajectories = record_robot_trajectories
 
         # Setup
-        self.policy = NavPolicy(self.config.WEIGHTS.NAV, device=self.config.DEVICE)
+        self.policy = NavPolicy(
+            self.config.WEIGHTS.NAV, device=self.config.DEVICE, config=self.config
+        )
         self.policy.reset()
 
         self.env = SpotNavEnv(self.config, self.spot)
@@ -397,7 +399,9 @@ class Place:
         self.use_policies = use_policies
         # Setup
         if self.use_policies:
-            self.policy = PlacePolicy(config.WEIGHTS.PLACE, device=config.DEVICE)
+            self.policy = PlacePolicy(
+                config.WEIGHTS.PLACE, device=config.DEVICE, config=config
+            )
             self.policy.reset()
 
         self.env = SpotPlaceEnv(config, spot)
