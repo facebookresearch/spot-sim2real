@@ -44,6 +44,7 @@ def main(spot, use_mixer, config, out_path=None):
             config.WEIGHTS.GAZE,
             config.WEIGHTS.PLACE,
             device=config.DEVICE,
+            config=config,
         )
         env_class = SpotMobileManipulationBaseEnv
     else:
@@ -52,6 +53,7 @@ def main(spot, use_mixer, config, out_path=None):
             config.WEIGHTS.GAZE,
             config.WEIGHTS.PLACE,
             device=config.DEVICE,
+            config=config,
         )
         env_class = SpotMobileManipulationSeqEnv
 
@@ -194,13 +196,15 @@ class Tasks:
 
 
 class SequentialExperts:
-    def __init__(self, nav_weights, gaze_weights, place_weights, device="cuda"):
+    def __init__(
+        self, nav_weights, gaze_weights, place_weights, device="cuda", config=None
+    ):
         print("Loading nav_policy...")
-        self.nav_policy = NavPolicy(nav_weights, device)
+        self.nav_policy = NavPolicy(nav_weights, device, config)
         print("Loading gaze_policy...")
-        self.gaze_policy = GazePolicy(gaze_weights, device)
+        self.gaze_policy = GazePolicy(gaze_weights, device, config)
         print("Loading place_policy...")
-        self.place_policy = PlacePolicy(place_weights, device)
+        self.place_policy = PlacePolicy(place_weights, device, config)
         print("Done loading all policies!")
 
     def reset(self):

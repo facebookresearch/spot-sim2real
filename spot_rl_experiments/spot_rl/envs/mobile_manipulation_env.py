@@ -43,6 +43,7 @@ def main(spot, use_mixer, config, out_path=None):
             config.WEIGHTS.GAZE,
             config.WEIGHTS.PLACE,
             device=config.DEVICE,
+            config=config,
         )
         env_class = SpotMobileManipulationBaseEnv
     else:
@@ -51,6 +52,7 @@ def main(spot, use_mixer, config, out_path=None):
             config.WEIGHTS.GAZE,
             config.WEIGHTS.PLACE,
             device=config.DEVICE,
+            config=config,
         )
         env_class = SpotMobileManipulationSeqEnv
 
@@ -116,6 +118,7 @@ def main(spot, use_mixer, config, out_path=None):
             out_data.append((time.time(), env.x, env.y, env.yaw))
 
             if use_mixer:
+                print("inside use mixer")
                 base_action, arm_action = policy.act(observations)
                 nav_silence_only = policy.nav_silence_only
             else:
@@ -184,13 +187,15 @@ class Tasks:
 
 
 class SequentialExperts:
-    def __init__(self, nav_weights, gaze_weights, place_weights, device="cuda"):
+    def __init__(
+        self, nav_weights, gaze_weights, place_weights, device="cuda", config=None
+    ):
         print("Loading nav_policy...")
-        self.nav_policy = NavPolicy(nav_weights, device)
+        self.nav_policy = NavPolicy(nav_weights, device, config)
         print("Loading gaze_policy...")
-        self.gaze_policy = GazePolicy(gaze_weights, device)
+        self.gaze_policy = GazePolicy(gaze_weights, device, config)
         print("Loading place_policy...")
-        self.place_policy = PlacePolicy(place_weights, device)
+        self.place_policy = PlacePolicy(place_weights, device, config)
         print("Done loading all policies!")
 
     def reset(self):
@@ -413,13 +418,13 @@ if __name__ == "__main__":
     config = construct_config(opts=args.opts)
     spot = (RemoteSpot if config.USE_REMOTE_SPOT else Spot)("RealSeqEnv")
     if config.USE_REMOTE_SPOT:
-        try:
-            main(spot, args.use_mixer, config, args.output)
-        finally:
-            spot.power_off()
+        # try:
+        main(spot, args.use_mixer, config, args.output)
+        # finally:
+        # spot.power_off()
     else:
         with spot.get_lease(hijack=True):
-            try:
-                main(spot, args.use_mixer, config, args.output)
-            finally:
-                spot.shutdown(should_dock=True)
+            # try:
+            main(spot, args.use_mixer, config, args.output)
+            # finally:
+            # spot.shutdown(should_dock=True)
