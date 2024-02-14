@@ -13,3 +13,6 @@
 	url = https://github.com/naokiyokoyama/mask_rcnn_detectron2
 	branch = main
 	ignore = dirty
+[submodule "third_party/hand_object_detector"]
+	path = third_party/hand_object_detector
+	url = https://github.com/ddshan/hand_object_detector
