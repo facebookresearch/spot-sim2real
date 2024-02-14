@@ -50,7 +50,7 @@ if __name__ == "__main__":
             # zxy = [73.7783801, 0, 19.46777266] #
 
             # spot.move_gripper_to_point((0.55, 0., 0.26), np.deg2rad(zxy))
-            spotskillmanager.pick("bottle")
+            # spotskillmanager.pick("bottle")
             # breakpoint()
             # spotskillmanager.nav(place_target_before)
             # current_arm_joints = spot.get_arm_joint_positions()
@@ -58,9 +58,9 @@ if __name__ == "__main__":
             # INITIAL_ARM_JOINT_ANGLES[-1] = current_arm_joints[-1]
             # spot.set_arm_joint_positions(INITIAL_ARM_JOINT_ANGLES)
             # breakpoint()
-            spot.move_gripper_to_point(
-                (0.55, 0.0, 0.5), np.deg2rad(rospy.get_param("pose_correction"))
-            )
+            # spot.move_gripper_to_point(
+            #     (0.55, 0.0, 0.5), np.deg2rad(rospy.get_param("pose_correction"))
+            # )
             # spot.set_arm_joint_positions(np.deg2rad(config.INITIAL_ARM_JOINT_ANGLES))
         else:
             # spotskillmanager.nav("nyc_mg_pos1")
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
         # breakpoint()
         # spotskillmanager.nav(place_target)
-        spotskillmanager.place_controller.config.RUNNING_AFTER_GRASP_FOR_PLACE = True
+        spotskillmanager.place_controller.config.RUNNING_AFTER_GRASP_FOR_PLACE = False
         spotskillmanager.place(place_target)
         # spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")

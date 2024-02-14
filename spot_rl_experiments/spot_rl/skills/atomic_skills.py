@@ -832,6 +832,53 @@ class SemanticPlace(Skill):
 
         return observations
 
+    def execute_rl_loop(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
+        # return super().execute_rl_loop(goal_dict)
+        """
+        !!BLOCKING CALL!!
+
+        Executes the action based on output from policy
+
+        WARNING: This method WILL NOT perform any explicit sanity checks on the input provided.
+                 It is the responsibility of the caller to ensure that the input is valid
+                 and safe to use or perform sanity checks inside reset_skill() method
+
+        Args:
+            goal_dict: Dict[str, Any] containing necessary goal information for the appropriate skill
+
+        Returns:
+            status (bool): Whether robot was able to succesfully execute the skill or not
+            message (str): Message indicating description of success / failure reason
+        """
+        # Reset policy,env and update logged data at init
+        self.env.initial_pose = self.spot.get_ee_pos_in_body_frame()[-1]
+        try:
+            observations = self.reset_skill(goal_dict)
+        except Exception as e:
+            raise e
+        done = False
+
+        # Execution Loop
+        while not done:
+            action = self.policy.act(observations)  # type: ignore
+            action_dict = self.split_action(action)
+            observations, _, done, _ = self.env.step(action_dict=action_dict)  # type: ignore
+
+            # Record trajectories at every step
+            self.skill_result_log["robot_trajectory"].append(
+                {
+                    "timestamp": time.time() - self.start_time,
+                    "pose": [
+                        self.env.x,  # type: ignore
+                        self.env.y,  # type: ignore
+                        np.rad2deg(self.env.yaw),  # type: ignore
+                    ],
+                }
+            )
+
+        # Update logged data after finishing execution and get feedback (status & msg)
+        return self.update_and_check_status(goal_dict)
+
     # ... COPY PASTE FROM PLACE
     def execute(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:  # noqa
         """
@@ -862,6 +909,7 @@ class SemanticPlace(Skill):
     # ... COPY PASTE FROM PLACE
     def update_and_check_status(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
         """Refer to class Skill for documentation"""
+
         self.env.say("Place Skill finished.. checking status")
 
         # Record the success
@@ -878,6 +926,8 @@ class SemanticPlace(Skill):
         # Update result log
         self.skill_result_log["time_taken"] = time.time() - self.start_time
         self.skill_result_log["success"] = check_place_success
+        self.skill_result_log["place_target"] = local_place_target_spot
+        self.skill_result_log["ee_pos"] = local_ee_pose_spot
 
         # Open gripper to drop the object
         self.spot.open_gripper()

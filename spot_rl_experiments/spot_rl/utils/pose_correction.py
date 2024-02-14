@@ -37,8 +37,8 @@ def load_model(model_name="owlvit", device="cpu"):
         )
 
 
-load_model("owlvit", device)
-load_model("sam", device)
+# load_model("owlvit", device)
+# load_model("sam", device)
 
 
 def detect(img, text_queries, score_threshold, device):
@@ -249,6 +249,7 @@ def pose_correction_pipeline(
     pc = np.array(pc.points)
     socket = connect_socket(port)
     save_path = "pc_after_correction.ply"
+    R = np.array([0, 0, 0])
     R, aligned_pcd = correct_pose(pc, save_path, socket)
     print(R)
 

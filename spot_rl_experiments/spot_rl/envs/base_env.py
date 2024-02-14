@@ -71,7 +71,7 @@ HEIGHT_SCALE = 0.5
 def pad_action(action):
     """We only control 4 out of 6 joints; add zeros to non-controllable indices."""
     if len(action) == 5:
-        return np.array([*action[:3], 0.0, action[3], action[4]])
+        return np.array([*action[:3], 0.0, action[3], 0])
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
@@ -257,7 +257,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def reset_arm(self):
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
-            positions=self.initial_arm_joint_angles, travel_time=0.75
+            positions=self.initial_arm_joint_angles, travel_time=2.00
         )
         self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
         self.spot.close_gripper()
@@ -283,6 +283,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Get Base & Arm actions, grasp and place from action dictionary
         base_action = action_dict.get("base_action", None)
         arm_action = action_dict.get("arm_action", None)
+        semantic_place = action_dict.get("semantic_place", False)
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
@@ -313,18 +314,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                             SpotCamIds.INTEL_REALSENSE_DEPTH,
                         ]
                     )
-                    camera_intrinsics = image_responses[0].source.pinhole.intrinsics
+                    # camera_intrinsics = image_responses[0].source.pinhole.intrinsics
                     image_responses = [
                         image_response_to_cv2(image_response)
                         for image_response in image_responses
                     ]
-                    pose_correction_pipeline(
-                        image_responses[0],
-                        image_responses[1],
-                        None,
-                        "bottle",
-                        camera_intrinsics,
-                    )
+                    # pose_correction_pipeline(
+                    #     image_responses[0],
+                    #     image_responses[1],
+                    #     None,
+                    #     "bottle",
+                    #     camera_intrinsics,
+                    # )
 
                 # The following cmd is blocking
                 success = self.attempt_grasp()
@@ -839,15 +840,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # the robot is at the place receptacle
         if use_base_rot:
             base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-            height = base_T.translation[2]
             ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+            body_T_ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
+            # Off set for the height
+            actual_ee_height = 0.5 + body_T_ee_T.translation[2] + 0.05
             # Move the base to ee location
-            base_T.translation = ee_T.translation
+            base_T.translation = mn.Vector3(
+                ee_T.translation[0], ee_T.translation[1], actual_ee_height
+            )
             # Get the glocal location of the place target
             target = np.copy(self.place_target)
             # Offset when we register the point
-            target[2] -= height
+            # 03/04: found base height is driftting
             gripper_pos = base_T.inverted().transform_point(target)
+            # Off set for the gripper
+            gripper_pos[0] += 0.2
         else:
             gripper_T_base = self.get_in_gripper_tf()
             base_T_gripper = gripper_T_base.inverted()
