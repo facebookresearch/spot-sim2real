@@ -527,7 +527,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             # Return blank images if the gripper is being blocked
             blank_img = np.zeros([NEW_HEIGHT, NEW_WIDTH, 1], dtype=np.float32)
             return blank_img, blank_img.copy()
-        if self.parallel_inference_mode and False:
+        if self.parallel_inference_mode:
             self.detection_timestamp = None
             # Use .copy() to prevent mutations during iteration
             for i in reversed(self.detections_buffer["detections"].copy()):
