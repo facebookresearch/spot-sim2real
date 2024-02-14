@@ -123,6 +123,8 @@ class SpotCamIds:
     RIGHT_DEPTH = "right_depth"
     RIGHT_DEPTH_IN_VISUAL_FRAME = "right_depth_in_visual_frame"
     RIGHT_FISHEYE = "right_fisheye_image"
+    INTEL_REALSENSE_COLOR = "intelrealsensergb"
+    INTEL_REALSENSE_DEPTH = "intelrealsensedepth"
 
 
 # Maps SpotCamId (name of camera in spot) to
@@ -176,6 +178,10 @@ class Spot:
             RobotCommandClient.default_service_name
         )
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
+        # Make our intel image client
+        self.intelrealsense_image_client = robot.ensure_client(
+            "intel-realsense-image-service"
+        )
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
         )
@@ -196,6 +202,10 @@ class Spot:
 
         # Print the battery charge level of the robot
         self.loginfo(f"Current battery charge: {self.get_battery_charge()}%")
+
+    @property
+    def IS_GRIPPER_BLOCKED(self):
+        return rospy.get_param("is_gripper_blocked", default=0) == 1
 
     def get_lease(self, hijack=False):
         # Make sure a lease for this client isn't already active
@@ -332,7 +342,9 @@ class Spot:
             self.command_client, cmd_id, timeout_sec=timeout_sec
         )
 
-    def get_image_responses(self, sources, quality=None, pixel_format=None):
+    def get_image_responses(
+        self, sources, quality=100, pixel_format=None, await_the_resp=True
+    ):
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -342,6 +354,11 @@ class Spot:
             should return its image with
         :return: list containing bosdyn image response objects
         """
+        image_client = (
+            self.image_client
+            if "intel" not in sources[0]
+            else self.intelrealsense_image_client
+        )
         if quality is not None:
             if isinstance(quality, int):
                 quality = [quality] * len(sources)
@@ -350,7 +367,7 @@ class Spot:
             img_requests = [
                 build_image_request(src, q) for src, q in zip(sources, quality)
             ]
-            image_responses = self.image_client.get_image(img_requests)
+            image_responses = image_client.get_image_async(img_requests)
         elif pixel_format is not None:
             if isinstance(pixel_format, int):
                 pixel_format = [pixel_format] * len(sources)
@@ -360,11 +377,11 @@ class Spot:
                 build_image_request(src, pixel_format=pf)
                 for src, pf in zip(sources, pixel_format)
             ]
-            image_responses = self.image_client.get_image(img_requests)
+            image_responses = image_client.get_image_async(img_requests)
         else:
-            image_responses = self.image_client.get_image_from_sources(sources)
+            image_responses = image_client.get_image_from_sources_async(sources)
 
-        return image_responses
+        return image_responses.result() if await_the_resp else image_responses
 
     def grasp_point_in_image(
         self,
@@ -823,19 +840,15 @@ class Spot:
         finally:
             self.power_off()
 
-    def get_hand_image(self, is_rgb: bool = True) -> List[image_pb2.ImageResponse]:
+    def get_hand_image_old(self, is_rgb=True, img_src: List[str] = []):
         """
-        Gets hand raw rgb & depth and returns ImageResponse objects for both as a list
-        Information on ImageResponse objects can be found here:
-            https://dev.bostondynamics.com/protos/bosdyn/api/proto_reference#bosdyn-api-ImageResponse
-
-        Args:
-            is_rgb: bool indicating whether to return rgb or depth image
-
-        Returns:
-            img_resp: List of 2 elements as ImageResponse objects for rgb and depth images
+        Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
         """
-        img_src = [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+        img_src = (
+            img_src
+            if img_src
+            else [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+        )  # default img_src to gripper
 
         pixel_format_rgb = (
             image_pb2.Image.PIXEL_FORMAT_RGB_U8
@@ -847,6 +860,23 @@ class Spot:
             img_src, pixel_format=[pixel_format_rgb, pixel_format_depth]
         )
         return img_resp
+
+    def get_hand_image(self, is_rgb=True):
+        """
+        Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
+        If is_gripper_blocked is True then returns intel realsense images
+        If hand_image_sources are passed then above condition is ignored & will send image & depth for each source
+        Thus if you send hand_image_sources=["gripper", "intelrealsense"] then 4 image resps should be returned
+        """
+        realsense_img_srcs: List[str] = [
+            SpotCamIds.INTEL_REALSENSE_COLOR,
+            SpotCamIds.INTEL_REALSENSE_DEPTH,
+        ]
+
+        if self.IS_GRIPPER_BLOCKED:  # return intel realsense
+            return self.get_hand_image_old(img_src=realsense_img_srcs)
+        else:
+            return self.get_hand_image_old(is_rgb=is_rgb)
 
     def get_camera_intrinsics(
         self, sources: List[SpotCamIds], quality=None, pixel_format=None
@@ -1016,7 +1046,10 @@ def make_robot_command(arm_joint_traj):
 
 
 def image_response_to_cv2(image_response, reorient=True):
-    if image_response.shot.image.pixel_format == image_pb2.Image.PIXEL_FORMAT_DEPTH_U16:
+    if (
+        image_response.shot.image.pixel_format == image_pb2.Image.PIXEL_FORMAT_DEPTH_U16
+        and image_response.shot.image.format == image_pb2.Image.FORMAT_RAW
+    ):
         dtype = np.uint16
     else:
         dtype = np.uint8
