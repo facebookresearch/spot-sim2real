@@ -12,6 +12,7 @@ from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
     construct_config_for_place,
+    construct_config_for_semantic_place,
 )
 from spot_rl.utils.heuristic_nav import (
     ImageSearch,
@@ -146,9 +147,14 @@ class SpotSkillManager:
             if not pick_config
             else pick_config
         )
-        self.place_config = (
-            construct_config_for_place() if not place_config else place_config
-        )
+        if place_config is None:
+            self.place_config = (
+                construct_config_for_semantic_place()
+                if self.use_semantic_place
+                else construct_config_for_place()
+            )
+        else:
+            self.place_config = place_config
 
     def __initiate_controllers(self, use_policies: bool = True):
         """
