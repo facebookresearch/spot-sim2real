@@ -7,10 +7,17 @@ from typing import Tuple
 
 import numpy as np
 from multimethod import multimethod
-from spot_rl.skills.atomic_skills import Navigation, Pick, Place, SemanticPlace
+from spot_rl.skills.atomic_skills import (
+    Navigation,
+    OpenDrawer,
+    Pick,
+    Place,
+    SemanticPlace,
+)
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
+    construct_config_for_open_drawer,
     construct_config_for_place,
 )
 from spot_rl.utils.heuristic_nav import (
@@ -119,7 +126,12 @@ class SpotSkillManager:
         pass
 
     def __init_spot(
-        self, spot: Spot = None, nav_config=None, pick_config=None, place_config=None
+        self,
+        spot: Spot = None,
+        nav_config=None,
+        pick_config=None,
+        place_config=None,
+        open_drawer_config=None,
     ):
         """
         Initialize the Spot object, acquire lease, and construct configs
@@ -149,6 +161,11 @@ class SpotSkillManager:
         self.place_config = (
             construct_config_for_place() if not place_config else place_config
         )
+        self.open_drawer_config = (
+            construct_config_for_open_drawer()
+            if not open_drawer_config
+            else open_drawer_config
+        )
 
     def __initiate_controllers(self, use_policies: bool = True):
         """
@@ -175,6 +192,10 @@ class SpotSkillManager:
                 config=self.place_config,
                 use_policies=use_policies,
             )
+        self.open_drawer_controller = OpenDrawer(
+            spot=self.spot,
+            config=self.open_drawer_config,
+        )
 
     def reset(self):
         # Reset the policies and environments via the controllers
@@ -350,6 +371,11 @@ class SpotSkillManager:
             str: Message indicating the status of the place
         """
         status, message = self.place_controller.execute((x, y, z), is_local=is_local)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    def opendrawer(self) -> Tuple[bool, str]:
+        status, message = self.open_drawer_controller.execute()
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 

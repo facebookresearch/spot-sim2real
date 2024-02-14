@@ -11,6 +11,7 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
+from spot_rl.envs.open_drawer_env import SpotOpenDrawerEnv
 from spot_rl.envs.place_env import SpotPlaceEnv, SpotSemanticPlaceEnv
 
 # Import policies
@@ -18,6 +19,7 @@ from spot_rl.real_policy import (
     GazePolicy,
     MobileGazePolicy,
     NavPolicy,
+    OpenDrawerPolicy,
     PlacePolicy,
     SemanticPlacePolicy,
 )
@@ -26,6 +28,7 @@ from spot_rl.real_policy import (
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
+    construct_config_for_open_drawer,
     construct_config_for_place,
 )
 from spot_rl.utils.geometry_utils import (
@@ -715,5 +718,93 @@ class SemanticPlace:
         ):
             status = True
             message = "Successfully reached the target position"
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+
+class OpenDrawer:
+    """
+    Open drawer skills
+    """
+
+    def __init__(self, spot, config):
+        if not config:
+            config = construct_config_for_open_drawer()
+        # super.__init__(spot, config)
+        self.spot = spot
+        self.config = config
+        self.verbose = True
+        self.policy = OpenDrawerPolicy(
+            self.config.WEIGHTS.OPEN_DRAWER,
+            device=self.config.DEVICE,
+            config=self.config,
+        )
+
+        self.policy.reset()
+        self.env = SpotOpenDrawerEnv(self.config, spot)
+
+    def reset_env_and_policy(self, target_obj_name):
+        """
+        Resets the env and policy
+
+        Args:
+            target_obj_name (str): Name of the target object
+
+        Returns:
+            observations: observations from the env
+
+        """
+        observations = self.env.reset(target_obj_name=target_obj_name)
+        self.policy.reset()
+
+        return observations
+
+    def execute_open_drawer(self, take_user_input=False):
+        target_obj_name = "drawer handle"
+        open_drawer_success_list = []
+        observations = self.reset_env_and_policy(target_obj_name=target_obj_name)
+        done = False
+        start_time = time.time()
+
+        while not done:
+            action = self.policy.act(observations)
+            arm_action = None
+            # first 4 are arm actions, then 2 are base actions & last bit is unused
+            arm_action = action[0:4]
+            observations, _, done, _ = self.env.step(arm_action=arm_action)
+
+        self.env.say("Open drawer finished")
+        # Ask user for feedback about the success of the open drawer and update the "success" flag accordingly
+        success_status_from_user_feedback = True
+        if take_user_input:
+            user_prompt = "Did the robot successfully open drawers?"
+            success_status_from_user_feedback = map_user_input_to_boolean(user_prompt)
+
+        open_drawer_success_list.append(
+            {
+                "target_object": "handle",
+                "time_taken": time.time() - start_time,
+                "success": self.env.grasp_attempted
+                and success_status_from_user_feedback,
+            }
+        )
+        return open_drawer_success_list
+
+    def execute(self):
+
+        result = None
+        # try:
+        result = self.execute_open_drawer()
+        # except Exception as e:
+        #     message = f"Error encountered while open drawer - {e}"
+        #     conditional_print(message=message, verbose=self.verbose)
+        #     return False, message
+
+        # Check for success and return appropriately
+        status = False
+        message = "Pick failed to open the drawer"
+        if result[0].get("success"):
+            status = True
+            message = "Successfully opened the drawer"
         conditional_print(message=message, verbose=self.verbose)
         return status, message

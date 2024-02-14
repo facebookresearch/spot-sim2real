@@ -16,6 +16,9 @@ WEIGHTS_TORCHSCRIPT:
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/latest_6_net.torchscript"
 
+  # Open drawer
+  OPEN_DRAWER: "weights/open_drawer/od4lr_5_latest.torchscript"
+
 WEIGHTS:
   # Regular Nav
   NAV: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
@@ -31,7 +34,10 @@ WEIGHTS:
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/latest_6_net.torchscript"
-  
+
+  # Open drawer
+  OPEN_DRAWER: "weights/open_drawer/od4lr_5_latest.torchscript"
+
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
   
@@ -79,6 +85,9 @@ PLACE_ACTION_SPACE_LENGTH: 4
 #Semantic Place
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9
 JOINT_BLACKLIST_SEMANTIC_PLACE: [3]
+
+#Open Drawer
+OPEN_DRAWER_ACTION_SPACE_LENGTH: 5
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters

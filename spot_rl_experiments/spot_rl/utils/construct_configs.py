@@ -106,3 +106,17 @@ def construct_config_for_place(file_path=None, opts=[]):
     config.USE_MRCNN = False
 
     return config
+
+
+def construct_config_for_open_drawer(file_path=None, opts=[]):
+    config = None
+    if file_path is None:
+        config = construct_config(opts=opts)
+    else:
+        config = construct_config(file_path=file_path, opts=opts)
+
+    # Don't need cameras for Place
+    config.USE_HEAD_CAMERA = False
+    config.USE_MRCNN = True
+
+    return config
