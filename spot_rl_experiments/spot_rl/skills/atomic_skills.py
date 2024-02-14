@@ -883,13 +883,13 @@ class SemanticPlace:
 
         result = None
         place_target_tuple = None
-        try:
-            place_target_tuple = (x, y, z)
-            result = self.execute_place([place_target_tuple], is_local=is_local)
-        except Exception as e:
-            message = f"Error encountered while placing : {e}"
-            conditional_print(message=message, verbose=self.verbose)
-            return False, message
+        # try:
+        place_target_tuple = (x, y, z)
+        result = self.execute_place([place_target_tuple], is_local=is_local)
+        # except Exception as e:
+        #     message = f"Error encountered while placing : {e}"
+        #     conditional_print(message=message, verbose=self.verbose)
+        #     return False, message
 
         # Check for success and return appropriately
         status = False
