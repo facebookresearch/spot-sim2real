@@ -64,8 +64,9 @@ class RealPolicy:
                 )
                 if checkpoint_path_without_ext in torchscript_checkpoint_path
             ]
+            checkpoint_path_prefix = checkpoint_path.split("weights")[0]
             checkpoint_path = (
-                checkpoint_path_ts[0]
+                os.path.join(checkpoint_path_prefix, checkpoint_path_ts[0])
                 if len(checkpoint_path_ts) > 0
                 else checkpoint_path
             )
