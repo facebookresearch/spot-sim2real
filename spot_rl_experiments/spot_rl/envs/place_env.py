@@ -60,18 +60,21 @@ class SpotPlaceEnv(SpotBaseEnv):
         return observations
 
 
-class SpotSPlaceEnv(SpotPlaceEnv):
+class SpotSemanticPlaceEnv(SpotPlaceEnv):
     def __init__(self, config, spot: Spot):
         super().__init__(config, spot)
-        self.initial_pose = None
+        self.initial_ee_pose = None
+        # Overwrite joint limits for semantic_place skills
+        self.arm_lower_limits = np.deg2rad(config.ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE)
+        self.arm_upper_limits = np.deg2rad(config.ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE)
 
     def get_observations(self):
-        assert self.initial_pose is not None
+        assert self.initial_ee_pose is not None
         # TODO: Obj_goal_sensor needs to be 3
         obj_goal_sensor = self.get_place_sensor()
         obj_goal_sensor = np.concatenate((obj_goal_sensor, obj_goal_sensor)).reshape(6)
         current_gripper_orientation = self.spot.get_ee_pos_in_body_frame()[-1]
-        delta = self.initial_pose - current_gripper_orientation
+        delta = self.initial_ee_pose - current_gripper_orientation
         delta = (delta + np.pi) % (2 * np.pi) - np.pi
         arm_depth, _ = self.get_gripper_images()
 
@@ -79,7 +82,7 @@ class SpotSPlaceEnv(SpotPlaceEnv):
             "obj_goal_sensor": obj_goal_sensor,
             "relative_initial_ee_orientation": delta,
             "articulated_agent_jaw_depth": arm_depth,
-            "joint": self.get_arm_joints(splace=True),
+            "joint": self.get_arm_joints(semantic_place=True),
             "is_holding": np.ones((1,)),
         }
 
@@ -87,4 +90,4 @@ class SpotSPlaceEnv(SpotPlaceEnv):
 
     def step(self, grip_action=None, *args, **kwargs):
         place = grip_action > 0.0
-        return super().step(place=place, *args, **kwargs)
+        return super().step(place=place, semantic_place=place, *args, **kwargs)

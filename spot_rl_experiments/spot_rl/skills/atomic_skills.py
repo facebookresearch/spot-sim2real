@@ -15,7 +15,7 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
-from spot_rl.envs.place_env import SpotPlaceEnv, SpotSPlaceEnv
+from spot_rl.envs.place_env import SpotPlaceEnv, SpotSemanticPlaceEnv
 
 # Import policies
 from spot_rl.real_policy import (
@@ -784,11 +784,11 @@ class SemanticPlace:
         # Setup
         if self.use_policies:
             self.policy = SemanticPlacePolicy(
-                config.WEIGHTS.SPLACE, device=config.DEVICE, config=config
+                config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
             )
             self.policy.reset()
 
-        self.env = SpotSPlaceEnv(config, spot)
+        self.env = SpotSemanticPlaceEnv(config, spot)
 
     def reset_env_and_policy(self, place_target, is_local):
         """
@@ -828,7 +828,7 @@ class SemanticPlace:
             self.env.say(f"Placing at {place_target}")
 
             if self.use_policies:
-                self.env.initial_pose = self.spot.get_ee_pos_in_body_frame()[-1]
+                self.env.initial_ee_pose = self.spot.get_ee_pos_in_body_frame()[-1]
                 observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
 

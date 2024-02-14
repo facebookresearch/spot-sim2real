@@ -13,7 +13,8 @@ import torch
 from gym import spaces
 from gym.spaces import Dict as SpaceDict
 from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
-from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
+
+# from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
 from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
 from habitat_baselines.utils.common import GaussianNet, batch_obs
 from spot_rl.utils.construct_configs import construct_config
@@ -386,7 +387,7 @@ class MixerPolicy(RealPolicy):
             observation_space,
             action_space,
             device,
-            policy_class=NavGazeMixtureOfExpertsMask,
+            policy_class=None,
             config=config,
         )
         self.not_done = torch.zeros(1, 1, dtype=torch.bool, device=self.device)

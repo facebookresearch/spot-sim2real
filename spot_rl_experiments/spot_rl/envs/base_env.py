@@ -266,6 +266,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param arm_action: np.array of radians denoting how each joint is to be moved
         :param grasp: whether to call the grasp_hand_depth() method
         :param place: whether to call the open_gripper() method
+        :param semantic_place: whether to call the open_gripper() method, but distable turning wrist behavior
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -284,6 +285,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             print(
                 f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
             )
+
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
             time.sleep(0.5)
@@ -320,7 +322,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     self.should_end = True
         elif place:
             self.say("PLACE ACTION CALLED: Opening the gripper!")
-            if self.get_grasp_angle_to_xy() < np.deg2rad(30):
+            # We only turning the wrist when calling place, but not semantic place
+            if self.get_grasp_angle_to_xy() < np.deg2rad(30) and not semantic_place:
                 self.turn_wrist()
                 self.say("open gripper in place")
             self.spot.open_gripper()
@@ -501,11 +504,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations
 
-    def get_arm_joints(self, splace: bool = False):
+    def get_arm_joints(self, semantic_place: bool = False):
         # Get proprioception inputs
         joint_black_list = (
-            self.config.JOINT_BLACKLIST_SPLACE
-            if splace
+            self.config.JOINT_BLACKLIST_SEMANTIC_PLACE
+            if semantic_place
             else self.config.JOINT_BLACKLIST
         )
         joints = np.array(
