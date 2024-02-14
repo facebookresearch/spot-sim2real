@@ -61,6 +61,8 @@ HEIGHT_SCALE = 0.5
 
 def pad_action(action):
     """We only control 4 out of 6 joints; add zeros to non-controllable indices."""
+    if len(action) == 5:
+        return np.array([*action[:3], 0.0, action[3], action[4]])
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
@@ -494,13 +496,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations
 
-    def get_arm_joints(self):
+    def get_arm_joints(self, splace: bool = False):
         # Get proprioception inputs
+        joint_black_list = (
+            self.config.JOINT_BLACKLIST_SPLACE
+            if splace
+            else self.config.JOINT_BLACKLIST
+        )
         joints = np.array(
             [
                 j
                 for idx, j in enumerate(self.current_arm_pose)
-                if idx not in self.config.JOINT_BLACKLIST
+                if idx not in joint_black_list
             ],
             dtype=np.float32,
         )

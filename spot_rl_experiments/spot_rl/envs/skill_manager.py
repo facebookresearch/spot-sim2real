@@ -7,7 +7,7 @@ from typing import Tuple
 
 import numpy as np
 from multimethod import multimethod
-from spot_rl.skills.atomic_skills import Navigation, Pick, Place
+from spot_rl.skills.atomic_skills import Navigation, Pick, Place, SemanticPlace
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
@@ -83,6 +83,7 @@ class SpotSkillManager:
         pick_config=None,
         place_config=None,
         use_mobile_pick: bool = False,
+        use_semantic_place: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -94,6 +95,7 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
+        self.use_semantic_place = use_semantic_place
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -163,11 +165,16 @@ class SpotSkillManager:
             config=self.pick_config,
             use_mobile_pick=self._use_mobile_pick,
         )
-        self.place_controller = Place(
-            spot=self.spot,
-            config=self.place_config,
-            use_policies=use_policies,
-        )
+        if self.use_semantic_place:
+            self.place_controller = SemanticPlace(
+                spot=self.spot, config=self.place_config, use_policies=use_policies
+            )
+        else:
+            self.place_controller = Place(
+                spot=self.spot,
+                config=self.place_config,
+                use_policies=use_policies,
+            )
 
     def reset(self):
         # Reset the policies and environments via the controllers
