@@ -7,6 +7,7 @@ import time
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
+import quaternion
 from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
@@ -15,16 +16,23 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
-from spot_rl.envs.place_env import SpotPlaceEnv
+from spot_rl.envs.place_env import SpotPlaceEnv, SpotSemanticPlaceEnv
 
 # Import policies
-from spot_rl.real_policy import GazePolicy, MobileGazePolicy, NavPolicy, PlacePolicy
+from spot_rl.real_policy import (
+    GazePolicy,
+    MobileGazePolicy,
+    NavPolicy,
+    PlacePolicy,
+    SemanticPlacePolicy,
+)
 
 # Import utils and helpers
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
     construct_config_for_place,
+    construct_config_for_semantic_place,
 )
 
 # Import Utils
@@ -591,6 +599,7 @@ class Place(Skill):
 
         place_target = goal_dict.get("place_target")
         is_local = goal_dict.get("is_local", False)
+        ee_orientation_at_grasping = goal_dict.get("ee_orientation_at_grasping", None)
 
         (x, y, z) = place_target
         conditional_print(
@@ -599,7 +608,11 @@ class Place(Skill):
         )
 
         # Reset the env and policy
-        observations = self.env.reset(place_target, is_local)
+        observations = self.env.reset(
+            place_target,
+            is_local,
+            ee_orientation_at_grasping=ee_orientation_at_grasping,
+        )
         if self.policy is not None:
             self.policy.reset()
 
@@ -735,6 +748,40 @@ class Place(Skill):
         action_dict = {
             "arm_action": action,
             "base_action": None,
+        }
+
+        return action_dict
+
+
+class SemanticPlace(Place):
+    """
+    Semantic place controller is used to execute place for given place targets
+    """
+
+    def __init__(self, spot: Spot, config):
+        if not config:
+            config = construct_config_for_semantic_place()
+        super().__init__(spot, config)
+
+        self.policy = SemanticPlacePolicy(
+            config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
+        )
+        self.policy.reset()
+
+        self.env = SpotSemanticPlaceEnv(config, spot)
+
+    def execute_rl_loop(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
+        # Set the robot inital pose
+        self.env.initial_pose = self.spot.get_ee_pos_in_body_frame()[-1]
+        return super().execute_rl_loop(goal_dict)
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        # For semantic place, TODO: add
+        action_dict = {
+            "arm_action": action[:5],
+            "base_action": None,
+            "grip_action": action[5],
         }
 
         return action_dict
