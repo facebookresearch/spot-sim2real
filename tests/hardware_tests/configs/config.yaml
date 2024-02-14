@@ -1,4 +1,6 @@
-WEIGHTS:
+WEIGHTS_TYPE: WEIGHTS #WEIGHTS_TORCHSCRIPT or WEIGHTS
+
+WEIGHTS_TORCHSCRIPT:
   # Regular Nav
   NAV: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript"
   
@@ -11,9 +13,22 @@ WEIGHTS:
   # Static place
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
-  # ASC
-  MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
+WEIGHTS:
+  # Regular Nav
+  NAV: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
+  
+  # Static gaze
+  GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
+  # Mobile Gaze torchscript module files path
+  MOBILE_GAZE: "weights/mg97_2_latest.pth"
+  
+  # Static place
+  PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
+  
+  # ASC (weight of ASC will always remain in pytorch)
+  MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
+  
   # Mask-RCNN and Deblurgan for object detection
   MRCNN: "weights/ikea_apricot_large_only_model_0002999.pth"
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"

@@ -3,6 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import os
 import pickle
 from collections import OrderedDict
 from typing import Any
@@ -15,7 +16,7 @@ from habitat_baselines.rl.ddppo.policy.resnet_policy import PointNavResNetPolicy
 from habitat_baselines.rl.ppo.moe import NavGazeMixtureOfExpertsMask
 from habitat_baselines.rl.ppo.policy import PointNavBaselinePolicy
 from habitat_baselines.utils.common import GaussianNet, batch_obs
-from spot_rl.utils.utils import construct_config
+from spot_rl.utils.construct_configs import construct_config
 from torch import Size, Tensor
 from yacs.config import CfgNode as CN
 
@@ -40,10 +41,36 @@ class RealPolicy:
         action_space,
         device,
         policy_class=PointNavBaselinePolicy,
+        config=CN(),
     ):
         print("Loading policy...")
         self.device = torch.device(device)
-        self.is_torchscript_policy = "torchscript" in checkpoint_path
+        # config = construct_config()
+
+        self.is_torchscript_policy = False
+
+        if (
+            "torchscript" in str(config.WEIGHTS_TYPE).lower()
+            and type(checkpoint_path) == str
+        ):
+            # map pytorch weight path to torchscript path based on basename
+            checkpoint_path_without_ext = os.path.basename(checkpoint_path).split(".")[
+                0
+            ]
+            checkpoint_path_ts = [
+                torchscript_checkpoint_path
+                for torchscript_checkpoint_path in list(
+                    config.WEIGHTS_TORCHSCRIPT.values()
+                )
+                if checkpoint_path_without_ext in torchscript_checkpoint_path
+            ]
+            checkpoint_path = (
+                checkpoint_path_ts[0]
+                if len(checkpoint_path_ts) > 0
+                else checkpoint_path
+            )
+            self.is_torchscript_policy = "torchscript" in checkpoint_path
+        # print(policy_class, self.is_torchscript_policy)
         if self.is_torchscript_policy:
             # Hab3 policy loading
             # Load the policy using torch script
@@ -170,7 +197,9 @@ class GazePolicy(RealPolicy):
         action_space = spaces.Box(
             -1.0, 1.0, (config.get("GAZE_ACTION_SPACE_LENGTH", 4),)
         )
-        super().__init__(checkpoint_path, observation_space, action_space, device)
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
 
 
 class MobileGazePolicy(RealPolicy):
@@ -197,7 +226,9 @@ class MobileGazePolicy(RealPolicy):
         action_space = spaces.Box(
             -1.0, 1.0, (config.get("MOBILE_GAZE_ACTION_SPACE_LENGTH", 7),)
         )
-        super().__init__(checkpoint_path, observation_space, action_space, device)
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
 
 
 class PlacePolicy(RealPolicy):
@@ -213,7 +244,9 @@ class PlacePolicy(RealPolicy):
         action_space = spaces.Box(
             -1.0, 1.0, (config.get("PLACE_ACTION_SPACE_LENGTH", 4),)
         )
-        super().__init__(checkpoint_path, observation_space, action_space, device)
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
 
 
 class NavPolicy(RealPolicy):
@@ -241,7 +274,9 @@ class NavPolicy(RealPolicy):
         action_space = spaces.Box(
             -1.0, 1.0, (config.get("NAV_ACTION_SPACE_LENGTH", 2),)
         )
-        super().__init__(checkpoint_path, observation_space, action_space, device)
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
 
 
 class MixerPolicy(RealPolicy):
@@ -252,6 +287,7 @@ class MixerPolicy(RealPolicy):
         gaze_checkpoint_path,
         place_checkpoint_path,
         device,
+        config,
     ):
         observation_space = SpaceDict(
             {
@@ -301,6 +337,7 @@ class MixerPolicy(RealPolicy):
             action_space,
             device,
             policy_class=NavGazeMixtureOfExpertsMask,
+            config=config,
         )
         self.not_done = torch.zeros(1, 1, dtype=torch.bool, device=self.device)
         self.moe_actions = None
