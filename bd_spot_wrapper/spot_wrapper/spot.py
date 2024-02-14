@@ -940,6 +940,29 @@ class Spot:
         quat = se3_pose.rotation.normalize()
         return sp.SE3(quat.to_matrix(), pos)
 
+    def get_ee_pos_in_body_frame(self):
+        """
+        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
+        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
+        If true, then the location is calculated from the vision frame else from home/dock
+        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        """
+        # Get the euler z,y,x
+        vision_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "vision",
+            "hand",
+        )
+        theta = math_helpers.quat_to_eulerZYX(
+            vision_T_hand.rotation
+        )  # Get the location
+        position = (
+            self.robot_state_client.get_robot_state()
+            .kinematic_state.transforms_snapshot.child_to_parent_edge_map["hand"]
+            .parent_tform_child.position
+        )
+        return np.array([position.x, position.y, position.z]), np.array(theta)[::-1]
+
 
 class SpotLease:
     """

@@ -58,3 +58,33 @@ class SpotPlaceEnv(SpotBaseEnv):
         }
 
         return observations
+
+
+class SpotSPlaceEnv(SpotPlaceEnv):
+    def __init__(self, config, spot: Spot):
+        super().__init__(config, spot)
+        self.initial_pose = None
+
+    def get_observations(self):
+        assert self.initial_pose is not None
+        # TODO: Obj_goal_sensor needs to be 3
+        obj_goal_sensor = self.get_place_sensor()
+        obj_goal_sensor = np.concatenate((obj_goal_sensor, obj_goal_sensor)).reshape(6)
+        current_gripper_orientation = self.spot.get_ee_pos_in_body_frame()[-1]
+        delta = self.initial_pose - current_gripper_orientation
+        delta = (delta + np.pi) % (2 * np.pi) - np.pi
+        arm_depth, _ = self.get_gripper_images()
+
+        observations = {
+            "obj_goal_sensor": obj_goal_sensor,
+            "relative_initial_ee_orientation": delta,
+            "articulated_agent_jaw_depth": arm_depth,
+            "joint": self.get_arm_joints(splace=True),
+            "is_holding": np.ones((1,)),
+        }
+
+        return observations
+
+    def step(self, grip_action=None, *args, **kwargs):
+        place = grip_action > 0.0
+        return super().step(place=place, *args, **kwargs)

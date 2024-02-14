@@ -250,6 +250,55 @@ class PlacePolicy(RealPolicy):
         )
 
 
+class SemanticPlacePolicy(RealPolicy):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
+        observation_space = SpaceDict(
+            {
+                "obj_goal_sensor": spaces.Box(
+                    shape=[
+                        6,
+                    ],
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    dtype=np.float32,
+                ),
+                "relative_initial_ee_orientation": spaces.Box(
+                    shape=[
+                        3,
+                    ],
+                    low=-np.pi,
+                    high=np.pi,
+                    dtype=np.float32,
+                ),
+                "articulated_agent_jaw_depth": spaces.Box(
+                    shape=[240, 228, 1], low=0.0, high=1.0, dtype=np.float32
+                ),
+                "joint": spaces.Box(
+                    shape=[
+                        5,
+                    ],
+                    low=0.0,
+                    high=1.0,
+                    dtype=np.float32,
+                ),
+                "is_holding": spaces.Box(
+                    shape=[
+                        1,
+                    ],
+                    low=0,
+                    high=1,
+                    dtype=np.float32,
+                ),
+            }
+        )
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("SEMANTIC_PLACE_ACTION_SPACE_LENGTH", 9),)
+        )
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
+
+
 class NavPolicy(RealPolicy):
     def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(

@@ -15,10 +15,16 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
-from spot_rl.envs.place_env import SpotPlaceEnv
+from spot_rl.envs.place_env import SpotPlaceEnv, SpotSPlaceEnv
 
 # Import policies
-from spot_rl.real_policy import GazePolicy, MobileGazePolicy, NavPolicy, PlacePolicy
+from spot_rl.real_policy import (
+    GazePolicy,
+    MobileGazePolicy,
+    NavPolicy,
+    PlacePolicy,
+    SemanticPlacePolicy,
+)
 
 # Import utils and helpers
 from spot_rl.utils.construct_configs import (
@@ -738,3 +744,164 @@ class Place(Skill):
         }
 
         return action_dict
+
+class SemanticPlace:
+    """
+    Place controller is used to execute place for given place targets
+
+    Args:
+        config: Config object
+        spot: Spot object
+        use_policies (bool): Whether to use policies or use BD API to execute place
+
+    How to use:
+        1. Create PlaceController object
+        2. Call execute() with place_target_list as input
+
+    Example:
+        config = construct_config_for_place(opts=[])
+        spot = Spot("PlaceController")
+        with spot.get_lease(hijack=True):
+            spot.power_robot()
+
+            place_target_list = [target1, target2, ...]
+            place_controller = PlaceController(config, spot, use_policies=True)
+            place_result = place_controller.execute(place_target_list, is_local=False)
+
+            spot.shutdown(should_dock=True)
+    """
+
+    def __init__(self, spot: Spot, config, use_policies=True):
+        # (TODO: Move all to base Skill class)
+        if not config:
+            config = construct_config_for_place()
+        # super.__init__(spot, config)
+        self.spot = spot
+        self.config = config
+        self.verbose = True
+
+        self.use_policies = use_policies
+        # Setup
+        if self.use_policies:
+            self.policy = SemanticPlacePolicy(
+                config.WEIGHTS.SPLACE, device=config.DEVICE, config=config
+            )
+            self.policy.reset()
+
+        self.env = SpotSPlaceEnv(config, spot)
+
+    def reset_env_and_policy(self, place_target, is_local):
+        """
+        Resets the env and policy
+
+        Args:
+            place_target (np.array([x,y,z])): Place target in either global frame or base frame of the robot
+            is_local (bool): Whether the place target is in the base frame of the robot
+
+        Returns:
+            observations: Initial observations from the env
+        """
+        observations = self.env.reset(place_target, is_local)
+        self.policy.reset()
+
+        return observations
+
+    def execute_place(self, place_target_list, is_local=False):
+        """
+        Execute place for each place target in place_target_list
+
+        Args:
+            place_target_list (list): List of place targets to go and place
+            is_local (bool): Whether the place target is in the local frame of the robot
+
+        Returns:
+            success_list (list): List of dicts containing the following keys:
+                - time_taken (float): Time taken to place the object
+                - success (bool): Whether the place was successful
+                - place_target (np.array([x,y,z])): Place target in base frame
+                - ee_pos (np.array([x,y,z])): End effector position in base frame
+        """
+        success_list = []
+        for place_target in place_target_list:
+            start_time = time.time()
+
+            self.env.say(f"Placing at {place_target}")
+
+            if self.use_policies:
+                self.env.initial_pose = self.spot.get_ee_pos_in_body_frame()[-1]
+                observations = self.reset_env_and_policy(place_target, is_local)
+                done = False
+
+                while not done:
+                    action = self.policy.act(observations)
+                    observations, _, done, _ = self.env.step(
+                        grip_action=action[5], arm_action=action[:5]
+                    )
+
+            # Record the success
+            local_place_target_spot = self.env.get_base_frame_place_target_spot()
+            local_ee_pose_spot = self.env.get_gripper_position_in_base_frame_spot()
+            success_list.append(
+                {
+                    "time_taken": time.time() - start_time,
+                    "success": is_position_within_bounds(
+                        local_place_target_spot,
+                        local_ee_pose_spot,
+                        self.config.SUCC_XY_DIST,
+                        self.config.SUCC_Z_DIST,
+                        convention="spot",
+                    ),
+                    "place_target": local_place_target_spot,
+                    "ee_pos": local_ee_pose_spot,
+                }
+            )
+
+            # Open gripper to drop the object
+            self.spot.open_gripper()
+            # Add sleep as open_gripper() is a non-blocking call
+            time.sleep(1)
+
+            # Reset the arm here
+            self.env.reset_arm()
+
+        return success_list
+
+    def execute(
+        self, place_target: Tuple[float, float, float], is_local=False
+    ) -> Tuple[bool, str]:  # noqa
+
+        if place_target is None:
+            message = "No place target specified, skipping nav"
+            conditional_print(message=message, verbose=self.verbose)
+            return False, message
+
+        (x, y, z) = place_target
+        conditional_print(
+            message=f"Place target object at x, y, z : {x}, {y}, {z}",
+            verbose=self.verbose,
+        )
+
+        result = None
+        place_target_tuple = None
+        try:
+            place_target_tuple = (x, y, z)
+            result = self.execute_place([place_target_tuple], is_local=is_local)
+        except Exception as e:
+            message = f"Error encountered while placing : {e}"
+            conditional_print(message=message, verbose=self.verbose)
+            return False, message
+
+        # Check for success and return appropriately
+        status = False
+        message = "Place failed to reach the target position"
+        if is_position_within_bounds(
+            result[0].get("ee_pos"),
+            result[0].get("place_target"),
+            self.config.SUCC_XY_DIST,
+            self.config.SUCC_Z_DIST,
+            convention="spot",
+        ):
+            status = True
+            message = "Successfully reached the target position"
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message

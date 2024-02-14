@@ -372,6 +372,7 @@ def convert_from_pytorch_to_torchscript(conversion_params_yaml_path: str):
         )
         observations[key] = np.zeros(shape, dtype=eval(dtype))
     # print({key:value.shape for key, value in observations.items()})
+    print(observation_space)
     observation_space = SpaceDict(observation_space)
     action_space = spaces.Box(-1.0, 1.0, (config.ACTION_SPACE_LENGTH,))
 
