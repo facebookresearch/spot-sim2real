@@ -14,8 +14,8 @@ ACTION_SPACE_LENGTH: 9
 # The path to load and save the models
 # TARGET_HAB3_POLICY_PATH: "../weights/semantic_place/latest_6.pth"
 # OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/semantic_place/latest_6_net.torchscript"
-TARGET_HAB3_POLICY_PATH: "../weights/semantic_place/sp12lhb2v2_5_latest.pth"
-OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/semantic_place/sp12lhb2v2_5_latest.torchscript"
+TARGET_HAB3_POLICY_PATH: "../weights/semantic_place/sp12lhb2v3_4_latest.pth"
+OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/semantic_place/sp12lhb2v3_4_latest.torchscript"
 # If we want to use stereo pair camera for mobile gaze
 USE_STEREO_PAIR_CAMERA: False
 NEW_HABITAT_LAB_POLICY_OR_OLD: 'new'
