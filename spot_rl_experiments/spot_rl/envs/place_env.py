@@ -88,5 +88,6 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         return observations
 
     def step(self, grip_action=None, *args, **kwargs):
-        place = grip_action > 0.0
+        # <= 0 for unsnap
+        place = grip_action <= 0.0
         return super().step(place=place, semantic_place=place, *args, **kwargs)
