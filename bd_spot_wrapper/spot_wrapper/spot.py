@@ -956,14 +956,12 @@ class Spot:
         Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
         """
         # Get the euler z,y,x
-        vision_T_hand = get_a_tform_b(
+        body_T_hand = get_a_tform_b(
             self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "vision",
+            "body",
             "hand",
         )
-        theta = math_helpers.quat_to_eulerZYX(
-            vision_T_hand.rotation
-        )  # Get the location
+        theta = math_helpers.quat_to_eulerZYX(body_T_hand.rotation)  # Get the location
         position = (
             self.robot_state_client.get_robot_state()
             .kinematic_state.transforms_snapshot.child_to_parent_edge_map["hand"]

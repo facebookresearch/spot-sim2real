@@ -14,7 +14,8 @@ WEIGHTS_TORCHSCRIPT:
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/latest_6_net.torchscript"
+  #SEMANTIC_PLACE: "weights/semantic_place/latest_6_net.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb2v2_5_latest.torchscript"
 
 WEIGHTS:
   # Regular Nav
@@ -30,7 +31,8 @@ WEIGHTS:
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/latest_6_net.torchscript"
+  #SEMANTIC_PLACE: "weights/semantic_place/latest_6_net.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb2v2_5_latest.torchscript"
   
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
@@ -85,10 +87,10 @@ MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
 
 # Arm action params
-MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
+MAX_JOINT_MOVEMENT: 0.11 #0.0872665  # Gaze arm speed (5 deg)
 MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
-INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
+INITIAL_ARM_JOINT_ANGLES:  [0, -180, 180, 90, 0, -90] #[0, -170, 120, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]

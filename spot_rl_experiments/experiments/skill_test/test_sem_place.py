@@ -19,6 +19,8 @@ if __name__ == "__main__":
         place_target = "test_semantic_place_table"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
+    # spotskillmanager.spot.get_ee_pos_in_body_frame()
+    # breakpoint()
     contnue = True
     while contnue:
         if in_fre_lab:
