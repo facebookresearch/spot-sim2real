@@ -19,6 +19,7 @@ if __name__ == "__main__":
         place_target = "test_semantic_place_table"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
+
     contnue = True
     while contnue:
         if in_fre_lab:

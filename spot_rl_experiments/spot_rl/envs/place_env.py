@@ -65,14 +65,13 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
 
     def get_observations(self):
         assert self.initial_ee_pose is not None
-        # TODO: Obj_goal_sensor needs to be 3
         obj_goal_sensor = self.get_place_sensor()
-        obj_goal_sensor = np.concatenate((obj_goal_sensor, obj_goal_sensor)).reshape(6)
         current_gripper_orientation = self.spot.get_ee_pos_in_body_frame()[-1]
         delta = self.initial_ee_pose - current_gripper_orientation
         delta = (delta + np.pi) % (2 * np.pi) - np.pi
         arm_depth, _ = self.get_gripper_images()
-
+        print("delta:", delta)
+        print("obj_goal_sensor:", obj_goal_sensor)
         observations = {
             "obj_goal_sensor": obj_goal_sensor,
             "relative_initial_ee_orientation": delta,
