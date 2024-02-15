@@ -988,7 +988,7 @@ class Spot:
         # Get the euler z,y,x
         vision_T_hand = get_a_tform_b(
             self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "vision",
+            "body",
             "hand",
         )
         theta = math_helpers.quat_to_eulerZYX(
