@@ -179,9 +179,13 @@ class Spot:
         )
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
         # Make our intel image client
-        self.intelrealsense_image_client = robot.ensure_client(
-            "intel-realsense-image-service"
-        )
+        try:
+            self.intelrealsense_image_client = robot.ensure_client(
+                "intel-realsense-image-service"
+            )
+        except Exception:
+            print("There is no intel-realsense-image_service. Using gripper cameras")
+            self.intelrealsense_image_client = None
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
         )
