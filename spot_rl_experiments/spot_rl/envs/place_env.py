@@ -40,7 +40,7 @@ class SpotPlaceEnv(SpotBaseEnv):
             self.config.SUCC_Z_DIST,
             convention="habitat",
         )
-
+        print("place in base place env:", place)
         return super().step(place=place, *args, **kwargs)
 
     def get_success(self, observations):
@@ -70,8 +70,8 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         delta = self.initial_ee_pose - current_gripper_orientation
         delta = (delta + np.pi) % (2 * np.pi) - np.pi
         arm_depth, _ = self.get_gripper_images()
-        print("delta:", delta)
-        print("obj_goal_sensor:", obj_goal_sensor)
+        print("init rpy delta:", delta)
+        print("dis to xyz:", obj_goal_sensor)
         observations = {
             "obj_goal_sensor": obj_goal_sensor,
             "relative_initial_ee_orientation": delta,
@@ -85,4 +85,5 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
     def step(self, grip_action=None, *args, **kwargs):
         # <= 0 for unsnap
         place = grip_action <= 0.0
+        print("grip_action in sem place env:", grip_action)
         return super().step(place=place, semantic_place=place, *args, **kwargs)
