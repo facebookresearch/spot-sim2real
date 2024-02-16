@@ -4,6 +4,7 @@
 
 
 import numpy as np
+import quaternion
 from spot_rl.envs.skill_manager import SpotSkillManager
 
 if __name__ == "__main__":
@@ -19,7 +20,13 @@ if __name__ == "__main__":
         place_target = "test_semantic_place_table"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
-
+    # spotskillmanager.spot.move_gripper_to_point(np.array([0.55, 0, 0.26]),[0.57,1.4,0])
+    init_rotation = spotskillmanager.spot.get_ee_pos_in_body_frame_quat()
+    quat = quaternion.quaternion(
+        init_rotation.w, init_rotation.x, init_rotation.y, init_rotation.z
+    )
+    quat_value = spotskillmanager.spot.angle_between_quat(quat, quat)
+    breakpoint()
     contnue = True
     while contnue:
         if in_fre_lab:

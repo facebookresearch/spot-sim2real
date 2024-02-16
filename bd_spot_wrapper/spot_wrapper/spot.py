@@ -925,6 +925,11 @@ class Spot:
         mn_transformation = mn.Matrix4.from_(rotation_matrix, translation)
         return mn_transformation
 
+    def angle_between_quat(self, q1, q2):
+        q1_inv = np.conjugate(q1)
+        dp = quaternion.as_float_array(q1_inv * q2)
+        return 2 * np.arctan2(np.linalg.norm(dp[1:]), np.abs(dp[0]))
+
     # TODO: Remove this function in PR#118
     @staticmethod
     def convert_transformation_from_sophus_to_magnum(
@@ -995,6 +1000,7 @@ class Spot:
             "body",
             "hand",
         )
+        print("vision_T_hand.rotation:", vision_T_hand.rotation)
         theta = math_helpers.quat_to_eulerZYX(
             vision_T_hand.rotation
         )  # Get the location
@@ -1004,6 +1010,21 @@ class Spot:
             .parent_tform_child.position
         )
         return np.array([position.x, position.y, position.z]), np.array(theta)[::-1]
+
+    def get_ee_pos_in_body_frame_quat(self):
+        """
+        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
+        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
+        If true, then the location is calculated from the vision frame else from home/dock
+        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        """
+        # Get the euler z,y,x
+        vision_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "body",
+            "hand",
+        )
+        return vision_T_hand.rotation
 
 
 class SpotLease:
