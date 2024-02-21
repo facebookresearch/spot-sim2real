@@ -361,9 +361,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             if np.count_nonzero(arm_action) > 0:
                 arm_action *= self._max_joint_movement_scale
                 arm_action = self.current_arm_pose + pad_action(arm_action)
+                print("before clip:", arm_action)
+                print("cur arm:", self.current_arm_pose)
                 arm_action = np.clip(
                     arm_action, self.arm_lower_limits, self.arm_upper_limits
                 )
+                print("after clip:", arm_action)
             else:
                 arm_action = None
 
@@ -799,6 +802,22 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         gripper_pos = base_T_gripper.transform_point(hab_place_target)
 
         return gripper_pos
+
+    def get_place_sensor_norm(self):
+        # Get the EE T
+        base_to_ee_T = self.spot.get_ee_transform()
+        # Get the place target
+        base_frame_place_target = self.get_base_frame_place_target_spot()
+        # Get the local ee xyz
+        gripper_pos = np.array(
+            base_to_ee_T.inverse().transform_point(
+                base_frame_place_target[0],
+                base_frame_place_target[1],
+                base_frame_place_target[2],
+            )
+        )
+        print(gripper_pos)
+        return np.array([np.linalg.norm(gripper_pos)], dtype=np.float32)
 
     def get_base_frame_place_target_spot(self):
         if self.place_target_is_local:

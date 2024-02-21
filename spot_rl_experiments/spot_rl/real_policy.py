@@ -255,9 +255,9 @@ class SemanticPlacePolicy(RealPolicy):
     def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
             {
-                "obj_goal_sensor": spaces.Box(
+                "distance_goal_sensor": spaces.Box(
                     shape=[
-                        6,
+                        1,
                     ],
                     low=np.finfo(np.float32).min,
                     high=np.finfo(np.float32).max,
@@ -265,10 +265,18 @@ class SemanticPlacePolicy(RealPolicy):
                 ),
                 "relative_initial_ee_orientation": spaces.Box(
                     shape=[
-                        3,
+                        1,
                     ],
-                    low=-np.pi,
-                    high=np.pi,
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    dtype=np.float32,
+                ),
+                "relative_target_object_orientation": spaces.Box(
+                    shape=[
+                        1,
+                    ],
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
                     dtype=np.float32,
                 ),
                 "articulated_agent_jaw_depth": spaces.Box(
@@ -278,8 +286,8 @@ class SemanticPlacePolicy(RealPolicy):
                     shape=[
                         5,
                     ],
-                    low=0.0,
-                    high=1.0,
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
                     dtype=np.float32,
                 ),
                 "is_holding": spaces.Box(
