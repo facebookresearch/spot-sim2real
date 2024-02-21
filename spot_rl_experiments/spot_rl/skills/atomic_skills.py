@@ -7,6 +7,7 @@ import time
 from typing import Dict, List, Tuple
 
 import numpy as np
+import quaternion
 from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
@@ -640,7 +641,6 @@ class SemanticPlace:
             self.env.say(f"Placing at {place_target}")
 
             if self.use_policies:
-                self.env.initial_ee_pose = self.spot.get_ee_pos_in_body_frame()[-1]
                 observations = self.reset_env_and_policy(place_target, is_local)
                 done = False
 

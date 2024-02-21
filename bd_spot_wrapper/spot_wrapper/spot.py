@@ -1011,7 +1011,7 @@ class Spot:
         )
         return np.array([position.x, position.y, position.z]), np.array(theta)[::-1]
 
-    def get_ee_pos_in_body_frame_quat(self):
+    def get_ee_transform(self):
         """
         Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
         Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
@@ -1024,7 +1024,23 @@ class Spot:
             "body",
             "hand",
         )
-        return vision_T_hand.rotation
+        return vision_T_hand
+
+    def get_ee_pos_in_body_frame_quat(self):
+        """
+        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
+        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
+        If true, then the location is calculated from the vision frame else from home/dock
+        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        """
+        vision_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "body",
+            "hand",
+        )
+        quat = vision_T_hand.rotation
+        quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
+        return quat
 
 
 class SpotLease:

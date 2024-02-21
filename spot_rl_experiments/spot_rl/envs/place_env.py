@@ -5,6 +5,7 @@
 
 import magnum as mn
 import numpy as np
+import quaternion
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_wrapper.spot import Spot
@@ -25,7 +26,13 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.place_target_is_local = target_is_local
 
         self.reset_arm()
-
+        self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
+        self.target_object_pose = quaternion.quaternion(
+            0.709041893482208,
+            0.704837739467621,
+            -0.00589140923693776,
+            -0.0207040011882782,
+        )
         observations = super().reset()
         self.placed = False
         return observations
@@ -59,22 +66,43 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
     def __init__(self, config, spot: Spot):
         super().__init__(config, spot)
         self.initial_ee_pose = None
+        self.target_object_pose = None
         # Overwrite joint limits for semantic_place skills
         self.arm_lower_limits = np.deg2rad(config.ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE)
         self.arm_upper_limits = np.deg2rad(config.ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE)
 
     def get_observations(self):
         assert self.initial_ee_pose is not None
-        obj_goal_sensor = self.get_place_sensor()
-        current_gripper_orientation = self.spot.get_ee_pos_in_body_frame()[-1]
-        delta = self.initial_ee_pose - current_gripper_orientation
-        delta = (delta + np.pi) % (2 * np.pi) - np.pi
+        assert self.target_object_pose is not None
+
+        # Get the gaol sensor
+        # obj_goal_sensor = self.get_place_sensor()
+        obj_goal_sensor = self.get_place_sensor_norm()
+
+        # Get the delta ee orientation
+        current_gripper_orientation = self.spot.get_ee_pos_in_body_frame_quat()
+        delta_ee = self.spot.angle_between_quat(
+            self.initial_ee_pose, current_gripper_orientation
+        )
+        delta_ee = np.array([delta_ee], dtype=np.float32)
+
+        # Get the delta object orientation
+        delta_obj = self.spot.angle_between_quat(
+            self.target_object_pose, current_gripper_orientation
+        )
+        delta_obj = np.array([delta_obj], dtype=np.float32)
+
+        # Get the jaw image
         arm_depth, _ = self.get_gripper_images()
-        print("init rpy delta:", delta)
-        print("dis to xyz:", obj_goal_sensor)
+
+        print("rpy to init ee:", delta_ee)
+        print("rpy to targ obj:", delta_obj)
+        print("xyz to targ obj:", obj_goal_sensor)
+
         observations = {
-            "obj_goal_sensor": obj_goal_sensor,
-            "relative_initial_ee_orientation": delta,
+            "distance_goal_sensor": obj_goal_sensor,
+            "relative_initial_ee_orientation": delta_ee,
+            "relative_target_object_orientation": delta_obj,
             "articulated_agent_jaw_depth": arm_depth,
             "joint": self.get_arm_joints(semantic_place=True),
             "is_holding": np.ones((1,)),
