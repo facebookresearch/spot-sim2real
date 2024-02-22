@@ -269,6 +269,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         semantic_place=False,
         nav_silence_only=True,
         disable_oa=None,
+        travel_time_scale=1.0,
     ):
         """Moves the arm and returns updated observations
 
@@ -397,7 +398,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 )
             elif arm_action is not None:
                 self.spot.set_arm_joint_positions(
-                    positions=arm_action, travel_time=1 / self.ctrl_hz * 0.9
+                    positions=arm_action,
+                    travel_time=1 / self.ctrl_hz * 0.9 * travel_time_scale,
                 )
 
         if self.prev_base_moved and base_action is None:
