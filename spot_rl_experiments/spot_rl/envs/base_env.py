@@ -255,11 +255,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
     def reset_arm(self):
         # Move arm to initial configuration
-        self.spot.open_gripper()
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=0.75
         )
         self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
+        self.spot.close_gripper()
 
     def step(  # noqa
         self,
