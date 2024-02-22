@@ -255,9 +255,9 @@ class SemanticPlacePolicy(RealPolicy):
     def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
             {
-                "distance_goal_sensor": spaces.Box(
+                "obj_goal_sensor": spaces.Box(
                     shape=[
-                        1,
+                        3,
                     ],
                     low=np.finfo(np.float32).min,
                     high=np.finfo(np.float32).max,

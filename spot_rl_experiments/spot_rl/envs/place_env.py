@@ -28,28 +28,33 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.place_target_is_local = target_is_local
 
         self.reset_arm()
+        # Set the initial ee pose
         self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
-        self.target_object_pose = quaternion.quaternion(
-            0.709041893482208,
-            0.704837739467621,
-            -0.00589140923693776,
-            -0.0207040011882782,
-        )
+        # Set the target pose
+        self.target_object_pose = self.spot.get_ee_pos_in_body_frame_quat()
+        # self.target_object_pose = quaternion.quaternion(
+        #     0.709041893482208,
+        #     0.704837739467621,
+        #     -0.00589140923693776,
+        #     -0.0207040011882782,
+        # )
         observations = super().reset()
         self.placed = False
         return observations
 
     def step(self, action_dict: Dict[str, Any], *args, **kwargs):
-        gripper_pos_in_base_frame = self.get_gripper_position_in_base_frame_hab()
-        place_target_in_base_frame = self.get_base_frame_place_target_hab()
-        place = is_position_within_bounds(
-            gripper_pos_in_base_frame,
-            place_target_in_base_frame,
-            self.config.SUCC_XY_DIST,
-            self.config.SUCC_Z_DIST,
-            convention="habitat",
-        )
-
+        # gripper_pos_in_base_frame = self.get_gripper_position_in_base_frame_hab()
+        # place_target_in_base_frame = self.get_base_frame_place_target_hab()
+        # place = is_position_within_bounds(
+        #     gripper_pos_in_base_frame,
+        #     place_target_in_base_frame,
+        #     self.config.SUCC_XY_DIST,
+        #     self.config.SUCC_Z_DIST,
+        #     convention="habitat",
+        # )
+        place = np.linalg.norm(self.get_place_sensor(True)) < 0.25
+        print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
+        
         # Update the action_dict with place flag
         action_dict["place"] = place
 
@@ -82,8 +87,8 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         assert self.target_object_pose is not None
 
         # Get the gaol sensor
-        # obj_goal_sensor = self.get_place_sensor()
-        obj_goal_sensor = self.get_place_sensor_norm()
+        obj_goal_sensor = self.get_place_sensor(True)
+        # obj_goal_sensor = self.get_place_sensor_norm()
 
         # Get the delta ee orientation
         current_gripper_orientation = self.spot.get_ee_pos_in_body_frame_quat()
@@ -104,9 +109,10 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         print("rpy to init ee:", delta_ee)
         print("rpy to targ obj:", delta_obj)
         print("xyz to targ obj:", obj_goal_sensor)
+        # self.spot.move_gripper_to_point(np.array([1.35, 0.17, 0.35]),[0.0,0,0])
 
         observations = {
-            "distance_goal_sensor": obj_goal_sensor,
+            "obj_goal_sensor": obj_goal_sensor,
             "relative_initial_ee_orientation": delta_ee,
             "relative_target_object_orientation": delta_obj,
             "articulated_agent_jaw_depth": arm_depth,
