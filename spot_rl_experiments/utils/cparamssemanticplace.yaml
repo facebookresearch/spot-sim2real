@@ -2,7 +2,7 @@
 MODEL_CLASS_NAME : "habitat_baselines.rl.ddppo.policy.resnet_policy.PointNavResNetPolicy"
 # Define the observation dict
 OBSERVATIONS_DICT:
-  distance_goal_sensor: [[1,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
+  obj_goal_sensor: [[3,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
   relative_initial_ee_orientation: [[1,],'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
   relative_target_object_orientation: [[1,],'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
   articulated_agent_jaw_depth: [[240, 228, 1], '0.0', '1.0', 'np.float32']
@@ -12,8 +12,8 @@ OBSERVATIONS_DICT:
 # Define the action space output length
 ACTION_SPACE_LENGTH: 9
 # The path to load and save the models
-TARGET_HAB3_POLICY_PATH: "../weights/semantic_place/sp12lrb5v1_6_ckpt.7.pth"
-OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/semantic_place/sp12lrb5v1_6_ckpt.7.torchscript"
+TARGET_HAB3_POLICY_PATH: "../weights/semantic_place/sp12lrb6v1_0_ckpt.18.pth"
+OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/semantic_place/sp12lrb6v1_0_ckpt.18.torchscript"
 # If we want to use stereo pair camera for mobile gaze
 USE_STEREO_PAIR_CAMERA: False
 NEW_HABITAT_LAB_POLICY_OR_OLD: 'new'

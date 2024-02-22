@@ -10,6 +10,13 @@ import time
 
 import cv2
 import gym
+from bosdyn.client.frame_helpers import (
+    GRAV_ALIGNED_BODY_FRAME_NAME,
+    HAND_FRAME_NAME,
+    VISION_FRAME_NAME,
+    get_a_tform_b,
+    get_vision_tform_body,
+)
 from spot_rl.utils.img_publishers import MAX_HAND_DEPTH
 from spot_rl.utils.mask_rcnn_utils import (
     generate_mrcnn_detections,
@@ -247,11 +254,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
     def reset_arm(self):
         # Move arm to initial configuration
-        self.spot.close_gripper()
+        self.spot.open_gripper()
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=0.75
         )
-        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=2)
+        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
 
     def step(  # noqa
         self,
@@ -788,14 +795,26 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             mn.Vector3(self.x, self.y, 0.5),
         )
 
-    def get_place_sensor(self):
+    def get_place_sensor(self, use_base_rot=False):
         # The place goal should be provided relative to the local robot frame given that
         # the robot is at the place receptacle
-        gripper_T_base = self.get_in_gripper_tf()
-        base_T_gripper = gripper_T_base.inverted()
-        base_frame_place_target = self.get_base_frame_place_target_spot()
-        hab_place_target = self.spot2habitat_translation(base_frame_place_target)
-        gripper_pos = base_T_gripper.transform_point(hab_place_target)
+        if use_base_rot:
+            base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+            height = base_T.translation[2]
+            ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+            # Move the base to ee location
+            base_T.translation = ee_T.translation
+            # Get the glocal location of the place target
+            target = np.copy(self.place_target)
+            # Offset when we register the point
+            target[2] -= height
+            gripper_pos = base_T.inverted().transform_point(target)
+        else:
+            gripper_T_base = self.get_in_gripper_tf()
+            base_T_gripper = gripper_T_base.inverted()
+            base_frame_place_target = self.get_base_frame_place_target_spot()
+            hab_place_target = self.spot2habitat_translation(base_frame_place_target)
+            gripper_pos = base_T_gripper.transform_point(hab_place_target)
 
         return gripper_pos
 
