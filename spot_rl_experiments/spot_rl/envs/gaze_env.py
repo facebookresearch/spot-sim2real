@@ -6,6 +6,7 @@
 import sys
 from typing import Dict, List
 
+import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_wrapper.spot import Spot
@@ -36,6 +37,7 @@ class SpotGazeEnv(SpotBaseEnv):
         )
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
+        self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
 
     def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
@@ -49,7 +51,7 @@ class SpotGazeEnv(SpotBaseEnv):
         # Update target object name as provided in config
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
-
+        rospy.set_param("is_gripper_blocked", 0)
         return observations
 
     def step(self, base_action=None, arm_action=None, grasp=False, place=False):

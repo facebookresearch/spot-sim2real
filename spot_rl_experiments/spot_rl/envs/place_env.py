@@ -6,6 +6,7 @@
 import magnum as mn
 import numpy as np
 import quaternion
+import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_wrapper.spot import Spot
@@ -25,7 +26,8 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.place_target = np.array(place_target)
         self.place_target_is_local = target_is_local
 
-        self.reset_arm()
+        if not self.config.RUNNING_AFTER_GRASP_FOR_PLACE:
+            self.reset_arm()
         # Set the initial ee pose
         self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
         # Set the target pose
@@ -38,6 +40,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         # )
         observations = super().reset()
         self.placed = False
+        rospy.set_param("is_gripper_blocked", 1)
         return observations
 
     def step(self, place=False, *args, **kwargs):
@@ -50,7 +53,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     self.config.SUCC_Z_DIST,
         #     convention="habitat",
         # )
-        place = np.linalg.norm(self.get_place_sensor(True)) < 0.225
+        place = np.linalg.norm(self.get_place_sensor(True)) < 0.2
         print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
         print("place in base place env:", place)
         return super().step(
