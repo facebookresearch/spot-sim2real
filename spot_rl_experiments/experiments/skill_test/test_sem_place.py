@@ -29,7 +29,11 @@ if __name__ == "__main__":
     while contnue:
         if in_fre_lab:
             spotskillmanager.nav(place_target)
-        # spotskillmanager.pick("bottle")
+        else:
+            spotskillmanager.nav("nyc_mg_pos1")
+            spotskillmanager.pick("glass bottle")
+            spotskillmanager.nav(place_target)
+
         spotskillmanager.place(place_target)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 

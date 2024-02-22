@@ -421,6 +421,8 @@ class Spot:
                 # The axis in the vision frame is the negative z-axis
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=-1)
 
+                print("topdown grasping")
+
             else:
                 # Add a constraint that requests that the y-axis of the gripper is
                 # pointing in the positive-z direction in the vision frame. That means
@@ -433,6 +435,8 @@ class Spot:
                 # The axis in the vision frame is the positive z-axis
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=1)
 
+                print("side grasping")
+
             grasp.grasp_params.grasp_params_frame_name = VISION_FRAME_NAME
             # Add the vector constraint to our proto.
             constraint = grasp.grasp_params.allowable_orientation.add()
@@ -444,7 +448,7 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            # constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
