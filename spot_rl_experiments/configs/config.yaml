@@ -89,7 +89,7 @@ MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
 
 # Arm action params
-MAX_JOINT_MOVEMENT: 0.04 #0.0872665  # Gaze arm speed (5 deg)
+MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
 MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 # This angle levels up the arm

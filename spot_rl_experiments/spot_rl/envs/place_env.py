@@ -52,13 +52,15 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     self.config.SUCC_Z_DIST,
         #     convention="habitat",
         # )
-        place = np.linalg.norm(self.get_place_sensor(True)) < 0.2
+        place = np.linalg.norm(self.get_place_sensor(True)) < 0.225
         print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
         
         # Update the action_dict with place flag
         action_dict["place"] = place
+        action_dict["travel_time_scale"] = 1.0 / 0.9 * 1.2
 
         print("place in base place env:", place)
+
         return super().step(action_dict=action_dict, *args, **kwargs)
 
     def get_success(self, observations):
