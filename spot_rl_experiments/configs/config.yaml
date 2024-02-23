@@ -14,9 +14,9 @@ WEIGHTS_TORCHSCRIPT:
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb2v3_6_ckpt.118.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb2v3_4_latest.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.120.torchscript"
+  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
+
 
 WEIGHTS:
   # Regular Nav
@@ -32,9 +32,9 @@ WEIGHTS:
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb2v3_6_ckpt.118.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb2v3_4_latest.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.120.torchscript"
+  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
+
   
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
@@ -79,7 +79,7 @@ EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
 SUCC_XY_DIST: 0.25
 SUCC_Z_DIST: 0.05
 PLACE_ACTION_SPACE_LENGTH: 4
-RUNNING_AFTER_GRASP_FOR_PLACE: True
+RUNNING_AFTER_GRASP_FOR_PLACE: False
 
 #Semantic Place
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9

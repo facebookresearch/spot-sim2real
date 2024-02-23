@@ -38,9 +38,9 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     -0.00589140923693776,
         #     -0.0207040011882782,
         # )
+        rospy.set_param("is_gripper_blocked", 1)
         observations = super().reset()
         self.placed = False
-        rospy.set_param("is_gripper_blocked", 1)
         return observations
 
     def step(self, place=False, *args, **kwargs):
