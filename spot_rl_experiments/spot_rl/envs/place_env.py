@@ -57,7 +57,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
         print("place in base place env:", place)
         return super().step(
-            place=place, travel_time_scale=1.0 / 0.9 * 1.2, *args, **kwargs
+            place=place, travel_time_scale=1.0 / 0.9 * 1.75, *args, **kwargs
         )
 
     def get_success(self, observations):
