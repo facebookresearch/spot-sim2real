@@ -60,7 +60,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         
         # Update the action_dict with place flag
         action_dict["place"] = place
-        action_dict["travel_time_scale"] = 1.0 / 0.9 * 1.2
+        action_dict["travel_time_scale"] = 1.0 / 0.9 * 1.75
 
         print("place in base place env:", place)
 
