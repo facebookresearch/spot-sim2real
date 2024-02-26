@@ -17,14 +17,13 @@ if __name__ == "__main__":
         place_target = "place_taget_test_table"
     else:
         # at NYC
-        place_target = "test_desk"  # "test_semantic_place_table"
+        place_target = "test_desk"  # "test_desk" #"shelf" #"drawer_pretend_to_be_dish_washer"  # "test_semantic_place_table"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
     # spotskillmanager.spot.move_gripper_to_point(np.array([0.55, 0, 0.26]),[0.57,1.4,0])
     # quat = spotskillmanager.spot.get_ee_pos_in_body_frame_quat()
     # quat_value = spotskillmanager.spot.angle_between_quat(quat, quat)
     # spotskillmanager.place_controller.env.get_place_sensor()
-
     contnue = True
     while contnue:
         if in_fre_lab:

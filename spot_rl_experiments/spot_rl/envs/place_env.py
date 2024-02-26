@@ -55,7 +55,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     self.config.SUCC_Z_DIST,
         #     convention="habitat",
         # )
-        place = np.linalg.norm(self.get_place_sensor(True)) < 0.2
+        place = np.linalg.norm(self.get_place_sensor(True)) < 0.25
         print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
         
         # Update the action_dict with place flag
