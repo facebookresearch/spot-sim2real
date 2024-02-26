@@ -14,7 +14,7 @@ WEIGHTS_TORCHSCRIPT:
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.120.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v3_24_ckpt.239.torchscript"
   # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
 
 
@@ -32,7 +32,7 @@ WEIGHTS:
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.120.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v3_24_ckpt.239.torchscript"
   # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
 
   
@@ -101,9 +101,12 @@ INITIAL_ARM_JOINT_ANGLES: [0, -180, 180, 0, 0, 90]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
-ARM_UPPER_LIMITS: [45, -45, 180, 0, 90, 0]
-ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE: [-45, -180, 0, 0, -90, -90]
-ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE: [45, -45, 180, 0, 90, 90]
+ARM_UPPER_LIMITS: [45, 0, 180, 0, 90, 0]
+# TODO: need to finalize the arm range
+# ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE: [-45, -180, 0, 0, -90, -90]
+# ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE: [45, -45, 180, 0, 90, 90]
+ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE: [-90, -180, 0, 0, -90, -90]
+ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE: [90, 0, 180, 0, 90, 90]
 JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"
 
 ACTUALLY_MOVE_ARM: True
