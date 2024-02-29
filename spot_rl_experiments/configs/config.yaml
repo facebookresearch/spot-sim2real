@@ -14,7 +14,7 @@ WEIGHTS_TORCHSCRIPT:
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.138.torchscript"
   # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
 
 
@@ -32,7 +32,7 @@ WEIGHTS:
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.138.torchscript"
   # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
 
   
@@ -95,6 +95,7 @@ MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 # This angle levels up the arm
 INITIAL_ARM_JOINT_ANGLES: [0, -180, 180, 0, 0, 90] 
+# INITIAL_ARM_JOINT_ANGLES: [0, -180, 180, 0, 0, 90] 
 # INITIAL_ARM_JOINT_ANGLES: [-0.91, -92.87, 91.21, 0, 90.01, 0] 
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
 # This is the robot holds the object: [-0.91, -92.87, 91.21, 0, 90.01, 0]

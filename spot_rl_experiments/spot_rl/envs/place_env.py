@@ -21,6 +21,57 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
         self.placed = False
 
+    def get_angle_v2(self, x, y):
+        if np.linalg.norm(x) != 0:
+            x_norm = x / np.linalg.norm(x)
+        else:
+            x_norm = x
+
+        if np.linalg.norm(y) != 0:
+            y_norm = y / np.linalg.norm(y)
+        else:
+            y_norm = y
+
+        return np.arccos(np.clip(np.dot(x_norm, y_norm), -1, 1))
+
+    def get_angle(self, rel_pos):
+        """Get angle"""
+        forward = np.array([1.0, 0, 0])
+        rel_pos = np.array(rel_pos)
+        forward = forward[[0, 1]]
+        rel_pos = rel_pos[[0, 1]]
+
+        heading_angle = self.get_angle_v2(forward, rel_pos)
+        c = np.cross(forward, rel_pos) < 0
+        if not c:
+            heading_angle = -1.0 * heading_angle
+        return heading_angle
+
+    def get_ee_target_orientation(self):
+        """ee target orientation"""
+        # Get base T
+        base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        height = base_T.translation[2]
+
+        # Get ee T
+        ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+
+        # Get the glocal location of the place target
+        target = np.copy(self.place_target)
+        # Offset when we register the point
+        target[2] -= height
+        obj_local_pos = base_T.inverted().transform_point(target)
+        # Get the angle
+        angle = self.get_angle(obj_local_pos)
+        # Rotate the base by the angle
+        base_T = base_T @ mn.Matrix4.rotation_z(mn.Rad(angle))
+
+        base_T_ee = base_T.inverted() @ ee_T
+
+        quat = quaternion.from_rotation_matrix(base_T_ee.rotation())
+
+        return quat
+
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
         assert place_target is not None
         self.place_target = np.array(place_target)
@@ -28,10 +79,16 @@ class SpotPlaceEnv(SpotBaseEnv):
 
         if not self.config.RUNNING_AFTER_GRASP_FOR_PLACE:
             self.reset_arm()
+            # There is a bit of mistchmatch of joints after resetting
+            # So we reset the arm again
+            ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
+            self.spot.move_gripper_to_point(ee_position, [np.pi / 2, 0, 0])
+
         # Set the initial ee pose
         self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
         # Set the target pose
-        self.target_object_pose = self.spot.get_ee_pos_in_body_frame_quat()
+        self.target_object_pose = self.get_ee_target_orientation()
+        # self.target_object_pose = self.spot.get_ee_pos_in_body_frame_quat()
         # self.target_object_pose = quaternion.quaternion(
         #     0.709041893482208,
         #     0.704837739467621,
@@ -53,7 +110,10 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     self.config.SUCC_Z_DIST,
         #     convention="habitat",
         # )
-        place = np.linalg.norm(self.get_place_sensor(True)) < 0.25
+        # xyz = self.get_place_sensor(True)
+        # if abs(xyz[2]) < 0.03 and np.linalg.norm(np.array([xyz[0], xyz[1]])) < 0.2:
+        #     breakpoint()
+
         print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
         print("place in base place env:", place)
         return super().step(
@@ -107,7 +167,12 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
 
         print("rpy to init ee:", delta_ee)
         print("rpy to targ obj:", delta_obj)
-        print("xyz to targ obj:", obj_goal_sensor)
+        print(
+            "xyz to targ obj:",
+            obj_goal_sensor,
+            self.initial_ee_pose,
+            current_gripper_orientation,
+        )
         # self.spot.move_gripper_to_point(np.array([1.35, 0.17, 0.35]),[0.0,0,0])
 
         observations = {
@@ -124,5 +189,5 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
     def step(self, grip_action=None, *args, **kwargs):
         # <= 0 for unsnap
         place = grip_action <= 0.0
-        print("grip_action in sem place env:", grip_action)
+        print("grip_action:", grip_action)
         return super().step(place=place, semantic_place=place, *args, **kwargs)
