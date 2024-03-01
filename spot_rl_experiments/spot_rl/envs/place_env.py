@@ -72,6 +72,20 @@ class SpotPlaceEnv(SpotBaseEnv):
 
         return quat
 
+    def get_cur_ee_pose_offset(self):
+        # Get base to hand's transformation
+        ee_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # Get the base transformation
+        base_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        # Do offset
+        base_transform.translation = base_transform.transform_point(
+            mn.Vector3(0.292, 0, 0)
+        )
+        # Get ee relative to base
+        ee_position = (base_transform.inverted() @ ee_transform).translation
+        base_T_hand_yaw = self.get_angle(ee_position)
+        return base_T_hand_yaw
+
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
         assert place_target is not None
         self.place_target = np.array(place_target)
@@ -87,8 +101,8 @@ class SpotPlaceEnv(SpotBaseEnv):
         # Set the initial ee pose
         self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
         # Set the target pose
-        self.target_object_pose = self.get_ee_target_orientation()
-        # self.target_object_pose = self.spot.get_ee_pos_in_body_frame_quat()
+        # self.target_object_pose = self.get_ee_target_orientation()
+        self.target_object_pose = self.spot.get_ee_pos_in_body_frame_quat()
         # self.target_object_pose = quaternion.quaternion(
         #     0.709041893482208,
         #     0.704837739467621,
@@ -160,7 +174,10 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         delta_obj = self.spot.angle_between_quat(
             self.target_object_pose, current_gripper_orientation
         )
-        delta_obj = np.array([delta_obj], dtype=np.float32)
+        # remove the offset from the base to object
+        delta_obj = np.array(
+            [delta_obj - abs(self.get_cur_ee_pose_offset())], dtype=np.float32
+        )
 
         # Get the jaw image
         arm_depth, _ = self.get_gripper_images()
@@ -183,7 +200,7 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
             "joint": self.get_arm_joints(semantic_place=True),
             "is_holding": np.ones((1,)),
         }
-
+        print("self.get_cur_ee_pose_offset()", self.get_cur_ee_pose_offset())
         return observations
 
     def step(self, grip_action=None, *args, **kwargs):
