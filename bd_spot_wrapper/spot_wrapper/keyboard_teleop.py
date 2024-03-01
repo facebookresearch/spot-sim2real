@@ -83,6 +83,15 @@ def main(spot: Spot):
     point, rpy = move_to_initial(spot)
     control_arm = False
 
+    # Init Spot Data Logger
+    spot.setup_logging_sources(
+        [(SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME)]
+    )
+
+    # st = time.time()
+    # spot.update_logging_data()
+    # print("Time Taken for 1 logging iteration : ", time.time() - st, " seconds")
+
     # Start in-terminal GUI
     stdscr = curses.initscr()
     stdscr.nodelay(True)
@@ -96,6 +105,9 @@ def main(spot: Spot):
             pressed_key = stdscr.getch()
 
             key_not_applicable = False
+
+            # Log Data
+            spot.update_logging_data()
 
             # Don't update if no key was pressed or we updated too recently
             if pressed_key == -1 or time.time() - last_execution < UPDATE_PERIOD:

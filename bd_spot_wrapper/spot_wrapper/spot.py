@@ -16,7 +16,11 @@ import os.path as osp
 import pdb
 import time
 from collections import OrderedDict
+<<<<<<< HEAD
 from typing import Dict, List
+=======
+from typing import Any, Dict, List, Tuple
+>>>>>>> Initial Prototype for Data logger
 
 import bosdyn.client
 import bosdyn.client.lease
@@ -149,6 +153,7 @@ SpotCamIdToFrameNameMap = {
     SpotCamIds.RIGHT_DEPTH_IN_VISUAL_FRAME: "right_fisheye",
     SpotCamIds.RIGHT_FISHEYE: "right_fisheye",
 }  # type: Dict[SpotCamIds, str]
+    # TODO: Maybe move all spot related frames names to one class (including frames defined in ros_frame_names.yaml)
 
 
 # CamIds that need to be rotated by 270 degrees in order to appear upright
@@ -332,7 +337,9 @@ class Spot:
             self.command_client, cmd_id, timeout_sec=timeout_sec
         )
 
-    def get_image_responses(self, sources, quality=None, pixel_format=None):
+    def get_image_responses(
+        self, sources, quality=None, pixel_format=None
+    ):  # returns 'google.protobuf.pyext._message.RepeatedCompositeContainer'
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -365,6 +372,82 @@ class Spot:
             image_responses = self.image_client.get_image_from_sources(sources)
 
         return image_responses
+
+    def setup_logging_sources(self, camera_source_pairs: List[Tuple[str, str]]):
+        """
+        Order .. RGB & then DEPTH_IN_RGB
+        DO NOT SUPPORT DEPTH and RGB_IN_DEPTH.
+        """
+        source_pair_list = []  # type: List[Tuple[str, str]]
+
+        if not camera_source_pairs:
+            print("Empty list passed in logger camera source")
+
+        # Verification checks
+        for (rgb_source, depth_in_vision_source) in camera_source_pairs:
+            if not (
+                ("_fisheye_image" in rgb_source or "color_image" in rgb_source)
+                and (
+                    "_depth_in_visual_frame" in depth_in_vision_source
+                    or "_depth_in_hand_color_frame" in depth_in_vision_source
+                )
+            ):
+                print(
+                    f"Invalid source name in pair ({rgb_source} , {depth_in_vision_source}). Tuple should have order as `<rgb_name>, <depth_in_vision_name>`)"
+                )
+            else:
+                source_pair_list.append((rgb_source, depth_in_vision_source))
+
+        self.source_pair_list = source_pair_list  # TODO define in init
+        print(f"Initialized logging for sources : {self.source_pair_list}")
+
+    def update_logging_data(self):
+        # print("Updating Log packet")
+
+        log_packet = {
+            "camera_data": [],
+            "vision_T_base": None,
+            "base_pose_xyt": None,
+            "arm_pose": None,
+        }  # type: Dict[str, Any]
+
+        for (rgb_source, depth_in_vision_source) in self.source_pair_list:
+            img_responses = self.get_image_responses(
+                [rgb_source, depth_in_vision_source]
+            )
+            log_packet["camera_data"].append(
+                {
+                    "src_info": (rgb_source, depth_in_vision_source),
+                    "rgb": image_response_to_cv2(
+                        img_responses[0]
+                    ),  # np.ndarray ... How to save? (Serialize to bytes / List / PNG)?
+                    "depth": image_response_to_cv2(
+                        img_responses[1]
+                    ),  # np.ndarray ... How to save? (Serialize to bytes / List / PNG)?
+                    "intrinsics_rgb": self.get_camera_intrinsics_as_3x3(
+                        img_responses[0].source.pinhole.intrinsics
+                    ),  # np.ndarray
+                    "instrinsics_depth": self.get_camera_intrinsics_as_3x3(
+                        img_responses[1].source.pinhole.intrinsics
+                    ),  # maybe not needed?  ... # np.ndarray  .. pickle to save
+                    "base_T_camera": self.get_sp_SE3_spot_a_T_b(
+                        img_responses[0].shot.transforms_snapshot,
+                        frame_a="body",
+                        frame_b=spot_cam_frame_names[rgb_source],
+                    ).matrix(),  # np.ndarray  .. pickle to save
+                }
+            )
+
+        log_packet["vision_T_base"] = self.get_sp_SE3_spot_a_T_b(
+            frame_tree_snapshot=None, frame_a="vision", frame_b="body"
+        ).matrix()  # np.ndarray  .. pickle to save
+        log_packet["base_pose_xyt"] = np.asarray(self.get_xy_yaw())
+        log_packet["arm_pose"] = self.get_arm_joint_positions()
+
+        # TODO: Check for optimized solution to store mixed DS in memory
+        # TODO: .to_list -> json || pickle dump to .json / .gz.json
+
+        # dump this struct in a folder "trajectory0/step_X.json"
 
     def grasp_point_in_image(
         self,
@@ -866,6 +949,19 @@ class Spot:
             for image_response in image_responses
         ]  # type: List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]
         return cam_intrinsics
+
+    def get_camera_intrinsics_as_3x3(self, camera_intrinsics) -> np.ndarray:
+        """
+        Converts camera intrinsics BD object to 3X3 camera intrinsics matrix
+        Args:
+           camera_intrinsics : bosdyn.api.image_pb2.CameraIntrinsics object"""
+        return None
+
+    def get_sp_SE3_spot_a_T_b(
+        self, frame_tree_snapshot, frame_a: str, frame_b: str
+    ) -> sp.SE3:
+        # This method is already defined in PR#118
+        return sp.SE3(np.eye(4))
 
     def get_ros_TransformStamped_vision_T_body(
         self, frame_tree_snapshot
