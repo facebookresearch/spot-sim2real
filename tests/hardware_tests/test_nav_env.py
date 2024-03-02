@@ -5,7 +5,7 @@
 
 
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pytest
@@ -41,7 +41,7 @@ def init_test_config():
     return config
 
 
-def compute_avg_and_std_time(ref_traj_set):
+def compute_avg_and_std_time(ref_traj_set: List[List[List[Dict]]]) -> Tuple[List, List]:
     """
     Compute average and standard deviation of time taken to reach each waypoint for all trajectories in ref_traj_set
 
@@ -77,7 +77,9 @@ def compute_avg_and_std_time(ref_traj_set):
     return avg_time_list_traj, std_time_list_traj
 
 
-def compute_avg_and_std_steps(ref_traj_set):
+def compute_avg_and_std_steps(
+    ref_traj_set: List[List[List[Dict]]],
+) -> Tuple[List, List]:
     """
     Computes average and standard deviation of steps taken to reach each waypoint for all trajectories in ref_traj_set
 
@@ -112,12 +114,14 @@ def compute_avg_and_std_steps(ref_traj_set):
     return avg_steps_list_traj, std_steps_list_traj
 
 
-def extract_goal_poses_timestamps_steps_from_traj(traj):
+def extract_goal_poses_timestamps_steps_from_traj(
+    trajs: List[List[Dict]],
+) -> Tuple[List, List, List]:
     """
     Extracts actual robot pose, timestamp, and number of steps that robot took to reach each of nav_targets
 
     Args:
-        traj: trajectory (a list for each waypoint) to extract goal poses, timestamps, and steps from
+        trajs: trajectory (a list for each waypoint) to extract goal poses, timestamps, and steps from
 
     Returns:
         goal_poses: list of actual robot poses at each waypoint
@@ -128,11 +132,11 @@ def extract_goal_poses_timestamps_steps_from_traj(traj):
     test_time_list = []
     test_pose_list = []
     test_step_list = []
-    num_wp_in_traj = len(traj)
+    num_wp_in_traj = len(trajs)
     # Test that test trajectory reached each waypoint successfully
     for wp_idx in range(num_wp_in_traj):
         # Capture robot's pose, timestamp when it reached each of its goals
-        data_at_last_wp = traj[wp_idx][-1]
+        data_at_last_wp = trajs[wp_idx][-1]
 
         pose_at_last_wp = data_at_last_wp["pose"]
         test_pose_list.append(pose_at_last_wp)
@@ -142,16 +146,19 @@ def extract_goal_poses_timestamps_steps_from_traj(traj):
         prev_time = time_at_last_wp
         test_time_list.append(time_delta_for_wp)
 
-        test_step_list.append(len(traj[wp_idx]))
+        test_step_list.append(len(trajs[wp_idx]))
 
     return test_pose_list, test_time_list, test_step_list
 
 
 def validate_nav_trajectories(
-    test_traj, config, test_waypoints_yaml_dict, test_waypoints
+    test_waypoints: List[str],
+    test_waypoints_yaml_dict: Dict,
+    test_trajs: List[List[Dict]],
+    config,
 ):
-    assert test_traj is not []
-    assert len(test_traj) == len(test_waypoints)
+    assert test_trajs is not []
+    assert len(test_trajs) == len(test_waypoints)
 
     ref_traj_set = load_json_files(test_square_nav_trajectories_dir)
 
@@ -161,7 +168,7 @@ def validate_nav_trajectories(
         test_pose_list,
         test_time_list,
         test_steps_list,
-    ) = extract_goal_poses_timestamps_steps_from_traj(test_traj)
+    ) = extract_goal_poses_timestamps_steps_from_traj(test_trajs)
 
     print(f"Dataset: Avg. time to reach each waypoint - {avg_time_list_traj}")
     print(f"Dataset: Std.Dev in time reach each waypoint - {std_time_list_traj}")
@@ -205,14 +212,15 @@ def validate_nav_trajectories(
         )
 
     # Report DTW scores
-    dtw_score_list = compute_dtw_scores(test_traj, ref_traj_set)
+    dtw_score_list = compute_dtw_scores(test_trajs, ref_traj_set)
     print(f"DTW scores: {dtw_score_list}")
 
 
-def validate_nav_feedback(feedback):
-    (status, message) = feedback
-    assert status is True
-    assert message == "Successfully reached the target pose by default"
+def validate_nav_feedbacks(feedback_list: List[Tuple[bool, str]]):
+    for feedback in feedback_list:
+        (status, message) = feedback
+        assert status is True
+        assert message == "Successfully reached the target pose by default"
 
 
 def test_nav_square():
@@ -230,33 +238,31 @@ def test_nav_square():
     ]
 
     test_spot = Spot("NavEnvHardwareTest")
-    test_traj = None
+    test_trajs = []  # type: List[List[Dict]]
+    test_feedbacks = []  # type: List[Tuple[bool,str]]
     with test_spot.get_lease(hijack=True):
         test_spot.power_robot()
-        nav_controller = Navigation(
-            spot=test_spot, config=config, record_robot_trajectories=True
+        nav_controller = Navigation(spot=test_spot, config=config)
+
+        # Test navigation execution and verify result + feedback
+        try:
+            for nav_target in test_nav_targets_list:
+                goal_dict = {"nav_target": nav_target}
+                test_feedbacks.append(nav_controller.execute(goal_dict=goal_dict))
+                test_trajs.append(
+                    nav_controller.get_most_recent_result_log().get("robot_trajectory")
+                )
+        except Exception:
+            pytest.fail(
+                "Pytest raised an error while executing Navigation.execute_rl_loop() from atomic_skills.py"
+            )
+        finally:
+            test_spot.shutdown(should_dock=False)
+
+        # Validate navigation trajectories
+        validate_nav_trajectories(
+            test_waypoints, test_waypoints_yaml_dict, test_trajs, config
         )
 
-        # Test navigation execution and verify with recorded trajectories
-        try:
-            test_traj = nav_controller.execute_nav(
-                nav_targets_list=test_nav_targets_list
-            )
-            validate_nav_trajectories(
-                test_traj, config, test_waypoints_yaml_dict, test_waypoints
-            )
-        except Exception:
-            pytest.fail(
-                "Pytest raised an error while executing Navigation.execute_nav() from atomic_skills.py"
-            )
-
-        # Test navigation execution and verify with feedback
-        try:
-            feedback = nav_controller.execute(test_nav_targets_list[0])
-            validate_nav_feedback(feedback)
-        except Exception:
-            pytest.fail(
-                "Pytest raised an error while executing Navigation.execute() from atomic_skills.py"
-            )
-
-        test_spot.shutdown(should_dock=False)
+        # Validate navigation feedback
+        validate_nav_feedbacks(test_feedbacks)

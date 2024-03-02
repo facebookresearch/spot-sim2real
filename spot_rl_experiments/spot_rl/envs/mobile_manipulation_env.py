@@ -6,6 +6,7 @@
 import os
 import time
 from collections import Counter
+from typing import Any, Dict
 
 import magnum as mn
 import numpy as np
@@ -116,7 +117,6 @@ def main(spot, use_mixer, config, out_path=None):
         env.stopwatch.reset()
         while not done:
             out_data.append((time.time(), env.x, env.y, env.yaw))
-
             if use_mixer:
                 print("inside use mixer")
                 base_action, arm_action = policy.act(observations)
@@ -124,10 +124,14 @@ def main(spot, use_mixer, config, out_path=None):
             else:
                 base_action, arm_action = policy.act(observations, expert=expert)
                 nav_silence_only = True
+
             env.stopwatch.record("policy_inference")
+            action_dict = {
+                "base_action": base_action,
+                "arm_action": arm_action,
+            }  # type: Dict[str, Any]
             observations, _, done, info = env.step(
-                base_action=base_action,
-                arm_action=arm_action,
+                action_dict=action_dict,
                 nav_silence_only=nav_silence_only,
             )
             # if done:
@@ -270,7 +274,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
 
         return SpotBaseEnv.reset(self)
 
-    def step(self, base_action, arm_action, *args, **kwargs):
+    def step(self, action_dict: Dict[str, Any], *args, **kwargs):
         # import pdb; pdb.set_trace()
         gripper_pos_in_base_frame = self.get_gripper_position_in_base_frame_hab()
         place_target_in_base_frame = self.get_base_frame_place_target_hab()
@@ -294,6 +298,10 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
         else:
             self.max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT
 
+        # Update the  action_dict with grasp and place flags
+        action_dict["grasp"] = grasp
+        action_dict["place"] = place
+
         # Slow the base down if we are close to the nav target for grasp to limit blur
         if (
             not self.grasp_attempted
@@ -307,10 +315,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
         disable_oa = False if self.rho > 0.3 and self.config.USE_OA_FOR_NAV else None
         observations, reward, done, info = SpotBaseEnv.step(
             self,
-            base_action=base_action,
-            arm_action=arm_action,
-            grasp=grasp,
-            place=place,
+            action_dict=action_dict,
             disable_oa=disable_oa,
             *args,
             **kwargs,

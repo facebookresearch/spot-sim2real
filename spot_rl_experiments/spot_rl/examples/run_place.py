@@ -4,6 +4,7 @@
 
 
 import sys
+from typing import Dict, List
 
 from spot_rl.skills.atomic_skills import Place
 from spot_rl.utils.construct_configs import construct_config_for_place
@@ -72,11 +73,21 @@ if __name__ == "__main__":
     with spot.get_lease(hijack=True):
         spot.power_robot()
         place_controller = Place(spot, config, use_policies=args.use_policies)
+        place_results = []  # type: List[Dict]
         try:
-            place_result = place_controller.execute_place(
-                place_target_list, args.target_is_local
-            )
+            for place_target in place_target_list:
+                print(f"Place target - {place_target}")
+                goal_dict = {
+                    "place_target": place_target,
+                    "is_local": args.target_is_local,
+                }
+                if args.use_policies:
+                    place_controller.execute(goal_dict=goal_dict)
+                place_results.append(place_controller.get_most_recent_result_log())
+        except Exception as e:
+            print(f"Error encountered while placing - {e}")
+            raise e
         finally:
-            spot.shutdown(should_dock=True)
+            spot.shutdown(should_dock=False)
 
-    print(f"Place results - {place_result}")
+    print(f"Place results - {place_results}")

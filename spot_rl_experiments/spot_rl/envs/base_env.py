@@ -7,6 +7,7 @@
 import os
 import os.path as osp
 import time
+from typing import Any, Dict
 
 import cv2
 import gym
@@ -253,10 +254,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
     def step(  # noqa
         self,
-        base_action=None,
-        arm_action=None,
-        grasp=False,
-        place=False,
+        action_dict: Dict[str, Any],
         nav_silence_only=True,
         disable_oa=None,
     ):
@@ -269,6 +267,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
+
+        # Get Base & Arm actions, grasp and place from action dictionary
+        base_action = action_dict.get("base_action", None)
+        arm_action = action_dict.get("arm_action", None)
+        grasp = action_dict.get("grasp", False)
+        place = action_dict.get("place", False)
+
         target_yaw = None
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
