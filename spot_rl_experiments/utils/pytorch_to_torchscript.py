@@ -56,10 +56,14 @@ class FinalTorchscriptModel(torch.nn.Module):
         std,
         min_log_std,
         max_log_std,
+        action_distribution_ts_1=None,
+        action_distribution_ts_2=None,
     ):
         super(FinalTorchscriptModel, self).__init__()
         self.net_ts = net_ts
         self.action_dist_ts = action_distribution_ts
+        self.action_dist_ts_1 = action_distribution_ts_1
+        self.action_dist_ts_2 = action_distribution_ts_2
         self.NEW_HABITAT_LAB_POLICY_OR_OLD = NEW_HABITAT_LAB_POLICY_OR_OLD
         self.std = std
         self.min_log_std = min_log_std
@@ -68,13 +72,16 @@ class FinalTorchscriptModel(torch.nn.Module):
     def get_action(self, mu_maybe_std, std):
         """Small wrapper to get the final action"""
         if self.NEW_HABITAT_LAB_POLICY_OR_OLD == "old":
-            return CustomNormal(*mu_maybe_std, validate_args=False)
-        mu_maybe_std = mu_maybe_std.float()
-        mu = mu_maybe_std
-        mu = torch.tanh(mu)
-        std = torch.clamp(std, self.min_log_std, self.max_log_std)
-        std = torch.exp(std)
-        return CustomNormal(mu, std, validate_args=False)
+            mu = torch.tanh(mu_maybe_std)
+            std = torch.clamp(std, min=1e-6, max=1)
+            return CustomNormal(mu, std, validate_args=False)
+        else:
+            mu_maybe_std = mu_maybe_std.float()
+            mu = mu_maybe_std
+            mu = torch.tanh(mu)
+            std = torch.clamp(std, self.min_log_std, self.max_log_std)
+            std = torch.exp(std)
+            return CustomNormal(mu, std, validate_args=False)
 
     def forward(
         self,
@@ -90,7 +97,12 @@ class FinalTorchscriptModel(torch.nn.Module):
             not_done_masks,
         )
         features, rnn_hidden_states = output_of_model[0], output_of_model[1]
-        action = self.get_action(self.action_dist_ts(features), self.std)
+        if self.NEW_HABITAT_LAB_POLICY_OR_OLD == "old":
+            action = self.get_action(
+                self.action_dist_ts_1(features), self.action_dist_ts_2(features)
+            )
+        else:
+            action = self.get_action(self.action_dist_ts(features), self.std)
         action = action.mean
         return action, rnn_hidden_states
 
@@ -230,13 +242,26 @@ class PolicyConverter:
             if self.conversion_params.NEW_HABITAT_LAB_POLICY_OR_OLD == "new"
             else self.policy.net.output_size
         )
-        traced_cell_ad = torch.jit.trace(
-            self.policy.action_distribution.mu_maybe_std
-            if self.conversion_params.NEW_HABITAT_LAB_POLICY_OR_OLD == "new"
-            else self.policy.action_distribution,
-            (torch.ones((1, action_dist_input_size)).to(self.device)),
-            strict=False,
-        )
+        if self.conversion_params.NEW_HABITAT_LAB_POLICY_OR_OLD == "old":
+            traced_cell_ad_mu = torch.jit.trace(
+                self.policy.action_distribution.mu,
+                (torch.ones((1, action_dist_input_size)).to(self.device)),
+                strict=False,
+            )
+            traced_cell_ad_std = torch.jit.trace(
+                self.policy.action_distribution.std,
+                (torch.ones((1, action_dist_input_size)).to(self.device)),
+                strict=False,
+            )
+            traced_cell_ad = traced_cell_ad_mu
+        else:
+            traced_cell_ad_mu = None
+            traced_cell_ad_std = None
+            traced_cell_ad = torch.jit.trace(
+                self.policy.action_distribution.mu_maybe_std,
+                (torch.ones((1, action_dist_input_size)).to(self.device)),
+                strict=False,
+            )
         # Create a Wrapper Network
         wrapper_network = FinalTorchscriptModel(
             traced_cell,
@@ -245,6 +270,8 @@ class PolicyConverter:
             self.std,
             self.min_log_std,
             self.max_log_std,
+            traced_cell_ad_mu,
+            traced_cell_ad_std,
         )
         wrapper_network.to(self.device)
         wrapper_network = torch.jit.trace(
