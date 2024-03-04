@@ -69,7 +69,7 @@ HEIGHT_SCALE = 0.5
 def pad_action(action):
     """We only control 4 out of 6 joints; add zeros to non-controllable indices."""
     if len(action) == 5:
-        return np.array([*action[:3], 0.0, action[3], action[4]])
+        return np.array([*action[:3], 0.0, action[3], 0])
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
@@ -255,7 +255,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def reset_arm(self):
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
-            positions=self.initial_arm_joint_angles, travel_time=0.75
+            positions=self.initial_arm_joint_angles, travel_time=2.00
         )
         self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
         self.spot.close_gripper()

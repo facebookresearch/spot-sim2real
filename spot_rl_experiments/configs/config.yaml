@@ -14,8 +14,8 @@ WEIGHTS_TORCHSCRIPT:
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_13_ckpt.206.torchscript"
+  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
 
 
 WEIGHTS:
@@ -32,8 +32,8 @@ WEIGHTS:
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v1_16_ckpt.53.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_13_ckpt.206.torchscript"
+  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
 
   
   # ASC (weight of ASC will always remain in pytorch)

@@ -3,6 +3,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import time
+
 import magnum as mn
 import numpy as np
 import quaternion
@@ -93,10 +95,13 @@ class SpotPlaceEnv(SpotBaseEnv):
 
         if not self.config.RUNNING_AFTER_GRASP_FOR_PLACE:
             self.reset_arm()
+            # We wait for a second to let the arm in the placing
+            # ready location
+            time.sleep(1.5)
             # There is a bit of mistchmatch of joints after resetting
             # So we reset the arm again
-            ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
-            self.spot.move_gripper_to_point(ee_position, [np.pi / 2, 0, 0])
+            # ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
+            # self.spot.move_gripper_to_point(ee_position, [np.pi / 2, 0, 0])
 
         # Set the initial ee pose
         self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
@@ -178,7 +183,6 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         delta_obj = np.array(
             [delta_obj - abs(self.get_cur_ee_pose_offset())], dtype=np.float32
         )
-
         # Get the jaw image
         arm_depth, _ = self.get_gripper_images()
 

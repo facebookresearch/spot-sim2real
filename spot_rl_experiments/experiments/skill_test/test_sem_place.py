@@ -32,6 +32,7 @@ if __name__ == "__main__":
             # spotskillmanager.nav("nyc_mg_pos1")
             # spotskillmanager.pick("glass bottle")
             # spotskillmanager.nav(place_target)
+            # breakpoint()
             pass
 
         spotskillmanager.place(place_target)
