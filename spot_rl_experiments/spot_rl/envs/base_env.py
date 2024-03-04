@@ -44,9 +44,10 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
+from spot_rl.utils.pose_correction import pose_correction_pipeline
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
-from spot_wrapper.spot import Spot, wrap_heading
+from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2, wrap_heading
 from std_msgs.msg import Float32, String
 
 MAX_CMD_DURATION = 5
@@ -303,6 +304,27 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 if self.config.VERBOSE:
                     print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
                 self.say("Grasping " + self.target_obj_name)
+
+                # Try to do Pose correction
+                if not rospy.get_param("pose_correction_success", False):
+                    image_responses = self.spot.get_hand_image_old(
+                        img_src=[
+                            SpotCamIds.INTEL_REALSENSE_COLOR,
+                            SpotCamIds.INTEL_REALSENSE_DEPTH,
+                        ]
+                    )
+                    camera_intrinsics = image_responses[0].source.pinhole.intrinsics
+                    image_responses = [
+                        image_response_to_cv2(image_response)
+                        for image_response in image_responses
+                    ]
+                    pose_correction_pipeline(
+                        image_responses[0],
+                        image_responses[1],
+                        None,
+                        "bottle",
+                        camera_intrinsics,
+                    )
 
                 # The following cmd is blocking
                 success = self.attempt_grasp()
@@ -735,7 +757,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return x1, y1, x2, y2
 
     @staticmethod
-    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.15):
+    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.55):
         cy, cx = height // 2, width // 2
         # Locked on if the center of the image is in the bbox
         if x1 < cx < x2 and y1 < cy < y2:
@@ -747,6 +769,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         dx = np.max([x1 - cx, 0, cx - x2])
         dy = np.max([y1 - cy, 0, cy - y2])
         bbox_dist = np.sqrt(dx**2 + dy**2)
+        print(
+            f"Locked on object {bbox_dist < pixel_radius}, {bbox_dist}, {pixel_radius}"
+        )
         locked_on = bbox_dist < pixel_radius
 
         return locked_on

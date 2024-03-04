@@ -55,7 +55,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     self.config.SUCC_Z_DIST,
         #     convention="habitat",
         # )
-        place = np.linalg.norm(self.get_place_sensor(True)) < 0.25
+        place = np.linalg.norm(self.get_place_sensor(True)) < 0.04
         print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
         
         # Update the action_dict with place flag
@@ -93,6 +93,7 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
 
         # Get the gaol sensor
         obj_goal_sensor = self.get_place_sensor(True)
+
         # obj_goal_sensor = self.get_place_sensor_norm()
 
         # Get the delta ee orientation

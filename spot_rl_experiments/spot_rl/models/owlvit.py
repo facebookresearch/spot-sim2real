@@ -104,7 +104,12 @@ class OwlVit:
         # img = img.to(self.device)
 
         inputs = self.processor(text=self.labels, images=img, return_tensors="pt")
-        target_sizes = torch.Tensor([img.shape[:2]]).to(self.device)
+        target_sizes = (
+            torch.Tensor([[max(img.shape[:2]), max(img.shape[:2])]]).to(self.device)
+            if self._version > 1
+            else torch.Tensor([img.shape[:2]]).to(self.device)
+        )
+
         inputs = inputs.to(self.device)
         # Inference
         with torch.no_grad():
