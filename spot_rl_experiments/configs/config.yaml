@@ -14,7 +14,7 @@ WEIGHTS_TORCHSCRIPT:
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_13_ckpt.206.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
   # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
 
 
@@ -32,7 +32,7 @@ WEIGHTS:
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
-  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_13_ckpt.206.torchscript"
+  SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
   # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
 
   

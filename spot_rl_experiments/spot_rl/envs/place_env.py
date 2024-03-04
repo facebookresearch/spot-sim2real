@@ -22,6 +22,7 @@ class SpotPlaceEnv(SpotBaseEnv):
 
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
         self.placed = False
+        self._time_step = 0
 
     def get_angle_v2(self, x, y):
         if np.linalg.norm(x) != 0:
@@ -93,6 +94,7 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.place_target = np.array(place_target)
         self.place_target_is_local = target_is_local
 
+        self._time_step = 0
         if not self.config.RUNNING_AFTER_GRASP_FOR_PLACE:
             self.reset_arm()
             # We wait for a second to let the arm in the placing
@@ -129,11 +131,21 @@ class SpotPlaceEnv(SpotBaseEnv):
         #     self.config.SUCC_Z_DIST,
         #     convention="habitat",
         # )
-        # xyz = self.get_place_sensor(True)
-        # if abs(xyz[2]) < 0.03 and np.linalg.norm(np.array([xyz[0], xyz[1]])) < 0.2:
-        #     breakpoint()
+        # We force the robot to place if it times out
+        xyz = self.get_place_sensor(True)
+        if (
+            abs(xyz[2]) < 0.05
+            and np.linalg.norm(np.array([xyz[0], xyz[1]])) < 0.25
+            and self._time_step >= 50
+        ):
+            place = True
+        if self._time_step >= 75:
+            place = True
 
-        print("dis to goal:", np.linalg.norm(self.get_place_sensor(True)))
+        self._time_step += 1
+        print(
+            "dis to goal:", np.linalg.norm(self.get_place_sensor(True)), self._time_step
+        )
         print("place in base place env:", place)
         return super().step(
             place=place, travel_time_scale=1.0 / 0.9 * 1.75, *args, **kwargs
