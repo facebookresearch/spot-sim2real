@@ -810,15 +810,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # the robot is at the place receptacle
         if use_base_rot:
             base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-            height = base_T.translation[2]
             ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+            body_T_ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
+            # Off set for the height
+            actual_ee_height = 0.5 + body_T_ee_T.translation[2] + 0.05
             # Move the base to ee location
-            base_T.translation = ee_T.translation
+            base_T.translation = mn.Vector3(
+                ee_T.translation[0], ee_T.translation[1], actual_ee_height
+            )
             # Get the glocal location of the place target
             target = np.copy(self.place_target)
             # Offset when we register the point
-            target[2] -= height
+            # 03/04: found base height is driftting
             gripper_pos = base_T.inverted().transform_point(target)
+            # Off set for the gripper
+            gripper_pos[0] += 0.2
         else:
             gripper_T_base = self.get_in_gripper_tf()
             base_T_gripper = gripper_T_base.inverted()
