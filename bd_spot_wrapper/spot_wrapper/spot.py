@@ -373,67 +373,57 @@ class Spot:
 
         return image_responses
 
-    def setup_logging_sources(self, camera_source_pairs: List[Tuple[str, str]]):
+    def setup_logging_sources(self, camera_sources: List[str]):
         """
         Order .. RGB & then DEPTH_IN_RGB
         DO NOT SUPPORT DEPTH and RGB_IN_DEPTH.
         """
-        source_pair_list = []  # type: List[Tuple[str, str]]
+        source_list = []  # type: List[str]
 
-        if not camera_source_pairs:
-            print("Empty list passed in logger camera source")
+        if not camera_sources:
+            print("Empty list passed in logger camera sources")
 
         # Verification checks
-        for (rgb_source, depth_in_vision_source) in camera_source_pairs:
-            if not (
-                ("_fisheye_image" in rgb_source or "color_image" in rgb_source)
-                and (
-                    "_depth_in_visual_frame" in depth_in_vision_source
-                    or "_depth_in_hand_color_frame" in depth_in_vision_source
-                )
+        for camera_source in camera_sources:
+            if (
+                "_depth" in camera_source
+                and "_depth_in_visual_frame" not in camera_source
+                and "_depth_in_hand_color_frame" not in camera_source
             ):
                 print(
-                    f"Invalid source name in pair ({rgb_source} , {depth_in_vision_source}). Tuple should have order as `<rgb_name>, <depth_in_vision_name>`)"
+                    f"Invalid source name {camera_source}. Camera source should either be rgb or depth aligned in rgb"
                 )
             else:
-                source_pair_list.append((rgb_source, depth_in_vision_source))
+                source_list.append(camera_source)
 
-        self.source_pair_list = source_pair_list  # TODO define in init
-        print(f"Initialized logging for sources : {self.source_pair_list}")
+        self.source_list = source_list  # TODO define in init
+        print(f"Initialized logging for sources : {self.source_list}")
 
     def update_logging_data(self):
-        # print("Updating Log packet")
 
         log_packet = {
+            "timestamp": time.time(),
             "camera_data": [],
             "vision_T_base": None,
             "base_pose_xyt": None,
             "arm_pose": None,
         }  # type: Dict[str, Any]
 
-        for (rgb_source, depth_in_vision_source) in self.source_pair_list:
-            img_responses = self.get_image_responses(
-                [rgb_source, depth_in_vision_source]
-            )
+        for camera_source in self.source_list:
+            img_responses = self.get_image_responses([camera_source])
             log_packet["camera_data"].append(
                 {
-                    "src_info": (rgb_source, depth_in_vision_source),
-                    "rgb": image_response_to_cv2(
+                    "src_info": camera_source,
+                    "raw_image": image_response_to_cv2(
                         img_responses[0]
                     ),  # np.ndarray ... How to save? (Serialize to bytes / List / PNG)?
-                    "depth": image_response_to_cv2(
-                        img_responses[1]
-                    ),  # np.ndarray ... How to save? (Serialize to bytes / List / PNG)?
-                    "intrinsics_rgb": self.get_camera_intrinsics_as_3x3(
+                    "camera_intrinsics": self.get_camera_intrinsics_as_3x3(
                         img_responses[0].source.pinhole.intrinsics
                     ),  # np.ndarray
-                    "instrinsics_depth": self.get_camera_intrinsics_as_3x3(
-                        img_responses[1].source.pinhole.intrinsics
-                    ),  # maybe not needed?  ... # np.ndarray  .. pickle to save
                     "base_T_camera": self.get_sp_SE3_spot_a_T_b(
                         img_responses[0].shot.transforms_snapshot,
                         frame_a="body",
-                        frame_b=spot_cam_frame_names[rgb_source],
+                        frame_b=spot_cam_frame_names[camera_source],
                     ).matrix(),  # np.ndarray  .. pickle to save
                 }
             )
@@ -441,8 +431,15 @@ class Spot:
         log_packet["vision_T_base"] = self.get_sp_SE3_spot_a_T_b(
             frame_tree_snapshot=None, frame_a="vision", frame_b="body"
         ).matrix()  # np.ndarray  .. pickle to save
-        log_packet["base_pose_xyt"] = np.asarray(self.get_xy_yaw())
+        log_packet["base_pose_xyt"] = np.asarray(
+            self.get_xy_yaw()
+        )  # redundant? Check if it is consistent with vision_T_base
         log_packet["arm_pose"] = self.get_arm_joint_positions()
+        # TODO: Add Gripper states (Griper Open/Close) : How to get gripper state from BD?
+        log_packet["is_gripper_closed"] = bool(
+            self.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
+        )
+        # TODO: Add force in gripper. How to get force reading?
 
         # TODO: Check for optimized solution to store mixed DS in memory
         # TODO: .to_list -> json || pickle dump to .json / .gz.json
@@ -1135,3 +1132,9 @@ def draw_crosshair(img):
 def wrap_heading(heading):
     """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
     return (heading + np.pi) % (2 * np.pi) - np.pi
+
+
+if __name__ == "__main__":
+    spot = Spot("A")
+    rs = spot.get_robot_state()
+    breakpoint()
