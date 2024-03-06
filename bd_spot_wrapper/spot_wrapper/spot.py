@@ -13,14 +13,9 @@
 """ Easy-to-use wrapper for properly controlling Spot """
 import os
 import os.path as osp
-import pdb
 import time
 from collections import OrderedDict
-<<<<<<< HEAD
-from typing import Dict, List
-=======
-from typing import Any, Dict, List, Tuple
->>>>>>> Initial Prototype for Data logger
+from typing import Any, Dict, List
 
 import bosdyn.client
 import bosdyn.client.lease
@@ -47,7 +42,6 @@ from bosdyn.client import math_helpers
 from bosdyn.client.docking import blocking_dock_robot, blocking_undock
 from bosdyn.client.frame_helpers import (
     GRAV_ALIGNED_BODY_FRAME_NAME,
-    HAND_FRAME_NAME,
     VISION_FRAME_NAME,
     get_a_tform_b,
     get_vision_tform_body,
@@ -153,7 +147,7 @@ SpotCamIdToFrameNameMap = {
     SpotCamIds.RIGHT_DEPTH_IN_VISUAL_FRAME: "right_fisheye",
     SpotCamIds.RIGHT_FISHEYE: "right_fisheye",
 }  # type: Dict[SpotCamIds, str]
-    # TODO: Maybe move all spot related frames names to one class (including frames defined in ros_frame_names.yaml)
+# TODO: Maybe move all spot related frames names to one class (including frames defined in ros_frame_names.yaml)
 
 
 # CamIds that need to be rotated by 270 degrees in order to appear upright
@@ -337,9 +331,7 @@ class Spot:
             self.command_client, cmd_id, timeout_sec=timeout_sec
         )
 
-    def get_image_responses(
-        self, sources, quality=None, pixel_format=None
-    ):  # returns 'google.protobuf.pyext._message.RepeatedCompositeContainer'
+    def get_image_responses(self, sources, quality=None, pixel_format=None):
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -347,7 +339,7 @@ class Spot:
             should return its image with
         :param pixel_format: either an int or a list specifying what pixel format each source
             should return its image with
-        :return: list containing bosdyn image response objects
+        :return: 'google.protobuf.pyext._message.RepeatedCompositeContainer'
         """
         if quality is not None:
             if isinstance(quality, int):
@@ -423,7 +415,7 @@ class Spot:
                     "base_T_camera": self.get_sp_SE3_spot_a_T_b(
                         img_responses[0].shot.transforms_snapshot,
                         frame_a="body",
-                        frame_b=spot_cam_frame_names[camera_source],
+                        frame_b=SpotCamIdToFrameNameMap[camera_source],
                     ).matrix(),  # np.ndarray  .. pickle to save
                 }
             )
@@ -929,36 +921,57 @@ class Spot:
         return img_resp
 
     def get_camera_intrinsics(
-        self, sources: List[SpotCamIds], quality=None, pixel_format=None
+        self,
+        sources: List[SpotCamIds],
+        quality=None,
+        pixel_format=None,
+        as_3x3_matrix: bool = False,
     ) -> List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]:
-        """Retrieve images from Spot's cameras
+        """Retrieve caliberation properties of stated Spot's cameras
 
         :param sources: list containing camera uuids
-        :param quality: either an int or a list specifying what quality each source
+        :param quality: (Optional) either an int or a list specifying what quality each source
             should return its image with
-        :return: list containing bosdyn image response objects
+        :param quality: (Optional) pixel format of response
+        :param as_3x3_matrix: (Optional) indicating the response of transformation if it should
+            be 3x3 np.ndarray or image_pb2.ImageSource.PinholeModel.CameraIntrinsics
+
+        :return: list containing all inputs cameras' intrinsics either as 3x3 np.ndarray or
+            as image_pb2.ImageSource.PinholeModel.CameraIntrinsics
         """
         image_responses = self.get_image_responses(
             sources, quality=quality, pixel_format=pixel_format
         )
-        cam_intrinsics = [
-            image_response.source.pinhole.intrinsics
-            for image_response in image_responses
-        ]  # type: List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]
-        return cam_intrinsics
 
-    def get_camera_intrinsics_as_3x3(self, camera_intrinsics) -> np.ndarray:
-        """
-        Converts camera intrinsics BD object to 3X3 camera intrinsics matrix
-        Args:
-           camera_intrinsics : bosdyn.api.image_pb2.CameraIntrinsics object"""
-        return None
+        camera_intrinsics_list = (
+            []
+        )  # type: List[Any[image_pb2.ImageSource.PinholeModel.CameraIntrinsics, np.ndarray]]
+        for image_response in image_responses:
+            camera_intrinsics = image_response.source.pinhole.intrinsics
+            if as_3x3_matrix:
+                fx = camera_intrinsics.focal_length.x
+                fy = camera_intrinsics.focal_length.y
+                ppx = camera_intrinsics.principal_point.x
+                ppy = camera_intrinsics.principal_point.y
+                camera_intrinsics_list.append(
+                    np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
+                )
+            else:
+                camera_intrinsics_list.append(camera_intrinsics)
+        return camera_intrinsics_list
 
-    def get_sp_SE3_spot_a_T_b(
-        self, frame_tree_snapshot, frame_a: str, frame_b: str
-    ) -> sp.SE3:
-        # This method is already defined in PR#118
-        return sp.SE3(np.eye(4))
+    # def get_camera_intrinsics_as_3x3(self, camera_intrinsics) -> np.ndarray:
+    #     """
+    #     Converts camera intrinsics BD object to 3X3 camera intrinsics matrix
+    #     Args:
+    #        camera_intrinsics : bosdyn.api.image_pb2.CameraIntrinsics object
+    #     """
+    #     fx = (camera_intrinsics.focal_length.x)
+    #     fy = (camera_intrinsics.focal_length.y)
+    #     ppx = (camera_intrinsics.principal_point.x)
+    #     ppy = (camera_intrinsics.principal_point.y)
+    #     intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
+    #     return intrinsics
 
     def get_ros_TransformStamped_vision_T_body(
         self, frame_tree_snapshot

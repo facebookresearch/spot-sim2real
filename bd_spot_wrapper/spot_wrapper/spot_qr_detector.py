@@ -90,16 +90,6 @@ class SpotQRDetector:
             cam_intrinsics_dict, self.outputs_dict
         )
 
-    # TODO: Move to spot.py as `get_camera_intrinsics_as_3x3` as a part of PR #143
-    def _to_camera_metadata_dict(self, camera_intrinsics):
-        """Converts a camera intrinsics proto to a 3x3 matrix as np.array"""
-        fx = (camera_intrinsics.focal_length.x,)
-        fy = (camera_intrinsics.focal_length.y,)
-        ppx = (camera_intrinsics.principal_point.x,)
-        ppy = (camera_intrinsics.principal_point.y,)
-        intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
-        return intrinsics
-
     def initialize_april_tag_detectors(
         self,
         cam_intrinsics_dict: Dict[SpotCamIds, Any],
