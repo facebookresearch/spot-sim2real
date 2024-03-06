@@ -25,6 +25,7 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
+import rospy
 import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (

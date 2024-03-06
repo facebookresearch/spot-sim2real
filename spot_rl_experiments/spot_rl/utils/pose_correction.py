@@ -162,14 +162,14 @@ def generate_point_cloud(
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points_3D)
     point_cloud.colors = o3d.utility.Vector3dVector(colors)
-    Rotmat = np.array(
-        [
-            [1.0, 0.0, 0.0],
-            [0.0, np.cos(np.pi), -np.sin(np.pi)],
-            [0.0, np.sin(np.pi), np.cos(np.pi)],
-        ]
-    )
-    point_cloud.rotate(Rotmat, center=point_cloud.get_center())
+    # Rotmat = np.array(
+    #     [
+    #         [1.0, 0.0, 0.0],
+    #         [0.0, np.cos(np.pi), -np.sin(np.pi)],
+    #         [0.0, np.sin(np.pi), np.cos(np.pi)],
+    #     ]
+    # )
+    # point_cloud.rotate(Rotmat, center=point_cloud.get_center())
     cl, ind = point_cloud.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
     point_cloud = point_cloud.select_by_index(ind)
     # cl, imd = point_cloud.remove_radius_outlier(nb_points=20, radius=0.5)

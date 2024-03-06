@@ -17,7 +17,7 @@ from spot_rl.utils.pose_correction import detect
 from spot_wrapper.spot import SpotCamIds, image_response_to_cv2
 
 if __name__ == "__main__":
-    from spot_rl.utils.utils import map_user_input_to_boolean
+    from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
     # Know which location we are doing experiments
     in_fre_lab = True  # map_user_input_to_boolean("Are you Tushar in FRE? Y/N ")
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         place_target = "high_shelf"  # "high_shelf", "test_desk" #"shelf" #"drawer_pretend_to_be_dish_washer"  # "test_semantic_place_table"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
-    spotskillmanager.gaze_controller.reset_env_and_policy("bottle")
+    # spotskillmanager.gaze_controller.reset_skill("bottle")
 
     spot = spotskillmanager.spot
 
@@ -75,6 +75,6 @@ if __name__ == "__main__":
         # spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
-    # spotskillmanager.gaze_controller.reset_env_and_policy("bottle")
+    # spotskillmanager.gaze_controller.reset_skill("bottle")
     # Navigate to dock and shutdown
     # spotskillmanager.dock()

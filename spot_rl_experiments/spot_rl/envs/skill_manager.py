@@ -172,7 +172,7 @@ class SpotSkillManager:
         )
         if self.use_semantic_place:
             self.place_controller = SemanticPlace(
-                spot=self.spot, config=self.place_config, use_policies=use_policies
+                spot=self.spot, config=self.place_config
             )
         else:
             self.place_controller = Place(
