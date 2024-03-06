@@ -111,6 +111,19 @@ def bd_SE3Pose_to_ros_Pose(bd_se3: SE3Pose) -> Pose:
     return pose
 
 
+def ros_Pose_to_bd_SE3Pose(ros_pose: Pose) -> SE3Pose:
+    """
+    Convert a ROS Pose to SE3Pose
+
+    Args:
+        bd_se3 (SE3Pose): Boston Dynamics SE3Pose object
+
+    Returns:
+        Pose: ROS Pose object
+    """
+    raise NotImplementedError("Not implemented yet")
+
+
 def bd_SE3Pose_to_ros_TransformStamped(
     bd_se3: SE3Pose, parent_frame: str, child_frame: str
 ) -> TransformStamped:
@@ -142,6 +155,23 @@ def bd_SE3Pose_to_ros_TransformStamped(
     ros_trf_stamped.transform.rotation.z = float(quat.z)
     ros_trf_stamped.transform.rotation.w = float(quat.w)
     return ros_trf_stamped
+
+
+def ros_TransformStamped_to_bd_SE3Pose(
+    ros_trf_stamped: TransformStamped, parent_frame: str, child_frame: str
+) -> SE3Pose:
+    """
+    Convert a ROS TransformStamped to BD SE3Pose
+
+    Args:
+        ros_trf_stamped (TransformStamped): ROS TransformStamped object
+        parent_frame (str): Parent frame name
+        child_frame (str): Child frame name
+
+    Returns:
+        bd_se3 (SE3Pose): Boston Dynamics SE3Pose object
+    """
+    raise NotImplementedError("Not implemented yet")
 
 
 def sophus_SE3_to_ros_TransformStamped(
@@ -233,7 +263,7 @@ def sophus_SE3_to_ros_PoseStamped(sp_se3: sp.SE3, parent_frame: str) -> PoseStam
     return ros_pse_stamped
 
 
-def ros_PoseStamped_to_sp_SE3(ros_pse_stamped: PoseStamped) -> sp.SE3:
+def ros_PoseStamped_to_sophus_SE3(ros_pse_stamped: PoseStamped) -> sp.SE3:
     """
     Convert a ROS PoseStamped to a Sophus SE3
 
@@ -257,6 +287,45 @@ def ros_PoseStamped_to_sp_SE3(ros_pse_stamped: PoseStamped) -> sp.SE3:
     return sp.SE3(
         Rotation.from_quat(quat).as_matrix(), trans
     )  # Rotation.from_quat() takes a quaternion in the form of [x, y, z, w]
+
+
+def bd_SE3Pose_to_sophus_SE3(bd_se3: SE3Pose) -> sp.SE3:
+    """
+    Convert a BD SE3Pose to a Sophus SE3
+
+    Args:
+        bd_se3 (SE3Pose): BD SE3Pose object
+
+    Returns:
+        sp_SE3 (sp.SE3): Sophus SE3 object
+    """
+    trans = np.array([0.0, 0.0, 0.0])
+    trans[0] = bd_se3.position.x
+    trans[1] = bd_se3.position.y
+    trans[2] = bd_se3.position.z
+
+    quat = np.array([0.0, 0.0, 0.0, 1.0])
+    quat[0] = bd_se3.rotation.x
+    quat[1] = bd_se3.rotation.y
+    quat[2] = bd_se3.rotation.z
+    quat[3] = bd_se3.rotation.w
+
+    return sp.SE3(
+        Rotation.from_quat(quat).as_matrix(), trans
+    )  # Rotation.from_quat() takes a quaternion in the form of [x, y, z, w]
+
+
+def sophus_SE3_to_bd_SE3Pose(sp_se3: sp.SE3) -> SE3Pose:
+    """
+    Convert a Sophus SE3 to a BD SE3Pose
+
+    Args:
+        sp_se3 (sp.SE3): Sophus SE3 object
+
+    Returns:
+        bd_se3 (SE3Pose): BD SE3Pose object
+    """
+    raise NotImplementedError("Not implemented yet")
 
 
 def np_matrix3x4_to_sophus_SE3(np_matrix: np.ndarray) -> sp.SE3:

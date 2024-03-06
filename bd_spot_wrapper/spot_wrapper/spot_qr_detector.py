@@ -2,127 +2,161 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import os
-from typing import Any, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
+import rospy
 import sophus as sp
 from bosdyn.client.frame_helpers import get_a_tform_b
-from perception_and_utils.perception.april_tag_pose_estimator import (
-    AprilTagPoseEstimator,
+from perception_and_utils.perception.detector_wrappers.april_tag_detector import (
+    AprilTagDetectorWrapper,
 )
 from perception_and_utils.utils.image_utils import decorate_img_with_text_for_qr
+from perception_and_utils.utils.math_utils import get_running_avg_a_T_b
 from scipy.spatial.transform import Rotation
 from spot_rl.utils.utils import ros_frames as rf
-from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
+from spot_wrapper.spot import (
+    Spot,
+    SpotCamIds,
+    SpotCamIdToFrameNameMap,
+    image_response_to_cv2,
+)
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 FILTER_DIST = 2.4  # in meters (distance for valid detection)
 
 
 class SpotQRDetector:
-    def __init__(self, spot: Spot):
+    """
+    Used for  Spot's cameras' pose estimation using external QR marker (Spot's dock's QR)
+    IMP: PLEASE Install fairotag as `pip install -e fairotag` as there needs to be some changes in its source code
+
+    This class will only detect the QR code of spot's base as set in bashrc (SPOT_DOCK_ID)
+
+    Args:
+        spot: Spot object
+        cam_ids: List of SpotCamIds for which QR detector should be initialized
+
+    How to use:
+        1. Create an instance of this class with appropriate cam ids
+        2. Call get_avg_spotWorld_T_marker with a single cam_id (blocking call)
+        3. Call `detect_markers_and_estimate_pose` method with image as input
+
+    Example:
+        # Create an instance of AprilTagPoseEstimator
+        sqrd = SpotQRDetector(spot, cam_ids=[cam_id])
+
+        # Compute average world_T_marker
+        avg_spotWorld_T_marker = sqrd.get_avg_spotWorld_T_marker(cam_id= SpotCamIds.cam_id)
+
+        # Compute instantaneous transformation between 2 cameras via QR marker
+        camera1_T_camera2 = sqrd.get_camera1_T_camera2(cam_id_1=SpotCamIds.cam_id1,cam_id_2=SpotCamIds.cam_id2)
+
+    """
+
+    def __init__(self, spot: Spot, cam_ids: List[SpotCamIds] = [SpotCamIds.HAND_COLOR]):
         self.spot = spot
         print("...Spot initialized...")
 
+        # Verify camera sources
+        for cam_id in cam_ids:
+            if cam_id == SpotCamIds.HAND or "_depth" in cam_id:
+                raise ValueError(
+                    f"SpotQRDetector cannot work for depth cameras. Invalid CamId - {cam_id}"
+                )
+
+        # Insert HAND_COLOR source if not present
+        if SpotCamIds.HAND_COLOR not in cam_ids:
+            cam_ids.append(SpotCamIds.HAND_COLOR)
+
+        # Create detector for each camera
+        self.april_tag_detector_dict = {
+            cam_id: AprilTagDetectorWrapper() for cam_id in cam_ids
+        }
+
+        # Get camera intrinsics
+        cam_intrinsics_dict = {
+            cam_id: self.spot.get_camera_intrinsics([cam_id])[0] for cam_id in cam_ids
+        }
+
+        # Initialize output dictionary
+        self.outputs_dict: Dict[SpotCamIds, Dict[str, Any]] = {
+            cam_id: {} for cam_id in cam_ids
+        }
+
+        # Initialize April Tag Pose Estimator for all requested cameras
+        self.outputs_dict = self.initialize_april_tag_detectors(
+            cam_intrinsics_dict, self.outputs_dict
+        )
+
+    # TODO: Move to spot.py as `get_camera_intrinsics_as_3x3` as a part of PR #143
     def _to_camera_metadata_dict(self, camera_intrinsics):
         """Converts a camera intrinsics proto to a 3x3 matrix as np.array"""
-        intrinsics = {
-            "fx": camera_intrinsics.focal_length.x,
-            "fy": camera_intrinsics.focal_length.x,
-            "ppx": camera_intrinsics.principal_point.x,
-            "ppy": camera_intrinsics.principal_point.y,
-            "coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
-        }
+        fx = (camera_intrinsics.focal_length.x,)
+        fy = (camera_intrinsics.focal_length.y,)
+        ppx = (camera_intrinsics.principal_point.x,)
+        ppy = (camera_intrinsics.principal_point.y,)
+        intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
         return intrinsics
 
-    def _get_body_T_handcam(self, frame_tree_snapshot_hand):
-        hand_bd_wrist_T_handcam_dict = (
-            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                "hand_color_image_sensor"
-            ).parent_tform_child
-        )
-        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnum(
-            hand_bd_wrist_T_handcam_dict
-        )
-
-        hand_bd_body_T_wrist_dict = (
-            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                "arm0.link_wr1"
-            ).parent_tform_child
-        )
-        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnum(
-            hand_bd_body_T_wrist_dict
-        )
-
-        hand_mn_body_T_handcam = hand_mn_body_T_wrist @ hand_mn_wrist_T_handcam
-
-        return hand_mn_body_T_handcam
-
-    def get_spot_a_T_b(self, a: str, b: str) -> sp.SE3:
-        frame_tree_snapshot = (
-            self.spot.get_robot_state().kinematic_state.transforms_snapshot
-        )
-        se3_pose = get_a_tform_b(frame_tree_snapshot, a, b)
-        pos = se3_pose.get_translation()
-        quat = se3_pose.rotation.normalize()
-        return sp.SE3(quat.to_matrix(), pos)
-
-    def _get_body_T_headcam(self, frame_tree_snapshot_head):
-        raise RuntimeError("This method is not used anymore. Please use get_spot_a_T_b")
-
-    def _get_spotWorld_T_handcam(
+    def initialize_april_tag_detectors(
         self,
-        frame_tree_snapshot_hand,
-        spot_frame: str = rf.SPOT_WORLD_VISION,
+        cam_intrinsics_dict: Dict[SpotCamIds, Any],
+        outputs_dict: Dict[SpotCamIds, Dict[str, Any]],
     ):
-        if spot_frame != rf.SPOT_WORLD_VISION and spot_frame != rf.SPOT_WORLD_ODOM:
-            raise ValueError("spot_frame should be either vision or odom")
-        spot_world_frame = spot_frame
+        """
+        Initialize the april tag detectors for all requested cameras
 
-        hand_bd_wrist_T_handcam_dict = (
-            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                "hand_color_image_sensor"
-            ).parent_tform_child
-        )
-        hand_mn_wrist_T_handcam = self.spot.convert_transformation_from_BD_to_magnum(
-            hand_bd_wrist_T_handcam_dict
-        )
+        Args:
+            outputs_list (List[Dict], optional): List of dictionary of outputs from each camera's april tag detectors. Defaults to [].
 
-        hand_bd_body_T_wrist_dict = (
-            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                "arm0.link_wr1"
-            ).parent_tform_child
-        )
-        hand_mn_body_T_wrist = self.spot.convert_transformation_from_BD_to_magnum(
-            hand_bd_body_T_wrist_dict
-        )
+        Updates:
+            - self.april_tag_detectors_list: List of AprilTagDetectorWrapper object, for each camera
 
-        hand_bd_body_T_spotWorld_dict = (
-            frame_tree_snapshot_hand.child_to_parent_edge_map.get(
-                spot_world_frame
-            ).parent_tform_child
-        )
-        hand_mn_body_T_spotWorld = self.spot.convert_transformation_from_BD_to_magnum(
-            hand_bd_body_T_spotWorld_dict
-        )
-        hand_mn_spotWorld_T_body = hand_mn_body_T_spotWorld.inverted()
+        Returns:
+            outputs_list (list[dict]): List of dictionary of outputs from the april tag detector, each dict contains the following keys:
+                - "tag_image_list" - List of np.ndarrays of images with detections
+                - "tag_image_metadata_list" - List of image metadata
+                - "tag_base_T_marker_list" - List of Sophus SE3 transforms from base frame to marker
+                                             where base is "device" frame for aria
+                                             and "body" frame for spot
+        """
+        # Sanity checks
+        assert len(cam_intrinsics_dict.keys()) == len(
+            outputs_dict.keys()
+        ), "Length of cam_intrinsics_dict and outputs_dict should be same"
+        assert len(cam_intrinsics_dict.keys()) == len(
+            self.april_tag_detector_dict.keys()
+        ), "Length of cam_intrinsics_dict and april_tag_detector_dict should be same"
 
-        hand_mn_body_T_handcam = hand_mn_body_T_wrist @ hand_mn_wrist_T_handcam
-        hand_mn_spotWorld_T_handcam = hand_mn_spotWorld_T_body @ hand_mn_body_T_handcam
+        # Initialize the april tag detectors for all requested cameras
+        for cam_id in cam_intrinsics_dict:
+            focal_lengths = (
+                cam_intrinsics_dict[cam_id].focal_length.x,
+                cam_intrinsics_dict[cam_id].focal_length.y,
+            )  # type: Tuple[float, float]
 
-        return hand_mn_spotWorld_T_handcam
+            principal_point = (
+                cam_intrinsics_dict[cam_id].principal_point.x,
+                cam_intrinsics_dict[cam_id].principal_point.y,
+            )  # type: Tuple[float, float]
 
-    def _get_spotWorld_T_headcam(
-        self, frame_tree_snapshot_head, use_vision_as_world: bool = True
-    ):
-        raise RuntimeError("This method is not used anymore. Please use get_spot_a_T_b")
+            outputs_dict[cam_id].update(
+                self.april_tag_detector_dict[cam_id]._init_april_tag_detector(
+                    focal_lengths=focal_lengths,
+                    principal_point=principal_point,
+                    verbose=False,
+                )
+            )
+        return outputs_dict
 
-    def get_avg_spotWorld_T_marker_HAND(
+    def get_avg_spotWorld_T_marker(
         self,
-        spot_frame: str = rf.SPOT_WORLD_VISION,
-        data_size_for_avg: int = 10,
-        filter_dist: float = 2.2,
+        cam_id: SpotCamIds = SpotCamIds.HAND_COLOR,
+        use_vision_as_spotWorld: bool = True,
+        filter_dist: float = FILTER_DIST,
+        fixed_data_length: int = 10,
     ):
         """
         Returns the average transformation of spot world frame to marker frame
@@ -133,142 +167,150 @@ class SpotQRDetector:
         camera_T_marker is used to compute spot_T_marker[i] and thus spotWorld_T_marker[i].
         Then we average all spotWorld_T-marker to find average marker pose wrt spotWorld.
         """
-        if spot_frame != rf.SPOT_WORLD_VISION and spot_frame != rf.SPOT_WORLD_ODOM:
-            raise ValueError("base_frame should be either vision or odom")
-        cv2.namedWindow("hand_image", cv2.WINDOW_AUTOSIZE)
-        spot_world_frame = spot_frame
+        spot_world_frame = rf.SPOT_WORLD_VISION
+        if not use_vision_as_spotWorld:
+            spot_world_frame = rf.SPOT_WORLD_ODOM
 
-        # Get Hand camera intrinsics
-        hand_cam_intrinsics = self.spot.get_camera_intrinsics(SpotCamIds.HAND_COLOR)
-        hand_cam_intrinsics = self._to_camera_metadata_dict(hand_cam_intrinsics)
-        hand_cam_pose_estimator = AprilTagPoseEstimator(hand_cam_intrinsics)
+        if cam_id not in self.april_tag_detector_dict.keys():
+            raise ValueError(
+                f"SpotQRDetector was not initialized for camera id - {cam_id}"
+            )
 
-        # Register marker ids
-        marker_ids_list = [DOCK_ID]
-        # marker_ids_list = [i for i in range(521, 550)]
-        hand_cam_pose_estimator.register_marker_ids(marker_ids_list)
+        cv2.namedWindow(f"image for {cam_id}", cv2.WINDOW_AUTOSIZE)
 
-        marker_position_from_dock_list = []  # type: List[Any]
-        marker_quaternion_from_dock_list = []  # type: List[Any]
+        # Maintain a list of all poses where qr code is detected (w.r.t spotWorld)
+        marker_positions_list = (
+            []
+        )  # type: List[np.ndarray] # List of  position as np.ndarray (x, y, z)
+        marker_quaternion_list = (
+            []
+        )  # type: List[np.ndarray] # List of quaternions as np.ndarray (x, y, z, w)
+        avg_spotWorld_T_marker = None  # type: Optional[sp.SE3]
 
-        marker_position_from_robot_list = []  # type: List[Any]
-        marker_quaternion_form_robot_list = []  # type: List[Any]
+        while len(marker_positions_list) < fixed_data_length:
+            print(f"Iterating - {len(marker_positions_list)}")
+            # Set camera_T_marker as None
+            camera_T_marker = None
 
-        while len(marker_position_from_dock_list) < data_size_for_avg:
-            print(f"Iterating - {len(marker_position_from_dock_list)}")
-            is_marker_detected_from_hand_cam = False
-
-            # Get Hand image - returns a list of BD ImageResponse objects for hand rgb and depth
-            img_response_hand = self.spot.get_hand_image()
-
-            # Obtain hand rgb image from list of BD ImageResponse objects
+            # Obtain rgb image from list of BD ImageResponse objects as per specified cam_id
             # More info on BD ImageResponse object can be found here -
             # https://dev.bostondynamics.com/protos/bosdyn/api/proto_reference#bosdyn-api-ImageResponse
-            img_response_hand_rgb = img_response_hand[0]
-            img_hand = image_response_to_cv2(img_response_hand_rgb)
+            img_response = self.spot.get_image_responses([cam_id])[0]
+            img = image_response_to_cv2(img_response)
 
-            (
-                img_rend_hand,
-                hand_sp_handcam_T_marker,
-            ) = hand_cam_pose_estimator.detect_markers_and_estimate_pose(
-                img_hand, should_render=True
-            )
+            # Detect Marker in the image
+            (viz_img, camera_T_marker) = self.april_tag_detector_dict[
+                cam_id
+            ].process_frame(img_frame=img)
 
-            hand_mn_handcam_T_marker = None
-            if hand_sp_handcam_T_marker is not None:
-                is_marker_detected_from_hand_cam = True
-                hand_mn_handcam_T_marker = (
-                    Spot.convert_transformation_from_sophus_to_magnum(
-                        sp_transformation=hand_sp_handcam_T_marker
-                    )
+            if camera_T_marker is not None:
+                # Spot_T_marker computation
+                frame_tree_snapshot = img_response.shot.transforms_snapshot
+                spot_T_camera = self.spot.get_sophus_SE3_spot_a_T_b(
+                    frame_tree_snapshot, rf.SPOT_BODY, SpotCamIdToFrameNameMap[cam_id]
+                )
+                spot_T_marker = spot_T_camera * camera_T_marker
+                spotWorld_T_spot = self.spot.get_sophus_SE3_spot_a_T_b(
+                    frame_tree_snapshot, spot_world_frame, rf.SPOT_BODY
                 )
 
-            # Spot - spotWorld_T_handcam computation
-            frame_tree_snapshot_hand = img_response_hand_rgb.shot.transforms_snapshot
-            hand_mn_body_T_handcam = self._get_body_T_handcam(frame_tree_snapshot_hand)
-            hand_mn_spotWorld_T_handcam = self._get_spotWorld_T_handcam(
-                frame_tree_snapshot_hand, spot_frame=spot_frame
-            )
-
-            if is_marker_detected_from_hand_cam:
-                hand_mn_spotWorld_T_marker = (
-                    hand_mn_spotWorld_T_handcam @ hand_mn_handcam_T_marker
+                # Frame: a = spotWorld
+                # Frame: intermediate = spot (spot base frame)
+                # Frame: b = marker / qr code
+                (
+                    marker_positions_list,
+                    marker_quaternion_list,
+                    avg_spotWorld_T_marker,
+                ) = get_running_avg_a_T_b(
+                    current_avg_a_T_b=avg_spotWorld_T_marker,
+                    a_T_b_position_list=marker_positions_list,
+                    a_T_b_quaternion_list=marker_quaternion_list,
+                    a_T_intermediate=spotWorld_T_spot,
+                    intermediate_T_b=spot_T_marker,
+                    filter_dist=filter_dist,
+                    fixed_data_length=fixed_data_length,
                 )
 
-                hand_mn_body_T_marker = (
-                    hand_mn_body_T_handcam @ hand_mn_handcam_T_marker
+                (viz_img, self.outputs_dict[cam_id],) = self.april_tag_detector_dict[
+                    cam_id
+                ].get_outputs(
+                    img_frame=viz_img,
+                    outputs=self.outputs_dict[cam_id],
+                    base_T_marker=spot_T_marker,
+                    timestamp=None,
+                    img_metadata=None,
                 )
 
-                img_rend_hand = decorate_img_with_text_for_qr(
-                    img=img_rend_hand,
-                    frame_name_str=spot_world_frame,
-                    qr_position=hand_mn_spotWorld_T_marker.translation,
-                )
-
-                dist = hand_mn_handcam_T_marker.translation.length()
-
-                print(
-                    f"Dist = {dist}, Recordings - {len(marker_position_from_dock_list)}"
-                )
-                if dist < filter_dist:
-                    marker_position_from_dock_list.append(
-                        np.array(hand_mn_spotWorld_T_marker.translation)
-                    )
-                    marker_quaternion_from_dock_list.append(
-                        Rotation.from_matrix(
-                            hand_mn_spotWorld_T_marker.rotation()
-                        ).as_quat()
-                    )
-                    marker_position_from_robot_list.append(
-                        np.array(hand_mn_body_T_marker.translation)
-                    )
-                    marker_quaternion_form_robot_list.append(
-                        Rotation.from_matrix(hand_mn_body_T_marker.rotation()).as_quat()
-                    )
-
-            cv2.imshow("hand_image", img_rend_hand)
+            cv2.imshow(f"Spot QR Detector - {cam_id} Cam", viz_img)
             cv2.waitKey(1)
 
-        marker_position_from_dock_np = np.array(marker_position_from_dock_list)
-        avg_marker_position_from_dock = np.mean(marker_position_from_dock_np, axis=0)
+        return avg_spotWorld_T_marker
 
-        marker_quaternion_from_dock_np = np.array(marker_quaternion_from_dock_list)
-        avg_marker_quaternion_from_dock = np.mean(
-            marker_quaternion_from_dock_np, axis=0
+    def get_camera1_T_camera2(self, cam_id_1: SpotCamIds, cam_id_2: SpotCamIds):
+        """
+        Get the instantaneous transform of camera_2 in the frame of camera_1
+
+        Args:
+            cam_id_1 (SpotCamIds): Camera ID of camera_1
+            cam_id_2 (SpotCamIds): Camera ID of camera_2
+
+        Returns:
+            camera_1_T_camera_2 (sp.SE3): The transform from camera1 to camera2 as a Sophus SE3 object
+        """
+
+        cv2.namedWindow("Spot QR Detector - Camera1", cv2.WINDOW_NORMAL)
+        cv2.namedWindow("Spot QR Detector - Camera2", cv2.WINDOW_NORMAL)
+        # Detect Marker in both images
+        camera1_T_marker = None
+        camera2_T_marker = None
+        while camera1_T_marker is None and camera2_T_marker is None:
+            # Get the images from both cameras
+            [img_response1, image_response2] = self.spot.get_image_responses(
+                [cam_id_1, cam_id_2]
+            )
+
+            # Extract images from the image responses
+            img1 = image_response_to_cv2(img_response1)
+            img2 = image_response_to_cv2(image_response2)
+
+            (viz_img1, camera1_T_marker,) = self.april_tag_detector_dict[
+                cam_id_1
+            ].process_frame(img_frame=img1)
+            cv2.imshow("Spot QR Detector - Camera1", viz_img1)
+
+            if camera1_T_marker is None:
+                print("No marker detected in Camera_1. Trying again...")
+
+            (viz_img2, camera2_T_marker,) = self.april_tag_detector_dict[
+                cam_id_2
+            ].process_frame(img_frame=img2)
+            cv2.imshow("Spot QR Detector - Camera2", viz_img2)
+
+            cv2.waitKey(1)
+            if camera2_T_marker is None:
+                print("No marker detected in Camera_2. Trying again...")
+
+            # If no marker is detected in either camera, reset the transforms
+            if camera1_T_marker is None or camera2_T_marker is None:
+                camera1_T_marker = None
+                camera2_T_marker = None
+
+        # Get the transforms from the image responses
+        camera1_T_camera2 = camera1_T_marker * camera2_T_marker.inverse()
+
+        print("Compute camera1_T_camera2")
+        print(
+            "Dist between camera1 and camera2: ",
+            np.linalg.norm(camera1_T_camera2.translation()),
         )
+        return camera1_T_camera2
 
-        marker_position_from_robot_np = np.array(marker_position_from_robot_list)
-        avg_marker_position_from_robot = np.mean(marker_position_from_robot_np, axis=0)
 
-        marker_quaternion_from_robot_np = np.array(marker_quaternion_form_robot_list)
-        avg_marker_quaternion_from_robot = np.mean(
-            marker_quaternion_from_robot_np, axis=0
-        )
-
-        avg_spotWorld_T_marker = sp.SE3(
-            Rotation.from_quat(avg_marker_quaternion_from_dock).as_matrix(),
-            avg_marker_position_from_dock,
-        )
-        avg_spot_T_marker = sp.SE3(
-            Rotation.from_quat(avg_marker_quaternion_from_robot).as_matrix(),
-            avg_marker_position_from_robot,
-        )
-
-        return avg_spotWorld_T_marker, avg_spot_T_marker
-
-    def get_avg_spotWorld_T_marker_HEAD(
-        self,
-        use_vision_as_world: bool = True,
-        data_size_for_avg: int = 10,
-        filter_dist: float = FILTER_DIST,
-    ):
-        pass
-
-    def get_avg_spotWorld_T_marker(
-        self,
-        camera: str = "hand",
-        use_vision_as_world: bool = True,
-        data_size_for_avg: int = 10,
-        filter_dist: float = FILTER_DIST,
-    ):
-        pass
+if __name__ == "__main__":
+    spot = Spot("QRDetector")
+    cam_ids = [SpotCamIds.FRONTLEFT_FISHEYE, SpotCamIds.HAND_COLOR]
+    sqrd = SpotQRDetector(spot, cam_ids=cam_ids)
+    avg_vision_T_marker = sqrd.get_avg_spotWorld_T_marker(cam_id=SpotCamIds.HAND_COLOR)
+    cam1_T_cam2 = sqrd.get_camera1_T_camera2(
+        SpotCamIds.FRONTLEFT_FISHEYE, SpotCamIds.HAND_COLOR
+    )

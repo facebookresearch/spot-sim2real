@@ -7,7 +7,7 @@ import numpy as np
 from spot_rl.envs.skill_manager import SpotSkillManager
 
 if __name__ == "__main__":
-    from spot_rl.utils.utils import map_user_input_to_boolean
+    from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
     # Pick Targets from Aria with +- 10 degree angle change
     pick_targets = [

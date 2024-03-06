@@ -29,9 +29,6 @@ class ObjectDetectorWrapper(GenericDetector):
         # Create an instance of ObjectDetectorWrapper
         odw = ObjectDetectorWrapper()
 
-        # Enable detector
-        odw.enable_detector() # base class method
-
         # Initialize detector
         outputs = odw._init_object_detector(object_labels, verbose)
 
@@ -67,7 +64,7 @@ class ObjectDetectorWrapper(GenericDetector):
                 - object_image_segment_list (List[int]) : List of image segment ids
                 - object_score_list (List[float]) : List of scores for each image frame
         """
-        assert self.is_enabled is True
+        self.enable_detector()
         self.verbose = verbose
 
         self.object_detector = OwlVit(
@@ -216,6 +213,9 @@ class ObjectDetectorWrapper(GenericDetector):
         """
         # Do nothing if detector is not enabled
         if self.is_enabled is False:
+            self._logger.warning(
+                "Object detector is disabled... Skipping processing of current frame."
+            )
             return img_frame, {}
 
         (_, object_scores, _, updated_img_frame,) = self._get_scored_object_detections(
@@ -238,6 +238,9 @@ class ObjectDetectorWrapper(GenericDetector):
         """
         # Do nothing if detector is not enabled
         if self.is_enabled is False:
+            self._logger.warning(
+                "Object detector is disabled... Skipping processing of current frame."
+            )
             return img_frame, {}
 
         (

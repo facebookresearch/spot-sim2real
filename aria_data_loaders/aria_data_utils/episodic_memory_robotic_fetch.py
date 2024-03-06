@@ -12,7 +12,7 @@ import rospy
 import sophus as sp
 from geometry_msgs.msg import PoseStamped
 from perception_and_utils.utils.conversions import (
-    ros_PoseStamped_to_sp_SE3,
+    ros_PoseStamped_to_sophus_SE3,
     ros_TransformStamped_to_sophus_SE3,
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
@@ -20,7 +20,7 @@ from perception_and_utils.utils.conversions import (
 )
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_frames as rf
-from spot_wrapper.spot import Spot
+from spot_wrapper.spot import Spot, SpotCamIds
 from spot_wrapper.spot_qr_detector import SpotQRDetector
 from std_msgs.msg import Bool
 from tf2_ros import (
@@ -104,25 +104,13 @@ class EpisodicMemoryRoboticFetch:
         # Sit Spot down
         self.skill_manager.sit()
 
-        # Detect the marker and get the average pose of marker w.r.t spotWorld frame
-        spot_qr = SpotQRDetector(spot=spot)
-        (
-            avg_spotWorld_T_marker,
-            avg_spot_T_marker,
-        ) = spot_qr.get_avg_spotWorld_T_marker_HAND()
-
         # Instantiate static transform broadcaster for publishing marker w.r.t spotWorld transforms
         self.static_tf_broadcaster = StaticTransformBroadcaster()
 
-        # Instantiate publisher for publishing go-to pose for pick and place
-        self._nav_PoseStamped_pub_for_pick = rospy.Publisher(
-            "/nav_pose_for_pick_viz", PoseStamped, queue_size=10
-        )
-        self._nav_PoseStamped_pub_for_place = rospy.Publisher(
-            "/nav_pose_for_place_viz", PoseStamped, queue_size=10
-        )
-        self.nav_xyt_for_pick = None
-        self.nav_xyt_for_handoff = None
+        # Detect the marker and get the average pose of marker w.r.t spotWorld frame
+        cam_id = SpotCamIds.HAND_COLOR
+        spot_qr = SpotQRDetector(spot=spot, cam_ids=[cam_id])
+        avg_spotWorld_T_marker = spot_qr.get_avg_spotWorld_T_marker(cam_id=cam_id)
 
         # Publish marker w.r.t spotWorld transforms for 5 seconds so it can be seen in rviz
         start_time = rospy.Time.now()
@@ -135,6 +123,16 @@ class EpisodicMemoryRoboticFetch:
                 )
             )
             rospy.sleep(0.5)
+
+        # Instantiate publisher for publishing go-to pose for pick and place
+        self._nav_PoseStamped_pub_for_pick = rospy.Publisher(
+            "/nav_pose_for_pick_viz", PoseStamped, queue_size=10
+        )
+        self._nav_PoseStamped_pub_for_place = rospy.Publisher(
+            "/nav_pose_for_place_viz", PoseStamped, queue_size=10
+        )
+        self.nav_xyt_for_pick = None
+        self.nav_xyt_for_handoff = None
 
         # Initialize static transform subscriber for listening to ariaWorld w.r.t marker transform
         self._tf_buffer = Buffer()
@@ -270,7 +268,7 @@ class EpisodicMemoryRoboticFetch:
             nav_PoseStamped_for_handoff (PoseStamped): Pose of wearer's last location in spotWorld frame before triggering spot_fetch
         """
         rospy.logdebug("Received message on ariaWorld_T_aria topic")
-        ariaWorld_T_aria = ros_PoseStamped_to_sp_SE3(ros_pse_stamped=msg)
+        ariaWorld_T_aria = ros_PoseStamped_to_sophus_SE3(ros_pse_stamped=msg)
         self.spotWorld_T_aria = self.spotWorld_T_ariaWorld * ariaWorld_T_aria
         rospy.logdebug(f"Got {self.spotWorld_T_aria}")
 
@@ -301,7 +299,7 @@ class EpisodicMemoryRoboticFetch:
             nav_PoseStamped_for_pcik (PoseStamped): Pose of wearer's location in spotWorld frame where it last saw the object of interest before triggering spot_fetch
         """
         rospy.logdebug("Received message on ariaWorld_T_aria_pose_of_interest topic")
-        ariaWorld_T_aria_pose_of_interest = ros_PoseStamped_to_sp_SE3(
+        ariaWorld_T_aria_pose_of_interest = ros_PoseStamped_to_sophus_SE3(
             ros_pse_stamped=msg
         )
         self.spotWorld_T_aria_pose_of_interest = (

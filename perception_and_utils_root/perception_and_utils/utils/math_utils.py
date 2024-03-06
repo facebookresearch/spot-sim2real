@@ -52,7 +52,7 @@ def get_running_avg_a_T_b(
     a_T_intermediate: sp.SE3,
     intermediate_T_b: sp.SE3,
     filter_dist: float = FILTER_DIST,
-    fixed_list_length: int = FIXED_LIST_LENGTH,
+    fixed_data_length: int = FIXED_LIST_LENGTH,
 ) -> Tuple[List[np.ndarray], List[np.ndarray], Optional[sp.SE3]]:
     """
      Computes and returns average transformation of frame a to frame b via an intermediate frame (a_T_intermediate & intermediate_T_b).
@@ -70,7 +70,7 @@ def get_running_avg_a_T_b(
          a_T_intermediate (sp.SE3): Sophus SE3 object representing transformation of frame intermediate in frame a. This is most recent data.
          intermediate_T_b (sp.SE3): Sophus SE3 object representing transformation of frame b in frame intermediate. This is most recent data.
          filter_dist (float, optional): Distance threshold for valid detections. Defaults to FILTER_DIST.
-         fixed_list_length (int, optional): Maximum size of the list. Defaults to FIXED_LIST_LENGTH.
+         fixed_data_length (int, optional): Maximum size of the list. Defaults to FIXED_LIST_LENGTH.
 
     # Returns:
          a_T_b_position_list (List[np.ndarray]): List of positions of frame b in frame a. Will be updated
@@ -89,7 +89,7 @@ def get_running_avg_a_T_b(
     # Consider only those detections where frame b is within a certain distance of the frame a measured in frame world
     if dist < filter_dist:
         # If the number of detections exceeds the fix list length, remove the first element
-        if len(a_T_b_position_list) >= fixed_list_length:
+        if len(a_T_b_position_list) >= fixed_data_length:
             a_T_b_position_list.pop(0)
             a_T_b_quaternion_list.pop(0)
 
@@ -109,5 +109,8 @@ def get_running_avg_a_T_b(
     else:
         # If the latest detection is not within the filter distance, then do not update the list
         avg_a_T_b = current_avg_a_T_b
+        print(
+            f"Dist ({dist}) exceeds filter distance limit ({filter_dist}). Skipping iteration"
+        )
 
     return a_T_b_position_list, a_T_b_quaternion_list, avg_a_T_b

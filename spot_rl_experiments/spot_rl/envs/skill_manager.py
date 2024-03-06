@@ -7,6 +7,7 @@ from typing import Any, Dict, Tuple
 
 import numpy as np
 from multimethod import multimethod
+from perception_and_utils.utils.generic_utils import conditional_print
 from spot_rl.skills.atomic_skills import Navigation, Pick, Place
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
@@ -18,7 +19,6 @@ from spot_rl.utils.heuristic_nav import (
     heurisitic_object_search_and_navigation,
 )
 from spot_rl.utils.utils import (
-    conditional_print,
     get_waypoint_yaml,
     nav_target_from_waypoint,
     place_target_from_waypoint,

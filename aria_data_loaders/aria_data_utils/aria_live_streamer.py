@@ -106,7 +106,7 @@ class AriaLiveReader:
         self.aria_rgb_frame = None
         aria.set_log_level(aria.Level.Info)
 
-        # 1. Create StreamingClient instance
+        # Create StreamingClient instance
         self._sensors_calib_json = None
         self._sensors_calib: Optional[aria_core.calibration.SensorCalibration] = None
         self._device_T_cpf = None
@@ -116,6 +116,10 @@ class AriaLiveReader:
         self.device, self.device_client = self._setup_aria()
 
         self.static_tf_broadcaster = StaticTransformBroadcaster()
+
+        # Create all detectors
+        self.april_tag_detector = AprilTagDetectorWrapper()
+        self.object_detector = ObjectDetectorWrapper()
 
         # Maintain a list of all poses where qr code is detected (w.r.t ariaWorld)
         self.marker_positions_list = (
@@ -377,9 +381,10 @@ class AriaLiveReader:
             - Object detection with OwlVIT
 
         April tag outputs:
+            - "tag_base_T_marker_list" - List of Sophus SE3 transforms from base frame to marker
+                                         where base is "device" frame for aria
             - "tag_image_list" - List of np.ndarrays of images with detections
             - "tag_image_metadata_list" - List of image metadata
-            - "tag_device_T_marker_list" - List of Sophus SE3 transforms from Device frame to marker
 
         Object detection outputs:
             - "object_image_list" - List of np.ndarrays of images with detections
@@ -455,7 +460,7 @@ class AriaLiveReader:
             viz_img, outputs = self.april_tag_detector.get_outputs(
                 img_frame=viz_img,
                 outputs=outputs,
-                device_T_marker=device_T_marker,
+                base_T_marker=device_T_marker,
                 timestamp=frame.get("timestamp"),
                 img_metadata=None,
             )
@@ -483,12 +488,17 @@ class AriaLiveReader:
             outputs (dict): Dictionary of outputs from the april tag detector with following keys:
                 - "tag_image_list" - List of np.ndarrays of images with detections
                 - "tag_image_metadata_list" - List of image metadata
-                - "tag_device_T_marker_list" - List of Sophus SE3 transforms from Device frame to marker
+                - "tag_base_T_marker_list" - List of Sophus SE3 transforms from base frame to marker
+                                             where base is "device" frame for aria
         """
-        self.april_tag_detector = AprilTagDetectorWrapper()
-        focal_lengths = self._dst_calib_params.get_focal_lengths()  # type:ignore
-        principal_point = self._dst_calib_params.get_principal_point()  # type: ignore
-        self.april_tag_detector.enable_detector()
+        focal_length_obj = self._dst_calib_params.get_focal_lengths()  # type:ignore
+        focal_lengths = (focal_length_obj[0].item(), focal_length_obj[1].item())
+
+        principal_point_obj = self._dst_calib_params.get_principal_point()  # type: ignore
+        principal_point = (
+            principal_point_obj[0].item(),
+            principal_point_obj[1].item(),
+        )
 
         outputs.update(
             self.april_tag_detector._init_april_tag_detector(
@@ -497,13 +507,19 @@ class AriaLiveReader:
         )
         return outputs
 
-    def initialize_object_detector(self, outputs: dict = {}, object_labels: list = []):
+    def initialize_object_detector(
+        self, outputs: dict = {}, object_labels: list = [], meta_objects: List[str] = []
+    ):
         """
         Initialize the object detector
 
         Args:
             outputs (dict, optional): Dictionary of outputs from the object detector. Defaults to {}.
             object_labels (list, optional): List of object labels to detect. Defaults to [].
+            meta_objects (List[str], optional): List of other objects to be detected in the image
+                                                apart from the object_labels; meta_objects are then
+                                                used internally to detect intersection of bbox with
+                                                objects of interest (eg: hand with bottle)
 
         Updates:
             - self.object_detector: ObjectDetectorWrapper object
@@ -516,13 +532,6 @@ class AriaLiveReader:
                     belongs to; smaller number means latter the segment time-wise
                 - "object_score_list" - List of Float signifying the detection score
         """
-        self.object_detector = ObjectDetectorWrapper()
-        self.object_detector.enable_detector()
-
-        # Meta objects are other objects to be detected in the image apart from the object_labels,
-        # meta_objects are then used internally to detect intersection of bbox with objects of interest (eg: hand with bottle)
-        meta_objects: List[str] = []
-
         outputs.update(
             self.object_detector._init_object_detector(
                 object_labels + meta_objects,
