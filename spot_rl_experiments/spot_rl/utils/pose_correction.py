@@ -277,8 +277,76 @@ def pose_correction_pipeline(
     )
 
 
+def get_3rd_point(a, b):
+    direct = a - b
+    return b + np.array([-direct[1], direct[0]], dtype=np.float32)
+
+
+def get_dir(src_point, rot_rad):
+    sn, cs = np.sin(rot_rad), np.cos(rot_rad)
+    src_result = [0, 0]
+    src_result[0] = src_point[0] * cs - src_point[1] * sn
+    src_result[1] = src_point[0] * sn + src_point[1] * cs
+    return src_result
+
+
+def get_affine_transform(
+    center, scale, rot, output_size, shift=np.array([0, 0], dtype=np.float32), inv=0
+):
+
+    if not isinstance(scale, np.ndarray) and not isinstance(scale, list):
+        scale = np.array([scale, scale], dtype=np.float32)
+
+    scale_tmp = scale
+    src_w = scale_tmp[0]
+    dst_w = output_size[0]
+    dst_h = output_size[1]
+
+    rot_rad = np.pi * rot / 180
+    src_dir = get_dir([0, src_w * -0.5], rot_rad)
+    dst_dir = np.array([0, dst_w * -0.5], np.float32)
+
+    src = np.zeros((3, 2), dtype=np.float32)
+    dst = np.zeros((3, 2), dtype=np.float32)
+    src[0, :] = center + scale_tmp * shift
+    src[1, :] = center + src_dir + scale_tmp * shift
+    dst[0, :] = [dst_w * 0.5, dst_h * 0.5]
+    dst[1, :] = np.array([dst_w * 0.5, dst_h * 0.5], np.float32) + dst_dir
+
+    src[2:, :] = get_3rd_point(src[0, :], src[1, :])
+    dst[2:, :] = get_3rd_point(dst[0, :], dst[1, :])
+
+    if inv:
+        trans = cv2.getAffineTransform(np.float32(dst), np.float32(src))
+    else:
+        trans = cv2.getAffineTransform(np.float32(src), np.float32(dst))
+
+    return trans
+
+
+def get_image_crop_resize(image, box, resize_shape):
+    """Crop image according to the box, and resize the cropped image to resize_shape
+    @param image: the image waiting to be cropped
+    @param box: [x0, y0, x1, y1]
+    @param resize_shape: [h, w]
+    """
+    center = np.array([(box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0])
+    scale = np.array([box[2] - box[0], box[3] - box[1]])
+
+    resize_h, resize_w = resize_shape
+    trans_crop = get_affine_transform(center, scale, 0, [resize_w, resize_h])
+    image_crop = cv2.warpAffine(
+        image, trans_crop, (resize_w, resize_h), flags=cv2.INTER_LINEAR
+    )
+
+    trans_crop_homo = np.concatenate([trans_crop, np.array([[0, 0, 1]])], axis=0)
+    return image_crop, trans_crop_homo
+
+
 if __name__ == "__main__":
     port = 8000
+    import os.path as osp
+
     from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
 
     intrinsics = [
@@ -289,9 +357,12 @@ if __name__ == "__main__":
     ]
 
     """psuedo plys"""
-    root_folder = "data"
+    root_folder = "/home/tusharsangam/Desktop/data/"
     object_name = "bottle"
-    variations = ["horizontal_1", "horizontal_2", "horizontal_3", "horizontal_4"]
+    variations = [
+        "reference",
+        "horizontal_3",
+    ]  # "horizontal_2", "horizontal_3", "horizontal_4"]
     src = "intel"
 
     if src == "intel":
@@ -313,21 +384,50 @@ if __name__ == "__main__":
         depth_raw = cv2.imread(depth_file_name, -1)
         R = pose_correction_pipeline(rgb_image, depth_raw, object_name, intrinsics, port)
     """
-    spot = Spot("test")
-    while True:
-        image_responses = spot.get_hand_image_old(
-            img_src=[SpotCamIds.INTEL_REALSENSE_COLOR, SpotCamIds.INTEL_REALSENSE_DEPTH]
-        )
-        camera_intrinsics = image_responses[0].source.pinhole.intrinsics
-        image_responses = [
-            image_response_to_cv2(image_response) for image_response in image_responses
-        ]
-        label = detect(image_responses[0], "bottle", 0.1, "cpu")
+    # spot = Spot("test")
+    for variation in variations:
+        image_path = osp.join(root_folder, f"{object_name}_{variation}_{src}_rgb.png")
+        print(f"path loaded {image_path}")
+        image = cv2.imread(image_path)
+        print(image.shape, image.dtype)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # image_responses = spot.get_hand_image_old(
+        #     img_src=[SpotCamIds.INTEL_REALSENSE_COLOR, SpotCamIds.INTEL_REALSENSE_DEPTH]
+        # )
+        # camera_intrinsics = image_responses[0].source.pinhole.intrinsics
+        # image_responses = [
+        #     image_response_to_cv2(image_response) for image_response in image_responses
+        # ]
+        label = detect(image, "bottle", 0.1, "cpu")
         bbox = label[0][0]
         x1, y1, x2, y2 = bbox
-        img_with_label = cv2.rectangle(
-            image_responses[0], (x1, y1), (x2, y2), (255, 0, 0)
+        # img_with_label = cv2.rectangle(
+        #     image, (x1, y1), (x2, y2), (255, 0, 0)
+        # )
+        print(f"BBox {x1},{y1},{x2},{y2}")
+        reference = image[y1 - 5 : y2 + 5, x1 - 5 : x2 + 5]
+
+        masks = segment(image, np.array([[x1, y1, x2, y2]]), image.shape[:2], device)
+        mask = masks[0, 0].cpu().numpy()
+        mask_path = f'{osp.basename(image_path).split(".")[0]}_mask.npy'
+        np.save(mask_path, mask)
+        w, h = x2 - x1, y2 - y1
+        compact_percent = 0.05
+        x1 -= int(w * compact_percent)
+        y1 -= int(h * compact_percent)
+        x2 += int(w * compact_percent)
+        y2 += int(h * compact_percent)
+        max_dim = max(x2 - x1, y2 - y1)
+        cx, cy = (x2 + x1) / 2, (y2 + y1) / 2
+        x1, x2 = cx - (max_dim / 2), cx + (max_dim / 2)
+        y1, y2 = cy - (max_dim / 2), cy + (max_dim / 2)
+        box = np.array([x1, y1, x2, y2])
+        resize_shape = np.array([256, 256])
+        image = image * mask[:, :, None]
+        image_crop, _ = get_image_crop_resize(image, box, resize_shape)
+        cv2.imwrite(
+            osp.basename(image_path), cv2.cvtColor(image_crop, cv2.COLOR_RGB2BGR)
         )
-        cv2.imshow("with det", img_with_label)
-        cv2.waitKey(1)
+
     """In real setup OwlVit2 & SAM & generate a pointcloud using camera intrinsics"""
