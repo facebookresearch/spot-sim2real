@@ -11,6 +11,8 @@ PATH_TO_LOGS = osp.join(
     "data/data_logs",
 )
 
+PICKLE_PROTOCOL_VERSION = 4
+
 
 def log(spot):
     data_log_list = []  # type: List[Dict[str, Any]]
@@ -30,7 +32,7 @@ def log(spot):
     # dump data as pkl
     file_name = time.strftime("%Y,%m,%d-%H,%M,%S") + ".pkl"
     with open(osp.join(PATH_TO_LOGS, file_name), "wb") as handle:
-        pkl.dump(data_log_list, handle, protocol=4)
+        pkl.dump(data_log_list, handle, protocol=PICKLE_PROTOCOL_VERSION)
 
 
 def log_replay(logfile_name: str):
