@@ -388,10 +388,14 @@ class Spot:
             else:
                 source_list.append(camera_source)
 
+            # cv2.namedWindow(camera_source, cv2.WINDOW_NORMAL)
+
         self.source_list = source_list  # TODO define in init
         print(f"Initialized logging for sources : {self.source_list}")
 
-    def update_logging_data(self):
+    def update_logging_data(
+        self, include_image_data: bool = True, visualize: bool = False
+    ):
 
         log_packet = {
             "timestamp": time.time(),
@@ -401,42 +405,52 @@ class Spot:
             "arm_pose": None,
         }  # type: Dict[str, Any]
 
-        for camera_source in self.source_list:
-            img_responses = self.get_image_responses([camera_source])
-            log_packet["camera_data"].append(
-                {
-                    "src_info": camera_source,
-                    "raw_image": image_response_to_cv2(
-                        img_responses[0]
-                    ),  # np.ndarray ... How to save? (Serialize to bytes / List / PNG)?
-                    "camera_intrinsics": self.get_camera_intrinsics_as_3x3(
-                        img_responses[0].source.pinhole.intrinsics
-                    ),  # np.ndarray
-                    "base_T_camera": self.get_sp_SE3_spot_a_T_b(
-                        img_responses[0].shot.transforms_snapshot,
-                        frame_a="body",
-                        frame_b=SpotCamIdToFrameNameMap[camera_source],
-                    ).matrix(),  # np.ndarray  .. pickle to save
-                }
-            )
+        if include_image_data:
+            for i in range(len(self.source_list)):
+                camera_source = self.source_list[i]
+                img_responses = self.get_image_responses([camera_source])
+                log_packet["camera_data"].append(
+                    {
+                        "src_info": camera_source,
+                        "raw_image": image_response_to_cv2(
+                            img_responses[0]
+                        ),  # np.ndarray should be okay too
+                        "camera_intrinsics": self.get_camera_intrinsics_as_3x3(
+                            img_responses[0].source.pinhole.intrinsics
+                        ),  # np.ndarray
+                        "base_T_camera": self.get_sophus_SE3_spot_a_T_b(
+                            img_responses[0].shot.transforms_snapshot,
+                            a="body",
+                            b=SpotCamIdToFrameNameMap[camera_source],
+                        ).matrix(),  # np.ndarray
+                    }
+                )
+                if visualize:
+                    cv2.imshow(camera_source, log_packet["camera_data"][i]["raw_image"])
+            if visualize:
+                cv2.waitKey(1)
 
-        log_packet["vision_T_base"] = self.get_sp_SE3_spot_a_T_b(
-            frame_tree_snapshot=None, frame_a="vision", frame_b="body"
-        ).matrix()  # np.ndarray  .. pickle to save
+        log_packet["vision_T_base"] = self.get_sophus_SE3_spot_a_T_b(
+            frame_tree_snapshot=None, a="vision", b="body"
+        ).matrix()  # np.ndarray
         log_packet["base_pose_xyt"] = np.asarray(
             self.get_xy_yaw()
-        )  # redundant? Check if it is consistent with vision_T_base
+        )  # redundant? TODO: Check if it is consistent with vision_T_base
         log_packet["arm_pose"] = self.get_arm_joint_positions()
         # TODO: Add Gripper states (Griper Open/Close) : How to get gripper state from BD?
         log_packet["is_gripper_closed"] = bool(
             self.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
+
+        if visualize:
+            print(log_packet)
         # TODO: Add force in gripper. How to get force reading?
 
         # TODO: Check for optimized solution to store mixed DS in memory
         # TODO: .to_list -> json || pickle dump to .json / .gz.json
 
-        # dump this struct in a folder "trajectory0/step_X.json"
+        # TODO: pkl dump. Allow caller to construct pkl & dump?
+        return log_packet
 
     def grasp_point_in_image(
         self,
@@ -960,18 +974,18 @@ class Spot:
                 camera_intrinsics_list.append(camera_intrinsics)
         return camera_intrinsics_list
 
-    # def get_camera_intrinsics_as_3x3(self, camera_intrinsics) -> np.ndarray:
-    #     """
-    #     Converts camera intrinsics BD object to 3X3 camera intrinsics matrix
-    #     Args:
-    #        camera_intrinsics : bosdyn.api.image_pb2.CameraIntrinsics object
-    #     """
-    #     fx = (camera_intrinsics.focal_length.x)
-    #     fy = (camera_intrinsics.focal_length.y)
-    #     ppx = (camera_intrinsics.principal_point.x)
-    #     ppy = (camera_intrinsics.principal_point.y)
-    #     intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
-    #     return intrinsics
+    def get_camera_intrinsics_as_3x3(self, camera_intrinsics) -> np.ndarray:
+        """
+        Converts camera intrinsics BD object to 3X3 camera intrinsics matrix
+        Args:
+           camera_intrinsics : bosdyn.api.image_pb2.CameraIntrinsics object
+        """
+        fx = camera_intrinsics.focal_length.x
+        fy = camera_intrinsics.focal_length.y
+        ppx = camera_intrinsics.principal_point.x
+        ppy = camera_intrinsics.principal_point.y
+        intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
+        return intrinsics
 
     def get_ros_TransformStamped_vision_T_body(
         self, frame_tree_snapshot
