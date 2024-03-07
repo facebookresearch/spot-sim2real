@@ -524,14 +524,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations
 
-    def get_arm_joints(self, semantic_place: bool = False):
+    def get_arm_joints(self, joint_black_list=None):
         """Get the current arm joints. If it is semantic place skills,
         we will return one addition joints"""
         # Get proprioception inputs
         joint_black_list = (
-            self.config.SEMANTIC_PLACE_JOINT_BLACKLIST
-            if semantic_place
-            else self.config.JOINT_BLACKLIST
+            self.config.JOINT_BLACKLIST
+            if joint_black_list is None
+            else joint_black_list
         )
         joints = np.array(
             [

@@ -16,6 +16,8 @@ WEIGHTS_TORCHSCRIPT:
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
+  # Open close drawer
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
 WEIGHTS:
   # Regular Nav
@@ -32,6 +34,9 @@ WEIGHTS:
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
+
+  # Open close drawer
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
@@ -81,6 +86,12 @@ PLACE_ACTION_SPACE_LENGTH: 4
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9
 SEMANTIC_PLACE_JOINT_BLACKLIST: [3]
 
+# Open Close Drawer env
+MAX_LIN_DIST_OPEN_CLOSE_DRAWER: 0.0
+MAX_ANG_DIST_OPEN_CLOSE_DRAWER: 3.73 # degrees
+OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
+OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
+
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
@@ -88,8 +99,8 @@ MAX_ANG_DIST: 15.0  # degrees
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
 MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
+MAX_JOINT_MOVEMENT_OPEN_CLOSE_DRAWER: 0.06
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
-# This angle levels up the arm
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping (gripper is in object's right hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # The initial orientation of the arm for side grasping (gripper is in object's left hand side)
@@ -101,7 +112,10 @@ ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
 ARM_UPPER_LIMITS: [45, 0, 180, 0, 90, 0]
 ARM_LOWER_LIMITS_SEMANTIC_PLACE: [-90, -180, 0, 0, -90, -90]
 ARM_UPPER_LIMITS_SEMANTIC_PLACE: [90, 0, 180, 0, 90, 90]
+ARM_LOWER_LIMITS_OPEN_CLOSE_DRAWER: [-90, -180, 0, 0, -90, 0]
+ARM_UPPER_LIMITS_OPEN_CLOSE_DRAWER: [90, 0, 180, 0, 90, 0]
 JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"
+JOINT_BLACKLIST_OPEN_CLOSE_DRAWER: [3]
 
 ACTUALLY_MOVE_ARM: True
 GRASP_EVERY_STEP: False
