@@ -91,7 +91,7 @@ class FinalTorchscriptModel(torch.nn.Module):
         )
         features, rnn_hidden_states = output_of_model[0], output_of_model[1]
         action = self.get_action(self.action_dist_ts(features), self.std)
-        action = action.mean
+        action = action.sample()
         return action, rnn_hidden_states
 
 
@@ -288,7 +288,7 @@ class PolicyConverter:
                 self.test_recurrent_hidden_states,
                 self.prev_actions,
                 self.not_done_masks,
-                deterministic=True,
+                deterministic=False,
             )
             actions = (
                 PolicyActionData.actions
