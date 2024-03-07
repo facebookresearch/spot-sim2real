@@ -83,14 +83,6 @@ def main(spot: Spot):
     point, rpy = move_to_initial(spot)
     control_arm = False
 
-    # # Init Spot Data Logger
-    # spot.setup_logging_sources(
-    #     [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-    # )
-    # while True:
-    #     # Log data packet
-    #     spot.update_logging_data()
-
     # Start in-terminal GUI
     stdscr = curses.initscr()
     stdscr.nodelay(True)
@@ -162,9 +154,6 @@ def main(spot: Spot):
                 else:
                     key_not_applicable = True
 
-                # Log data packet
-                spot.update_logging_data()
-
             if not key_not_applicable:
                 last_execution = time.time()
 
@@ -177,5 +166,5 @@ def main(spot: Spot):
 
 if __name__ == "__main__":
     spot = Spot("ArmKeyboardTeleop")
-    with spot.get_lease(hijack=False) as lease:
+    with spot.get_lease(hijack=True) as lease:
         main(spot)
