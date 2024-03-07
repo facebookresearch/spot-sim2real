@@ -45,6 +45,7 @@ from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
     is_position_within_bounds,
 )
+from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 
 # Import core classes
 from spot_wrapper.spot import Spot
@@ -142,6 +143,10 @@ class Skill:
             raise e
         done = False
 
+        # Check the current buffer to see which skill we are using right now
+        # This does not have any effect if the initial ros buffter is none
+        begin_skill_name, begin_skill_input = get_skill_name_and_input_from_ros()
+
         # Execution Loop
         while not done:
             action = self.policy.act(observations)  # type: ignore
@@ -159,6 +164,15 @@ class Skill:
                     ],
                 }
             )
+
+            # Check if we still want to use the same skill
+            # We terminate the skill if skill name or input is differnt from the one at the beginning.
+            cur_skill_name, cur_skill_input = get_skill_name_and_input_from_ros()
+            if (
+                cur_skill_name != begin_skill_name
+                or cur_skill_input != begin_skill_input
+            ):
+                done = True
 
         # Update logged data after finishing execution and get feedback (status & msg)
         return self.update_and_check_status(goal_dict)
