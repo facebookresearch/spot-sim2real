@@ -5,14 +5,15 @@ OBSERVATIONS_DICT:
   articulated_agent_arm_depth: [[240, 228, 1], '0.0', '1.0', 'np.float32']
   joint: [[5,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
   ee_pos: [[3,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
-  is_holding: [[1,], '0', '1', 'np.float32']
+  # TODO: ckpt 12 series does not have is holding sensor
+  # is_holding: [[1,], '0', '1', 'np.float32']
   handle_bbox: [[240, 228, 1], '0.0', '1.0', 'np.float32']
   art_pose_delta_sensor: [[1,], '0.0', '1.0', 'np.float32']
 # Define the action space output length
 ACTION_SPACE_LENGTH: 8
 # The path to load and save the models
-TARGET_HAB3_POLICY_PATH: "/home/jmmy/research/spot-sim2real/spot_rl_experiments/weights/open_close_drawer/od11lr_11_ckpt.42.pth"
-OUTPUT_COMBINED_NET_SAVE_PATH: "/home/jmmy/research/spot-sim2real/spot_rl_experiments/weights/open_close_drawer/od11lr_11_ckpt.42.combined_net.torchscript"
+TARGET_HAB3_POLICY_PATH: "/home/jmmy/research/spot-sim2real/spot_rl_experiments/weights/open_close_drawer/od12lr_13_ckpt.40.pth"
+OUTPUT_COMBINED_NET_SAVE_PATH: "/home/jmmy/research/spot-sim2real/spot_rl_experiments/weights/open_close_drawer/od12lr_13_ckpt.40.combined_net.torchscript"
 # If we want to use stereo pair camera for mobile gaze
 USE_STEREO_PAIR_CAMERA: False
 NEW_HABITAT_LAB_POLICY_OR_OLD: 'new'

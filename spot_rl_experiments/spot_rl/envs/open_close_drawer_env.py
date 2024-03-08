@@ -11,13 +11,28 @@ import numpy as np
 import quaternion
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_wrapper.spot import Spot
+from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
+
+
+def get_3d_point(cam_intrinsics, pixel_uv, z):
+    """Helper function to compute 3D point"""
+    # Get camera intrinsics
+    fx = cam_intrinsics.focal_length.x
+    fy = cam_intrinsics.focal_length.y
+    cx = cam_intrinsics.principal_point.x
+    cy = cam_intrinsics.principal_point.y
+
+    # print(fx, fy, cx, cy)
+    # Get 3D point
+    x = (pixel_uv[0] - cx) * z / fx
+    y = (pixel_uv[1] - cy) * z / fy
+    return np.array([x, y, z])
 
 
 class SpotOpenCloseDrawerEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
         # Select suitable keys
-        max_joint_movement_key = "MAX_JOINT_MOVEMENT"
+        max_joint_movement_key = "MAX_JOINT_MOVEMENT_OPEN_CLOSE_DRAWER"
         max_lin_dist_key = "MAX_LIN_DIST"
         max_ang_dist_key = "MAX_ANG_DIST"
 
@@ -37,16 +52,38 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # The initial joint angles is in the stow location
         self.initial_arm_joint_angles = np.deg2rad([0, -180, 180, 0, 0, 0])
 
+        # The number of times calls close gripper
+        self._ee_close_times = 0
+
+        # Flag for done
+        self._done = False
+
     def reset(self, *args, **kwargs):
+
+        print("Open gripper called in OpenCloseDrawer")
+        self.spot.open_gripper()
 
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
         )
 
+        # Block until arm arrives with incremental timeout for 3 attempts
+        timeout_sec = 1.0
+        max_allowed_timeout_sec = 3.0
+        status = False
+        while status is False and timeout_sec <= max_allowed_timeout_sec:
+            status = self.spot.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+            timeout_sec += 1.0
+
         # Make the arm to be in true nominal location
-        # ee_position = self.get_gripper_position_in_base_frame_spot()
-        # self.spot.move_gripper_to_point(ee_position, [0, 0, 0])
+        ee_position = self.get_gripper_position_in_base_frame_spot()
+        self.spot.move_gripper_to_point(ee_position, [0, 0, 0])
+
+        # Move arm to initial configuration again to ensure it is in the good location
+        cmd_id = self.spot.set_arm_joint_positions(
+            positions=self.initial_arm_joint_angles, travel_time=1
+        )
 
         # Block until arm arrives with incremental timeout for 3 attempts
         timeout_sec = 1.0
@@ -58,16 +95,90 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         self.initial_ee_orientation = self.spot.get_ee_rotation_in_body_frame_quat()
 
-        print("Open gripper called in OpenCloseDrawer")
-        self.spot.open_gripper()
-
         # Update target object name as provided in config
         observations = super().reset(
             target_obj_name=self.target_obj_name, *args, **kwargs
         )
         rospy.set_param("object_target", self.target_obj_name)
 
+        # The number of times calls close gripper
+        self._ee_close_times = 0
+
+        # Flag for done
+        self._done = False
+
         return observations
+
+    def approach_handle_and_grasp(self, bbox):
+        """This method doing IK to approach the handle and close the gripper."""
+        imgs = self.spot.get_hand_image()
+        unscaled_dep_img = image_response_to_cv2(imgs[1])
+
+        # Get the camera intrinsics
+        cam_intrinsics = imgs[0].source.pinhole.intrinsics
+
+        # Get the transformation
+        body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        )
+
+        # Locate the bbox location
+        height_center_bbox = bbox.shape[0] // 2  # 240 //2
+        width_center_bbox = bbox.shape[1] // 2  # 228 //2
+        bbox_where = np.argwhere(bbox[:, :, 0])
+        (x_min, y_min), (x_max, y_max) = bbox_where.min(0), bbox_where.max(0) + 1
+        x_center = (x_min + x_max) // 2
+        y_center = (y_min + y_max) // 2
+        delta_x = -height_center_bbox + x_center
+        delta_y = -width_center_bbox + y_center
+
+        # Get the z depth
+        height_center = unscaled_dep_img.shape[0] // 2  # 240 //2
+        width_center = unscaled_dep_img.shape[1] // 2  # 228 //2
+        z = (
+            unscaled_dep_img[height_center + delta_x, width_center + delta_y] * 0.001
+        )  # from mm to meter
+        print(f"distance from RGB to the point: {z}")
+
+        # Get the 3D point
+        point_in_local_3d = get_3d_point(
+            cam_intrinsics, (height_center + delta_x, width_center + delta_y), z
+        )
+
+        # Get the point in the hand frame
+        point_in_global_3d: mn.Vector3 = body_T_hand.transform_point(
+            mn.Vector3(*point_in_local_3d)
+        )
+        # Small offset to move the gripper forward
+        offset_x = 0.1
+        point_in_global_3d = np.array(
+            [
+                point_in_global_3d.x + offset_x,
+                point_in_global_3d.y,
+                point_in_global_3d.z,
+            ]
+        )
+
+        # Move the gripper to target
+        self.spot.move_gripper_to_point(point_in_global_3d, [0, 0, 0])
+
+        # Close the gripper
+        self.spot.close_gripper()
+
+        # Pull the drawer by 40 cm
+        move_target = [
+            point_in_global_3d[0] - 0.4,
+            point_in_global_3d[1],
+            point_in_global_3d[2],
+        ]
+        self.spot.move_gripper_to_point(move_target, [0, 0, 0])
+
+        # Open the gripper and retract the arm
+        self.spot.open_gripper()
+        self.spot.move_gripper_to_point([0.55, 0, 0.27], [0, 0, 0])
+
+        # Change the flag to finish
+        self._done = True
 
     def step(self, action_dict: Dict[str, Any]):
         # Update the action_dict with place flag
@@ -77,9 +188,15 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         )
         # We close gripper here
         # TODO: clean up debug msg
-        print(f" action_dict: {action_dict}")
-        if action_dict["close_gripper"] >= 0:
-            self.spot.close_gripper()
+        print(f" action_dict: {action_dict} {self._ee_close_times}")
+        if (
+            action_dict["close_gripper"] >= 0
+            and np.sum(observations["handle_bbox"]) > 0
+        ):
+            self._ee_close_times += 1
+            # Do IK to approach the target
+            self.approach_handle_and_grasp(observations["handle_bbox"])
+
         return observations, reward, done, info
 
     def angle_between_quat(self, q1, q2):
@@ -150,7 +267,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             "articulated_agent_arm_depth": arm_depth,
             "joint": self.get_arm_joints(self.config.JOINT_BLACKLIST_OPEN_CLOSE_DRAWER),
             "ee_pos": self.get_gripper_position_in_base_frame_spot(),
-            "is_holding": np.zeros((1,)),
+            # TODO: ckpt 12 series does not have is_holding sensor
+            # "is_holding": np.zeros((1,)),
             "handle_bbox": arm_depth_bbox,
             "art_pose_delta_sensor": delta_ee,
         }
@@ -161,5 +279,4 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         return observations
 
     def get_success(self, observations):
-        # TODO: better way to handle this
-        return False
+        return self._done
