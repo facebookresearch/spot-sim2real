@@ -277,6 +277,19 @@ class Spot:
         self.set_arm_joint_positions(new_arm_joint_states)
         time.sleep(0.5)
 
+    def get_ee_rotation_in_body_frame_quat(self):
+        """
+        return ee rotation in quaternion
+        """
+        vision_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "body",
+            "hand",
+        )
+        quat = vision_T_hand.rotation
+        quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
+        return quat
+
     def move_gripper_to_point(
         self, point, rotation, seconds_to_goal=3.0, timeout_sec=10
     ):

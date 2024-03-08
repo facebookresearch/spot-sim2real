@@ -499,14 +499,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations
 
-    def get_arm_joints(self):
+    def get_arm_joints(self, black_list=None):
         # Get proprioception inputs
+        black_list = self.config.JOINT_BLACKLIST if black_list is None else black_list
         joints = np.array(
-            [
-                j
-                for idx, j in enumerate(self.current_arm_pose)
-                if idx not in self.config.JOINT_BLACKLIST
-            ],
+            [j for idx, j in enumerate(self.current_arm_pose) if idx not in black_list],
             dtype=np.float32,
         )
 

@@ -15,15 +15,23 @@ from spot_rl.envs.gaze_env import SpotGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
+from spot_rl.envs.open_close_drawer_env import SpotOpenCloseDrawerEnv
 from spot_rl.envs.place_env import SpotPlaceEnv
 
 # Import policies
-from spot_rl.real_policy import GazePolicy, MobileGazePolicy, NavPolicy, PlacePolicy
+from spot_rl.real_policy import (
+    GazePolicy,
+    MobileGazePolicy,
+    NavPolicy,
+    OpenCloseDrawerPolicy,
+    PlacePolicy,
+)
 
 # Import utils and helpers
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
+    construct_config_for_open_close_drawer,
     construct_config_for_place,
 )
 
@@ -737,4 +745,49 @@ class Place(Skill):
             "base_action": None,
         }
 
+        return action_dict
+
+
+class OpenCloseDrawer(Skill):
+    """
+    Open close drawer controller is used to execute open/close drawers
+    """
+
+    def __init__(self, spot, config=None) -> None:
+        if not config:
+            config = construct_config_for_open_close_drawer()
+        super().__init__(spot, config)
+
+        # Setup
+        self.policy = OpenCloseDrawerPolicy(
+            self.config.WEIGHTS.OPEN_CLOSE_DRAWER,
+            device=self.config.DEVICE,
+            config=self.config,
+        )
+        self.policy.reset()
+
+        self.env = SpotOpenCloseDrawerEnv(self.config, spot)
+
+    def reset_skill(self, goal_dict: Dict[str, Any]) -> Any:
+        """Refer to class Skill for documentation"""
+        # Reset the env and policy
+        observations = self.env.reset()
+        self.policy.reset()
+
+        # Reset logged data at init
+        self.reset_logger()
+
+        return observations
+
+    def update_and_check_status(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
+        # TODO: terminatation checking
+        return (False, "Not yet")
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        action_dict = {
+            "arm_action": action[0:4],
+            "base_action": None,
+            "close_gripper": action[4],
+        }
         return action_dict

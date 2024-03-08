@@ -106,3 +106,26 @@ def construct_config_for_place(file_path=None, opts=[]):
     config.USE_MRCNN = False
 
     return config
+
+
+def construct_config_for_open_close_drawer(file_path=None, opts=[]):
+    """
+    Constructs and updates the config for open close drawer
+
+    Args:
+        file_path (str): Path to the config file
+        opts (list): List of options to update the config
+
+    Returns:
+        config (Config): Updated config object
+    """
+    config = None
+    if file_path is None:
+        config = construct_config(opts=opts)
+    else:
+        config = construct_config(file_path=file_path, opts=opts)
+
+    # Don't need head cameras for Gaze
+    config.USE_HEAD_CAMERA = False
+
+    return config

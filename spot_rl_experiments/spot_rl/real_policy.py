@@ -280,6 +280,50 @@ class NavPolicy(RealPolicy):
         )
 
 
+class OpenCloseDrawerPolicy(RealPolicy):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
+        observation_space = SpaceDict(
+            {
+                "handle_bbox": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(240, 228, 1),
+                    dtype=np.float32,
+                ),
+                "articulated_agent_arm_depth": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "joint": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(5,),
+                    dtype=np.float32,
+                ),
+                "ee_pos": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(3,),
+                    dtype=np.float32,
+                ),
+                "art_pose_delta_sensor": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(1,),
+                    dtype=np.float32,
+                ),
+                "is_holding": spaces.Box(
+                    low=0.0, high=1.0, shape=(1,), dtype=np.float32
+                ),
+            }
+        )
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH", 8),)
+        )
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
+
+
 class MixerPolicy(RealPolicy):
     def __init__(
         self,

@@ -13,6 +13,9 @@ WEIGHTS_TORCHSCRIPT:
   # Static place
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
+  # Open close drawer
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od11lr_11_ckpt.42.combined_net.torchscript"
+  
 WEIGHTS:
   # Regular Nav
   NAV: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
@@ -25,6 +28,9 @@ WEIGHTS:
   
   # Static place
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
+
+  # Open close drawer
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od11lr_11_ckpt.42.combined_net.torchscript"
   
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
@@ -70,6 +76,9 @@ SUCC_XY_DIST: 0.1
 SUCC_Z_DIST: 0.20
 PLACE_ACTION_SPACE_LENGTH: 4
 
+# Open Close Drawer env
+OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
+
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
@@ -82,7 +91,8 @@ GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
 ARM_UPPER_LIMITS: [45, -45, 180, 0, 90, 0]
-JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"
+JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"\
+JOINT_BLACKLIST_OPEN_CLOSE_DRAWER: [3]
 ACTUALLY_MOVE_ARM: True
 GRASP_EVERY_STEP: False
 TERMINATE_ON_GRASP: False
