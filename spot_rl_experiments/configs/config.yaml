@@ -89,8 +89,11 @@ MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
-ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
-ARM_UPPER_LIMITS: [45, -45, 180, 0, 90, 0]
+# ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
+# ARM_UPPER_LIMITS: [45, -45, 180, 0, 90, 0]
+# TODO: better way to set the arm limit for different skills
+ARM_LOWER_LIMITS: [-90, -180, 0, 0, -90, 0]
+ARM_UPPER_LIMITS: [90, 0, 180, 0, 90, 0]
 JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"\
 JOINT_BLACKLIST_OPEN_CLOSE_DRAWER: [3]
 ACTUALLY_MOVE_ARM: True

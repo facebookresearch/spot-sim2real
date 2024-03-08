@@ -29,7 +29,9 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
         )
-        self.target_obj_name = "drawer handle"
+        # TODO: finalize what is the target object name
+        # possible candidate: drawer handle/cup/purple cube
+        self.target_obj_name = "cup"
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
 
         # The initial joint angles is in the stow location
@@ -41,6 +43,10 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
         )
+
+        # Make the arm to be in true nominal location
+        # ee_position = self.get_gripper_position_in_base_frame_spot()
+        # self.spot.move_gripper_to_point(ee_position, [0, 0, 0])
 
         # Block until arm arrives with incremental timeout for 3 attempts
         timeout_sec = 1.0
@@ -70,6 +76,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             action_dict=action_dict,
         )
         # We close gripper here
+        # TODO: clean up debug msg
+        print(f" action_dict: {action_dict}")
         if action_dict["close_gripper"] >= 0:
             self.spot.close_gripper()
         return observations, reward, done, info
@@ -110,7 +118,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         ee_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
         # Get the base transformation
         base_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-        # Do offset
+        # Do offset: move the base center forward to be close to the gripper base
         base_transform.translation = base_transform.transform_point(
             mn.Vector3(0.292, 0, 0)
         )
@@ -146,6 +154,10 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             "handle_bbox": arm_depth_bbox,
             "art_pose_delta_sensor": delta_ee,
         }
+        # TODO: clean up the debug msg
+        print(
+            f"ee_pos: {self.get_gripper_position_in_base_frame_spot()}; pose_delta: {delta_ee}"
+        )
         return observations
 
     def get_success(self, observations):
