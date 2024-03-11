@@ -109,10 +109,53 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         return observations
 
-    def approach_handle_and_grasp(self, bbox):
-        """This method doing IK to approach the handle and close the gripper."""
+    def compute_distance_to_handle(self, bbox, average_mode=True):
+        "Compute the distance in the bounding box center"
         imgs = self.spot.get_hand_image()
         unscaled_dep_img = image_response_to_cv2(imgs[1])
+
+        # Locate the bbox location
+        height_center_bbox = bbox.shape[0] // 2  # 240 //2
+        width_center_bbox = bbox.shape[1] // 2  # 228 //2
+        bbox_where = np.argwhere(bbox[:, :, 0])
+        (x_min, y_min), (x_max, y_max) = bbox_where.min(0), bbox_where.max(0) + 1
+        x_center = (x_min + x_max) // 2
+        y_center = (y_min + y_max) // 2
+
+        # Offset in the bbox
+        delta_x = -height_center_bbox + x_center
+        delta_y = -width_center_bbox + y_center
+
+        # Center of depth image
+        height_center = unscaled_dep_img.shape[0] // 2  # 480 //2
+        width_center = unscaled_dep_img.shape[1] // 2  # 640 //2
+
+        # Get the z depth
+        if average_mode:
+            # x_offset. y_offset
+            x_offset = height_center - height_center_bbox
+            y_offset = width_center - width_center_bbox
+            x_min_depth = x_offset + x_min
+            y_min_depth = y_offset + y_min
+            x_max_depth = x_offset + x_max
+            y_max_depth = y_offset + y_max
+            z = (
+                np.average(
+                    unscaled_dep_img[x_min_depth:x_max_depth, y_min_depth:y_max_depth]
+                )
+                * 0.001
+            )  # from mm to meter
+        else:
+            # Center of the depth image with offset
+            z = (
+                unscaled_dep_img[height_center + delta_x, width_center + delta_y]
+                * 0.001
+            )  # from mm to meter
+        return z, height_center + delta_x, width_center + delta_y
+
+    def approach_handle_and_grasp(self, z, pixel_x, pixel_y):
+        """This method doing IK to approach the handle and close the gripper."""
+        imgs = self.spot.get_hand_image()
 
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
@@ -122,28 +165,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
         )
 
-        # Locate the bbox location
-        height_center_bbox = bbox.shape[0] // 2  # 240 //2
-        width_center_bbox = bbox.shape[1] // 2  # 228 //2
-        bbox_where = np.argwhere(bbox[:, :, 0])
-        (x_min, y_min), (x_max, y_max) = bbox_where.min(0), bbox_where.max(0) + 1
-        x_center = (x_min + x_max) // 2
-        y_center = (y_min + y_max) // 2
-        delta_x = -height_center_bbox + x_center
-        delta_y = -width_center_bbox + y_center
-
-        # Get the z depth
-        height_center = unscaled_dep_img.shape[0] // 2  # 240 //2
-        width_center = unscaled_dep_img.shape[1] // 2  # 228 //2
-        z = (
-            unscaled_dep_img[height_center + delta_x, width_center + delta_y] * 0.001
-        )  # from mm to meter
-        print(f"distance from RGB to the point: {z}")
-
         # Get the 3D point
-        point_in_local_3d = get_3d_point(
-            cam_intrinsics, (height_center + delta_x, width_center + delta_y), z
-        )
+        point_in_local_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
 
         # Get the point in the hand frame
         point_in_global_3d: mn.Vector3 = body_T_hand.transform_point(
@@ -186,16 +209,25 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         observations, reward, done, info = super().step(
             action_dict=action_dict,
         )
+
+        # Get bounding box
+        bbox = observations["handle_bbox"]
+
+        # Compute the distance from the gripper to bounding box
+        z = float("inf")
+        if np.sum(bbox) > 0:
+            z, pixel_x, pixel_y = self.compute_distance_to_handle(bbox)
+        print(f"distance to bbox {z}")
+
         # We close gripper here
         # TODO: clean up debug msg
         print(f" action_dict: {action_dict} {self._ee_close_times}")
-        if (
-            action_dict["close_gripper"] >= 0
-            and np.sum(observations["handle_bbox"]) > 0
+        if (action_dict["close_gripper"] >= 0 and np.sum(bbox) > 0 and False) or (
+            z != 0 and z <= 0.3
         ):
             self._ee_close_times += 1
             # Do IK to approach the target
-            self.approach_handle_and_grasp(observations["handle_bbox"])
+            self.approach_handle_and_grasp(z, pixel_x, pixel_y)
 
         return observations, reward, done, info
 

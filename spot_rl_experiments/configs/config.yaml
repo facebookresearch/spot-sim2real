@@ -15,7 +15,7 @@ WEIGHTS_TORCHSCRIPT:
 
   # Open close drawer
   # OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od11lr_11_ckpt.42.combined_net.torchscript"
-  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od12lr_13_ckpt.40.combined_net.torchscript"
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od14lr_30_ckpt.144.combined_net.torchscript"
   
 WEIGHTS:
   # Regular Nav
@@ -32,7 +32,7 @@ WEIGHTS:
 
   # Open close drawer
   # OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od11lr_11_ckpt.42.combined_net.torchscript"
-  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od12lr_13_ckpt.40.combined_net.torchscript"
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od14lr_30_ckpt.144.combined_net.torchscript"
   
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
