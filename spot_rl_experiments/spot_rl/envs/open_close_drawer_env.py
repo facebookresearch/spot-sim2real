@@ -153,6 +153,10 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             )  # from mm to meter
         return z, height_center + delta_x, width_center + delta_y
 
+    def bd_open_drawer_api(self):
+        """BD API to open the drawer in x direction"""
+        pass
+
     def approach_handle_and_grasp(self, z, pixel_x, pixel_y):
         """This method doing IK to approach the handle and close the gripper."""
         imgs = self.spot.get_hand_image()
@@ -161,40 +165,57 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
 
         # Get the transformation
-        body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-            "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        # body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+        #     "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        # )
+        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+
+        # Get the 3D point in the hand frame, and offset the gripper 0.1 meter
+        point_in_hand_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z + 0.1)
+
+        # Get the vision to hand
+        vision_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        )
+        point_in_global_3d = vision_T_hand.transform_point(
+            mn.Vector3(*point_in_hand_3d)
         )
 
-        # Get the 3D point
-        point_in_local_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
+        # Get the point in the base frame
+        point_in_base_3d = vision_T_base.inverted().transform_point(point_in_global_3d)
 
-        # Get the point in the hand frame
-        point_in_global_3d: mn.Vector3 = body_T_hand.transform_point(
-            mn.Vector3(*point_in_local_3d)
-        )
-        # Small offset to move the gripper forward
-        offset_x = 0.1
-        point_in_global_3d = np.array(
+        # Make it to be numpy
+        point_in_base_3d = np.array(
             [
-                point_in_global_3d.x + offset_x,
-                point_in_global_3d.y,
-                point_in_global_3d.z,
+                point_in_base_3d.x,
+                point_in_base_3d.y,
+                point_in_base_3d.z,
             ]
         )
 
-        # Move the gripper to target
-        self.spot.move_gripper_to_point(point_in_global_3d, [0, 0, 0])
+        # Get the current ee rotation in body frame
+        ee_rotation = self.spot.get_ee_rotation_in_body_frame_quat()
+
+        # Move the gripper to target using current gripper pose in the body frame
+        self.spot.move_gripper_to_point(
+            point_in_base_3d,
+            [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+        )
 
         # Close the gripper
         self.spot.close_gripper()
 
-        # Pull the drawer by 40 cm
-        move_target = [
-            point_in_global_3d[0] - 0.4,
-            point_in_global_3d[1],
-            point_in_global_3d[2],
-        ]
-        self.spot.move_gripper_to_point(move_target, [0, 0, 0])
+        # Get the transformation of the gripper
+        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # Get the location that we want to move to for retracting the arm. Pull the drawer by 40 cm
+        move_target = vision_T_hand.transform_point(mn.Vector3([-0.4, 0, 0]))
+        # Get the move_target in base frame
+        move_target = vision_T_base.inverted().transform_point(move_target)
+
+        # Retract the arm based on the current gripper location
+        self.spot.move_gripper_to_point(
+            move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
+        )
 
         # Open the gripper and retract the arm
         self.spot.open_gripper()
