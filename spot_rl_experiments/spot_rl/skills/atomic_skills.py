@@ -771,7 +771,7 @@ class OpenCloseDrawer(Skill):
     def reset_skill(self, goal_dict: Dict[str, Any]) -> Any:
         """Refer to class Skill for documentation"""
         # Reset the env and policy
-        observations = self.env.reset()
+        observations = self.env.reset(goal_dict)
         self.policy.reset()
 
         # Reset logged data at init

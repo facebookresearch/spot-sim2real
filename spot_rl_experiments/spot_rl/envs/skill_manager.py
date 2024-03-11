@@ -372,7 +372,7 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
-    def OpenCloseDrawer(self) -> Tuple[bool, str]:
+    def OpenCloseDrawer(self, open_mode=True) -> Tuple[bool, str]:
         """
         Perform open and close skills
 
@@ -380,7 +380,10 @@ class SpotSkillManager:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
-        status, message = self.open_close_drawer_controller.execute(goal_dict={})
+        goal_dict = {
+            "mode": "open" if open_mode else "close",
+        }  # type: Dict[str, Any]
+        status, message = self.open_close_drawer_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 

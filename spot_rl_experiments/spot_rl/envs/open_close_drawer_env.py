@@ -58,8 +58,10 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Flag for done
         self._done = False
 
-    def reset(self, *args, **kwargs):
+        # Mode for opening or closing
+        self._mode = "open"
 
+    def reset(self, goal_dict=None, *args, **kwargs):
         print("Open gripper called in OpenCloseDrawer")
         self.spot.open_gripper()
 
@@ -106,6 +108,9 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Flag for done
         self._done = False
+
+        # Get the mode: open or close drawers
+        self._mode = goal_dict["mode"]
 
         return observations
 
@@ -207,8 +212,11 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Get the transformation of the gripper
         vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the location that we want to move to for retracting the arm. Pull the drawer by 40 cm
-        move_target = vision_T_hand.transform_point(mn.Vector3([-0.4, 0, 0]))
+        # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 40 cm
+        pull_push_distance = -0.4 if self._mode == "open" else 0.4
+        move_target = vision_T_hand.transform_point(
+            mn.Vector3([pull_push_distance, 0, 0])
+        )
         # Get the move_target in base frame
         move_target = vision_T_base.inverted().transform_point(move_target)
 
