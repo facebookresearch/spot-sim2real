@@ -394,9 +394,12 @@ class Spot:
         print(f"Initialized logging for sources : {self.source_list}")
 
     def update_logging_data(
-        self, include_image_data: bool = True, visualize: bool = False
+        self,
+        include_image_data: bool = True,
+        visualize: bool = False,
+        verbose: bool = False,
     ):
-
+        print("Starting Logging!")
         log_packet = {
             "timestamp": time.time(),
             "camera_data": [],
@@ -406,20 +409,21 @@ class Spot:
         }  # type: Dict[str, Any]
 
         if include_image_data:
-            for i in range(len(self.source_list)):
-                camera_source = self.source_list[i]
-                img_responses = self.get_image_responses([camera_source])
+            img_responses = self.get_image_responses(self.source_list)
+            frame_tree_snapshot = img_responses[0].shot.transforms_snapshot
+
+            for i, camera_source in enumerate(self.source_list):
                 log_packet["camera_data"].append(
                     {
                         "src_info": camera_source,
                         "raw_image": image_response_to_cv2(
-                            img_responses[0]
+                            img_responses[i], reorient=True
                         ),  # np.ndarray should be okay too
                         "camera_intrinsics": self.get_camera_intrinsics_as_3x3(
-                            img_responses[0].source.pinhole.intrinsics
+                            img_responses[i].source.pinhole.intrinsics
                         ),  # np.ndarray
                         "base_T_camera": self.get_sophus_SE3_spot_a_T_b(
-                            img_responses[0].shot.transforms_snapshot,
+                            img_responses[i].shot.transforms_snapshot,
                             a="body",
                             b=SpotCamIdToFrameNameMap[camera_source],
                         ).matrix(),  # np.ndarray
@@ -431,7 +435,7 @@ class Spot:
                 cv2.waitKey(1)
 
         log_packet["vision_T_base"] = self.get_sophus_SE3_spot_a_T_b(
-            frame_tree_snapshot=None, a="vision", b="body"
+            frame_tree_snapshot=frame_tree_snapshot, a="vision", b="body"
         ).matrix()  # np.ndarray
         log_packet["base_pose_xyt"] = np.asarray(
             self.get_xy_yaw()
@@ -442,13 +446,13 @@ class Spot:
             self.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
 
-        if visualize:
+        if verbose:
             print(log_packet)
         # TODO: Add force in gripper. How to get force reading?
 
         # TODO: Check for optimized solution to store mixed DS in memory
         # TODO: .to_list -> json || pickle dump to .json / .gz.json
-
+        print("Ending Logging!")
         # TODO: pkl dump. Allow caller to construct pkl & dump?
         return log_packet
 
@@ -1127,6 +1131,7 @@ def image_response_to_cv2(image_response, reorient=True):
         img = cv2.imdecode(img, -1)
 
     if reorient and image_response.source.name in SHOULD_ROTATE:
+        print("Image Is Getting Rotated")
         img = np.rot90(img, k=3)
 
     return img
