@@ -32,6 +32,7 @@ from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
     construct_config_for_place,
+    construct_config_for_semantic_place,
 )
 
 # Import Utils
@@ -747,38 +748,16 @@ class Place(Skill):
         return action_dict
 
 
-class SemanticPlace(Skill):
+class SemanticPlace(Place):
     """
-    Place controller is used to execute place for given place targets
-
-    Args:
-        config: Config object
-        spot: Spot object
-        use_policies (bool): Whether to use policies or use BD API to execute place
-
-    How to use:
-        1. Create PlaceController object
-        2. Call execute() with place_target_list as input
-
-    Example:
-        config = construct_config_for_place(opts=[])
-        spot = Spot("PlaceController")
-        with spot.get_lease(hijack=True):
-            spot.power_robot()
-
-            place_target_list = [target1, target2, ...]
-            place_controller = PlaceController(config, spot, use_policies=True)
-            place_result = place_controller.execute(place_target_list, is_local=False)
-
-            spot.shutdown(should_dock=True)
+    Semantic place controller is used to execute place for given place targets
     """
 
     def __init__(self, spot: Spot, config):
         if not config:
-            config = construct_config_for_place()
+            config = construct_config_for_semantic_place()
         super().__init__(spot, config)
 
-        # Setup
         self.policy = SemanticPlacePolicy(
             config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
         )
@@ -786,165 +765,10 @@ class SemanticPlace(Skill):
 
         self.env = SpotSemanticPlaceEnv(config, spot)
 
-    # ... COPY PASTE FROM PLACE
-    def sanity_check(self, goal_dict: Dict[str, Any]):
-        """Refer to class Skill for documentation"""
-        place_target = goal_dict.get(
-            "place_target", None
-        )  # type: Tuple[float, float, float]
-        if place_target is None:
-            raise KeyError(
-                "Error in Place.sanity_check(): place_target key not found in goal_dict"
-            )
-
-        conditional_print(message="SanityCheck passed for place", verbose=self.verbose)
-
-    # ... COPY PASTE FROM PLACE
-    def reset_skill(self, goal_dict: Dict[str, Any]) -> Any:
-        """Refer to class Skill for documentation"""
-        try:
-            self.sanity_check(goal_dict)
-        except Exception as e:
-            raise e
-
-        place_target = goal_dict.get("place_target")
-        is_local = goal_dict.get("is_local", False)
-
-        (x, y, z) = place_target
-        conditional_print(
-            message=f"Place target object at x, y, z : {x}, {y}, {z} in {'spot' if is_local else 'spots world'} frame.",
-            verbose=self.verbose,
-        )
-
-        # Reset the env and policy
-        observations = self.env.reset(place_target, is_local)
-        if self.policy is not None:
-            self.policy.reset()
-
-        # Logging and Debug
-        self.env.say(f"Placing at {place_target}")
-        print(
-            "CAUTION: The robot will DROP the object from the place_target location, please use objects that are not fragile!"
-        )
-
-        # Reset logged data at init
-        self.reset_logger()
-
-        return observations
-
     def execute_rl_loop(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
-        # return super().execute_rl_loop(goal_dict)
-        """
-        !!BLOCKING CALL!!
-
-        Executes the action based on output from policy
-
-        WARNING: This method WILL NOT perform any explicit sanity checks on the input provided.
-                 It is the responsibility of the caller to ensure that the input is valid
-                 and safe to use or perform sanity checks inside reset_skill() method
-
-        Args:
-            goal_dict: Dict[str, Any] containing necessary goal information for the appropriate skill
-
-        Returns:
-            status (bool): Whether robot was able to succesfully execute the skill or not
-            message (str): Message indicating description of success / failure reason
-        """
-        # Reset policy,env and update logged data at init
+        # Set the robot inital pose
         self.env.initial_pose = self.spot.get_ee_pos_in_body_frame()[-1]
-        try:
-            observations = self.reset_skill(goal_dict)
-        except Exception as e:
-            raise e
-        done = False
-
-        # Execution Loop
-        while not done:
-            action = self.policy.act(observations)  # type: ignore
-            action_dict = self.split_action(action)
-            observations, _, done, _ = self.env.step(action_dict=action_dict)  # type: ignore
-
-            # Record trajectories at every step
-            self.skill_result_log["robot_trajectory"].append(
-                {
-                    "timestamp": time.time() - self.start_time,
-                    "pose": [
-                        self.env.x,  # type: ignore
-                        self.env.y,  # type: ignore
-                        np.rad2deg(self.env.yaw),  # type: ignore
-                    ],
-                }
-            )
-
-        # Update logged data after finishing execution and get feedback (status & msg)
-        return self.update_and_check_status(goal_dict)
-
-    # ... COPY PASTE FROM PLACE
-    def execute(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:  # noqa
-        """
-        Execute place for each place target in place_target_list
-
-        Args:
-            place_target_list (list): List of place targets to go and place
-            is_local (bool): Whether the place target is in the local frame of the robot
-
-        Returns:
-            success_list (list): List of dicts containing the following keys:
-                - time_taken (float): Time taken to place the object
-                - success (bool): Whether the place was successful
-                - place_target (np.array([x,y,z])): Place target in base frame
-                - ee_pos (np.array([x,y,z])): End effector position in base frame
-        """
-        status = False
-        message = ""
-        try:
-            status, message = self.execute_rl_loop(goal_dict=goal_dict)
-            print(f"Feedback from place: {message}")
-        except Exception as e:
-            message = f"Error encountered while placing : {e}"
-            conditional_print(message=message, verbose=self.verbose)
-
-        return status, message
-
-    # ... COPY PASTE FROM PLACE
-    def update_and_check_status(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
-        """Refer to class Skill for documentation"""
-
-        self.env.say("Place Skill finished.. checking status")
-
-        # Record the success
-        local_place_target_spot = self.env.get_base_frame_place_target_spot()
-        local_ee_pose_spot = self.env.get_gripper_position_in_base_frame_spot()
-        check_place_success = is_position_within_bounds(
-            local_place_target_spot,
-            local_ee_pose_spot,
-            self.config.SUCC_XY_DIST,
-            self.config.SUCC_Z_DIST,
-            convention="spot",
-        )
-
-        # Update result log
-        self.skill_result_log["time_taken"] = time.time() - self.start_time
-        self.skill_result_log["success"] = check_place_success
-        self.skill_result_log["place_target"] = local_place_target_spot
-        self.skill_result_log["ee_pos"] = local_ee_pose_spot
-
-        # Open gripper to drop the object
-        self.spot.open_gripper()
-        # Add sleep as open_gripper() is a non-blocking call
-        time.sleep(1)
-
-        # Reset the arm here
-        self.env.reset_arm()
-
-        # Check for success and return appropriately
-        status = False
-        message = "Place failed to reach the target position"
-        if check_place_success:
-            status = True
-            message = "Successfully reached the target position"
-        conditional_print(message=message, verbose=self.verbose)
-        return status, message
+        return super().execute_rl_loop(goal_dict)
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""

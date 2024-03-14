@@ -91,7 +91,9 @@ class FinalTorchscriptModel(torch.nn.Module):
         )
         features, rnn_hidden_states = output_of_model[0], output_of_model[1]
         action = self.get_action(self.action_dist_ts(features), self.std)
-        # action = action.mean
+        # Note that you can either choose between sample() or mean method
+        # action = action.mean for mean
+        # action = action.sample for doing sampling
         action = action.sample()
         return action, rnn_hidden_states
 
@@ -372,8 +374,7 @@ def convert_from_pytorch_to_torchscript(conversion_params_yaml_path: str):
             dtype=eval(dtype),
         )
         observations[key] = np.zeros(shape, dtype=eval(dtype))
-    # print({key:value.shape for key, value in observations.items()})
-    print(observation_space)
+
     observation_space = SpaceDict(observation_space)
     action_space = spaces.Box(-1.0, 1.0, (config.ACTION_SPACE_LENGTH,))
 
@@ -416,9 +417,6 @@ def convert_from_pytorch_to_torchscript(conversion_params_yaml_path: str):
     print(
         f"Are actions from Pytorch & torchscript model same ? {is_same_actions}, are recurrent hidden states same ? {is_same_rnn_states}",
     )
-    # assert (
-    #     is_same_actions and is_same_rnn_states
-    # ), f"Actions & RNN states were supposed to be same but found actions to be same? {is_same_actions} & rnn states to be same?{is_same_rnn_states}"
     print(f"Torchscipt net model saved at {save_path['full_net']}")
 
 

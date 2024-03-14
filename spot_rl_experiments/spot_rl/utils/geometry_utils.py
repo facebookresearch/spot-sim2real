@@ -179,12 +179,6 @@ def is_position_within_bounds(
         is_within_linear_z_bounds = (
             abs(test_position[1] - target_position[1]) < z_dist_threshold
         )
-        print(
-            "xy:",
-            np.linalg.norm(test_position[[0, 2]] - target_position[[0, 2]]),
-            xy_dist_threshold,
-        )
-        print("z:", abs(test_position[1] - target_position[1]), z_dist_threshold)
     else:
         raise NotImplementedError
 

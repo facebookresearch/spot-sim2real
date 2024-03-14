@@ -124,7 +124,7 @@ class SpotCamIds:
     RIGHT_DEPTH = "right_depth"
     RIGHT_DEPTH_IN_VISUAL_FRAME = "right_depth_in_visual_frame"
     RIGHT_FISHEYE = "right_fisheye_image"
-    INTEL_REALSENSE_COLOR = "intelrealsensergb"
+    INTEL_REALSENSE_COLOR = "intelrealsensergb"  # In habitat-lab, the intelrealsense camera is called jaw camera
     INTEL_REALSENSE_DEPTH = "intelrealsensedepth"
 
 
@@ -179,6 +179,7 @@ class Spot:
             RobotCommandClient.default_service_name
         )
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
+
         # Make our intel image client
         try:
             self.intelrealsense_image_client = robot.ensure_client(
@@ -187,6 +188,7 @@ class Spot:
         except Exception:
             print("There is no intel-realsense-image_service. Using gripper cameras")
             self.intelrealsense_image_client = None
+
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
         )
@@ -209,7 +211,11 @@ class Spot:
         self.loginfo(f"Current battery charge: {self.get_battery_charge()}%")
 
     @property
-    def IS_GRIPPER_BLOCKED(self):
+    def is_gripper_blocked(self):
+        """A function to set the ros parameter: is_gripper_blocked for choosing between
+        Spot's gripper camera or intelrealsense camera (jaw camera). 0 for using Spot's gripper camera,
+        and 1 for using intelrealsense camera (jaw camera).
+        """
         return rospy.get_param("is_gripper_blocked", default=0) == 1
 
     def get_lease(self, hijack=False):
@@ -357,8 +363,11 @@ class Spot:
             should return its image with
         :param pixel_format: either an int or a list specifying what pixel format each source
             should return its image with
+        :param await_the_resp: either get image response result() or not
         :return: list containing bosdyn image response objects
         """
+
+        # Choose between intelrealsense camera or gripper camera
         image_client = (
             self.image_client
             if "intel" not in sources[0]
@@ -421,9 +430,6 @@ class Spot:
 
                 # The axis in the vision frame is the negative z-axis
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=-1)
-
-                print("topdown grasping")
-
             else:
                 # Add a constraint that requests that the y-axis of the gripper is
                 # pointing in the positive-z direction in the vision frame. That means
@@ -436,8 +442,6 @@ class Spot:
                 # The axis in the vision frame is the positive z-axis
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=1)
 
-                print("side grasping")
-
             grasp.grasp_params.grasp_params_frame_name = VISION_FRAME_NAME
             # Add the vector constraint to our proto.
             constraint = grasp.grasp_params.allowable_orientation.add()
@@ -449,7 +453,7 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            # constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
@@ -849,9 +853,10 @@ class Spot:
         finally:
             self.power_off()
 
-    def get_hand_image_old(self, is_rgb=True, img_src: List[str] = []):
+    def select_hand_image(self, is_rgb=True, img_src: List[str] = []):
         """
-        Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
+        Gets hand raw rgb and depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot
+        and camera intrinsics along with pixel data
         """
         img_src = (
             img_src
@@ -882,10 +887,10 @@ class Spot:
             SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
 
-        if self.IS_GRIPPER_BLOCKED:  # return intel realsense
-            return self.get_hand_image_old(img_src=realsense_img_srcs)
+        if self.is_gripper_blocked:  # return intelrealsense
+            return self.select_hand_image(img_src=realsense_img_srcs)
         else:
-            return self.get_hand_image_old(is_rgb=is_rgb)
+            return self.select_hand_image(is_rgb=is_rgb)
 
     def get_camera_intrinsics(
         self, sources: List[SpotCamIds], quality=None, pixel_format=None
@@ -979,56 +984,41 @@ class Spot:
         quat = se3_pose.rotation.normalize()
         return sp.SE3(quat.to_matrix(), pos)
 
-    def angle_between_quat(self, q1, q2):
-        q1_inv = np.conjugate(q1)
-        dp = quaternion.as_float_array(q1_inv * q2)
-        return 2 * np.arctan2(np.linalg.norm(dp[1:]), np.abs(dp[0]))
-
     def get_ee_pos_in_body_frame(self):
         """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        Return ee xyz position and roll, pitch, yaw
         """
-        # Get the euler z,y,x
-        vision_T_hand = get_a_tform_b(
-            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "body",
-            "hand",
-        )
-        print("vision_T_hand.rotation:", vision_T_hand.rotation)
-        theta = math_helpers.quat_to_eulerZYX(
-            vision_T_hand.rotation
-        )  # Get the location
+        # Get transformation
+        body_T_hand = self.get_ee_transform()
+
+        # Get rotation. BD API returns values with the order of yaw, pitch, roll.
+        theta = math_helpers.quat_to_eulerZYX(body_T_hand.rotation)
+        # Change the order to roll, pitch, yaw
+        theta = np.array(theta)[::-1]
+
+        # Get position x,y,z
         position = (
             self.robot_state_client.get_robot_state()
             .kinematic_state.transforms_snapshot.child_to_parent_edge_map["hand"]
             .parent_tform_child.position
         )
-        return np.array([position.x, position.y, position.z]), np.array(theta)[::-1]
+
+        return np.array([position.x, position.y, position.z]), theta
 
     def get_ee_transform(self):
         """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        Get ee transformation from base (body) to hand frame
         """
-        # Get the euler z,y,x
-        vision_T_hand = get_a_tform_b(
+        body_T_hand = get_a_tform_b(
             self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
             "body",
             "hand",
         )
-        return vision_T_hand
+        return body_T_hand
 
-    def get_ee_transform_global(self):
+    def get_ee_transform_in_vision_frame(self):
         """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        Get ee transformation from vision (global) to hand frame
         """
         # Get the euler z,y,x
         vision_T_hand = get_a_tform_b(
@@ -1038,88 +1028,12 @@ class Spot:
         )
         return vision_T_hand
 
-    def get_ee_pos_in_body_frame_quat(self):
+    def get_ee_quaternion_in_body_frame(self):
         """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
+        Get ee's quaternion
         """
-        vision_T_hand = get_a_tform_b(
-            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "body",
-            "hand",
-        )
-        quat = vision_T_hand.rotation
-        quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
-        return quat
-
-    def get_ee_pos_in_body_frame(self):
-        """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
-        """
-        # Get the euler z,y,x
-        vision_T_hand = get_a_tform_b(
-            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "vision",
-            "hand",
-        )
-        theta = math_helpers.quat_to_eulerZYX(
-            vision_T_hand.rotation
-        )  # Get the location
-        position = (
-            self.robot_state_client.get_robot_state()
-            .kinematic_state.transforms_snapshot.child_to_parent_edge_map["hand"]
-            .parent_tform_child.position
-        )
-        return np.array([position.x, position.y, position.z]), np.array(theta)[::-1]
-
-    def get_ee_transform(self):
-        """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
-        """
-        # Get the euler z,y,x
-        vision_T_hand = get_a_tform_b(
-            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "body",
-            "hand",
-        )
-        return vision_T_hand
-
-    def get_ee_transform_global(self):
-        """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
-        """
-        # Get the euler z,y,x
-        vision_T_hand = get_a_tform_b(
-            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "vision",
-            "hand",
-        )
-        return vision_T_hand
-
-    def get_ee_pos_in_body_frame_quat(self):
-        """
-        Much like spot.get_xy_yaw(), this function returns x,y,yaw of the hand camera instead of base such as in spot.get_xy_yaw()
-        Accepts the same parameter use_boot_origin of type bool like the function mentioned in above line, this determines whether the calculation is from the vision frame or robot'home
-        If true, then the location is calculated from the vision frame else from home/dock
-        Returns x,y,theta useful in head/hand based navigation used in Heurisitic Mobile Navigation
-        """
-        vision_T_hand = get_a_tform_b(
-            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "body",
-            "hand",
-        )
-        quat = vision_T_hand.rotation
+        body_T_hand = self.get_ee_transform()
+        quat = body_T_hand.rotation
         quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
         return quat
 

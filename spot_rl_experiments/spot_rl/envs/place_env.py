@@ -14,6 +14,7 @@ import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_wrapper.spot import Spot
+from spot_wrapper.utils import angle_between_quat, get_angle_between_forward_and_target
 
 
 class SpotPlaceEnv(SpotBaseEnv):
@@ -65,65 +66,48 @@ class SpotPlaceEnv(SpotBaseEnv):
 
 
 class SpotSemanticPlaceEnv(SpotBaseEnv):
+    """This is Spot semantic place class"""
+
     def __init__(self, config, spot: Spot):
+        # We set the initial arm joints
         config.INITIAL_ARM_JOINT_ANGLES = copy.deepcopy(
             config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
         )
         super().__init__(config, spot)
+
+        # Define the place variables
         self.place_target = None
         self.place_target_is_local = False
-
-        self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
         self.placed = False
-        self._time_step = 0
+
+        # Set gripper variables
+        self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
+
+        # Define the observation variables
         self.initial_ee_pose = None
         self.target_object_pose = None
+
         # Overwrite joint limits for semantic_place skills
-        self.arm_lower_limits = np.deg2rad(config.ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE)
-        self.arm_upper_limits = np.deg2rad(config.ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE)
+        self.arm_lower_limits = np.deg2rad(config.ARM_LOWER_LIMITS_SEMANTIC_PLACE)
+        self.arm_upper_limits = np.deg2rad(config.ARM_UPPER_LIMITS_SEMANTIC_PLACE)
 
-    def get_angle_v2(self, x, y):
-        if np.linalg.norm(x) != 0:
-            x_norm = x / np.linalg.norm(x)
-        else:
-            x_norm = x
-
-        if np.linalg.norm(y) != 0:
-            y_norm = y / np.linalg.norm(y)
-        else:
-            y_norm = y
-
-        return np.arccos(np.clip(np.dot(x_norm, y_norm), -1, 1))
-
-    def get_angle(self, rel_pos):
-        """Get angle"""
-        forward = np.array([1.0, 0, 0])
-        rel_pos = np.array(rel_pos)
-        forward = forward[[0, 1]]
-        rel_pos = rel_pos[[0, 1]]
-
-        heading_angle = self.get_angle_v2(forward, rel_pos)
-        c = np.cross(forward, rel_pos) < 0
-        if not c:
-            heading_angle = -1.0 * heading_angle
-        return heading_angle
+        # Place steps
+        self._time_step = 0
 
     def get_ee_target_orientation(self):
-        """ee target orientation"""
+        """Get ee target orientation"""
         # Get base T
         base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
         height = base_T.translation[2]
-
         # Get ee T
         ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-
         # Get the glocal location of the place target
         target = np.copy(self.place_target)
         # Offset when we register the point
         target[2] -= height
         obj_local_pos = base_T.inverted().transform_point(target)
         # Get the angle
-        angle = self.get_angle(obj_local_pos)
+        angle = get_angle_between_forward_and_target(obj_local_pos)
         # Rotate the base by the angle
         base_T = base_T @ mn.Matrix4.rotation_z(mn.Rad(angle))
 
@@ -134,17 +118,19 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         return quat
 
     def get_cur_ee_pose_offset(self):
+        """Get the current ee pose offset"""
         # Get base to hand's transformation
         ee_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
         # Get the base transformation
         base_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
         # Do offset
+        base_to_arm_offset = 0.292
         base_transform.translation = base_transform.transform_point(
-            mn.Vector3(0.292, 0, 0)
+            mn.Vector3(base_to_arm_offset, 0, 0)
         )
         # Get ee relative to base
         ee_position = (base_transform.inverted() @ ee_transform).translation
-        base_T_hand_yaw = self.get_angle(ee_position)
+        base_T_hand_yaw = get_angle_between_forward_and_target(ee_position)
         return base_T_hand_yaw
 
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
@@ -157,52 +143,53 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             self.reset_arm()
             # We wait for a second to let the arm in the placing
             # ready location
-            time.sleep(1.5)
-            # There is a bit of mistchmatch of joints after resetting
-            # So we reset the arm again
+            time.sleep(1.0)
+            # Sometimes, there will be a bit of mistchmatch of joints after resetting
+            # So we can reset the arm again here using the following
             # ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
             # self.spot.move_gripper_to_point(ee_position, [np.pi / 2, 0, 0])
 
         # Set the initial ee pose
-        self.initial_ee_pose = self.spot.get_ee_pos_in_body_frame_quat()
+        self.initial_ee_pose = self.spot.get_ee_quaternion_in_body_frame()
         # Set the target pose
-        # self.target_object_pose = self.get_ee_target_orientation()
-        self.target_object_pose = self.spot.get_ee_pos_in_body_frame_quat()
-        # self.target_object_pose = quaternion.quaternion(
-        #     0.709041893482208,
-        #     0.704837739467621,
-        #     -0.00589140923693776,
-        #     -0.0207040011882782,
-        # )
+        self.target_object_pose = self.spot.get_ee_quaternion_in_body_frame()
+        # Automatically use intelrealsense camera
         rospy.set_param("is_gripper_blocked", 1)
         observations = super().reset()
         self.placed = False
         return observations
 
     def step(self, action_dict: Dict[str, Any], *args, **kwargs):
-        # <= 0 for unsnap
-        place = action_dict.get("place", False)
-        xyz = self.get_place_sensor(True)
+
+        place = False
+
+        # Place command is issued if the place action is smaller than zero
+        place = action_dict.get("grip_action", None) <= 0.0
+
+        # If the time steps have been passed for 50 steps and gripper is in the desired place location
+        cur_place_sensor_xyz = self.get_place_sensor(True)
         if (
-            abs(xyz[2]) < 0.05
-            and np.linalg.norm(np.array([xyz[0], xyz[1]])) < 0.25
+            abs(cur_place_sensor_xyz[2]) < 0.05
+            and np.linalg.norm(
+                np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
+            )
+            < 0.25
             and self._time_step >= 50
         ):
             place = True
+
+        # If the time steps have been passed for 75 steps, we will just place the object
         if self._time_step >= 75:
             place = True
 
         self._time_step += 1
-        print(
-            "dis to goal:", np.linalg.norm(self.get_place_sensor(True)), self._time_step
-        )
-        print("place in base place env:", place)
-        action_dict["place"] = place
+
+        # Set the travel time scale so that the arm movement is smooth
         action_dict["travel_time_scale"] = 1.0 / 0.9 * 1.75
-        place = action_dict.get("grip_action", None) <= 0.0
-        print("grip_action in sem place env:", action_dict.get("grip_action", None))
+        # Write into action dict
         action_dict["place"] = place
         action_dict["semantic_place"] = place
+
         return super().step(action_dict, *args, **kwargs)
 
     def get_success(self, observations):
@@ -214,17 +201,14 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # Get the gaol sensor
         obj_goal_sensor = self.get_place_sensor(True)
-        # obj_goal_sensor = self.get_place_sensor_norm()
 
         # Get the delta ee orientation
-        current_gripper_orientation = self.spot.get_ee_pos_in_body_frame_quat()
-        delta_ee = self.spot.angle_between_quat(
-            self.initial_ee_pose, current_gripper_orientation
-        )
+        current_gripper_orientation = self.spot.get_ee_quaternion_in_body_frame()
+        delta_ee = angle_between_quat(self.initial_ee_pose, current_gripper_orientation)
         delta_ee = np.array([delta_ee], dtype=np.float32)
 
         # Get the delta object orientation
-        delta_obj = self.spot.angle_between_quat(
+        delta_obj = angle_between_quat(
             self.target_object_pose, current_gripper_orientation
         )
         # remove the offset from the base to object
@@ -234,16 +218,6 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Get the jaw image
         arm_depth, _ = self.get_gripper_images()
 
-        print("rpy to init ee:", delta_ee)
-        print("rpy to targ obj:", delta_obj)
-        print(
-            "xyz to targ obj:",
-            obj_goal_sensor,
-            self.initial_ee_pose,
-            current_gripper_orientation,
-        )
-        # self.spot.move_gripper_to_point(np.array([1.35, 0.17, 0.35]),[0.0,0,0])
-
         observations = {
             "obj_goal_sensor": obj_goal_sensor,
             "relative_initial_ee_orientation": delta_ee,
@@ -252,5 +226,4 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             "joint": self.get_arm_joints(semantic_place=True),
             "is_holding": np.ones((1,)),
         }
-        print("self.get_cur_ee_pose_offset()", self.get_cur_ee_pose_offset())
         return observations

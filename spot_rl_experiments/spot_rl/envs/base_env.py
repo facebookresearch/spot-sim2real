@@ -69,9 +69,10 @@ HEIGHT_SCALE = 0.5
 
 
 def pad_action(action):
-    """We only control 4 out of 6 joints; add zeros to non-controllable indices."""
-    if len(action) == 5:
-        return np.array([*action[:3], 0.0, action[3], 0])
+    """Pad action zero for the non-controllable indices of the arm."""
+    # A special case for semantic place skills. The semantic skill
+    # controls 5 joints. However, in the real world testing, we disable
+    # the last joint control for better performance.
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
@@ -257,7 +258,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def reset_arm(self):
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
-            positions=self.initial_arm_joint_angles, travel_time=2.00
+            positions=self.initial_arm_joint_angles, travel_time=1.00
         )
         self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
         self.spot.close_gripper()
@@ -306,26 +307,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
                 self.say("Grasping " + self.target_obj_name)
 
-                # Try to do Pose correction
+                # Try to do Pose correction if pose_correction_success ros parameter is true
                 if not rospy.get_param("pose_correction_success", False):
-                    image_responses = self.spot.get_hand_image_old(
+                    image_responses = self.spot.select_hand_image(
                         img_src=[
                             SpotCamIds.INTEL_REALSENSE_COLOR,
                             SpotCamIds.INTEL_REALSENSE_DEPTH,
                         ]
                     )
-                    # camera_intrinsics = image_responses[0].source.pinhole.intrinsics
                     image_responses = [
                         image_response_to_cv2(image_response)
                         for image_response in image_responses
                     ]
-                    # pose_correction_pipeline(
-                    #     image_responses[0],
-                    #     image_responses[1],
-                    #     None,
-                    #     "bottle",
-                    #     camera_intrinsics,
-                    # )
 
                 # The following cmd is blocking
                 success = self.attempt_grasp()
@@ -344,11 +337,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     time.sleep(2)
 
                 if success:
+                    # TODO: cleaning this up
                     # We want to maintain a good grasping location
                     # Get the current arm pose
                     target_xyz, target_rpy = self.spot.get_ee_pos_in_body_frame()
 
-                    # Revert joint positions after grasp
+                    # Revert joint positions after grasping
                     self.spot.move_gripper_to_point(target_xyz, target_rpy)
                 else:
                     self.spot.set_arm_joint_positions(
@@ -361,7 +355,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     self.should_end = True
         elif place:
             self.say("PLACE ACTION CALLED: Opening the gripper!")
-            # We only turning the wrist when calling place, but not semantic place
+            # We only turning the wrist when calling place, but not doing this for semantic place
             if self.get_grasp_angle_to_xy() < np.deg2rad(30) and not semantic_place:
                 self.turn_wrist()
                 self.say("open gripper in place")
@@ -400,12 +394,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             if np.count_nonzero(arm_action) > 0:
                 arm_action *= self._max_joint_movement_scale
                 arm_action = self.current_arm_pose + pad_action(arm_action)
-                print("before clip:", arm_action)
-                print("cur arm:", self.current_arm_pose)
                 arm_action = np.clip(
                     arm_action, self.arm_lower_limits, self.arm_upper_limits
                 )
-                print("after clip:", arm_action)
             else:
                 arm_action = None
 
@@ -548,9 +539,11 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return observations
 
     def get_arm_joints(self, semantic_place: bool = False):
+        """Get the current arm joints. If it is semantic place skills,
+        we will return one addition joints"""
         # Get proprioception inputs
         joint_black_list = (
-            self.config.JOINT_BLACKLIST_SEMANTIC_PLACE
+            self.config.SEMANTIC_PLACE_JOINT_BLACKLIST
             if semantic_place
             else self.config.JOINT_BLACKLIST
         )
@@ -836,24 +829,32 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
 
     def get_place_sensor(self, use_base_rot=False):
+        """Get the placing target x,y,z.
+        param: use_base_rot: if we use base rotation as the ee rotation
+        """
         # The place goal should be provided relative to the local robot frame given that
         # the robot is at the place receptacle
+
+        # use_base_rot=True is needed for computing the correct place target for the semantic
+        # place skills. The normal place skill does not need this
         if use_base_rot:
+            # Get the transformationss
             base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
             ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
             body_T_ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
-            # Off set for the height
-            actual_ee_height = 0.5 + body_T_ee_T.translation[2] + 0.05
-            # Move the base to ee location
+            # Offset for the height
+            base_height = 0.5
+            ee_height = 0.05
+            actual_ee_height = base_height + body_T_ee_T.translation[2] + ee_height
+            # Move the base's translation to ee translation
             base_T.translation = mn.Vector3(
                 ee_T.translation[0], ee_T.translation[1], actual_ee_height
             )
             # Get the glocal location of the place target
             target = np.copy(self.place_target)
-            # Offset when we register the point
-            # 03/04: found base height is driftting
+            # Get the final target point
             gripper_pos = base_T.inverted().transform_point(target)
-            # Off set for the gripper
+            # Offset the ee x direction
             gripper_pos[0] += 0.2
         else:
             gripper_T_base = self.get_in_gripper_tf()
@@ -863,22 +864,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             gripper_pos = base_T_gripper.transform_point(hab_place_target)
 
         return gripper_pos
-
-    def get_place_sensor_norm(self):
-        # Get the EE T
-        base_to_ee_T = self.spot.get_ee_transform()
-        # Get the place target
-        base_frame_place_target = self.get_base_frame_place_target_spot()
-        # Get the local ee xyz
-        gripper_pos = np.array(
-            base_to_ee_T.inverse().transform_point(
-                base_frame_place_target[0],
-                base_frame_place_target[1],
-                base_frame_place_target[2],
-            )
-        )
-        print(gripper_pos)
-        return np.array([np.linalg.norm(gripper_pos)], dtype=np.float32)
 
     def get_base_frame_place_target_spot(self):
         if self.place_target_is_local:

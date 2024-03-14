@@ -7,6 +7,7 @@ import subprocess
 
 import cv2
 import numpy as np
+import quaternion
 
 
 def say(text):
@@ -100,3 +101,39 @@ def color_bbox(img, just_get_bbox=False):
     crosshair_in_bbox = x < width // 2 < x + w and y < height // 2 < y + h
 
     return bbox_mask, cx, cy, crosshair_in_bbox
+
+
+def angle_between_quat(q1, q2):
+    """A function that returns the angle between two quaternions"""
+    q1_inv = np.conjugate(q1)
+    dp = quaternion.as_float_array(q1_inv * q2)
+    return 2 * np.arctan2(np.linalg.norm(dp[1:]), np.abs(dp[0]))
+
+
+def get_angle_between_two_vectors(self, x, y):
+    """Get angle between two vectors"""
+    if np.linalg.norm(x) != 0:
+        x_norm = x / np.linalg.norm(x)
+    else:
+        x_norm = x
+
+    if np.linalg.norm(y) != 0:
+        y_norm = y / np.linalg.norm(y)
+    else:
+        y_norm = y
+
+    return np.arccos(np.clip(np.dot(x_norm, y_norm), -1, 1))
+
+
+def get_angle_between_forward_and_target(rel_pos):
+    """Get the angle bewtween forward and target vectors"""
+    forward = np.array([1.0, 0, 0])
+    rel_pos = np.array(rel_pos)
+    forward = forward[[0, 1]]
+    rel_pos = rel_pos[[0, 1]]
+
+    heading_angle = get_angle_between_two_vectors(forward, rel_pos)
+    c = np.cross(forward, rel_pos) < 0
+    if not c:
+        heading_angle = -1.0 * heading_angle
+    return heading_angle

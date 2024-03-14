@@ -3,42 +3,39 @@ WEIGHTS_TYPE: WEIGHTS_TORCHSCRIPT #WEIGHTS_TORCHSCRIPT or WEIGHTS
 WEIGHTS_TORCHSCRIPT:
   # Regular Nav
   NAV: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript"
-  
+
   # Static gaze
   GAZE: "weights/torchscript/gaze_normal_32_seed100_1649708902_ckpt.38_combined_net.torchscript"
 
   # Mobile Gaze torchscript module files path
   MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
-  
+
   # Static place
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
 
 
 WEIGHTS:
   # Regular Nav
   NAV: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
-  
+
   # Static gaze
   GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
   # Mobile Gaze torchscript module files path
   MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
-  
+
   # Static place
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
-  # SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v4_0_ckpt.56.torchscript"
 
-  
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
-  
+
   # Mask-RCNN and Deblurgan for object detection
   MRCNN: "weights/ikea_apricot_large_only_model_0002999.pth"
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
@@ -81,9 +78,9 @@ SUCC_Z_DIST: 0.05
 PLACE_ACTION_SPACE_LENGTH: 4
 RUNNING_AFTER_GRASP_FOR_PLACE: False
 
-#Semantic Place
+# Semantic Place
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9
-JOINT_BLACKLIST_SEMANTIC_PLACE: [3]
+SEMANTIC_PLACE_JOINT_BLACKLIST: [3]
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
@@ -95,19 +92,15 @@ MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 # This angle levels up the arm
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
-INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90]  #Semantic Place
-# INITIAL_ARM_JOINT_ANGLES: [-0.91, -92.87, 91.21, 0, 90.01, 0] 
+INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping
+# INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
-# This is the robot holds the object: [-0.91, -92.87, 91.21, 0, 90.01, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
 ARM_UPPER_LIMITS: [45, 0, 180, 0, 90, 0]
-# TODO: need to finalize the arm range
-# ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE: [-45, -180, 0, 0, -90, -90]
-# ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE: [45, -45, 180, 0, 90, 90]
-ARM_LOWER_LIMITS_FOR_SEMANTIC_PLACE: [-90, -180, 0, 0, -90, -90]
-ARM_UPPER_LIMITS_FOR_SEMANTIC_PLACE: [90, 0, 180, 0, 90, 90]
+ARM_LOWER_LIMITS_SEMANTIC_PLACE: [-90, -180, 0, 0, -90, -90]
+ARM_UPPER_LIMITS_SEMANTIC_PLACE: [90, 0, 180, 0, 90, 90]
 JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"
 
 ACTUALLY_MOVE_ARM: True

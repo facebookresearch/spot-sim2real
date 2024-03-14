@@ -393,7 +393,7 @@ if __name__ == "__main__":
         print(image.shape, image.dtype)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # image_responses = spot.get_hand_image_old(
+        # image_responses = spot.select_hand_image(
         #     img_src=[SpotCamIds.INTEL_REALSENSE_COLOR, SpotCamIds.INTEL_REALSENSE_DEPTH]
         # )
         # camera_intrinsics = image_responses[0].source.pinhole.intrinsics
