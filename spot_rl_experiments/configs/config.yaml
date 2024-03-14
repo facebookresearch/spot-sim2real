@@ -91,8 +91,9 @@ MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 # This angle levels up the arm
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
-INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping
-# INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
+INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping (gripper is in object's right hand side)
+INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # The initial orientation of the arm for side grasping (gripper is in object's left hand side)
+INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]

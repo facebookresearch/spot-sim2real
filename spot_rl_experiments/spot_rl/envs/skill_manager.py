@@ -306,12 +306,14 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, place_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
         Args:
             place_target (str): Name of the place target (as stored in waypoints.yaml)
+            ee_orientation_at_grasping (list): The ee orientation at grasping. If users specifiy, the robot will place the object in the desired pose
+                This is only used for the semantic place skills.
 
         Returns:
             bool: True if place was successful, False otherwise
@@ -338,13 +340,24 @@ class SpotSkillManager:
             return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
-        status, message = self.place(place_x, place_y, place_z)
+
+        status, message = self.place(
+            place_x,
+            place_y,
+            place_z,
+            ee_orientation_at_grasping=ee_orientation_at_grasping,
+        )
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
     @multimethod  # type: ignore
     def place(  # noqa
-        self, x: float, y: float, z: float, is_local: bool = False
+        self,
+        x: float,
+        y: float,
+        z: float,
+        is_local: bool = False,
+        ee_orientation_at_grasping: np.ndarray = None,
     ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
@@ -354,6 +367,7 @@ class SpotSkillManager:
             y (float): y coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
             z (float): z coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
             is_local (bool): If True, place in the spot's body frame, else in the world frame
+            ee_orientation_at_grasping (np.ndarray): The grasping arm joint angles
 
         Returns:
             status (bool): True if place was successful, False otherwise
@@ -362,6 +376,7 @@ class SpotSkillManager:
         goal_dict = {
             "place_target": (x, y, z),
             "is_local": is_local,
+            "ee_orientation_at_grasping": ee_orientation_at_grasping,
         }  # type: Dict[str, Any]
         status, message = self.place_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)

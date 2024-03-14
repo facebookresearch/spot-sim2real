@@ -44,10 +44,7 @@ if __name__ == "__main__":
         else:
             pass
 
-        spotskillmanager.nav("black_case")
-        spotskillmanager.pick("bottle")
-        spotskillmanager.nav("test_desk")
-        spotskillmanager.place("test_desk")
+        spotskillmanager.place(place_target)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
 # The following is a helpful tip to debug the arm
@@ -58,3 +55,11 @@ if __name__ == "__main__":
 # We can also set the robot arm joints
 # config = construct_config()
 # spot.set_arm_joint_positions(np.deg2rad(config.INITIAL_ARM_JOINT_ANGLES))
+
+# In addition, if you want to use semantic place skill based on the grasping orientation, you can do
+# spotskillmanager.nav("black_case")
+# spotskillmanager.pick("bottle")
+# # Fetch the arm joint at grasping location
+# ee_orientation_at_grasping = spotskillmanager.gaze_controller.env.ee_orientation_at_grasping
+# spotskillmanager.nav("test_desk")
+# spotskillmanager.place("test_desk", orientation_at_grasping) # This controls the arm initial orientation
