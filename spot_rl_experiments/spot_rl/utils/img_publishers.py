@@ -92,8 +92,8 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
     sources = [
         Cam.FRONTRIGHT_DEPTH,
         Cam.FRONTLEFT_DEPTH,
-        Cam.HAND_COLOR,
         Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        Cam.HAND_COLOR,
     ]
 
     def __init__(self, spot):
@@ -101,12 +101,7 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         self.spot = spot
 
     def _publish(self):
-        image_responses = self.spot.get_image_responses(
-            self.sources[:2], quality=100, await_the_resp=False
-        )
-        hand_image_responses = self.spot.get_hand_image()
-        image_responses = image_responses.result()
-        image_responses.extend(hand_image_responses)
+        image_responses = self.spot.get_image_responses(self.sources, quality=100)
         imgs_list = [image_response_to_cv2(r) for r in image_responses]
         imgs = {k: v for k, v in zip(self.sources, imgs_list)}
 
