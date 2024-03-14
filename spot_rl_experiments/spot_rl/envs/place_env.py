@@ -139,15 +139,14 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         self.place_target_is_local = target_is_local
 
         self._time_step = 0
-        if not self.config.RUNNING_AFTER_GRASP_FOR_PLACE:
-            self.reset_arm()
-            # We wait for a second to let the arm in the placing
-            # ready location
-            time.sleep(1.0)
-            # Sometimes, there will be a bit of mistchmatch of joints after resetting
-            # So we can reset the arm again here using the following
-            # ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
-            # self.spot.move_gripper_to_point(ee_position, [np.pi / 2, 0, 0])
+        self.reset_arm()
+        # We wait for a second to let the arm in the placing
+        # ready location
+        time.sleep(1.0)
+        # Sometimes, there will be a bit of mistchmatch of joints after resetting
+        # So we can reset the arm again here using the following
+        # ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
+        # self.spot.move_gripper_to_point(ee_position, [np.pi / 2, 0, 0])
 
         # Set the initial ee pose
         self.initial_ee_pose = self.spot.get_ee_quaternion_in_body_frame()

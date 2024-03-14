@@ -14,7 +14,11 @@ from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 from scipy.spatial.transform import Rotation
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.construct_configs import construct_config
-from spot_rl.utils.pose_correction import detect
+
+try:
+    from spot_rl.utils.pose_correction import detect
+except Exception:
+    print("pose_correction is not imported")
 from spot_wrapper.spot import SpotCamIds, image_response_to_cv2
 
 if __name__ == "__main__":
@@ -29,7 +33,7 @@ if __name__ == "__main__":
         place_target = "test_desk"
 
     # Initialize the skill manager
-    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
 
     # Start testing
     contnue = True
@@ -40,7 +44,10 @@ if __name__ == "__main__":
         else:
             pass
 
-        spotskillmanager.place(place_target)
+        spotskillmanager.nav("black_case")
+        spotskillmanager.pick("bottle")
+        spotskillmanager.nav("test_desk")
+        spotskillmanager.place("test_desk")
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
 # The following is a helpful tip to debug the arm

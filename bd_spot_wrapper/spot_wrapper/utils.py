@@ -110,7 +110,7 @@ def angle_between_quat(q1, q2):
     return 2 * np.arctan2(np.linalg.norm(dp[1:]), np.abs(dp[0]))
 
 
-def get_angle_between_two_vectors(self, x, y):
+def get_angle_between_two_vectors(x, y):
     """Get angle between two vectors"""
     if np.linalg.norm(x) != 0:
         x_norm = x / np.linalg.norm(x)

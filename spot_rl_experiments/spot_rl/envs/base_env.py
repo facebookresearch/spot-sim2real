@@ -44,7 +44,11 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
-from spot_rl.utils.pose_correction import pose_correction_pipeline
+
+try:
+    from spot_rl.utils.pose_correction import pose_correction_pipeline
+except Exception:
+    print("Pose estimation pipeline is not imported")
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2, wrap_heading
@@ -336,18 +340,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     arm_positions = np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES)
                     time.sleep(2)
 
-                if success:
-                    # TODO: cleaning this up
-                    # We want to maintain a good grasping location
-                    # Get the current arm pose
-                    target_xyz, target_rpy = self.spot.get_ee_pos_in_body_frame()
-
-                    # Revert joint positions after grasping
-                    self.spot.move_gripper_to_point(target_xyz, target_rpy)
-                else:
-                    self.spot.set_arm_joint_positions(
-                        positions=arm_positions, travel_time=1.0
-                    )
+                self.spot.set_arm_joint_positions(
+                    positions=arm_positions, travel_time=1.0
+                )
 
                 # Wait for arm to return to position
                 time.sleep(1.0)
@@ -751,7 +746,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return x1, y1, x2, y2
 
     @staticmethod
-    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.55):
+    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.40):
         cy, cx = height // 2, width // 2
         # Locked on if the center of the image is in the bbox
         if x1 < cx < x2 and y1 < cy < y2:
