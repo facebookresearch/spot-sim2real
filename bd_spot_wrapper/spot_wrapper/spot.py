@@ -182,6 +182,9 @@ class Spot:
             RobotStateClient.default_service_name
         )
 
+        # Logging srcs init
+        self.source_list = []  # type: List[str]
+
         # Used to re-center origin of global frame
         if osp.isfile(HOME_TXT):
             with open(HOME_TXT) as f:
@@ -390,7 +393,7 @@ class Spot:
 
             # cv2.namedWindow(camera_source, cv2.WINDOW_NORMAL)
 
-        self.source_list = source_list  # TODO define in init
+        self.source_list = source_list
         print(f"Initialized logging for sources : {self.source_list}")
 
     def update_logging_data(
@@ -399,7 +402,6 @@ class Spot:
         visualize: bool = False,
         verbose: bool = False,
     ):
-        print("Starting Logging!")
         log_packet = {
             "timestamp": time.time(),
             "camera_data": [],
@@ -450,10 +452,6 @@ class Spot:
             print(log_packet)
         # TODO: Add force in gripper. How to get force reading?
 
-        # TODO: Check for optimized solution to store mixed DS in memory
-        # TODO: .to_list -> json || pickle dump to .json / .gz.json
-        print("Ending Logging!")
-        # TODO: pkl dump. Allow caller to construct pkl & dump?
         return log_packet
 
     def grasp_point_in_image(
