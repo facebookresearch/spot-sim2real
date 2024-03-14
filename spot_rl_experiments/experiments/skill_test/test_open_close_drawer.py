@@ -15,5 +15,5 @@ if __name__ == "__main__":
     # Using while loop
     contnue = True
     while contnue:
-        spotskillmanager.OpenCloseDrawer(open_mode=True)
+        # spotskillmanager.OpenCloseDrawer(open_mode=True)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")

@@ -44,9 +44,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
         )
-        # TODO: finalize what is the target object name
-        # possible candidate: drawer handle/cup/purple cube
-        self.target_obj_name = "cup"
+
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
 
         # The initial joint angles is in the stow location
@@ -98,9 +96,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         self.initial_ee_orientation = self.spot.get_ee_rotation_in_body_frame_quat()
 
         # Update target object name as provided in config
-        observations = super().reset(
-            target_obj_name=self.target_obj_name, *args, **kwargs
-        )
+        observations = super().reset(target_obj_name="drawer handle", *args, **kwargs)
         rospy.set_param("object_target", self.target_obj_name)
 
         # The number of times calls close gripper
@@ -175,16 +171,31 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # )
         vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
 
-        # Get the 3D point in the hand frame, and offset the gripper 0.1 meter
-        point_in_hand_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z + 0.1)
+        # Get the 3D point in the hand frame, and offset the gripper x meter
+        z_offset = 0.0
+        point_in_hand_image_3d = get_3d_point(
+            cam_intrinsics, (pixel_x, pixel_y), z + z_offset
+        )
 
         # Get the vision to hand
-        vision_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+        vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
             "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
         )
-        point_in_global_3d = vision_T_hand.transform_point(
-            mn.Vector3(*point_in_hand_3d)
+        point_in_global_3d = vision_T_hand_image.transform_point(
+            mn.Vector3(*point_in_hand_image_3d)
         )
+
+        # Get the transformation of the gripper
+        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # Get the location relative to the gripper
+        point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
+        # Offset the x and y direction in hand frame
+        ee_offset_x = 0.30  # 10 cm -> 20cm
+        ee_offset_z = -0.05  # 0 cm
+        point_in_hand_3d[0] += ee_offset_x
+        point_in_hand_3d[2] += ee_offset_z
+        # Make it back to global frame
+        point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
 
         # Get the point in the base frame
         point_in_base_3d = vision_T_base.inverted().transform_point(point_in_global_3d)
@@ -213,7 +224,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the transformation of the gripper
         vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
         # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 40 cm
-        pull_push_distance = -0.4 if self._mode == "open" else 0.4
+        pull_push_distance = -0.2 if self._mode == "open" else 0.2
         move_target = vision_T_hand.transform_point(
             mn.Vector3([pull_push_distance, 0, 0])
         )
@@ -252,7 +263,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # TODO: clean up debug msg
         print(f" action_dict: {action_dict} {self._ee_close_times}")
         if (action_dict["close_gripper"] >= 0 and np.sum(bbox) > 0 and False) or (
-            z != 0 and z <= 0.3
+            z != 0 and z <= 0.30  # Make the value from 0.3
         ):
             self._ee_close_times += 1
             # Do IK to approach the target
