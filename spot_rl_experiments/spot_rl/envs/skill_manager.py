@@ -8,11 +8,12 @@ from typing import Any, Dict, Tuple
 import numpy as np
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
-from spot_rl.skills.atomic_skills import Navigation, Pick, Place
+from spot_rl.skills.atomic_skills import Navigation, Pick, Place, SemanticPlace
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
     construct_config_for_place,
+    construct_config_for_semantic_place,
 )
 from spot_rl.utils.heuristic_nav import (
     ImageSearch,
@@ -83,6 +84,7 @@ class SpotSkillManager:
         pick_config=None,
         place_config=None,
         use_mobile_pick: bool = False,
+        use_semantic_place: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -94,6 +96,7 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
+        self.use_semantic_place = use_semantic_place
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -144,9 +147,14 @@ class SpotSkillManager:
             if not pick_config
             else pick_config
         )
-        self.place_config = (
-            construct_config_for_place() if not place_config else place_config
-        )
+        if place_config is None:
+            self.place_config = (
+                construct_config_for_semantic_place()
+                if self.use_semantic_place
+                else construct_config_for_place()
+            )
+        else:
+            self.place_config = place_config
 
     def __initiate_controllers(self, use_policies: bool = True):
         """
@@ -162,11 +170,16 @@ class SpotSkillManager:
             config=self.pick_config,
             use_mobile_pick=self._use_mobile_pick,
         )
-        self.place_controller = Place(
-            spot=self.spot,
-            config=self.place_config,
-            use_policies=use_policies,
-        )
+        if self.use_semantic_place:
+            self.place_controller = SemanticPlace(
+                spot=self.spot, config=self.place_config
+            )
+        else:
+            self.place_controller = Place(
+                spot=self.spot,
+                config=self.place_config,
+                use_policies=use_policies,
+            )
 
     def reset(self):
         # Reset the policies and environments via the controllers

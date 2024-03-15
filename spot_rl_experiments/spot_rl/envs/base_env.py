@@ -11,6 +11,13 @@ from typing import Any, Dict
 
 import cv2
 import gym
+from bosdyn.client.frame_helpers import (
+    GRAV_ALIGNED_BODY_FRAME_NAME,
+    HAND_FRAME_NAME,
+    VISION_FRAME_NAME,
+    get_a_tform_b,
+    get_vision_tform_body,
+)
 from spot_rl.utils.img_publishers import MAX_HAND_DEPTH
 from spot_rl.utils.mask_rcnn_utils import (
     generate_mrcnn_detections,
@@ -37,9 +44,10 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
+from spot_rl.utils.pose_correction import pose_correction_pipeline
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
-from spot_wrapper.spot import Spot, wrap_heading
+from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2, wrap_heading
 from std_msgs.msg import Float32, String
 
 MAX_CMD_DURATION = 5
@@ -62,6 +70,8 @@ HEIGHT_SCALE = 0.5
 
 def pad_action(action):
     """We only control 4 out of 6 joints; add zeros to non-controllable indices."""
+    if len(action) == 5:
+        return np.array([*action[:3], 0.0, action[3], action[4]])
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
@@ -246,17 +256,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
     def reset_arm(self):
         # Move arm to initial configuration
-        self.spot.close_gripper()
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=0.75
         )
-        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=2)
+        self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
+        self.spot.close_gripper()
 
     def step(  # noqa
         self,
         action_dict: Dict[str, Any],
         nav_silence_only=True,
         disable_oa=None,
+        travel_time_scale=1.0,
     ):
         """Moves the arm and returns updated observations
 
@@ -264,6 +275,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         :param arm_action: np.array of radians denoting how each joint is to be moved
         :param grasp: whether to call the grasp_hand_depth() method
         :param place: whether to call the open_gripper() method
+        :param semantic_place: whether to call the open_gripper() method, but distable turning wrist behavior
         :return: observations, reward (None), done, info
         """
         assert self.reset_ran, ".reset() must be called first!"
@@ -273,6 +285,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         arm_action = action_dict.get("arm_action", None)
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
+        semantic_place = action_dict.get("semantic_place", False)
 
         target_yaw = None
         if disable_oa is None:
@@ -282,6 +295,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             print(
                 f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
             )
+
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
             time.sleep(0.5)
@@ -291,6 +305,28 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 if self.config.VERBOSE:
                     print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
                 self.say("Grasping " + self.target_obj_name)
+
+                # Try to do Pose correction
+                if self.config.get("ENABLE_POSE_CORRECTION", False):
+                    if not rospy.get_param("pose_correction_success", False):
+                        image_responses = self.spot.get_hand_image_old(
+                            img_src=[
+                                SpotCamIds.INTEL_REALSENSE_COLOR,
+                                SpotCamIds.INTEL_REALSENSE_DEPTH,
+                            ]
+                        )
+                        camera_intrinsics = image_responses[0].source.pinhole.intrinsics
+                        image_responses = [
+                            image_response_to_cv2(image_response)
+                            for image_response in image_responses
+                        ]
+                        pose_correction_pipeline(
+                            image_responses[0],
+                            image_responses[1],
+                            None,
+                            rospy.get_param("object_target", "bottle"),
+                            camera_intrinsics,
+                        )
 
                 # The following cmd is blocking
                 success = self.attempt_grasp()
@@ -308,17 +344,26 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     arm_positions = np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES)
                     time.sleep(2)
 
-                # Revert joint positions after grasp
-                self.spot.set_arm_joint_positions(
-                    positions=arm_positions, travel_time=1.0
-                )
+                if success:
+                    # We want to maintain a good grasping location
+                    # Get the current arm pose
+                    target_xyz, target_rpy = self.spot.get_ee_pos_in_body_frame()
+
+                    # Revert joint positions after grasp
+                    self.spot.move_gripper_to_point(target_xyz, target_rpy)
+                else:
+                    self.spot.set_arm_joint_positions(
+                        positions=arm_positions, travel_time=1.0
+                    )
+
                 # Wait for arm to return to position
                 time.sleep(1.0)
                 if self.config.TERMINATE_ON_GRASP:
                     self.should_end = True
         elif place:
             self.say("PLACE ACTION CALLED: Opening the gripper!")
-            if self.get_grasp_angle_to_xy() < np.deg2rad(30):
+            # We only turning the wrist when calling place, but not semantic place
+            if self.get_grasp_angle_to_xy() < np.deg2rad(30) and not semantic_place:
                 self.turn_wrist()
                 self.say("open gripper in place")
             self.spot.open_gripper()
@@ -356,9 +401,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             if np.count_nonzero(arm_action) > 0:
                 arm_action *= self._max_joint_movement_scale
                 arm_action = self.current_arm_pose + pad_action(arm_action)
+                print("before clip:", arm_action)
+                print("cur arm:", self.current_arm_pose)
                 arm_action = np.clip(
                     arm_action, self.arm_lower_limits, self.arm_upper_limits
                 )
+                print("after clip:", arm_action)
             else:
                 arm_action = None
 
@@ -386,7 +434,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 )
             elif arm_action is not None:
                 self.spot.set_arm_joint_positions(
-                    positions=arm_action, travel_time=1 / self.ctrl_hz * 0.9
+                    positions=arm_action,
+                    travel_time=1 / self.ctrl_hz * 0.9 * travel_time_scale,
                 )
 
         if self.prev_base_moved and base_action is None:
@@ -499,13 +548,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations
 
-    def get_arm_joints(self):
+    def get_arm_joints(self, semantic_place: bool = False):
         # Get proprioception inputs
+        joint_black_list = (
+            self.config.JOINT_BLACKLIST_SEMANTIC_PLACE
+            if semantic_place
+            else self.config.JOINT_BLACKLIST
+        )
         joints = np.array(
             [
                 j
                 for idx, j in enumerate(self.current_arm_pose)
-                if idx not in self.config.JOINT_BLACKLIST
+                if idx not in joint_black_list
             ],
             dtype=np.float32,
         )
@@ -705,7 +759,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return x1, y1, x2, y2
 
     @staticmethod
-    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.15):
+    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.55):
         cy, cx = height // 2, width // 2
         # Locked on if the center of the image is in the bbox
         if x1 < cx < x2 and y1 < cy < y2:
@@ -717,6 +771,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         dx = np.max([x1 - cx, 0, cx - x2])
         dy = np.max([y1 - cy, 0, cy - y2])
         bbox_dist = np.sqrt(dx**2 + dy**2)
+        print(
+            f"Locked on object {bbox_dist < pixel_radius}, {bbox_dist}, {pixel_radius}"
+        )
         locked_on = bbox_dist < pixel_radius
 
         return locked_on
@@ -779,16 +836,44 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             mn.Vector3(self.x, self.y, 0.5),
         )
 
-    def get_place_sensor(self):
+    def get_place_sensor(self, use_base_rot=False):
         # The place goal should be provided relative to the local robot frame given that
         # the robot is at the place receptacle
-        gripper_T_base = self.get_in_gripper_tf()
-        base_T_gripper = gripper_T_base.inverted()
-        base_frame_place_target = self.get_base_frame_place_target_spot()
-        hab_place_target = self.spot2habitat_translation(base_frame_place_target)
-        gripper_pos = base_T_gripper.transform_point(hab_place_target)
+        if use_base_rot:
+            base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+            height = base_T.translation[2]
+            ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+            # Move the base to ee location
+            base_T.translation = ee_T.translation
+            # Get the glocal location of the place target
+            target = np.copy(self.place_target)
+            # Offset when we register the point
+            target[2] -= height
+            gripper_pos = base_T.inverted().transform_point(target)
+        else:
+            gripper_T_base = self.get_in_gripper_tf()
+            base_T_gripper = gripper_T_base.inverted()
+            base_frame_place_target = self.get_base_frame_place_target_spot()
+            hab_place_target = self.spot2habitat_translation(base_frame_place_target)
+            gripper_pos = base_T_gripper.transform_point(hab_place_target)
 
         return gripper_pos
+
+    def get_place_sensor_norm(self):
+        # Get the EE T
+        base_to_ee_T = self.spot.get_ee_transform()
+        # Get the place target
+        base_frame_place_target = self.get_base_frame_place_target_spot()
+        # Get the local ee xyz
+        gripper_pos = np.array(
+            base_to_ee_T.inverse().transform_point(
+                base_frame_place_target[0],
+                base_frame_place_target[1],
+                base_frame_place_target[2],
+            )
+        )
+        print(gripper_pos)
+        return np.array([np.linalg.norm(gripper_pos)], dtype=np.float32)
 
     def get_base_frame_place_target_spot(self):
         if self.place_target_is_local:

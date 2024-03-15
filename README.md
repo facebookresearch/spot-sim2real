@@ -187,6 +187,12 @@ Follow the steps in [the project documentation](./aria_data_loaders/README.md#sc
 ## :star: Convert pytorch weights to torchscript
 To convert pytorch weights to torchscript, please follow [Torchscript Conversion Instructions.](./spot_rl_experiments/utils/README.md)
 
+## :star: Adding Third party module
+To add a third party module run ``` git submodule add <repository-url> third_party/<submodule-name> ```
+Git commit ```git add .gitmodules third_party/<submodule-name> && git commit -m "Adding submodule"```
+To pull only the specific third party module ```cd third_party/<submodule-name> && git submodule update --remote ```
+To pull specific branch of the specific third party module ```cd third_party/<submodule-name> && git submodule update --remote --branch <branch-name>```
+
 ## :mega: Acknowledgement
 We thank [Naoki Yokoyama](http://naoki.io/) for setting up the foundation of the codebase, and [Joanne Truong](https://www.joannetruong.com/) for polishing the codebase. Spot-Sim2Real is built upon Naoki's codebases: [bd_spot_wrapper](https://github.com/naokiyokoyama/bd_spot_wrapper) and [spot_rl_experiments
 ](https://github.com/naokiyokoyama/spot_rl_experiments), and with new features (LLMs, pytest) and improving robustness.

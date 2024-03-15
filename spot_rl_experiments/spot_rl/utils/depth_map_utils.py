@@ -78,7 +78,8 @@ DIAMOND_KERNEL_7 = np.asarray(
 )
 
 
-def filter_depth(depth_img, max_depth, whiten_black=True):
+def filter_depth(depth_img, max_depth, whiten_black=False):
+    # TODO: make the whiten black to be False. So that this is consistent with the one in simulation
     filtered_depth_img = (
         fill_in_multiscale(depth_img.astype(np.float32) * (max_depth / 255.0))[0]
         * (255.0 / max_depth)
@@ -242,7 +243,7 @@ def fill_in_multiscale(
     s4_blurred_depths[valid_pixels] = blurred[valid_pixels]
 
     # Calculate a top mask
-    top_mask = np.ones(depths_in.shape, dtype=np.bool)
+    top_mask = np.ones(depths_in.shape, dtype=bool)
     for pixel_col_idx in range(s4_blurred_depths.shape[1]):
         pixel_col = s4_blurred_depths[:, pixel_col_idx]
         top_pixel_row = np.argmax(pixel_col > 0.1)
@@ -259,7 +260,7 @@ def fill_in_multiscale(
 
     # Extend highest pixel to top of image or create top mask
     s6_extended_depths = np.copy(s5_dilated_depths)
-    top_mask = np.ones(s5_dilated_depths.shape, dtype=np.bool)
+    top_mask = np.ones(s5_dilated_depths.shape, dtype=bool)
 
     top_row_pixels = np.argmax(s5_dilated_depths > 0.1, axis=0)
     top_pixel_values = s5_dilated_depths[
