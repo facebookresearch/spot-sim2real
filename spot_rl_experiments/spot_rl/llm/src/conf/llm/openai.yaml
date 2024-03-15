@@ -1,8 +1,8 @@
-# text-davinci-003, text-curie-001, text-babbage-001, text-ada-001
-engine: text-davinci-003
+# text-davinci-003, text-curie-001, text-babbage-001, text-ada-001 (OLD); gpt-4, gpt-3.5-turbo-instruct (NEW)
+model: gpt-4
 
 # The prompt to start the generation from.
-prompt: '' 
+messages: '' 
 
 # The maximum number of tokens to generate in the completion.
 max_tokens: 100
@@ -16,15 +16,11 @@ temperature: .75
 # the top 10% probability mass are considered.
 top_p: 1
 
-# Returns the best `n` out of `best_of` completions made on server side
-n: 1
-best_of: 3
-
 # Whether to stream back partial progress
 stream: False
 
 # Include log-probabilities of the top `logprobs` tokens.
-logprobs: 0
+# logprobs: 0
 
 # up to 4 sequences that stop the generation
 stop: '' 
