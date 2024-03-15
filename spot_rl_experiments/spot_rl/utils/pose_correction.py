@@ -37,8 +37,8 @@ def load_model(model_name="owlvit", device="cpu"):
         )
 
 
-load_model("owlvit", device)
-load_model("sam", device)
+# load_model("owlvit", device)
+# load_model("sam", device)
 
 
 def detect(img, text_queries, score_threshold, device):

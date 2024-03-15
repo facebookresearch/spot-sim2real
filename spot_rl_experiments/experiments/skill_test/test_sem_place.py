@@ -13,8 +13,6 @@ from bosdyn.client.frame_helpers import get_a_tform_b
 from scipy.spatial.transform import Rotation
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.construct_configs import construct_config
-from spot_rl.utils.pose_correction import detect
-from spot_wrapper.spot import SpotCamIds, image_response_to_cv2
 
 if __name__ == "__main__":
     from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
@@ -41,40 +39,26 @@ if __name__ == "__main__":
 
     while contnue:
         if in_fre_lab:
-            # pass
             # spotskillmanager.nav(place_target)
-            rospy.set_param("is_gripper_blocked", 0)
-            # rospy.set_param("pose_correction", [90, 0, 0.0])
-            rospy.set_param("pose_correction_success", False)
-            # xyz = [-95.47550342, 19.46777266, 73.77838018]
-            # zxy = [73.7783801, 0, 19.46777266] #
 
-            # spot.move_gripper_to_point((0.55, 0., 0.26), np.deg2rad(zxy))
+            if config.get("ENABLE_POSE_CORRECTION", False):
+                rospy.set_param("pose_correction_success", False)
             spotskillmanager.pick("bottle")
-            # breakpoint()
-            # spotskillmanager.nav(place_target_before)
-            # current_arm_joints = spot.get_arm_joint_positions()
-            # INITIAL_ARM_JOINT_ANGLES = np.deg2rad(copy.deepcopy(config.INITIAL_ARM_JOINT_ANGLES))
-            # INITIAL_ARM_JOINT_ANGLES[-1] = current_arm_joints[-1]
-            # spot.set_arm_joint_positions(INITIAL_ARM_JOINT_ANGLES)
-            # breakpoint()
-            spot.move_gripper_to_point(
-                (0.55, 0.0, 0.5), np.deg2rad(rospy.get_param("pose_correction"))
-            )
-            # spot.set_arm_joint_positions(np.deg2rad(config.INITIAL_ARM_JOINT_ANGLES))
+            # TODO: Move the pose correction inside reset_arm
+            if rospy.get_param("pose_correction_success", False):
+                spot.move_gripper_to_point(
+                    (0.55, 0.0, 0.5), np.deg2rad(rospy.get_param("pose_correction"))
+                )
         else:
             # spotskillmanager.nav("nyc_mg_pos1")
             # spotskillmanager.pick("glass bottle")
             # spotskillmanager.nav(place_target)
             pass
 
-        # breakpoint()
-        # spotskillmanager.nav(place_target)
         spotskillmanager.place_controller.config.RUNNING_AFTER_GRASP_FOR_PLACE = True
         spotskillmanager.place(place_target)
         # spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
-    # spotskillmanager.gaze_controller.reset_skill("bottle")
     # Navigate to dock and shutdown
     # spotskillmanager.dock()

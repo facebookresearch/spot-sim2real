@@ -285,6 +285,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         arm_action = action_dict.get("arm_action", None)
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
+        semantic_place = action_dict.get("semantic_place", False)
 
         target_yaw = None
         if disable_oa is None:
@@ -306,25 +307,26 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.say("Grasping " + self.target_obj_name)
 
                 # Try to do Pose correction
-                if not rospy.get_param("pose_correction_success", False):
-                    image_responses = self.spot.get_hand_image_old(
-                        img_src=[
-                            SpotCamIds.INTEL_REALSENSE_COLOR,
-                            SpotCamIds.INTEL_REALSENSE_DEPTH,
+                if self.config.get("ENABLE_POSE_CORRECTION", False):
+                    if not rospy.get_param("pose_correction_success", False):
+                        image_responses = self.spot.get_hand_image_old(
+                            img_src=[
+                                SpotCamIds.INTEL_REALSENSE_COLOR,
+                                SpotCamIds.INTEL_REALSENSE_DEPTH,
+                            ]
+                        )
+                        camera_intrinsics = image_responses[0].source.pinhole.intrinsics
+                        image_responses = [
+                            image_response_to_cv2(image_response)
+                            for image_response in image_responses
                         ]
-                    )
-                    camera_intrinsics = image_responses[0].source.pinhole.intrinsics
-                    image_responses = [
-                        image_response_to_cv2(image_response)
-                        for image_response in image_responses
-                    ]
-                    pose_correction_pipeline(
-                        image_responses[0],
-                        image_responses[1],
-                        None,
-                        "bottle",
-                        camera_intrinsics,
-                    )
+                        pose_correction_pipeline(
+                            image_responses[0],
+                            image_responses[1],
+                            None,
+                            rospy.get_param("object_target", "bottle"),
+                            camera_intrinsics,
+                        )
 
                 # The following cmd is blocking
                 success = self.attempt_grasp()

@@ -130,3 +130,6 @@ ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
 
 # Prints
 VERBOSE: True
+
+#pose estimation
+ENABLE_POSE_CORRECTION: False #enable pose correction before placing ?
