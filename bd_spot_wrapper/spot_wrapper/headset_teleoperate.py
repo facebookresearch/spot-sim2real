@@ -117,42 +117,49 @@ def main(spot: Spot):
         vr_trans = get_init_transformation_vr()
     print("Got the VR transformation...")
 
-    # Start in-terminal GUI
-    stdscr = curses.initscr()
-    stdscr.nodelay(True)
-    curses.noecho()
-    signal.signal(signal.SIGINT, raise_error)
-    stdscr.addstr(INSTRUCTIONS)
-    last_execution = time.time()
+    # # Start in-terminal GUI
+    # stdscr = curses.initscr()
+    # stdscr.nodelay(True)
+    # curses.noecho()
+    # signal.signal(signal.SIGINT, raise_error)
+    # stdscr.addstr(INSTRUCTIONS)
+    # last_execution = time.time()
     try:
         while True:
             # Don't update  we updated too recently
-            if time.time() - last_execution < UPDATE_PERIOD:
-                continue
+            # if time.time() - last_execution < UPDATE_PERIOD:
+            #     continue
 
             # Get the current VR hand location
             cur_pos, cur_rot = get_cur_vr_pose()
             cur_pos_relative_to_init = vr_trans.inverted().transform_point(cur_pos)
 
+            # Make the xyz to be correct
+            cur_pos_relative_to_init = [
+                -cur_pos_relative_to_init[2],
+                -cur_pos_relative_to_init[0],
+                cur_pos_relative_to_init[1],
+            ]
+
             # Get the point in robot frame
             cur_ee_pos = robot_trans.transform_point(cur_pos_relative_to_init)
-            cur_ee_rot = [cur_rot[3], cur_rot[0], cur_rot[1], cur_rot[2]]
-
+            cur_ee_rot = np.array(
+                [0, 0, 0]
+            )  # [cur_rot[3], cur_rot[0], cur_rot[1], cur_rot[2]]
+            print(cur_pos_relative_to_init)
             print(f"target cur_ee_pos/cur_ee_rot: {cur_ee_pos} {cur_ee_rot}")
 
             # Move the gripper
-            spot.move_gripper_to_point(
-                cur_ee_pos, cur_ee_rot, timeout_sec=UPDATE_PERIOD * 0.5
-            )
+            spot.move_gripper_to_point(cur_ee_pos, cur_ee_rot, timeout_sec=0.1)
             cement_arm_joints(spot)
 
-            last_execution = time.time()
+            # last_execution = time.time()
 
     finally:
         spot.power_off()
-        curses.echo()
-        stdscr.nodelay(False)
-        curses.endwin()
+        # curses.echo()
+        # stdscr.nodelay(False)
+        # curses.endwin()
 
 
 if __name__ == "__main__":
