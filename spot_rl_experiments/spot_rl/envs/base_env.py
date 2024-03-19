@@ -65,7 +65,7 @@ def pad_action(action):
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
-def rescale_actions(actions, action_thresh=0.05, silence_only=False):
+def rescale_actions(actions, action_thresh=0.0, silence_only=False):
     actions = np.clip(actions, -1, 1)
     # Silence low actions
     actions[np.abs(actions) < action_thresh] = 0.0
@@ -724,7 +724,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def should_grasp(self):
         grasp = False
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
-            if self.target_object_distance < 1.5:
+            # This original value is 1.5. We tune the number small to get
+            # the gripper closed to the object
+            if self.target_object_distance < 0.5:
                 if self.config.ASSERT_CENTERING:
                     x, y = self.obj_center_pixel
                     if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:
