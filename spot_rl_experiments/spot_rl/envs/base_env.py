@@ -385,10 +385,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif arm_action is not None:
-                # TODO: Finalize the design of how to control EE smoothly
-                # It was tunned to be 0.9 so that the gripper can move fast
                 self.spot.set_arm_joint_positions(
-                    positions=arm_action, travel_time=1 / self.ctrl_hz * 0.9
+                    positions=arm_action, travel_time=1 / self.ctrl_hz * 1.5
                 )
 
         if self.prev_base_moved and base_action is None:
