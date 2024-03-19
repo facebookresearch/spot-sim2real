@@ -15,5 +15,12 @@ if __name__ == "__main__":
     # Using while loop
     contnue = True
     while contnue:
-        # spotskillmanager.OpenCloseDrawer(open_mode=True)
-        contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
+        spotskillmanager.openclosedrawer(open_mode=True)
+        close_drawer = map_user_input_to_boolean(
+            "Do you want to close the drawer ? Y/N "
+        )
+        if close_drawer:
+            spotskillmanager.openclosedrawer(open_mode=False)
+        contnue = map_user_input_to_boolean(
+            "Do you want to open the drawer again ? Y/N "
+        )

@@ -780,11 +780,18 @@ class OpenCloseDrawer(Skill):
         return observations
 
     def update_and_check_status(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
-        # TODO: terminatation checking
-        return (False, "Not yet")
+        # Check for success and return appropriately
+        status = False
+        message = "Open/close failed to open/close the drawer"
+        check_open_close_success = self.env.get_success()
+        if check_open_close_success:
+            status = True
+            message = "Successfully opened/closed the drawer"
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
-        """Refer to class Skill for documentation"""
+        # Assign the action into action dict
         action_dict = {
             "arm_action": action[0:4],
             "base_action": None,
