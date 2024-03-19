@@ -29,7 +29,7 @@ class OpenAI:
 
     def generate(self, prompt):
         params = OmegaConf.to_object(self.llm_conf)
-        params["messages"] =[{"role": "user", "content": prompt}]
+        params["messages"] = [{"role": "user", "content": prompt}]
         if self.verbose:
             print(f"Prompt: {prompt}")
         return self.client.create(**params)
