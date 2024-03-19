@@ -373,25 +373,20 @@ class Spot:
         Order .. RGB & then DEPTH_IN_RGB
         DO NOT SUPPORT DEPTH and RGB_IN_DEPTH.
         """
-        source_list = []  # type: List[str]
+        # By default, always log for hand camera data
+        source_list = [
+            SpotCamIds.HAND_COLOR,
+            SpotCamIds.HAND_COLOR_IN_HAND_DEPTH_FRAME,
+        ]  # type: List[str]
 
         if not camera_sources:
-            print("Empty list passed in logger camera sources")
-
-        # Verification checks
-        for camera_source in camera_sources:
-            if (
-                "_depth" in camera_source
-                and "_depth_in_visual_frame" not in camera_source
-                and "_depth_in_hand_color_frame" not in camera_source
-            ):
-                print(
-                    f"Invalid source name {camera_source}. Camera source should either be rgb or depth aligned in rgb"
-                )
-            else:
-                source_list.append(camera_source)
-
-            # cv2.namedWindow(camera_source, cv2.WINDOW_NORMAL)
+            print(
+                f"Empty list passed in logger camera sources, will initiate logger for : {source_list}"
+            )
+        else:
+            for camera_source in camera_sources:
+                if camera_source not in source_list:
+                    source_list.append(camera_source)
 
         self.source_list = source_list
         print(f"Initialized logging for sources : {self.source_list}")

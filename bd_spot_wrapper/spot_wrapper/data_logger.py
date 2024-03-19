@@ -16,11 +16,34 @@ PATH_TO_LOGS = osp.join(
 PICKLE_PROTOCOL_VERSION = 4
 
 
+def verify_sources(camera_sources: List[str]) -> bool:
+    for camera_source in camera_sources:
+        if (
+            "_depth" in camera_source
+            and "_depth_in_visual_frame" not in camera_source
+            and "_depth_in_hand_color_frame" not in camera_source
+        ):
+            print(
+                f"Invalid source name {camera_source}. Camera source should either be rgb or depth aligned in rgb"
+            )
+            return False
+    return True
+
+
 def log_data_async(spot):
+    source_list = [
+        SpotCamIds.HAND_COLOR,
+        SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+    ]  # type: List[str]
+
     log_packet_list = []  # type: List[Dict[str, Any]]
-    spot.setup_logging_sources(
-        [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-    )
+
+    if not verify_sources(source_list):
+        raise ValueError(
+            "Camera source verification failed please provide valid sources."
+        )
+
+    spot.setup_logging_sources(source_list)
     print("Will start logging data now, hit Ctrl+C to end.")
     try:
         while True:
