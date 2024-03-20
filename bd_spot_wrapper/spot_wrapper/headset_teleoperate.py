@@ -174,7 +174,7 @@ def main(spot: Spot):
 
             # Move the gripper
             spot.move_gripper_to_point(
-                cur_ee_pos, cur_ee_rot, seconds_to_goal=1.0, timeout_sec=1
+                cur_ee_pos, cur_ee_rot, seconds_to_goal=1.0, timeout_sec=0.1
             )
             cement_arm_joints(spot)
 
