@@ -12,6 +12,7 @@ import time
 import magnum as mn
 import numpy as np
 import rospy
+from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_wrapper.spot import Spot, SpotCamIds
 
 MOVE_INCREMENT = 0.02
@@ -60,6 +61,14 @@ def move_to_initial(spot):
     cement_arm_joints(spot)
 
     return point, rpy
+
+
+def get_cur_vr_button():
+    """Get the button being pressed"""
+    hand_held = rospy.get_param("buttonHeld", None)
+    if hand_held is not None and len(hand_held) > 0:
+        return True
+    return False
 
 
 def get_cur_vr_pose():
@@ -117,6 +126,11 @@ def main(spot: Spot):
         vr_trans = get_init_transformation_vr()
     print("Got the VR transformation...")
 
+    # Get the initial VR rotation
+    _, init_rot = get_cur_vr_pose()
+    while init_rot is None:
+        _, init_rot = get_cur_vr_pose()
+
     # # Start in-terminal GUI
     # stdscr = curses.initscr()
     # stdscr.nodelay(True)
@@ -140,19 +154,35 @@ def main(spot: Spot):
                 -cur_pos_relative_to_init[0],
                 cur_pos_relative_to_init[1],
             ]
+            import quaternion
+
+            cur_trans = get_init_transformation_vr()
+            delta_rot = np.array((vr_trans.inverted() @ cur_trans).rotation())
+            rpy = quaternion.as_euler_angles(
+                (quaternion.from_rotation_matrix(delta_rot))
+            )
+            rpy[0] -= np.pi / 2
+            rpy[2] += np.pi / 2
+            print(rpy)
 
             # Get the point in robot frame
             cur_ee_pos = robot_trans.transform_point(cur_pos_relative_to_init)
             cur_ee_rot = np.array(
                 [0, 0, 0]
             )  # [cur_rot[3], cur_rot[0], cur_rot[1], cur_rot[2]]
-            print(cur_pos_relative_to_init)
             print(f"target cur_ee_pos/cur_ee_rot: {cur_ee_pos} {cur_ee_rot}")
 
             # Move the gripper
-            spot.move_gripper_to_point(cur_ee_pos, cur_ee_rot, timeout_sec=0.1)
+            spot.move_gripper_to_point(
+                cur_ee_pos, cur_ee_rot, seconds_to_goal=1.0, timeout_sec=1
+            )
             cement_arm_joints(spot)
 
+            # Get the parameter for the button
+            if get_cur_vr_button():
+                spot.close_gripper()
+            else:
+                spot.open_gripper()
             # last_execution = time.time()
 
     finally:
