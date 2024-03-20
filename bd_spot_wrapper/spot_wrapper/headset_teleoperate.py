@@ -11,9 +11,15 @@ import time
 
 import magnum as mn
 import numpy as np
+import quaternion
 import rospy
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_wrapper.spot import Spot, SpotCamIds
+from utils_transformation import (
+    euler_from_matrix,
+    euler_from_quaternion,
+    quaternion_from_matrix,
+)
 
 MOVE_INCREMENT = 0.02
 TILT_INCREMENT = 5.0
@@ -52,6 +58,66 @@ INSTRUCTIONS = (
     "('wasdqe' will control base).\n"
     "Press 'z' to quit.\n"
 )
+
+
+def cam_pose_from_opengl_to_opencv(cam_pose: np.ndarray) -> np.ndarray:
+    """
+    Convert pose matrix from OpenGL (habitat) to OpenCV convention.
+    """
+    assert cam_pose.shape == (4, 4), f"Invalid pose shape {cam_pose.shape}"
+    transform = np.array([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+    cam_pose = cam_pose @ transform
+    return cam_pose
+
+
+def cam_pose_from_xzy_to_xyz(camera_pose_xzy: np.ndarray) -> np.ndarray:
+    """
+    Convert from habitat to common convention
+    """
+    assert camera_pose_xzy.shape == (
+        4,
+        4,
+    ), f"Invalid pose shape {camera_pose_xzy.shape}"
+    # Extract rotation matrix and translation vector from the camera pose
+    rotation_matrix_xzy = camera_pose_xzy[:3, :3]
+    translation_vector_xzy = camera_pose_xzy[:3, 3]
+
+    # Convert rotation matrix from XZ-Y to XYZ convention
+    rotation_matrix_xyz = np.array(
+        [
+            [
+                rotation_matrix_xzy[0, 0],
+                rotation_matrix_xzy[0, 1],
+                rotation_matrix_xzy[0, 2],
+            ],
+            [
+                -rotation_matrix_xzy[2, 0],
+                -rotation_matrix_xzy[2, 1],
+                -rotation_matrix_xzy[2, 2],
+            ],
+            [
+                rotation_matrix_xzy[1, 0],
+                rotation_matrix_xzy[1, 1],
+                rotation_matrix_xzy[1, 2],
+            ],
+        ]
+    )
+
+    # Convert translation vector from XZ-Y to XYZ convention
+    translation_vector_xyz = np.array(
+        [
+            translation_vector_xzy[0],
+            -translation_vector_xzy[2],
+            translation_vector_xzy[1],
+        ]
+    )
+
+    # Create the new camera pose matrix in XYZ convention
+    camera_pose_xyz = np.eye(4)
+    camera_pose_xyz[:3, :3] = rotation_matrix_xyz
+    camera_pose_xyz[:3, 3] = translation_vector_xyz
+
+    return camera_pose_xyz
 
 
 def move_to_initial(spot):
@@ -95,6 +161,10 @@ def get_init_transformation_vr():
     return trans
 
 
+def angle_between(a, b):
+    return (b - a + np.pi * 3) % (2 * np.pi) - np.pi
+
+
 def cement_arm_joints(spot):
     arm_proprioception = spot.get_arm_proprioception()
     current_positions = np.array(
@@ -131,6 +201,11 @@ def main(spot: Spot):
     while init_rot is None:
         _, init_rot = get_cur_vr_pose()
 
+    cur_trans_xyz = cam_pose_from_xzy_to_xyz(
+        cam_pose_from_opengl_to_opencv(np.array(vr_trans))
+    )
+    r_m, p_m, y_m = euler_from_matrix(cur_trans_xyz)
+
     # # Start in-terminal GUI
     # stdscr = curses.initscr()
     # stdscr.nodelay(True)
@@ -154,25 +229,37 @@ def main(spot: Spot):
                 -cur_pos_relative_to_init[0],
                 cur_pos_relative_to_init[1],
             ]
-            import quaternion
 
+            # Get the current transformation
             cur_trans = get_init_transformation_vr()
-            delta_rot = np.array((vr_trans.inverted() @ cur_trans).rotation())
-            rpy = quaternion.as_euler_angles(
-                (quaternion.from_rotation_matrix(delta_rot))
+
+            # rpy[0] -= np.pi / 2
+            # rpy[2] += np.pi / 2
+            # print(rpy)
+
+            cur_trans_xyz = cam_pose_from_xzy_to_xyz(
+                cam_pose_from_opengl_to_opencv(np.array(cur_trans))
             )
-            rpy[0] -= np.pi / 2
-            rpy[2] += np.pi / 2
-            print(rpy)
+            r_m_step, p_m_step, y_m_step = euler_from_matrix(cur_trans_xyz)
+
+            delta_r = angle_between(r_m_step, r_m)
+            delta_p = angle_between(p_m_step, p_m)
+            delta_y = angle_between(y_m_step, y_m)
+
+            rpy = np.array([-delta_p, delta_r, -delta_y])
+
+            # rpy_quaternion = quaternion.from_rotation_matrix(np.array(cur_trans_xyz))
+            # rpy_quaternion = np.array([rpy_quaternion.w, rpy_quaternion.x, rpy_quaternion.y, rpy_quaternion.z])
+            # r_q,p_q,y_q = euler_from_quaternion(rpy_quaternion)
+
+            print(f"rpy: {rpy}, {np.array([delta_r,delta_p,delta_y])}")
 
             # Get the point in robot frame
             cur_ee_pos = robot_trans.transform_point(cur_pos_relative_to_init)
-            cur_ee_rot = np.array(
-                [0, 0, 0]
-            )  # [cur_rot[3], cur_rot[0], cur_rot[1], cur_rot[2]]
+            cur_ee_rot = np.array(rpy)
             print(f"target cur_ee_pos/cur_ee_rot: {cur_ee_pos} {cur_ee_rot}")
 
-            # Move the gripper
+            # # Move the gripper
             spot.move_gripper_to_point(
                 cur_ee_pos, cur_ee_rot, seconds_to_goal=1.0, timeout_sec=0.1
             )
@@ -186,10 +273,11 @@ def main(spot: Spot):
             # last_execution = time.time()
 
     finally:
-        spot.power_off()
+        # spot.power_off()
         # curses.echo()
         # stdscr.nodelay(False)
         # curses.endwin()
+        print("done!")
 
 
 if __name__ == "__main__":
