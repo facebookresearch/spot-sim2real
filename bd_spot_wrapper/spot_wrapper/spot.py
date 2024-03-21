@@ -13,10 +13,9 @@
 """ Easy-to-use wrapper for properly controlling Spot """
 import os
 import os.path as osp
-import pdb
 import time
 from collections import OrderedDict
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import bosdyn.client
 import bosdyn.client.lease
@@ -43,7 +42,6 @@ from bosdyn.client import math_helpers
 from bosdyn.client.docking import blocking_dock_robot, blocking_undock
 from bosdyn.client.frame_helpers import (
     GRAV_ALIGNED_BODY_FRAME_NAME,
-    HAND_FRAME_NAME,
     VISION_FRAME_NAME,
     get_a_tform_b,
     get_vision_tform_body,
@@ -149,6 +147,7 @@ SpotCamIdToFrameNameMap = {
     SpotCamIds.RIGHT_DEPTH_IN_VISUAL_FRAME: "right_fisheye",
     SpotCamIds.RIGHT_FISHEYE: "right_fisheye",
 }  # type: Dict[SpotCamIds, str]
+# TODO: Maybe move all spot related frames names to one class (including frames defined in ros_frame_names.yaml)
 
 
 # CamIds that need to be rotated by 270 degrees in order to appear upright
@@ -182,6 +181,9 @@ class Spot:
         self.robot_state_client = robot.ensure_client(
             RobotStateClient.default_service_name
         )
+
+        # Logging srcs init
+        self.source_list = []  # type: List[str]
 
         # Used to re-center origin of global frame
         if osp.isfile(HOME_TXT):
@@ -340,7 +342,7 @@ class Spot:
             should return its image with
         :param pixel_format: either an int or a list specifying what pixel format each source
             should return its image with
-        :return: list containing bosdyn image response objects
+        :return: 'google.protobuf.pyext._message.RepeatedCompositeContainer'
         """
         if quality is not None:
             if isinstance(quality, int):
@@ -365,6 +367,87 @@ class Spot:
             image_responses = self.image_client.get_image_from_sources(sources)
 
         return image_responses
+
+    def setup_logging_sources(self, camera_sources: List[str]):
+        """
+        Order .. RGB & then DEPTH_IN_RGB
+        DO NOT SUPPORT DEPTH and RGB_IN_DEPTH.
+        """
+        # By default, always log for hand camera data
+        source_list = [
+            SpotCamIds.HAND_COLOR,
+            SpotCamIds.HAND_COLOR_IN_HAND_DEPTH_FRAME,
+        ]  # type: List[str]
+
+        if not camera_sources:
+            print(
+                f"Empty list passed in logger camera sources, will initiate logger for : {source_list}"
+            )
+        else:
+            for camera_source in camera_sources:
+                if camera_source not in source_list:
+                    source_list.append(camera_source)
+
+        self.source_list = source_list
+        print(f"Initialized logging for sources : {self.source_list}")
+
+    def update_logging_data(
+        self,
+        include_image_data: bool = True,
+        visualize: bool = False,
+        verbose: bool = False,
+    ):
+        log_packet = {
+            "timestamp": time.time(),
+            "camera_data": [],
+            "vision_T_base": None,
+            "base_pose_xyt": None,
+            "arm_pose": None,
+        }  # type: Dict[str, Any]
+
+        if include_image_data:
+            img_responses = self.get_image_responses(self.source_list)
+            frame_tree_snapshot = img_responses[0].shot.transforms_snapshot
+
+            for i, camera_source in enumerate(self.source_list):
+                log_packet["camera_data"].append(
+                    {
+                        "src_info": camera_source,
+                        "raw_image": image_response_to_cv2(
+                            img_responses[i], reorient=True
+                        ),  # np.ndarray should be okay too
+                        "camera_intrinsics": self.get_camera_intrinsics_as_3x3(
+                            img_responses[i].source.pinhole.intrinsics
+                        ),  # np.ndarray
+                        "base_T_camera": self.get_sophus_SE3_spot_a_T_b(
+                            img_responses[i].shot.transforms_snapshot,
+                            a="body",
+                            b=SpotCamIdToFrameNameMap[camera_source],
+                        ).matrix(),  # np.ndarray
+                    }
+                )
+                if visualize:
+                    cv2.imshow(camera_source, log_packet["camera_data"][i]["raw_image"])
+            if visualize:
+                cv2.waitKey(1)
+
+        log_packet["vision_T_base"] = self.get_sophus_SE3_spot_a_T_b(
+            frame_tree_snapshot=frame_tree_snapshot, a="vision", b="body"
+        ).matrix()  # np.ndarray
+        log_packet["base_pose_xyt"] = np.asarray(
+            self.get_xy_yaw()
+        )  # redundant? TODO: Check if it is consistent with vision_T_base
+        log_packet["arm_pose"] = self.get_arm_joint_positions()
+        # TODO: Add Gripper states (Griper Open/Close) : How to get gripper state from BD?
+        log_packet["is_gripper_closed"] = bool(
+            self.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
+        )
+
+        if verbose:
+            print(log_packet)
+        # TODO: Add force in gripper. How to get force reading?
+
+        return log_packet
 
     def grasp_point_in_image(
         self,
@@ -849,23 +932,57 @@ class Spot:
         return img_resp
 
     def get_camera_intrinsics(
-        self, sources: List[SpotCamIds], quality=None, pixel_format=None
+        self,
+        sources: List[SpotCamIds],
+        quality=None,
+        pixel_format=None,
+        as_3x3_matrix: bool = False,
     ) -> List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]:
-        """Retrieve images from Spot's cameras
+        """Retrieve caliberation properties of stated Spot's cameras
 
         :param sources: list containing camera uuids
-        :param quality: either an int or a list specifying what quality each source
+        :param quality: (Optional) either an int or a list specifying what quality each source
             should return its image with
-        :return: list containing bosdyn image response objects
+        :param quality: (Optional) pixel format of response
+        :param as_3x3_matrix: (Optional) indicating the response of transformation if it should
+            be 3x3 np.ndarray or image_pb2.ImageSource.PinholeModel.CameraIntrinsics
+
+        :return: list containing all inputs cameras' intrinsics either as 3x3 np.ndarray or
+            as image_pb2.ImageSource.PinholeModel.CameraIntrinsics
         """
         image_responses = self.get_image_responses(
             sources, quality=quality, pixel_format=pixel_format
         )
-        cam_intrinsics = [
-            image_response.source.pinhole.intrinsics
-            for image_response in image_responses
-        ]  # type: List[image_pb2.ImageSource.PinholeModel.CameraIntrinsics]
-        return cam_intrinsics
+
+        camera_intrinsics_list = (
+            []
+        )  # type: List[Any[image_pb2.ImageSource.PinholeModel.CameraIntrinsics, np.ndarray]]
+        for image_response in image_responses:
+            camera_intrinsics = image_response.source.pinhole.intrinsics
+            if as_3x3_matrix:
+                fx = camera_intrinsics.focal_length.x
+                fy = camera_intrinsics.focal_length.y
+                ppx = camera_intrinsics.principal_point.x
+                ppy = camera_intrinsics.principal_point.y
+                camera_intrinsics_list.append(
+                    np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
+                )
+            else:
+                camera_intrinsics_list.append(camera_intrinsics)
+        return camera_intrinsics_list
+
+    def get_camera_intrinsics_as_3x3(self, camera_intrinsics) -> np.ndarray:
+        """
+        Converts camera intrinsics BD object to 3X3 camera intrinsics matrix
+        Args:
+           camera_intrinsics : bosdyn.api.image_pb2.CameraIntrinsics object
+        """
+        fx = camera_intrinsics.focal_length.x
+        fy = camera_intrinsics.focal_length.y
+        ppx = camera_intrinsics.principal_point.x
+        ppy = camera_intrinsics.principal_point.y
+        intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
+        return intrinsics
 
     def get_ros_TransformStamped_vision_T_body(
         self, frame_tree_snapshot
@@ -1007,6 +1124,7 @@ def image_response_to_cv2(image_response, reorient=True):
         img = cv2.imdecode(img, -1)
 
     if reorient and image_response.source.name in SHOULD_ROTATE:
+        print("Image Is Getting Rotated")
         img = np.rot90(img, k=3)
 
     return img
@@ -1039,3 +1157,9 @@ def draw_crosshair(img):
 def wrap_heading(heading):
     """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
     return (heading + np.pi) % (2 * np.pi) - np.pi
+
+
+if __name__ == "__main__":
+    spot = Spot("A")
+    rs = spot.get_robot_state()
+    breakpoint()
