@@ -726,7 +726,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
             # This original value is 1.5. We tune the number small to get
             # the gripper closed to the object
-            if self.target_object_distance < 0.5:
+            if self.target_object_distance < 1.0:
                 if self.config.ASSERT_CENTERING:
                     x, y = self.obj_center_pixel
                     if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:
