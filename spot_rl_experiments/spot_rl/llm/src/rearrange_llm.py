@@ -9,13 +9,13 @@ import os
 import hydra
 import openai
 import regex as re
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 
 class OpenAI:
     def __init__(self, conf):
         self.llm_conf = conf.llm
-        self.client = openai.Completion()
+        self.client = openai.ChatCompletion()
         self._validate_conf()
         self.verbose = conf.verbose
 
@@ -26,14 +26,10 @@ class OpenAI:
             raise ValueError("No API keys provided")
         if self.llm_conf.stream:
             raise ValueError("Streaming not supported")
-        if self.llm_conf.n > 1 and self.llm_conf.stream:
-            raise ValueError("Cannot stream results with n > 1")
-        if self.llm_conf.best_of > 1 and self.llm_conf.stream:
-            raise ValueError("Cannot stream results with best_of > 1")
 
     def generate(self, prompt):
-        params = copy.deepcopy(self.llm_conf)
-        params["prompt"] = prompt
+        params = OmegaConf.to_object(self.llm_conf)
+        params["messages"] = [{"role": "user", "content": prompt}]
         if self.verbose:
             print(f"Prompt: {prompt}")
         return self.client.create(**params)
@@ -55,12 +51,12 @@ class RearrangeEasyChain:
 
     def generate(self, input):
         prompt = self.prompt.replace(self.input_variable, input)
-        ans = self.llm.generate(prompt)
-        return ans
+        return self.llm.generate(prompt)
 
     def parse_instructions(self, input):
-        text = self.generate(input)["choices"][0]["text"]
-        matches = re.findall("\(.*?\)", text)  # noqa
+        gn_op = self.generate(input)
+        msg_content = gn_op["choices"][0]["message"]["content"]
+        matches = re.findall("\(.*?\)", msg_content)  # noqa
         matches = [match.replace("(", "").replace(")", "") for match in matches]
         nav_1, pick, nav_2, place = matches
         place, nav_2 = place.split(",")
@@ -76,7 +72,7 @@ def main(conf: DictConfig):
     chain = RearrangeEasyChain(conf)
     instruction = conf.instruction
     ans = chain.generate(instruction)
-    print(ans["choices"][0]["text"])
+    print(ans["choices"][0]["message"]["content"])
 
 
 if __name__ == "__main__":
