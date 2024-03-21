@@ -214,13 +214,14 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         self._time_step += 1
 
-        # Set the travel time scale so that the arm movement is smooth
-        action_dict["travel_time_scale"] = 1.0 / 0.9 * 1.75
         # Write into action dict
         action_dict["place"] = place
         action_dict["semantic_place"] = place
 
-        return super().step(action_dict, *args, **kwargs)
+        # Set the travel time scale so that the arm movement is smooth
+        return super().step(
+            action_dict, travel_time_scale=1.0 / 0.9 * 1.75, *args, **kwargs
+        )
 
     def get_success(self, observations):
         return self.place_attempted
