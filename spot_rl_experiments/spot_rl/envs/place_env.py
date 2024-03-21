@@ -220,7 +220,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # Set the travel time scale so that the arm movement is smooth
         return super().step(
-            action_dict, travel_time_scale=1.0 / 0.9 * 1.75, *args, **kwargs
+            action_dict, travel_time_scale=1.0 / 0.9 * 2.75, *args, **kwargs
         )
 
     def get_success(self, observations):
