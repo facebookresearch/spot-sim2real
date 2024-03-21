@@ -46,7 +46,7 @@ USE_REMOTE_SPOT: False
 PARALLEL_INFERENCE_MODE: True
 
 # General env params
-CTRL_HZ: 10.0
+CTRL_HZ: 2.0
 MAX_EPISODE_STEPS: 500
 
 # Nav env
@@ -80,13 +80,17 @@ PLACE_ACTION_SPACE_LENGTH: 4
 # Semantic Place
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9
 SEMANTIC_PLACE_JOINT_BLACKLIST: [3]
+SEMANTIC_PLACE_MAX_JOINT_MOVEMENT: 0.12
+SEMANTIC_PLACE_CTRL_HZ: 10.0
+SEMANTIC_PLACE_ARM_TRAVEL_TIME: 2.75
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
 
 # Arm action params
-MAX_JOINT_MOVEMENT: 0.12 #0.0872665  # Gaze arm speed (5 deg)
+# These are default values
+MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
 MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 # This angle levels up the arm

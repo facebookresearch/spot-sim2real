@@ -119,4 +119,8 @@ def construct_config_for_semantic_place(file_path=None, opts=[]):
     config.USE_HEAD_CAMERA = False
     config.USE_MRCNN = True
 
+    # Here we do a config yaml overwrite for the critical parameters
+    config.MAX_JOINT_MOVEMENT = config.SEMANTIC_PLACE_MAX_JOINT_MOVEMENT
+    config.CTRL_HZ = config.SEMANTIC_PLACE_CTRL_HZ
+
     return config

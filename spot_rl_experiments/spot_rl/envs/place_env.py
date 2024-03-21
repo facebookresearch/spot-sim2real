@@ -94,6 +94,9 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Place steps
         self._time_step = 0
 
+        # Place arm travel time
+        self._travel_time = config.SEMANTIC_PLACE_ARM_TRAVEL_TIME
+
     def get_ee_target_orientation(self):
         """Get ee target orientation"""
         # Get base T
@@ -220,7 +223,10 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # Set the travel time scale so that the arm movement is smooth
         return super().step(
-            action_dict, travel_time_scale=1.0 / 0.9 * 2.75, *args, **kwargs
+            action_dict,
+            travel_time_scale=1.0 / 0.9 * self._travel_time,
+            *args,
+            **kwargs
         )
 
     def get_success(self, observations):
