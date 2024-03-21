@@ -78,7 +78,6 @@ DIAMOND_KERNEL_7 = np.asarray(
 )
 
 
-# TODO: whiten_back default is True
 def filter_depth(depth_img, max_depth, whiten_black=False):
     filtered_depth_img = (
         fill_in_multiscale(depth_img.astype(np.float32) * (max_depth / 255.0))[0]

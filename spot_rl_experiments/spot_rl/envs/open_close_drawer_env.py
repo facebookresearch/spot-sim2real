@@ -131,9 +131,6 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
 
         # Get the transformation
-        # body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-        #     "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
-        # )
         vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
 
         # Get the 3D point in the hand RGB frame
@@ -202,6 +199,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Open the gripper and retract the arm
         self.spot.open_gripper()
         # [0.55, 0, 0.27] is the gripper nominal location
+        # [0,0,0] is the roll pitch yaw
         self.spot.move_gripper_to_point([0.55, 0, 0.27], [0, 0, 0])
 
         # Change the flag to finish
