@@ -106,3 +106,21 @@ def construct_config_for_place(file_path=None, opts=[]):
     config.USE_MRCNN = False
 
     return config
+
+
+def construct_config_for_semantic_place(file_path=None, opts=[]):
+    config = None
+    if file_path is None:
+        config = construct_config(opts=opts)
+    else:
+        config = construct_config(file_path=file_path, opts=opts)
+
+    # Don't need cameras for Place
+    config.USE_HEAD_CAMERA = False
+    config.USE_MRCNN = True
+
+    # Here we do a config yaml overwrite for the critical parameters
+    config.MAX_JOINT_MOVEMENT = config.SEMANTIC_PLACE_MAX_JOINT_MOVEMENT
+    config.CTRL_HZ = config.SEMANTIC_PLACE_CTRL_HZ
+
+    return config

@@ -13,3 +13,6 @@
 	url = https://github.com/naokiyokoyama/mask_rcnn_detectron2
 	branch = main
 	ignore = dirty
+[submodule "third_party/GenPose"]
+	path = third_party/GenPose
+	url = https://github.com/tusharsangam/GenPose-for-spotsim2real.git
