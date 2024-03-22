@@ -153,6 +153,7 @@ def segment_with_socket(img, bbox):
     socket.send_pyobj((img, bbox))
     return socket.recv_pyobj()
 
+
 def detect_with_socket(img, object_name, thresh=0.01, device="cpu"):
     port = 21001
     context = zmq.Context()
@@ -367,21 +368,34 @@ def get_target_points_by_heuristic(
     ]
 
 
-def plot_intel_point_in_gripper_image(gripper_image_resps, gripper_T_intel, point3d_in_intel:np.ndarray):
+def plot_intel_point_in_gripper_image(
+    gripper_image_resps, gripper_T_intel, point3d_in_intel: np.ndarray
+):
     gripper_intrinsics = gripper_image_resps[0].source.pinhole.intrinsics
-    gripper_image:np.ndarray = [image_response_to_cv2(gripper_image_resp) for gripper_image_resp in gripper_image_resps][0]
-    #breakpoint()
-    point3d_in_gripper:np.ndarray = gripper_T_intel*point3d_in_intel #.transform_point(mn.Vector3(point3d_in_intel))
-    #point3d_in_gripper:np.ndarray = np.array([point3d_in_gripper.x, point3d_in_gripper.y, point3d_in_gripper.z])
+    gripper_image: np.ndarray = [
+        image_response_to_cv2(gripper_image_resp)
+        for gripper_image_resp in gripper_image_resps
+    ][0]
+    # breakpoint()
+    point3d_in_gripper: np.ndarray = (
+        gripper_T_intel * point3d_in_intel
+    )  # .transform_point(mn.Vector3(point3d_in_intel))
+    # point3d_in_gripper:np.ndarray = np.array([point3d_in_gripper.x, point3d_in_gripper.y, point3d_in_gripper.z])
     fx = gripper_intrinsics.focal_length.x
     fy = gripper_intrinsics.focal_length.y
     cx = gripper_intrinsics.principal_point.x
     cy = gripper_intrinsics.principal_point.y
-    point2d_in_gripper =  project_3d_to_pixel_uv(point3d_in_gripper.reshape(1, 3), fx, fy, cx, cy)[0]
+    point2d_in_gripper = project_3d_to_pixel_uv(
+        point3d_in_gripper.reshape(1, 3), fx, fy, cx, cy
+    )[0]
     img_with_point = cv2.circle(
-        gripper_image.copy(), (int(point2d_in_gripper[0]), int(point2d_in_gripper[1])), 2, (0, 0, 255)
+        gripper_image.copy(),
+        (int(point2d_in_gripper[0]), int(point2d_in_gripper[1])),
+        2,
+        (0, 0, 255),
     )
     return img_with_point
+
 
 def detect_place_point_by_pcd_method(
     img,
@@ -400,7 +414,7 @@ def detect_place_point_by_pcd_method(
 
     h, w = img.shape[:2]
     predictions = detect_with_socket(img, object_name, 0.01, device)
-    #predictions = detect(img, object_name, 0.01, device, owlvitmodel, proceesor)
+    # predictions = detect(img, object_name, 0.01, device, owlvitmodel, proceesor)
     # print(predictions)
     prediction, distance_to_prediction = select_the_bbox_closer_to_camera(
         predictions, depth_raw
@@ -458,8 +472,10 @@ def detect_place_point_by_pcd_method(
     #     sample_patch_around_point(int(selected_xy[0]), int(selected_xy[1]), depth_raw)
     #     / 1000.0
     # )
-    depth_at_selected_xy = depth_raw[int(selected_xy[-1]), int(selected_xy[0])]/1000.
-    assert depth_at_selected_xy != 0., f"Non zero depth required found {depth_at_selected_xy}"
+    depth_at_selected_xy = depth_raw[int(selected_xy[-1]), int(selected_xy[0])] / 1000.0
+    assert (
+        depth_at_selected_xy != 0.0
+    ), f"Non zero depth required found {depth_at_selected_xy}"
     selected_point = get_3d_point(camera_intrinsics, selected_xy, depth_at_selected_xy)
 
     for xy in corners_xys:
