@@ -43,6 +43,7 @@ def get_3d_points(cam_intrinsics, pixels_uv: np.ndarray, zs: np.ndarray):
     """
     # pixels_uv = nx2 xs -> :, 1
     # Get camera intrinsics
+    # u= y, v = x
     fx = cam_intrinsics.focal_length.x
     fy = cam_intrinsics.focal_length.y
     cx = cam_intrinsics.principal_point.x

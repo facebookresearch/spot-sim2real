@@ -196,10 +196,11 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         print(
             "dis to goal:", np.linalg.norm(self.get_place_sensor(True)), self._time_step
         )
+        print(f"Time step Internal {self._time_step}")
         print("place in base place env:", place)
         action_dict["place"] = place
         action_dict["travel_time_scale"] = 1.0 / 0.9 * 1.75
-        place = action_dict.get("grip_action", None) <= 0.0
+        # place = action_dict.get("grip_action", None) <= 0.0
         print("grip_action in sem place env:", action_dict.get("grip_action", None))
         action_dict["place"] = place
         action_dict["semantic_place"] = place

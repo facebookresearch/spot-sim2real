@@ -1,5 +1,6 @@
 import math
 import os
+import time
 
 import cv2
 import numpy as np
@@ -14,7 +15,7 @@ from transformers import Owlv2ForObjectDetection, Owlv2Processor
 socket = None
 model, processor = None, None
 sam = None
-device = "cpu"
+device = "cuda"
 
 
 def load_model(model_name="owlvit", device="cpu"):
@@ -27,6 +28,7 @@ def load_model(model_name="owlvit", device="cpu"):
             "google/owlv2-base-patch16-ensemble"
         ).to(device)
         processor = Owlv2Processor.from_pretrained("google/owlv2-base-patch16-ensemble")
+        return model, processor
         # run segment anything (SAM)
     if model_name == "sam":
         print("Loading SAM")
@@ -35,16 +37,14 @@ def load_model(model_name="owlvit", device="cpu"):
                 checkpoint="/home/tusharsangam/Desktop/spot-sim2real/spot_rl_experiments/weights/sam_vit_h_4b8939.pth"
             ).to(device)
         )
+        return sam
 
 
 # load_model("owlvit", device)
 # load_model("sam", device)
 
 
-def detect(img, text_queries, score_threshold, device):
-    global model
-    global processor
-
+def detect(img, text_queries, score_threshold, device, model=None, processor=None):
     if model is None or processor is None:
         load_model("owlvit", device)
 
@@ -79,9 +79,8 @@ def detect(img, text_queries, score_threshold, device):
     return result_labels
 
 
-def segment(image, boxes, size, device):
+def segment(image, boxes, size, device, sam=None):
 
-    global sam
     if sam is None:
         load_model("sam", device)
 
@@ -170,8 +169,8 @@ def generate_point_cloud(
     #     ]
     # )
     # point_cloud.rotate(Rotmat, center=point_cloud.get_center())
-    cl, ind = point_cloud.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
-    point_cloud = point_cloud.select_by_index(ind)
+    # cl, ind = point_cloud.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+    # point_cloud = point_cloud.select_by_index(ind)
     # cl, imd = point_cloud.remove_radius_outlier(nb_points=20, radius=0.5)
     # point_cloud = point_cloud.select_by_index(ind)
     # point_cloud = rotate_point_cloud(point_cloud, 'z', -180)
@@ -362,7 +361,7 @@ if __name__ == "__main__":
     object_name = "bottle"
     variations = [
         "reference",
-        "horizontal_3",
+        # "horizontal_3",
     ]  # "horizontal_2", "horizontal_3", "horizontal_4"]
     src = "intel"
 
@@ -386,49 +385,34 @@ if __name__ == "__main__":
         R = pose_correction_pipeline(rgb_image, depth_raw, object_name, intrinsics, port)
     """
     # spot = Spot("test")
-    for variation in variations:
-        image_path = osp.join(root_folder, f"{object_name}_{variation}_{src}_rgb.png")
-        print(f"path loaded {image_path}")
-        image = cv2.imread(image_path)
-        print(image.shape, image.dtype)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    i_ = 0
+    delta_sum, delta_count = 0, 0
+    variation = variations[0]
+    image_path = osp.join(root_folder, f"{object_name}_{variation}_{src}_rgb.png")
+    # print(f"path loaded {image_path}")
+    image = cv2.imread(image_path)
+    # print(image.shape, image.dtype)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    while True:
 
-        # image_responses = spot.get_hand_image_old(
-        #     img_src=[SpotCamIds.INTEL_REALSENSE_COLOR, SpotCamIds.INTEL_REALSENSE_DEPTH]
-        # )
-        # camera_intrinsics = image_responses[0].source.pinhole.intrinsics
-        # image_responses = [
-        #     image_response_to_cv2(image_response) for image_response in image_responses
-        # ]
-        label = detect(image, "bottle", 0.1, "cpu")
+        start_time = time.time()
+        label = detect(image, "bottle", 0.1, "cuda")
         bbox = label[0][0]
         x1, y1, x2, y2 = bbox
+        end_time = time.time()
+        if i_ > 20:
+            delta = end_time - start_time
+            delta_sum += delta
+            delta_count += 1
+            print(
+                f"time to process 1 frame {delta_sum/delta_count}, fps {delta_count/delta_sum}"
+            )
+
         # img_with_label = cv2.rectangle(
         #     image, (x1, y1), (x2, y2), (255, 0, 0)
         # )
-        print(f"BBox {x1},{y1},{x2},{y2}")
-        reference = image[y1 - 5 : y2 + 5, x1 - 5 : x2 + 5]
-
-        masks = segment(image, np.array([[x1, y1, x2, y2]]), image.shape[:2], device)
-        mask = masks[0, 0].cpu().numpy()
-        mask_path = f'{osp.basename(image_path).split(".")[0]}_mask.npy'
-        np.save(mask_path, mask)
-        w, h = x2 - x1, y2 - y1
-        compact_percent = 0.05
-        x1 -= int(w * compact_percent)
-        y1 -= int(h * compact_percent)
-        x2 += int(w * compact_percent)
-        y2 += int(h * compact_percent)
-        max_dim = max(x2 - x1, y2 - y1)
-        cx, cy = (x2 + x1) / 2, (y2 + y1) / 2
-        x1, x2 = cx - (max_dim / 2), cx + (max_dim / 2)
-        y1, y2 = cy - (max_dim / 2), cy + (max_dim / 2)
-        box = np.array([x1, y1, x2, y2])
-        resize_shape = np.array([256, 256])
-        image = image * mask[:, :, None]
-        image_crop, _ = get_image_crop_resize(image, box, resize_shape)
-        cv2.imwrite(
-            osp.basename(image_path), cv2.cvtColor(image_crop, cv2.COLOR_RGB2BGR)
-        )
+        i_ += 1
+        print(f"BBox {x1},{y1},{x2},{y2}, {i_}")
+        # reference = image[y1 - 5 : y2 + 5, x1 - 5 : x2 + 5]
 
     """In real setup OwlVit2 & SAM & generate a pointcloud using camera intrinsics"""
