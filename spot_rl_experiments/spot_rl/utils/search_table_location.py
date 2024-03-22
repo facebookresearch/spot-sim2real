@@ -300,37 +300,43 @@ def farthest_point_sampling(points, num_samples):
 
 
 def project_3d_to_pixel_uv(points_3d, fx, fy, cx, cy):
-    # points_3d = farthest_point_sampling(points_3d, 1024)
     Z = points_3d[:, -1]  # n
     X_Z = points_3d[:, 0] / Z  # n/n
     Y_Z = points_3d[:, 1] / Z
     u = (fx * X_Z) + cx
     v = (fy * Y_Z) + cy
-    # u  = np.linspace(u.min(), u.max(), 100)
-    # v = np.linspace(v.min(), v.max(), 100)
-    print(u.shape, v.shape, points_3d.shape)
-    # XX, YY = np.meshgrid(u, v)
-    # Flatten and stack
     return np.stack([u.flatten(), v.flatten()], axis=1).reshape(-1, 2)
 
 
-def get_target_points(np_points):
+def get_target_points_by_heuristic(
+    np_points,
+    x_percentile=50,
+    x_sd_multiplier=0.1,
+    z_percentage=20,
+    z_sd_multiplier=0.2,
+):
 
-    mean = np.mean(np_points[:, 0])
-    sd = np.std(np_points[:, 0])
-    thresh = 0.2
+    x_thresh = np.percentile(np_points[:, 0], x_percentile)
+    x_distances = np_points[:, 0] - x_thresh
+    sd = np.sqrt(np.mean((x_distances) ** 2))
+
     np_points_mid_point_filtered = np.array(
         [
             x
             for i, x in enumerate(np_points)
-            if (x[0] > (mean - (thresh * sd)) and x[0] < (mean + (thresh * sd)))
+            if (
+                x_distances[i] > (x_thresh - (x_sd_multiplier * sd))
+                and x_distances[i] < (x_thresh + (x_sd_multiplier * sd))
+            )
         ]
     ).reshape(-1, 3)
-    z_thresh = percentage_threshold(np_points_mid_point_filtered[:, -1], 20)
+
+    """
+    z_thresh = percentage_threshold(np_points_mid_point_filtered[:, -1], z_percentage)
     z_distances = np_points_mid_point_filtered[:, -1] - z_thresh
     mean = z_thresh  # np.mean(z_distances)
     sd = np.sqrt(np.mean((np_points_mid_point_filtered[:, -1] - z_thresh) ** 2))
-    thresh = 0.1
+    thresh = z_sd_multiplier
     np_points_mid_point_filtered_z_filtered = np.array(
         [
             x
@@ -341,25 +347,14 @@ def get_target_points(np_points):
             )
         ]
     ).reshape(-1, 3)
+    assert len(np_points_mid_point_filtered_z_filtered) > 0, f"No points left after z filering {len(np_points_mid_point_filtered_z_filtered)}"
+    """
+    np_points_mid_point_filtered_z_filtered = np_points_mid_point_filtered
     return np_points_mid_point_filtered_z_filtered, [
         np.median(np_points_mid_point_filtered_z_filtered[:, 0]),
         np.median(np_points_mid_point_filtered_z_filtered[:, 1]),
         np.median(np_points_mid_point_filtered_z_filtered[:, -1]),
     ]
-
-    # 2. Calculate distance from the camera (assuming camera at origin)
-    distances = np.linalg.norm(np_points, axis=1)
-
-    # 3. Find the average distance
-    average_distance = np.mean(distances)
-
-    # 4. Find a point that is approximately 20% farther than the average distance
-    target_distance = 1.0 * average_distance
-
-    # Find the point closest to the target distance
-    index = (np.abs(distances - target_distance)).argmin()
-    points = np.array([np_points[index]]).reshape(1, 3)
-    return points
 
 
 def detect_place_point_by_pcd_method(
@@ -408,6 +403,7 @@ def detect_place_point_by_pcd_method(
     pcd = generate_point_cloud(img, depth_raw, mask, prediction[0], fx, fy, cx, cy)
     # o3d.io.write_point_cloud("original_pcd.ply", pcd)
     plane_pcd = plane_detect(pcd)
+    # DownSample
     plane_pcd.points = o3d.utility.Vector3dVector(
         farthest_point_sampling(np.array(plane_pcd.points), 1024)
     )
@@ -416,12 +412,27 @@ def detect_place_point_by_pcd_method(
     color[:, 1] = 0
     color[:, 2] = 0
     plane_pcd.colors = o3d.utility.Vector3dVector(color)
-    target_points, selected_point = get_target_points(np.array(plane_pcd.points))
+    target_points, selected_point = get_target_points_by_heuristic(
+        np.array(plane_pcd.points)
+    )
     corners_xys = project_3d_to_pixel_uv(target_points, fx, fy, cx, cy)
-    selected_xy = project_3d_to_pixel_uv(
-        np.array([selected_point]).reshape(1, 3), fx, fy, cx, cy
-    )[0]
-    print("selected xy", selected_xy)
+
+    y_threshold = np.percentile(corners_xys[:, -1], 70)
+
+    # breakpoint()
+    indices_gtr_thn_y_thresh = corners_xys[:, 1] >= y_threshold
+    corners_gtr_than_y_thresh = corners_xys[indices_gtr_thn_y_thresh]
+    indices = np.argsort(corners_gtr_than_y_thresh[:, 1])
+    sorted_corners_gtr_than_y_thresh = corners_gtr_than_y_thresh[indices]
+    selected_xy = sorted_corners_gtr_than_y_thresh[0]
+    corners_xys = corners_gtr_than_y_thresh[indices]
+    print(f"Selected XY {selected_xy}")
+    depth_at_selected_xy = (
+        sample_patch_around_point(int(selected_xy[0]), int(selected_xy[1]), depth_raw)
+        / 1000.0
+    )
+    selected_point = get_3d_point(camera_intrinsics, selected_xy, depth_at_selected_xy)
+
     for xy in corners_xys:
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(xy[0]), int(xy[1])), 1, (255, 0, 0)
@@ -432,6 +443,7 @@ def detect_place_point_by_pcd_method(
     cv2.imshow("Table detection", img_with_bbox)
     cv2.waitKey(0)
     o3d.visualization.draw_geometries([pcd, plane_pcd])
+    cv2.imwrite("table_detection.png", img_with_bbox)
     cv2.destroyAllWindows()
     # o3d.io.write_point_cloud("plane_pcd.ply", plane_pcd)
     point_in_vision = vision_T_hand.transform_point(mn.Vector3(*selected_point))
