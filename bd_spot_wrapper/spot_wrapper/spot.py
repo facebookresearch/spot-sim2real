@@ -374,6 +374,7 @@ class Spot:
         data_edge_timeout=2,
         top_down_grasp=False,
         horizontal_grasp=False,
+        threshold_radians=0.2,
     ):
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
@@ -423,7 +424,9 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            constraint.vector_alignment_with_tolerance.threshold_radians = (
+                threshold_radians
+            )
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
@@ -472,6 +475,19 @@ class Spot:
                 break
 
             time.sleep(0.25)
+
+        # Reduce the torque applied to the object so that the object is not squeezed
+        if success:
+            print("Applying min torque...")
+            command_gripper = robot_command_pb2.RobotCommand()
+            command_gripper.synchronized_command.gripper_command.claw_gripper_command.trajectory.points.add().point = (
+                -0.087
+            )
+            command_gripper.synchronized_command.gripper_command.claw_gripper_command.maximum_torque.value = (
+                0.0
+            )
+            self.command_client.robot_command(command_gripper)
+
         return success
 
     def grasp_hand_depth(self, *args, **kwargs):
