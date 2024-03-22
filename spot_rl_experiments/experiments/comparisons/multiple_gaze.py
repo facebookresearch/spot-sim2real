@@ -26,7 +26,7 @@ def main(spot):
 
     env = SpotGazeEnv(config, spot, mask_rcnn_weights=config.WEIGHTS.MRCNN)
     spot.power_robot()
-    policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE)
+    policy = GazePolicy(config.WEIGHTS.GAZE, device=config.DEVICE, config=config)
     for target_id in range(1, 9):
         goal_x, goal_y, goal_heading = nav_target_from_waypoint(
             "white_box", waypoints_yaml=waypoint_yaml

@@ -25,6 +25,7 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
+import rospy
 import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (
@@ -123,6 +124,8 @@ class SpotCamIds:
     RIGHT_DEPTH = "right_depth"
     RIGHT_DEPTH_IN_VISUAL_FRAME = "right_depth_in_visual_frame"
     RIGHT_FISHEYE = "right_fisheye_image"
+    INTEL_REALSENSE_COLOR = "intelrealsensergb"  # In habitat-lab, the intelrealsense camera is called jaw camera
+    INTEL_REALSENSE_DEPTH = "intelrealsensedepth"
 
 
 # Maps SpotCamId (name of camera in spot) to
@@ -176,6 +179,16 @@ class Spot:
             RobotCommandClient.default_service_name
         )
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
+
+        # Make our intel image client
+        try:
+            self.intelrealsense_image_client = robot.ensure_client(
+                "intel-realsense-image-service"
+            )
+        except Exception:
+            print("There is no intel-realsense-image_service. Using gripper cameras")
+            self.intelrealsense_image_client = None
+
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
         )
@@ -196,6 +209,14 @@ class Spot:
 
         # Print the battery charge level of the robot
         self.loginfo(f"Current battery charge: {self.get_battery_charge()}%")
+
+    @property
+    def is_gripper_blocked(self):
+        """A function to set the ros parameter: is_gripper_blocked for choosing between
+        Spot's gripper camera or intelrealsense camera (jaw camera). 0 for using Spot's gripper camera,
+        and 1 for using intelrealsense camera (jaw camera).
+        """
+        return rospy.get_param("is_gripper_blocked", default=0) == 1
 
     def get_lease(self, hijack=False):
         # Make sure a lease for this client isn't already active
@@ -332,7 +353,9 @@ class Spot:
             self.command_client, cmd_id, timeout_sec=timeout_sec
         )
 
-    def get_image_responses(self, sources, quality=None, pixel_format=None):
+    def get_image_responses(
+        self, sources, quality=100, pixel_format=None, await_the_resp=True
+    ):
         """Retrieve images from Spot's cameras
 
         :param sources: list containing camera uuids
@@ -340,8 +363,16 @@ class Spot:
             should return its image with
         :param pixel_format: either an int or a list specifying what pixel format each source
             should return its image with
+        :param await_the_resp: either get image response result() or not
         :return: list containing bosdyn image response objects
         """
+
+        # Choose between intelrealsense camera or gripper camera
+        image_client = (
+            self.image_client
+            if "intel" not in sources[0]
+            else self.intelrealsense_image_client
+        )
         if quality is not None:
             if isinstance(quality, int):
                 quality = [quality] * len(sources)
@@ -350,7 +381,7 @@ class Spot:
             img_requests = [
                 build_image_request(src, q) for src, q in zip(sources, quality)
             ]
-            image_responses = self.image_client.get_image(img_requests)
+            image_responses = image_client.get_image_async(img_requests)
         elif pixel_format is not None:
             if isinstance(pixel_format, int):
                 pixel_format = [pixel_format] * len(sources)
@@ -360,11 +391,11 @@ class Spot:
                 build_image_request(src, pixel_format=pf)
                 for src, pf in zip(sources, pixel_format)
             ]
-            image_responses = self.image_client.get_image(img_requests)
+            image_responses = image_client.get_image_async(img_requests)
         else:
-            image_responses = self.image_client.get_image_from_sources(sources)
+            image_responses = image_client.get_image_from_sources_async(sources)
 
-        return image_responses
+        return image_responses.result() if await_the_resp else image_responses
 
     def grasp_point_in_image(
         self,
@@ -399,7 +430,6 @@ class Spot:
 
                 # The axis in the vision frame is the negative z-axis
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=-1)
-
             else:
                 # Add a constraint that requests that the y-axis of the gripper is
                 # pointing in the positive-z direction in the vision frame. That means
@@ -823,19 +853,16 @@ class Spot:
         finally:
             self.power_off()
 
-    def get_hand_image(self, is_rgb: bool = True) -> List[image_pb2.ImageResponse]:
+    def select_hand_image(self, is_rgb=True, img_src: List[str] = []):
         """
-        Gets hand raw rgb & depth and returns ImageResponse objects for both as a list
-        Information on ImageResponse objects can be found here:
-            https://dev.bostondynamics.com/protos/bosdyn/api/proto_reference#bosdyn-api-ImageResponse
-
-        Args:
-            is_rgb: bool indicating whether to return rgb or depth image
-
-        Returns:
-            img_resp: List of 2 elements as ImageResponse objects for rgb and depth images
+        Gets hand raw rgb and depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot
+        and camera intrinsics along with pixel data
         """
-        img_src = [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+        img_src = (
+            img_src
+            if img_src
+            else [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+        )  # default img_src to gripper
 
         pixel_format_rgb = (
             image_pb2.Image.PIXEL_FORMAT_RGB_U8
@@ -847,6 +874,23 @@ class Spot:
             img_src, pixel_format=[pixel_format_rgb, pixel_format_depth]
         )
         return img_resp
+
+    def get_hand_image(self, is_rgb=True):
+        """
+        Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
+        If is_gripper_blocked is True then returns intel realsense images
+        If hand_image_sources are passed then above condition is ignored & will send image & depth for each source
+        Thus if you send hand_image_sources=["gripper", "intelrealsense"] then 4 image resps should be returned
+        """
+        realsense_img_srcs: List[str] = [
+            SpotCamIds.INTEL_REALSENSE_COLOR,
+            SpotCamIds.INTEL_REALSENSE_DEPTH,
+        ]
+
+        if self.is_gripper_blocked:  # return intelrealsense
+            return self.select_hand_image(img_src=realsense_img_srcs)
+        else:
+            return self.select_hand_image(is_rgb=is_rgb)
 
     def get_camera_intrinsics(
         self, sources: List[SpotCamIds], quality=None, pixel_format=None
@@ -940,6 +984,59 @@ class Spot:
         quat = se3_pose.rotation.normalize()
         return sp.SE3(quat.to_matrix(), pos)
 
+    def get_ee_pos_in_body_frame(self):
+        """
+        Return ee xyz position and roll, pitch, yaw
+        """
+        # Get transformation
+        body_T_hand = self.get_ee_transform()
+
+        # Get rotation. BD API returns values with the order of yaw, pitch, roll.
+        theta = math_helpers.quat_to_eulerZYX(body_T_hand.rotation)
+        # Change the order to roll, pitch, yaw
+        theta = np.array(theta)[::-1]
+
+        # Get position x,y,z
+        position = (
+            self.robot_state_client.get_robot_state()
+            .kinematic_state.transforms_snapshot.child_to_parent_edge_map["hand"]
+            .parent_tform_child.position
+        )
+
+        return np.array([position.x, position.y, position.z]), theta
+
+    def get_ee_transform(self):
+        """
+        Get ee transformation from base (body) to hand frame
+        """
+        body_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "body",
+            "hand",
+        )
+        return body_T_hand
+
+    def get_ee_transform_in_vision_frame(self):
+        """
+        Get ee transformation from vision (global) to hand frame
+        """
+        # Get the euler z,y,x
+        vision_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "vision",
+            "hand",
+        )
+        return vision_T_hand
+
+    def get_ee_quaternion_in_body_frame(self):
+        """
+        Get ee's quaternion
+        """
+        body_T_hand = self.get_ee_transform()
+        quat = body_T_hand.rotation
+        quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
+        return quat
+
 
 class SpotLease:
     """
@@ -993,7 +1090,10 @@ def make_robot_command(arm_joint_traj):
 
 
 def image_response_to_cv2(image_response, reorient=True):
-    if image_response.shot.image.pixel_format == image_pb2.Image.PIXEL_FORMAT_DEPTH_U16:
+    if (
+        image_response.shot.image.pixel_format == image_pb2.Image.PIXEL_FORMAT_DEPTH_U16
+        and image_response.shot.image.format == image_pb2.Image.FORMAT_RAW
+    ):
         dtype = np.uint16
     else:
         dtype = np.uint8

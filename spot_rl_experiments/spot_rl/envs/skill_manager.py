@@ -8,11 +8,12 @@ from typing import Any, Dict, Tuple
 import numpy as np
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
-from spot_rl.skills.atomic_skills import Navigation, Pick, Place
+from spot_rl.skills.atomic_skills import Navigation, Pick, Place, SemanticPlace
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
     construct_config_for_place,
+    construct_config_for_semantic_place,
 )
 from spot_rl.utils.heuristic_nav import (
     ImageSearch,
@@ -83,6 +84,7 @@ class SpotSkillManager:
         pick_config=None,
         place_config=None,
         use_mobile_pick: bool = False,
+        use_semantic_place: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -94,6 +96,7 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
+        self.use_semantic_place = use_semantic_place
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -144,9 +147,14 @@ class SpotSkillManager:
             if not pick_config
             else pick_config
         )
-        self.place_config = (
-            construct_config_for_place() if not place_config else place_config
-        )
+        if place_config is None:
+            self.place_config = (
+                construct_config_for_semantic_place()
+                if self.use_semantic_place
+                else construct_config_for_place()
+            )
+        else:
+            self.place_config = place_config
 
     def __initiate_controllers(self, use_policies: bool = True):
         """
@@ -162,11 +170,16 @@ class SpotSkillManager:
             config=self.pick_config,
             use_mobile_pick=self._use_mobile_pick,
         )
-        self.place_controller = Place(
-            spot=self.spot,
-            config=self.place_config,
-            use_policies=use_policies,
-        )
+        if self.use_semantic_place:
+            self.place_controller = SemanticPlace(
+                spot=self.spot, config=self.place_config
+            )
+        else:
+            self.place_controller = Place(
+                spot=self.spot,
+                config=self.place_config,
+                use_policies=use_policies,
+            )
 
     def reset(self):
         # Reset the policies and environments via the controllers
@@ -293,12 +306,14 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, place_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
         Args:
             place_target (str): Name of the place target (as stored in waypoints.yaml)
+            ee_orientation_at_grasping (list): The ee orientation at grasping. If users specifiy, the robot will place the object in the desired pose
+                This is only used for the semantic place skills.
 
         Returns:
             bool: True if place was successful, False otherwise
@@ -325,13 +340,24 @@ class SpotSkillManager:
             return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
-        status, message = self.place(place_x, place_y, place_z)
+
+        status, message = self.place(
+            place_x,
+            place_y,
+            place_z,
+            ee_orientation_at_grasping=ee_orientation_at_grasping,
+        )
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
     @multimethod  # type: ignore
     def place(  # noqa
-        self, x: float, y: float, z: float, is_local: bool = False
+        self,
+        x: float,
+        y: float,
+        z: float,
+        is_local: bool = False,
+        ee_orientation_at_grasping: np.ndarray = None,
     ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
@@ -341,6 +367,7 @@ class SpotSkillManager:
             y (float): y coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
             z (float): z coordinate of the place target (in meters) specified in spot's frame if is_local is true, otherwise in world frame
             is_local (bool): If True, place in the spot's body frame, else in the world frame
+            ee_orientation_at_grasping (np.ndarray): The grasping arm joint angles
 
         Returns:
             status (bool): True if place was successful, False otherwise
@@ -349,6 +376,7 @@ class SpotSkillManager:
         goal_dict = {
             "place_target": (x, y, z),
             "is_local": is_local,
+            "ee_orientation_at_grasping": ee_orientation_at_grasping,
         }  # type: Dict[str, Any]
         status, message = self.place_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
