@@ -434,6 +434,10 @@ class Spot:
             # Input zero to API is palm grasping
             grasp.grasp_params.grasp_palm_to_fingertip = 1.0 - percentage_of_palm
 
+            # Only grasp the point that is asked by users
+            # That is at the exact position you requested, but has less or no automatic grasp selection help in position.
+            grasp.grasp_params.position_constraint = 2
+
             # Add the vector constraint to our proto.
             constraint = grasp.grasp_params.allowable_orientation.add()
             constraint.vector_alignment_with_tolerance.axis_on_gripper_ewrt_gripper.CopyFrom(
