@@ -14,7 +14,7 @@ import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_wrapper.spot import Spot
-from spot_wrapper.utils import angle_between_quat, get_angle_between_forward_and_target
+from spot_wrapper.utils import angle_between_quat
 
 
 class SpotPlaceEnv(SpotBaseEnv):
@@ -93,45 +93,6 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # Place steps
         self._time_step = 0
-
-    def get_ee_target_orientation(self):
-        """Get ee target orientation"""
-        # Get base T
-        base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-        height = base_T.translation[2]
-        # Get ee T
-        ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the glocal location of the place target
-        target = np.copy(self.place_target)
-        # Offset when we register the point
-        target[2] -= height
-        obj_local_pos = base_T.inverted().transform_point(target)
-        # Get the angle
-        angle = get_angle_between_forward_and_target(obj_local_pos)
-        # Rotate the base by the angle
-        base_T = base_T @ mn.Matrix4.rotation_z(mn.Rad(angle))
-
-        base_T_ee = base_T.inverted() @ ee_T
-
-        quat = quaternion.from_rotation_matrix(base_T_ee.rotation())
-
-        return quat
-
-    def get_cur_ee_pose_offset(self):
-        """Get the current ee pose offset"""
-        # Get base to hand's transformation
-        ee_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the base transformation
-        base_transform = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-        # Do offset
-        base_to_arm_offset = 0.292
-        base_transform.translation = base_transform.transform_point(
-            mn.Vector3(base_to_arm_offset, 0, 0)
-        )
-        # Get ee relative to base
-        ee_position = (base_transform.inverted() @ ee_transform).translation
-        base_T_hand_yaw = get_angle_between_forward_and_target(ee_position)
-        return base_T_hand_yaw
 
     def decide_init_arm_joint(self, ee_orientation_at_grasping):
         """Decide the place location"""
@@ -244,7 +205,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         )
         # remove the offset from the base to object
         delta_obj = np.array(
-            [delta_obj - abs(self.get_cur_ee_pose_offset())], dtype=np.float32
+            [delta_obj - abs(self.spot.get_cur_ee_pose_offset())], dtype=np.float32
         )
         # Get the jaw image
         arm_depth, _ = self.get_gripper_images()
@@ -254,7 +215,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             "relative_initial_ee_orientation": delta_ee,
             "relative_target_object_orientation": delta_obj,
             "articulated_agent_jaw_depth": arm_depth,
-            "joint": self.get_arm_joints(semantic_place=True),
+            "joint": self.get_arm_joints(self.config.SEMANTIC_PLACE_JOINT_BLACKLIST),
             "is_holding": np.ones((1,)),
         }
         return observations

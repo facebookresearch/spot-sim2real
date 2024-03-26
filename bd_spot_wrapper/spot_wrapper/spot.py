@@ -68,6 +68,7 @@ from perception_and_utils.utils.conversions import (
     bd_SE3Pose_to_sophus_SE3,
 )
 from spot_rl.utils.utils import ros_frames as rf
+from spot_wrapper.utils import get_angle_between_forward_and_target
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -1036,6 +1037,22 @@ class Spot:
         quat = body_T_hand.rotation
         quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
         return quat
+
+    def get_cur_ee_pose_offset(self):
+        """Get the current ee pose offset"""
+        # Get base to hand's transformation
+        ee_transform = self.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # Get the base transformation
+        base_transform = self.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        # Do offset
+        base_to_arm_offset = 0.292
+        base_transform.translation = base_transform.transform_point(
+            mn.Vector3(base_to_arm_offset, 0, 0)
+        )
+        # Get ee relative to base
+        ee_position = (base_transform.inverted() @ ee_transform).translation
+        base_T_hand_yaw = get_angle_between_forward_and_target(ee_position)
+        return base_T_hand_yaw
 
 
 class SpotLease:

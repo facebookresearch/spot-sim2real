@@ -239,14 +239,67 @@ class OwlVit:
 
         return result
 
+    def process_results(self, results):
+        """
+        Returns the all bounding box for each label above the threshold
+        """
+        boxes, scores, labels = (
+            results[0]["boxes"],
+            results[0]["scores"],
+            results[0]["labels"],
+        )
+        boxes = boxes.to("cpu")
+        labels = labels.to("cpu")
+        scores = scores.to("cpu")
+
+        # Initialize dictionaries to store most confident bounding boxes and scores per label
+        target_boxes = {}
+        target_scores = {}
+
+        for box, score, label in zip(boxes, scores, labels):
+            box = [round(i, 2) for i in box.tolist()]
+            if score >= self.score_threshold:
+                # If the current score is higher than the stored score for this label, update the target box and score
+                if label.item() not in target_scores:
+                    target_scores[label.item()] = [score.item()]
+                    target_boxes[label.item()] = [box]
+                else:
+                    target_scores[label.item()] += [score.item()]
+                    target_boxes[label.item()] += [box]
+
+        # Format the output
+        result = []
+        for label, boxes in target_boxes.items():
+            for idx, box in enumerate(boxes):
+                x1 = int(box[0])
+                y1 = int(box[1])
+                x2 = int(box[2])
+                y2 = int(box[3])
+
+                # Strip the prefix from the label
+                label_without_prefix = self.labels[0][label][len(self.prefix) + 1 :]
+                result.append(
+                    [label_without_prefix, target_scores[label][idx], [x1, y1, x2, y2]]
+                )
+
+        return result
+
     def create_img_with_bounding_box(self, img, results):
         """
-        Returns an image with all bounding boxes avove the threshold overlaid
+        Returns an image with all bounding boxes above the threshold overlaid
         """
-
-        results = self.get_most_confident_bounding_box_per_label(results)
+        results = self.process_results(results)
         font = cv2.FONT_HERSHEY_SIMPLEX
+        # Get the score list
+        scores = [score for _, score, _ in results]
+        # Return the ranking from the most confidence to the least confidence
+        sorted_scores = sorted(scores)
+        rank_dict = {
+            value: len(scores) - index for index, value in enumerate(sorted_scores)
+        }
+        ranks = [rank_dict[element] for element in scores]
 
+        idx = 0
         for label, score, box in results:
             img = cv2.rectangle(img, box[:2], box[2:], (255, 0, 0), 5)
             if box[3] + 25 > 768:
@@ -254,8 +307,16 @@ class OwlVit:
             else:
                 y = box[3] + 25
             img = cv2.putText(
-                img, label, (box[0], y), font, 1, (255, 0, 0), 2, cv2.LINE_AA
+                img,
+                f"{ranks[idx]}:{label}",
+                (box[0], y),
+                font,
+                1,
+                (255, 0, 0),
+                2,
+                cv2.LINE_AA,
             )
+            idx += 1
 
         return img
 

@@ -8,10 +8,17 @@ from typing import Any, Dict, Tuple
 import numpy as np
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
-from spot_rl.skills.atomic_skills import Navigation, Pick, Place, SemanticPlace
+from spot_rl.skills.atomic_skills import (
+    Navigation,
+    OpenCloseDrawer,
+    Pick,
+    Place,
+    SemanticPlace,
+)
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
     construct_config_for_nav,
+    construct_config_for_open_close_drawer,
     construct_config_for_place,
     construct_config_for_semantic_place,
 )
@@ -83,6 +90,7 @@ class SpotSkillManager:
         nav_config=None,
         pick_config=None,
         place_config=None,
+        open_close_drawer_config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
         verbose: bool = True,
@@ -104,6 +112,7 @@ class SpotSkillManager:
             nav_config=nav_config,
             pick_config=pick_config,
             place_config=place_config,
+            open_close_drawer_config=open_close_drawer_config,
         )
 
         # Initiate the controllers for nav, gaze, and place
@@ -120,7 +129,12 @@ class SpotSkillManager:
         pass
 
     def __init_spot(
-        self, spot: Spot = None, nav_config=None, pick_config=None, place_config=None
+        self,
+        spot: Spot = None,
+        nav_config=None,
+        pick_config=None,
+        place_config=None,
+        open_close_drawer_config=None,
     ):
         """
         Initialize the Spot object, acquire lease, and construct configs
@@ -147,6 +161,7 @@ class SpotSkillManager:
             if not pick_config
             else pick_config
         )
+
         if place_config is None:
             self.place_config = (
                 construct_config_for_semantic_place()
@@ -155,6 +170,18 @@ class SpotSkillManager:
             )
         else:
             self.place_config = place_config
+
+        self.open_close_drawer_config = (
+            construct_config_for_open_close_drawer()
+            if not open_close_drawer_config
+            else open_close_drawer_config
+        )
+
+        self.open_close_drawer_config = (
+            construct_config_for_open_close_drawer()
+            if not open_close_drawer_config
+            else open_close_drawer_config
+        )
 
     def __initiate_controllers(self, use_policies: bool = True):
         """
@@ -180,6 +207,10 @@ class SpotSkillManager:
                 config=self.place_config,
                 use_policies=use_policies,
             )
+        self.open_close_drawer_controller = OpenCloseDrawer(
+            spot=self.spot,
+            config=self.open_close_drawer_config,
+        )
 
     def reset(self):
         # Reset the policies and environments via the controllers
@@ -379,6 +410,41 @@ class SpotSkillManager:
             "ee_orientation_at_grasping": ee_orientation_at_grasping,
         }  # type: Dict[str, Any]
         status, message = self.place_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    def opendrawer(self) -> Tuple[bool, str]:
+        """
+        Perform the open drawer skill
+
+        Returns:
+            bool: True if the open drawer skill was successful, False otherwise
+            str: Message indicating the status of opening drawers
+        """
+        return self.openclosedrawer(open_mode=True)
+
+    def closedrawer(self) -> Tuple[bool, str]:
+        """
+        Perform the close drawer skill
+
+        Returns:
+            bool: True if the close skill was successful, False otherwise
+            str: Message indicating the status of closing drawers
+        """
+        return self.openclosedrawer(open_mode=False)
+
+    def openclosedrawer(self, open_mode=True) -> Tuple[bool, str]:
+        """
+        Perform the open and close drawer skill
+
+        Returns:
+            bool: True if open close was successful, False otherwise
+            str: Message indicating the status of the open/close drawers
+        """
+        goal_dict = {
+            "mode": "open" if open_mode else "close",
+        }  # type: Dict[str, Any]
+        status, message = self.open_close_drawer_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
