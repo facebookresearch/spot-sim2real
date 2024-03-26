@@ -275,7 +275,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         place = action_dict.get("place", False)
 
         # Get meta data for grasping
-        top_down_grasp = action_dict.get("top_down_grasp", False)
+        top_down_grasp = action_dict.get("top_down_grasp", True)
         horizontal_grasp = action_dict.get("horizontal_grasp", False)
         threshold_radians = action_dict.get("threshold_radians", 0.05)
         percentage_of_palm = action_dict.get("percentage_of_palm", 0.5)
