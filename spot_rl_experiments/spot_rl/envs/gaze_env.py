@@ -6,8 +6,11 @@
 import sys
 from typing import Any, Dict
 
+import magnum as mn
+import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
+from spot_rl.utils.heuristic_nav import get_3d_point
 from spot_wrapper.spot import Spot
 
 
@@ -60,8 +63,88 @@ class SpotGazeEnv(SpotBaseEnv):
 
         return observations
 
+    def approach_object(self):
+        """Approach the object based on pixel x, y, and the depth image"""
+
+        raw_z, pixel_x, pixel_y = (
+            self.target_object_distance,
+            self.obj_center_pixel[0],
+            self.obj_center_pixel[1],
+        )
+        while raw_z > 0.6:
+            print(f"raw_z: {raw_z} pixel_x: {pixel_x}, pixel_y: {pixel_y}")
+            # z -= 0.50
+            z = 0.20
+
+            imgs = self.spot.get_hand_image()
+
+            # Get the camera intrinsics
+            cam_intrinsics = imgs[0].source.pinhole.intrinsics
+
+            # Get the transformation
+            vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+
+            # Get the 3D point in the hand RGB frame
+            point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
+
+            # Get the vision to hand
+            vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+            )
+            point_in_global_3d = vision_T_hand_image.transform_point(
+                mn.Vector3(*point_in_hand_image_3d)
+            )
+
+            # Get the transformation of the gripper
+            vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+            # Get the location relative to the gripper
+            point_in_hand_3d = vision_T_hand.inverted().transform_point(
+                point_in_global_3d
+            )
+            # Offset the x and z direction in hand frame
+            ee_offset_x = 0.0
+            ee_offset_z = 0.0
+            point_in_hand_3d[0] += ee_offset_x
+            point_in_hand_3d[2] += ee_offset_z
+            # Make it back to global frame
+            point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
+
+            # Get the point in the base frame
+            point_in_base_3d = vision_T_base.inverted().transform_point(
+                point_in_global_3d
+            )
+
+            # Make it to be numpy
+            point_in_base_3d = np.array(
+                [
+                    point_in_base_3d.x,
+                    point_in_base_3d.y,
+                    point_in_base_3d.z,
+                ]
+            )
+
+            # Get the current ee rotation in body frame
+            ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
+
+            # Move the gripper to target using current gripper pose in the body frame
+            # while maintaining the gripper orientation
+            self.spot.move_gripper_to_point(
+                point_in_base_3d,
+                [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+            )
+
+            self.get_gripper_images(save_image=True)
+            raw_z, pixel_x, pixel_y = (
+                self.target_object_distance,
+                self.obj_center_pixel[0],
+                self.obj_center_pixel[1],
+            )
+
     def step(self, action_dict: Dict[str, Any]):
         grasp = self.should_grasp()
+
+        if grasp:
+            self.approach_object()
 
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp

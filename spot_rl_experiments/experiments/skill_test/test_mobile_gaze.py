@@ -27,7 +27,7 @@ if __name__ == "__main__":
         spotskillmanager = SpotSkillManager(use_mobile_pick=True)
         # spotskillmanager.nav("test_desk")
         # x = input(f"Press Enter to continue to mobile gaze from {pick_from}")
-        spotskillmanager.pick("green bottle")
+        spotskillmanager.pick("cup")
         spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 

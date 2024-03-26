@@ -366,6 +366,26 @@ class Spot:
 
         return image_responses
 
+    def get_ee_transform(self):
+        """
+        Get ee transformation from base (body) to hand frame
+        """
+        body_T_hand = get_a_tform_b(
+            self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
+            "body",
+            "hand",
+        )
+        return body_T_hand
+
+    def get_ee_quaternion_in_body_frame(self):
+        """
+        Get ee's quaternion
+        """
+        body_T_hand = self.get_ee_transform()
+        quat = body_T_hand.rotation
+        quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
+        return quat
+
     def grasp_point_in_image(
         self,
         image_response,
@@ -391,6 +411,7 @@ class Spot:
         :param apply_min_force_to_object: if we want to loose the gripper after grasping
         :return: success true or false
         """
+
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
             height = image_response.shot.image.rows

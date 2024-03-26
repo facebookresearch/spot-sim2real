@@ -291,7 +291,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             )
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
-            time.sleep(0.5)
+            time.sleep(1.5)
             self.get_gripper_images(save_image=True)
 
             if self.curr_forget_steps == 0:
