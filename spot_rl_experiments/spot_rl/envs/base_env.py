@@ -75,7 +75,7 @@ def pad_action(action):
     return np.array([*action[:3], 0.0, action[3], 0.0])
 
 
-def rescale_actions(actions, action_thresh=0.05, silence_only=False):
+def rescale_actions(actions, action_thresh=0.0, silence_only=False):
     actions = np.clip(actions, -1, 1)
     # Silence low actions
     actions[np.abs(actions) < action_thresh] = 0.0
@@ -290,6 +290,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
+        # Get meta data for grasping
+        top_down_grasp = action_dict.get("top_down_grasp", True)
+        horizontal_grasp = action_dict.get("horizontal_grasp", False)
+        threshold_radians = action_dict.get("threshold_radians", 0.05)
+        percentage_of_palm = action_dict.get("percentage_of_palm", 0.5)
+        apply_min_force_to_object = action_dict.get("apply_min_force_to_object", False)
+
         target_yaw = None
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
@@ -310,7 +317,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.say("Grasping " + self.target_obj_name)
 
                 # The following cmd is blocking
-                success = self.attempt_grasp()
+                success = self.attempt_grasp(
+                    top_down_grasp=top_down_grasp,
+                    horizontal_grasp=horizontal_grasp,
+                    threshold_radians=threshold_radians,
+                    percentage_of_palm=percentage_of_palm,
+                    apply_min_force_to_object=apply_min_force_to_object,
+                )
+
                 if success:
                     # Just leave the object on the receptacle if desired
                     if self.config.DONT_PICK_UP:
@@ -458,10 +472,25 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations, reward, done, info
 
-    def attempt_grasp(self):
+    def attempt_grasp(
+        self,
+        top_down_grasp,
+        horizontal_grasp,
+        threshold_radians,
+        percentage_of_palm,
+        apply_min_force_to_object,
+    ):
         pre_grasp = time.time()
+        # The robot is forced to use top down grasping for better performance.
+        # At the same time, we allow the robot to have 0.2 rad (11 deg) tolerance to the vertical line
         ret = self.spot.grasp_hand_depth(
-            self.obj_center_pixel, top_down_grasp=True, timeout=10
+            self.obj_center_pixel,
+            top_down_grasp=top_down_grasp,
+            horizontal_grasp=horizontal_grasp,
+            timeout=10,
+            threshold_radians=threshold_radians,
+            percentage_of_palm=percentage_of_palm,
+            apply_min_force_to_object=apply_min_force_to_object,
         )
         if self.config.USE_REMOTE_SPOT:
             ret = time.time() - pre_grasp > 3  # TODO: Make this better...
@@ -759,7 +788,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def should_grasp(self):
         grasp = False
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
-            if self.target_object_distance < 1.5:
+            # This original value is 1.5. We tune the number small to get
+            # the gripper closed to the object
+            if self.target_object_distance < 1.0:
                 if self.config.ASSERT_CENTERING:
                     x, y = self.obj_center_pixel
                     if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:

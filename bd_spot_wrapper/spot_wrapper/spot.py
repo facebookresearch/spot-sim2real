@@ -405,7 +405,23 @@ class Spot:
         data_edge_timeout=2,
         top_down_grasp=False,
         horizontal_grasp=False,
+        threshold_radians=0.2,
+        percentage_of_palm=1.0,
+        apply_min_force_to_object=False,
     ):
+        """The semantic grasping API
+
+        :param image_response: image response source
+        :param pixel_xy: the x, y location for grasping in the image
+        :param timeout: the max time to finish the entire grasping
+        :param data_edge_timeout: the max time to finish data planning
+        :param top_down_grasp: top down grasping or not
+        :param horizontal_grasp: side grasping or not
+        :param threshold_radians: the angle threshold to the top down or side grasping
+        :param percentage_of_palm: 1.0 for doing full palm grasping, and 0.0 for doing fingertip grasping
+        :param apply_min_force_to_object: if we want to loose the gripper after grasping
+        :return: success true or false
+        """
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
             height = image_response.shot.image.rows
@@ -443,6 +459,15 @@ class Spot:
                 axis_to_align_with_ewrt_vo = geometry_pb2.Vec3(x=0, y=0, z=1)
 
             grasp.grasp_params.grasp_params_frame_name = VISION_FRAME_NAME
+
+            # Adding grasp parameters for palm or fingertip grasping
+            # Input zero to API is palm grasping
+            grasp.grasp_params.grasp_palm_to_fingertip = 1.0 - percentage_of_palm
+
+            # Only grasp the point that is asked by users
+            # That is at the exact position you requested, but has less or no automatic grasp selection help in position.
+            grasp.grasp_params.position_constraint = 2
+
             # Add the vector constraint to our proto.
             constraint = grasp.grasp_params.allowable_orientation.add()
             constraint.vector_alignment_with_tolerance.axis_on_gripper_ewrt_gripper.CopyFrom(
@@ -453,7 +478,9 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            constraint.vector_alignment_with_tolerance.threshold_radians = (
+                threshold_radians
+            )
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
@@ -502,13 +529,23 @@ class Spot:
                 break
 
             time.sleep(0.25)
+
+        # Reduce the torque applied to the object so that the object is not squeezed
+        if success and apply_min_force_to_object:
+            print("Applying min torque...")
+            command_gripper = robot_command_pb2.RobotCommand()
+            command_gripper.synchronized_command.gripper_command.claw_gripper_command.trajectory.points.add().point = (
+                -0.087
+            )
+            command_gripper.synchronized_command.gripper_command.claw_gripper_command.maximum_torque.value = (
+                0.0
+            )
+            self.command_client.robot_command(command_gripper)
+
         return success
 
     def grasp_hand_depth(self, *args, **kwargs):
-        image_responses = self.get_image_responses(
-            # [SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-            [SpotCamIds.HAND_COLOR]
-        )
+        image_responses = self.get_image_responses([SpotCamIds.HAND_COLOR])
         hand_image_response = image_responses[0]  # only expecting one image
         return self.grasp_point_in_image(hand_image_response, *args, **kwargs)
 

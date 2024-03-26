@@ -139,11 +139,23 @@ class Skill:
             raise e
         done = False
 
+        time_get_action = []
+        time_env_step = []
         # Execution Loop
         while not done:
+            being_time = time.time()
             action = self.policy.act(observations)  # type: ignore
+            time_get_action.append(time.time() - being_time)
+            print(
+                f"Get action time: {np.mean(time_get_action)} +- {np.std(time_get_action)} s"
+            )
             action_dict = self.split_action(action)
+            being_time = time.time()
             observations, _, done, _ = self.env.step(action_dict=action_dict)  # type: ignore
+            time_env_step.append(time.time() - being_time)
+            print(
+                f"Env step time: {np.mean(time_env_step)} +- {np.std(time_env_step)} s"
+            )
 
             # Record trajectories at every step
             self.skill_result_log["robot_trajectory"].append(
