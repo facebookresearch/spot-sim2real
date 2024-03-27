@@ -4,16 +4,89 @@
 
 
 import sys
+import time
+from math import tan
+from termios import VEOL
 from typing import Any, Dict
 
 import magnum as mn
 import numpy as np
 import quaternion
 import rospy
+from bosdyn.api import basic_command_pb2, geometry_pb2
+from bosdyn.client.robot_command import RobotCommandBuilder
+from google.protobuf import wrappers_pb2
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.heuristic_nav import get_3d_point
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
 from spot_wrapper.utils import angle_between_quat
+
+POSITION_MODE = (
+    basic_command_pb2.ConstrainedManipulationCommand.Request.CONTROL_MODE_POSITION
+)
+VELOCITY_MODE = (
+    basic_command_pb2.ConstrainedManipulationCommand.Request.CONTROL_MODE_VELOCITY
+)
+
+
+# This function is used to scale the velocity limit given
+# the force limit. This scaling ensures that when the measured arm
+# velocity is zero but desired velocity is max (vel_limit), we request
+# max (force_limit) amount of force in that direction.
+def scale_velocity_lim_given_force_lim(force_limit):
+    internal_vel_tracking_gain = 7000.0 / 333.0
+    vel_limit = force_limit / internal_vel_tracking_gain
+    return vel_limit
+
+
+# This function is used to scale the rotational velocity limit given
+# the torque limit. This scaling ensures that when the measured arm
+# velocity is zero but desired velocity is max (vel_limit), we request
+# max (torque_limit) amount of torque in that direction.
+def scale_rot_velocity_lim_given_torque_lim(torque_limit):
+    internal_vel_tracking_gain = 300.0 / 333.0
+    vel_limit = torque_limit / internal_vel_tracking_gain
+    return vel_limit
+
+
+def get_position_and_vel_values(
+    target_position,
+    velocity_normalized,
+    force_or_torque_limit,
+    position_control,
+    pure_rot_move=False,
+):
+    position_sign = 1
+    position_value = 0
+    if target_position is not None:
+        position_sign = np.sign(target_position)
+        position_value = abs(target_position)
+
+    # Scale the velocity in a way to ensure we hit force_limit when arm is not moving but velocity_normalized is max.
+    velocity_normalized = max(min(velocity_normalized, 1.0), -1.0)
+    if not pure_rot_move:
+        velocity_limit_from_force = scale_velocity_lim_given_force_lim(
+            force_or_torque_limit
+        )
+        # Tangential velocity in units of m/s
+        velocity_with_unit = velocity_normalized * velocity_limit_from_force
+    else:
+        velocity_limit_from_torque = scale_rot_velocity_lim_given_torque_lim(
+            force_or_torque_limit
+        )
+        # Rotational velocity in units or rad/s
+        velocity_with_unit = velocity_limit_from_torque * velocity_normalized
+
+    if position_control:
+        if target_position is None:
+            print(
+                "Error! In position control mode, target_position must be set. Exiting."
+            )
+            return
+        # For position moves, the velocity is treated as an unsigned velocity limit
+        velocity_with_unit = abs(velocity_with_unit)
+
+    return position_sign, position_value, velocity_with_unit
 
 
 class SpotOpenCloseDrawerEnv(SpotBaseEnv):
@@ -111,6 +184,109 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         """BD API to open the drawer in x direction"""
         raise NotImplementedError
 
+    def bd_open_cabinet_api(self):
+        """BD API to open the cabinet in x direction"""
+        command = self.construct_cabinet_task(
+            0.25, force_limit=40, target_angle=1.74, position_control=True
+        )
+        task_duration = 10000000
+        command.full_body_command.constrained_manipulation_request.end_time.CopyFrom(
+            self.spot.robot.time_sync.robot_timestamp_from_local_secs(
+                time.time() + task_duration
+            )
+        )
+        self.spot.command_client.robot_command_async(command)
+        time.sleep(10)
+
+    def open_cabinet(self):
+        """Herustics to open the cabinet in x direction"""
+        # Get the location of the rotataional axis
+        base_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
+
+        # Assuming that there is no gripper rotation
+        # Assuming that the cabniet door panel width is 0.45
+        # Assuming that the door axis is on the left of the hand
+        width = 0.45
+        base_T_hand.translation = base_T_hand.transform_point(
+            mn.Vector3(0.0, 0.0, -width)
+        )
+        for cur_ang_in_deg in range(5, 60, 5):
+            # angle in degree
+            cur_ang = np.deg2rad(cur_ang_in_deg)
+            # Rotate the trans by this degree
+            cur_base_T_hand = base_T_hand @ mn.Matrix4.rotation_y(mn.Rad(-cur_ang))
+            # Get the point in that frame
+            ee_target_point = cur_base_T_hand.transform_point(
+                mn.Vector3(0.0, 0.0, width)
+            )
+            self.spot.move_gripper_to_point(
+                np.array(ee_target_point), [np.pi / 2, -cur_ang * 2, 0.0]
+            )
+            self.spot.close_gripper()
+            print(f"{cur_ang_in_deg} ee pos: {ee_target_point}; yaw: {-cur_ang}")
+
+    def construct_cabinet_task(
+        self,
+        velocity_normalized,
+        force_limit=40,
+        target_angle=None,
+        position_control=False,
+        reset_estimator_bool=True,
+    ):
+        """Helper function for opening/closing cabinets
+
+        params:
+        + velocity_normalized: normalized task tangential velocity in range [-1.0, 1.0]
+        In position mode, this normalized velocity is used as a velocity limit for the planned trajectory.
+        + force_limit (optional): positive value denoting max force robot will exert along task dimension
+        + target_angle: target angle displacement (rad) in task space. This is only used if position_control == True
+        + position_control: if False will move the affordance in velocity control, if True will move by target_angle
+        with a max velocity of velocity_limit
+        + reset_estimator_bool: boolean that determines if the estimator should compute a task frame from scratch.
+        Only set to False if you want to re-use the estimate from the last constrained manipulation action.
+
+        Output:
+        + command: api command object
+
+        Notes:
+        In this function, we assume the initial motion of the cabinet is
+        along the x-axis of the hand (forward and backward). If the initial
+        grasp is such that the initial motion needs to be something else,
+        change the force direction.
+        """
+        angle_sign, angle_value, tangential_velocity = get_position_and_vel_values(
+            target_angle, velocity_normalized, force_limit, position_control
+        )
+
+        frame_name = "hand"
+        force_lim = force_limit
+        # Setting a placeholder value that doesn't matter, since we don't
+        # apply a pure torque in this task.
+        torque_lim = 5.0
+        force_direction = geometry_pb2.Vec3(x=angle_sign * -1.0, y=0.0, z=0.0)
+        torque_direction = geometry_pb2.Vec3(x=0.0, y=0.0, z=0.0)
+        init_wrench_dir = geometry_pb2.Wrench(
+            force=force_direction, torque=torque_direction
+        )
+        task_type = (
+            basic_command_pb2.ConstrainedManipulationCommand.Request.TASK_TYPE_R3_CIRCLE_FORCE
+        )
+        reset_estimator = wrappers_pb2.BoolValue(value=reset_estimator_bool)
+        control_mode = POSITION_MODE if position_control else VELOCITY_MODE
+
+        command = RobotCommandBuilder.constrained_manipulation_command(
+            task_type=task_type,
+            init_wrench_direction_in_frame_name=init_wrench_dir,
+            force_limit=force_lim,
+            torque_limit=torque_lim,
+            tangential_speed=tangential_velocity,
+            frame_name=frame_name,
+            control_mode=control_mode,
+            target_angle=angle_value,
+            reset_estimator=reset_estimator,
+        )
+        return command
+
     def approach_handle_and_grasp(self, z, pixel_x, pixel_y):
         """This method does IK to approach the handle and close the gripper."""
         imgs = self.spot.get_hand_image()
@@ -137,8 +313,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the location relative to the gripper
         point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
         # Offset the x and z direction in hand frame
-        ee_offset_x = 0.05
-        ee_offset_z = -0.05
+        ee_offset_x = 0.0
+        ee_offset_z = 0.0
         point_in_hand_3d[0] += ee_offset_x
         point_in_hand_3d[2] += ee_offset_z
         # Make it back to global frame
@@ -166,23 +342,34 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
         )
 
+        # TODO: for the cabnet part: rotation the gripper
+        self.spot.move_gripper_to_point(
+            point_in_base_3d,
+            [np.pi / 2, 0, 0],
+        )
+
         # Close the gripper
         self.spot.close_gripper()
+        time.sleep(2)
 
-        # Get the transformation of the gripper
-        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        pull_push_distance = -0.2 if self._mode == "open" else 0.25
-        move_target = vision_T_hand.transform_point(
-            mn.Vector3([pull_push_distance, 0, 0])
-        )
-        # Get the move_target in base frame
-        move_target = vision_T_base.inverted().transform_point(move_target)
+        # Call API to open cab
+        self.open_cabinet()
 
-        # Retract the arm based on the current gripper location
-        self.spot.move_gripper_to_point(
-            move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
-        )
+        #### The following is the code for open drawer
+        # # Get the transformation of the gripper
+        # vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
+        # pull_push_distance = -0.2 if self._mode == "open" else 0.25
+        # move_target = vision_T_hand.transform_point(
+        #     mn.Vector3([pull_push_distance, 0, 0])
+        # )
+        # # Get the move_target in base frame
+        # move_target = vision_T_base.inverted().transform_point(move_target)
+
+        # # Retract the arm based on the current gripper location
+        # self.spot.move_gripper_to_point(
+        #     move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
+        # )
 
         # Open the gripper and retract the arm
         self.spot.open_gripper()
@@ -194,6 +381,14 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         self._success = True
 
     def step(self, action_dict: Dict[str, Any]):
+
+        # # TODO: debug
+        # self.spot.move_gripper_to_point([0.9, 0.0,0.33],[0,0,0])
+        # # Rotate the gripper
+        # self.spot.move_gripper_to_point([0.9, 0.0,0.33],[np.pi/2,0,0])
+        # self.spot.close_gripper()
+        # self.open_cabinet()
+        # breakpoint()
 
         # Update the action_dict with place flag
         action_dict["place"] = False
