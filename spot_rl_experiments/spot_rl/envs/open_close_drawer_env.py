@@ -15,7 +15,7 @@ import quaternion
 import rospy
 from bosdyn.api import basic_command_pb2, geometry_pb2
 from bosdyn.client.robot_command import RobotCommandBuilder
-from google.protobuf import wrappers_pb2
+from google.protobuf import wrappers_pb2  # type: ignore
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.heuristic_nav import get_3d_point
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
@@ -120,10 +120,16 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Mode for opening or closing
         self._mode = "open"
 
+        # Get the receptacle type
+        self._rep_type = "drawer"
+
         # Distance threshold to call IK to approach the drawers
         self._dis_threshold_ee_to_handle = (
             config.OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE
         )
+
+        # Flag for using API to open the cabinet or not
+        self._use_bd_api = False
 
     def reset(self, goal_dict=None, *args, **kwargs):
         self.spot.open_gripper()
@@ -170,6 +176,14 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the mode: open or close drawers
         self._mode = goal_dict["mode"]
 
+        # Get the receptacle type
+        self._rep_type = goal_dict["rep_type"]
+
+        assert self._rep_type in [
+            "drawer",
+            "cabinet",
+        ], f"Do not support repcetacle type {self._rep_type} in open/close skills"
+
         return observations
 
     def compute_distance_to_handle(self):
@@ -181,11 +195,11 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         )
 
     def bd_open_drawer_api(self):
-        """BD API to open the drawer in x direction"""
+        """BD API to open the drawer"""
         raise NotImplementedError
 
     def bd_open_cabinet_api(self):
-        """BD API to open the cabinet in x direction"""
+        """BD API to open the cabinet"""
         command = self.construct_cabinet_task(
             0.25, force_limit=40, target_angle=1.74, position_control=True
         )
@@ -198,17 +212,38 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         self.spot.command_client.robot_command_async(command)
         time.sleep(10)
 
+    def open_drawer(self):
+        """Herusitics to open the drawer"""
+        # Get the transformation
+        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
+
+        # Get the transformation of the gripper
+        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
+        pull_push_distance = -0.2 if self._mode == "open" else 0.25
+        move_target = vision_T_hand.transform_point(
+            mn.Vector3([pull_push_distance, 0, 0])
+        )
+        # Get the move_target in base frame
+        move_target = vision_T_base.inverted().transform_point(move_target)
+
+        # Retract the arm based on the current gripper location
+        self.spot.move_gripper_to_point(
+            move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
+        )
+
     def open_cabinet(self):
-        """Herustics to open the cabinet in x direction"""
+        """Herustics to open the cabinet"""
         # Get the location of the rotataional axis
         base_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
 
         # Assuming that there is no gripper rotation
         # Assuming that the cabniet door panel width is 0.45
         # Assuming that the door axis is on the left of the hand
-        width = 0.45
+        panel_size = 0.45
         base_T_hand.translation = base_T_hand.transform_point(
-            mn.Vector3(0.0, 0.0, -width)
+            mn.Vector3(0.0, 0.0, -panel_size)
         )
         for cur_ang_in_deg in range(5, 60, 5):
             # angle in degree
@@ -217,7 +252,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             cur_base_T_hand = base_T_hand @ mn.Matrix4.rotation_y(mn.Rad(-cur_ang))
             # Get the point in that frame
             ee_target_point = cur_base_T_hand.transform_point(
-                mn.Vector3(0.0, 0.0, width)
+                mn.Vector3(0.0, 0.0, panel_size)
             )
             self.spot.move_gripper_to_point(
                 np.array(ee_target_point), [np.pi / 2, -cur_ang * 2, 0.0]
@@ -313,8 +348,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the location relative to the gripper
         point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
         # Offset the x and z direction in hand frame
-        ee_offset_x = 0.0
-        ee_offset_z = 0.0
+        ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.0
+        ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.0
         point_in_hand_3d[0] += ee_offset_x
         point_in_hand_3d[2] += ee_offset_z
         # Make it back to global frame
@@ -342,34 +377,29 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
         )
 
-        # TODO: for the cabnet part: rotation the gripper
-        self.spot.move_gripper_to_point(
-            point_in_base_3d,
-            [np.pi / 2, 0, 0],
-        )
+        # For the cabnet part: rotation the gripper by 90 degree
+        if self._rep_type == "cabinet":
+            self.spot.move_gripper_to_point(
+                point_in_base_3d,
+                [np.pi / 2, 0, 0],
+            )
 
         # Close the gripper
         self.spot.close_gripper()
         time.sleep(2)
 
-        # Call API to open cab
-        self.open_cabinet()
-
-        #### The following is the code for open drawer
-        # # Get the transformation of the gripper
-        # vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        # pull_push_distance = -0.2 if self._mode == "open" else 0.25
-        # move_target = vision_T_hand.transform_point(
-        #     mn.Vector3([pull_push_distance, 0, 0])
-        # )
-        # # Get the move_target in base frame
-        # move_target = vision_T_base.inverted().transform_point(move_target)
-
-        # # Retract the arm based on the current gripper location
-        # self.spot.move_gripper_to_point(
-        #     move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
-        # )
+        if self._rep_type == "cabinet":
+            # Call API to open cab
+            if self._use_bd_api:
+                self.bd_open_cabinet_api()
+            else:
+                self.open_cabinet()
+        elif self._rep_type == "drawer":
+            # Call API to open drawer
+            if self._use_bd_api:
+                self.bd_open_drawer_api()
+            else:
+                self.open_drawer()
 
         # Open the gripper and retract the arm
         self.spot.open_gripper()
@@ -381,14 +411,6 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         self._success = True
 
     def step(self, action_dict: Dict[str, Any]):
-
-        # # TODO: debug
-        # self.spot.move_gripper_to_point([0.9, 0.0,0.33],[0,0,0])
-        # # Rotate the gripper
-        # self.spot.move_gripper_to_point([0.9, 0.0,0.33],[np.pi/2,0,0])
-        # self.spot.close_gripper()
-        # self.open_cabinet()
-        # breakpoint()
 
         # Update the action_dict with place flag
         action_dict["place"] = False
