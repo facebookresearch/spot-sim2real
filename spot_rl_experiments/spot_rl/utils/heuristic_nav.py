@@ -53,7 +53,9 @@ def get_3d_points(cam_intrinsics, pixels_uv: np.ndarray, zs: np.ndarray):
     return np.array([xs.flatten(), ys.flatten(), zs]).reshape(-1, 3)
 
 
-def get_best_uvz_from_detection(unscaled_dep_img, detection):
+def get_best_uvz_from_detection(
+    unscaled_dep_img, detection, depth_scale: float = 0.001
+):
     """
     Sample best z depth for the given bounding box
     """
@@ -70,7 +72,9 @@ def get_best_uvz_from_detection(unscaled_dep_img, detection):
         # find mu & sigma
         mu = np.median(depth_patch_in_bbox)
         closest_depth_to_mu = np.argmin(np.absolute(depth_patch_in_bbox - mu))
-        return (center_x, center_y), depth_patch_in_bbox[closest_depth_to_mu] * 0.001
+        return (center_x, center_y), depth_patch_in_bbox[
+            closest_depth_to_mu
+        ] * depth_scale
     return (center_x, center_y), 0
 
 

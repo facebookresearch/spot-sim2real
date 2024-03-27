@@ -2,8 +2,12 @@
 .vscode
 *.jpg
 *.png
+!intel_realsense_payload_for_spotsim2real/images_for_readme/*.jpg
+!intel_realsense_payload_for_spotsim2real/images_for_readme/*.png
 **/**.egg-info/**
 
+intel_realsense_payload_for_spotsim2real/dist/*
+intel_realsense_payload_for_spotsim2real/build/*
 bd_spot_wrapper/spot_wrapper.egg-info/**
 bd_spot_wrapper/spot_wrapper/home.txt
 spot_rl_experiments/spot_rl.egg-info/**
@@ -13,3 +17,4 @@ spot_rl_experiments/configs/waypoints.yaml
 **/temp_recordings/**
 
 **/**/.ipynb_checkpoints
+*capture_the_moment.py
