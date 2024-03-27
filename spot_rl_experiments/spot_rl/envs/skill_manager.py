@@ -433,7 +433,27 @@ class SpotSkillManager:
         """
         return self.openclosedrawer(open_mode=False)
 
-    def openclosedrawer(self, open_mode=True) -> Tuple[bool, str]:
+    def opencabinet(self) -> Tuple[bool, str]:
+        """
+        Perform the open cabinet skill
+
+        Returns:
+            bool: True if the open cabinet skill was successful, False otherwise
+            str: Message indicating the status of opening cabinets
+        """
+        return self.openclosedrawer(open_mode=True, rep_type="cabinet")
+
+    def closecabinet(self) -> Tuple[bool, str]:
+        """
+        Perform the close cabinet skill
+
+        Returns:
+            bool: True if the close skill was successful, False otherwise
+            str: Message indicating the status of closing cabinets
+        """
+        return self.openclosedrawer(open_mode=False, rep_type="cabinet")
+
+    def openclosedrawer(self, open_mode=True, rep_type="drawer") -> Tuple[bool, str]:
         """
         Perform the open and close drawer skill
 
@@ -443,6 +463,7 @@ class SpotSkillManager:
         """
         goal_dict = {
             "mode": "open" if open_mode else "close",
+            "rep_type": rep_type,
         }  # type: Dict[str, Any]
         status, message = self.open_close_drawer_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
