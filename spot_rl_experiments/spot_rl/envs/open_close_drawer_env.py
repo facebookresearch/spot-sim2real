@@ -241,11 +241,17 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Assuming that there is no gripper rotation
         # Assuming that the cabniet door panel width is 0.45
         # Assuming that the door axis is on the left of the hand
-        panel_size = 0.45
+        panel_size = 0.55
         base_T_hand.translation = base_T_hand.transform_point(
             mn.Vector3(0.0, 0.0, -panel_size)
         )
-        for cur_ang_in_deg in range(5, 60, 5):
+        target_degree = 70
+        interval = 10
+        for cur_ang_in_deg in range(10, target_degree + 10, interval):
+            if cur_ang_in_deg < target_degree:
+                self.spot.close_gripper()
+            else:
+                self.spot.open_gripper()
             # angle in degree
             cur_ang = np.deg2rad(cur_ang_in_deg)
             # Rotate the trans by this degree
@@ -255,10 +261,17 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
                 mn.Vector3(0.0, 0.0, panel_size)
             )
             self.spot.move_gripper_to_point(
-                np.array(ee_target_point), [np.pi / 2, -cur_ang * 2, 0.0]
+                np.array(ee_target_point), [np.pi / 2, -cur_ang * 1.5, 0.0]
             )
-            self.spot.close_gripper()
             print(f"{cur_ang_in_deg} ee pos: {ee_target_point}; yaw: {-cur_ang}")
+
+        # Robot back up a bit to avoid gripper collision with handle
+        self.spot.set_base_velocity(
+            x_vel=-0.25,
+            y_vel=0,
+            ang_vel=0,
+            vel_time=0.8,
+        )
 
     def construct_cabinet_task(
         self,
@@ -348,9 +361,11 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the location relative to the gripper
         point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
         # Offset the x and z direction in hand frame
-        ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.0
-        ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.0
+        ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.05
+        ee_offset_y = 0.0 if self._rep_type == "drawer" else 0.01
+        ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.02
         point_in_hand_3d[0] += ee_offset_x
+        point_in_hand_3d[1] += ee_offset_y
         point_in_hand_3d[2] += ee_offset_z
         # Make it back to global frame
         point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
@@ -370,18 +385,18 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the current ee rotation in body frame
         ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
 
-        # Move the gripper to target using current gripper pose in the body frame
-        # while maintaining the gripper orientation
-        self.spot.move_gripper_to_point(
-            point_in_base_3d,
-            [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
-        )
-
         # For the cabnet part: rotation the gripper by 90 degree
         if self._rep_type == "cabinet":
             self.spot.move_gripper_to_point(
                 point_in_base_3d,
                 [np.pi / 2, 0, 0],
+            )
+        elif self._rep_type == "drawer":
+            # Move the gripper to target using current gripper pose in the body frame
+            # while maintaining the gripper orientation
+            self.spot.move_gripper_to_point(
+                point_in_base_3d,
+                [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
             )
 
         # Close the gripper

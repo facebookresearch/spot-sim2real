@@ -10,12 +10,14 @@ if __name__ == "__main__":
     from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
     # Init the skill
-    spotskillmanager = SpotSkillManager()
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
 
     # Using while loop
     contnue = True
     while contnue:
         spotskillmanager.opencabinet()
+        spotskillmanager.pick("bottle")
+        breakpoint()
         close_drawer = map_user_input_to_boolean(
             "Do you want to close the cabinet ? Y/N "
         )
