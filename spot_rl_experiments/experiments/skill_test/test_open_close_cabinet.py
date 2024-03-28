@@ -15,12 +15,7 @@ if __name__ == "__main__":
     # Using while loop
     contnue = True
     while contnue:
-        spotskillmanager.opencabinet()
-        close_cabinet = map_user_input_to_boolean(
-            "Do you want to close the cabinet ? Y/N "
-        )
-        if close_cabinet:
-            spotskillmanager.closecabinet()
+        spotskillmanager.opencabinet(cab_door="left")
         contnue = map_user_input_to_boolean(
             "Do you want to open the cabinet again ? Y/N "
         )

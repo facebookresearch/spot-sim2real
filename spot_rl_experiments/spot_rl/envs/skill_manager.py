@@ -433,27 +433,46 @@ class SpotSkillManager:
         """
         return self.openclosedrawer(open_mode=False)
 
-    def opencabinet(self) -> Tuple[bool, str]:
+    def opencabinet(self, cab_door="left") -> Tuple[bool, str]:
         """
-        Perform the open cabinet skill
+        Perform the open cabinet skill. You need to tell skills if the left door or right door
 
         Returns:
             bool: True if the open cabinet skill was successful, False otherwise
             str: Message indicating the status of opening cabinets
         """
-        return self.openclosedrawer(open_mode=True, rep_type="cabinet")
 
-    def closecabinet(self) -> Tuple[bool, str]:
+        assert cab_door in [
+            "left",
+            "right",
+        ], f"cab_door is not right or left but {cab_door}"
+
+        return self.openclosedrawer(
+            open_mode=True, rep_type="cabinet", cab_door=cab_door
+        )
+
+    def closecabinet(self, cab_door="left") -> Tuple[bool, str]:
         """
-        Perform the close cabinet skill
+        Perform the close cabinet skill. You need to tell skills if the left door or right door
 
         Returns:
             bool: True if the close skill was successful, False otherwise
             str: Message indicating the status of closing cabinets
         """
-        return self.openclosedrawer(open_mode=False, rep_type="cabinet")
+        assert cab_door in [
+            "left",
+            "right",
+        ], f"cab_door is not right or left but {cab_door}"
 
-    def openclosedrawer(self, open_mode=True, rep_type="drawer") -> Tuple[bool, str]:
+        raise NotImplementedError
+
+        return self.openclosedrawer(
+            open_mode=False, rep_type="cabinet", cab_door=cab_door
+        )
+
+    def openclosedrawer(
+        self, open_mode=True, rep_type="drawer", cab_door="left"
+    ) -> Tuple[bool, str]:
         """
         Perform the open and close drawer skill
 
@@ -464,6 +483,7 @@ class SpotSkillManager:
         goal_dict = {
             "mode": "open" if open_mode else "close",
             "rep_type": rep_type,
+            "cab_door": cab_door,
         }  # type: Dict[str, Any]
         status, message = self.open_close_drawer_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
