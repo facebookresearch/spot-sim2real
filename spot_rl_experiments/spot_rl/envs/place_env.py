@@ -181,7 +181,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
     def step(self, action_dict: Dict[str, Any], *args, **kwargs):
         # <= 0 for unsnap
-        place = action_dict.get("place", False)
+        place = action_dict.get("grip_action", None) < 0.
         xyz = self.get_place_sensor(True)
         if (
             abs(xyz[2]) < 0.05

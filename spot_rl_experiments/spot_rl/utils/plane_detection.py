@@ -126,7 +126,7 @@ def DrawResult(points, colors):
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(points)
     pcd.colors = o3d.utility.Vector3dVector(colors)
-    # o3d.visualization.draw_geometries([pcd])
+    o3d.visualization.draw_geometries([pcd])
     return pcd
 
 
@@ -162,6 +162,7 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
 def plane_detect(pcd):
     points = PCDToNumpy(pcd)
     points = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)
+    #z_threshold = np.percentile(points[:, -1], 70)
 
     # DrawPointCloud(points, color=(0.4, 0.4, 0.4))
     t0 = time.time()
@@ -171,11 +172,15 @@ def plane_detect(pcd):
     print("Time:", time.time() - t0)
     planes = []
     colors = []
-    for _, plane in results:
+
+    highest_pts, high_i = -np.inf, 0
+    #lowest_dist_to_camera, low_i = np.inf, 0
+    print(f"{len(results)} plane are detected")
+    for i, (_, plane) in enumerate(results):
 
         r = 1
-        g = 0  # random.random()
-        b = 0  # random.random()
+        g = random.random()
+        b = random.random()
 
         color = np.zeros((plane.shape[0], plane.shape[1]))
         color[:, 0] = r
@@ -184,7 +189,17 @@ def plane_detect(pcd):
 
         planes.append(plane)
         colors.append(color)
+        
+        #check depth at centroid
+        plane_pcd = NumpyToPCD(plane)
+        dist = -plane_pcd.get_center()[-1] + plane.shape[0]
+        if dist >= highest_pts:
+            highest_pts = dist
+            high_i = i
+        
 
+    planes = [planes[high_i]]
+    colors = [colors[high_i]]
     planes = np.concatenate(planes, axis=0)
     colors = np.concatenate(colors, axis=0)
     return DrawResult(planes, colors)

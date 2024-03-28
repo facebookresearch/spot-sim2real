@@ -130,17 +130,25 @@ def area(x1, y1, x2, y2):
     return np.abs(y2 - y1) * np.abs(x2 - x1)
 
 
-def select_the_bbox_closer_to_camera(predictions, raw_depth):
+def select_the_bbox_closer_to_camera(predictions, raw_depth, camera_intrinsics):
     closer_dist = np.inf
+    upper_dist = -np.inf
     closer_i = 0
+    h, w = raw_depth.shape
     for i, prediction in enumerate(predictions):
+        print(i, prediction)
         (x1, y1, x2, y2), score = prediction[0], prediction[-1]
-        depth_patch = raw_depth[y1:y2, x1:x2]
-        mean_dist = np.nan_to_num(depth_patch[depth_patch > 0].mean(), nan=np.inf)
-        print(f"mean dist to prediction {i} is {mean_dist}")
-        if mean_dist <= closer_dist:
-            closer_dist = mean_dist
-            closer_i = i
+        if x1 < x2 and y1 < y2:
+            if 0 <= x1 <=  w and 0 <= x2 <=  w and 0 <= y1 <=  h and 0 <= y2 <=  h:
+                cx, cy = (x1 + x2) //2, (y1 + y2)//2
+                depth_patch = sample_patch_around_point(cx, cy, raw_depth)
+                mean_dist = np.nan_to_num(depth_patch, nan=np.inf)
+                xyz = get_3d_point(camera_intrinsics, (cx, cy), mean_dist)
+                #mean_dist = mean_dist + np.abs(xyz[1]) #y -
+                print(f"mean dist to prediction {i} is {mean_dist}, {xyz}")
+                if mean_dist <= closer_dist :
+                    closer_dist = mean_dist
+                    closer_i = i
     return predictions[closer_i], closer_dist
 
 
@@ -233,8 +241,8 @@ def search_table(
             color=(0, 0, 255),
             thickness=2,
         )
-    # cv2.imshow("img_with_bboox", img_with_bbox)
-    # cv2.waitKey(0)
+    cv2.imshow("img_with_bboox", img_with_bbox)
+    cv2.waitKey(0)
     # masks = segment(img, np.array([[x1, y1, x2, y2]]), [h, w], device, sammodel)
     # mask = masks[0, 0].cpu().numpy()
     mask = segment_with_socket(img, np.array([[x1, y1, x2, y2]]))
@@ -369,18 +377,18 @@ def get_target_points_by_heuristic(
 
 
 def plot_intel_point_in_gripper_image(
-    gripper_image_resps, gripper_T_intel, point3d_in_intel: np.ndarray
+    gripper_image_resps, gripper_T_intel:mn.Matrix4, point3d_in_intel: np.ndarray
 ):
     gripper_intrinsics = gripper_image_resps[0].source.pinhole.intrinsics
     gripper_image: np.ndarray = [
         image_response_to_cv2(gripper_image_resp)
         for gripper_image_resp in gripper_image_resps
-    ][0]
+    ]
+    gripper_image, gripper_depth = gripper_image[0], gripper_image[1]
     # breakpoint()
-    point3d_in_gripper: np.ndarray = (
-        gripper_T_intel * point3d_in_intel
-    )  # .transform_point(mn.Vector3(point3d_in_intel))
-    # point3d_in_gripper:np.ndarray = np.array([point3d_in_gripper.x, point3d_in_gripper.y, point3d_in_gripper.z])
+    point3d_in_gripper: mn.Matrix3 = gripper_T_intel.transform_point(mn.Vector3(point3d_in_intel)) 
+    point3d_in_gripper:np.ndarray = np.array([point3d_in_gripper.x, point3d_in_gripper.y, point3d_in_gripper.z])
+    
     fx = gripper_intrinsics.focal_length.x
     fy = gripper_intrinsics.focal_length.y
     cx = gripper_intrinsics.principal_point.x
@@ -394,14 +402,18 @@ def plot_intel_point_in_gripper_image(
         2,
         (0, 0, 255),
     )
+    #print(f"Point in gripper {point3d_in_gripper}, depth in gripper {gripper_depth[int(point2d_in_gripper[1]), int(point2d_in_gripper[0])]/1000.}")
     return img_with_point
 
 
 def detect_place_point_by_pcd_method(
     img,
     depth_raw,
-    camera_intrinsics,
-    vision_T_hand: mn.Matrix4,
+    gripper_depth,
+    camera_intrinsics_intel,
+    camera_intrinsics_gripper,
+    body_T_hand: mn.Matrix4,
+    gripper_T_intel:mn.Matrix4,
     object_name: str = "table top",
     percentile=95,
     owlvitmodel=None,
@@ -415,14 +427,13 @@ def detect_place_point_by_pcd_method(
     h, w = img.shape[:2]
     predictions = detect_with_socket(img, object_name, 0.01, device)
     # predictions = detect(img, object_name, 0.01, device, owlvitmodel, proceesor)
-    # print(predictions)
     prediction, distance_to_prediction = select_the_bbox_closer_to_camera(
-        predictions, depth_raw
+        predictions, depth_raw, camera_intrinsics_intel
     )
     if distance_to_prediction > 2000:
         return owlvitmodel, proceesor, sammodel, None, None
     img_with_bbox = img.copy()
-    for bbox in [prediction]:
+    for bbox in predictions:
         x1, y1, x2, y2 = bbox[0]
         score = bbox[-1]
         img_with_bbox = cv2.rectangle(img_with_bbox, (x1, y1), (x2, y2), (255, 0, 0), 1)
@@ -435,12 +446,15 @@ def detect_place_point_by_pcd_method(
             color=(0, 0, 255),
             thickness=2,
         )
-    mask = np.zeros_like(depth_raw).astype(bool)
+    #cv2.imshow("bbox", img_with_bbox)
+    #cv2.waitKey(0)
+    mask = np.ones_like(depth_raw).astype(bool)
     mask[y1:y2, x1:x2] = True
-    fx = camera_intrinsics.focal_length.x
-    fy = camera_intrinsics.focal_length.y
-    cx = camera_intrinsics.principal_point.x
-    cy = camera_intrinsics.principal_point.y
+    fx = camera_intrinsics_intel.focal_length.x
+    fy = camera_intrinsics_intel.focal_length.y
+    cx = camera_intrinsics_intel.principal_point.x
+    cy = camera_intrinsics_intel.principal_point.y
+    #u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
     pcd = generate_point_cloud(img, depth_raw, mask, prediction[0], fx, fy, cx, cy)
     # o3d.io.write_point_cloud("original_pcd.ply", pcd)
     plane_pcd = plane_detect(pcd)
@@ -457,7 +471,7 @@ def detect_place_point_by_pcd_method(
         np.array(plane_pcd.points)
     )
     corners_xys = project_3d_to_pixel_uv(target_points, fx, fy, cx, cy)
-
+    #print(corners_xys)
     y_threshold = np.percentile(corners_xys[:, -1], 70)
 
     # breakpoint()
@@ -468,16 +482,33 @@ def detect_place_point_by_pcd_method(
     selected_xy = sorted_corners_gtr_than_y_thresh[0]
     corners_xys = corners_gtr_than_y_thresh[indices]
     print(f"Selected XY {selected_xy}")
-    # depth_at_selected_xy = (
-    #     sample_patch_around_point(int(selected_xy[0]), int(selected_xy[1]), depth_raw)
-    #     / 1000.0
-    # )
-    depth_at_selected_xy = depth_raw[int(selected_xy[-1]), int(selected_xy[0])] / 1000.0
+    depth_at_selected_xy = (
+        sample_patch_around_point(int(selected_xy[0]), int(selected_xy[1]), depth_raw)
+        / 1000.0
+    )
+    print(f"Depth in Intel {depth_at_selected_xy}")
+    #depth_at_selected_xy = depth_raw[int(selected_xy[-1]), int(selected_xy[0])] / 1000.0
     assert (
         depth_at_selected_xy != 0.0
     ), f"Non zero depth required found {depth_at_selected_xy}"
-    selected_point = get_3d_point(camera_intrinsics, selected_xy, depth_at_selected_xy)
-
+    selected_point = get_3d_point(camera_intrinsics_intel, selected_xy, depth_at_selected_xy)
+    #print(f"Point in Intel {selected_point}")
+    
+    #Convert selected point in gripper 3D to 3D then 3D to 2D then 2D to 3D using depth at Gripper
+    #Ideally body-T_hand*hand_T_intel*point_in_intel should work but hand_T_intel has errors plus depth in Intel at closer points is not same as gripper 
+    #thus we convert intel 3D point to Gripper 3D, convert 3D to 2D & then again from 2D to 3D using depth map
+    selected_point_in_gripper = gripper_T_intel.transform_point(mn.Vector3(*selected_point))
+    selected_point_in_gripper = np.array([selected_point_in_gripper.x, selected_point_in_gripper.y, selected_point_in_gripper.z])
+    fx = camera_intrinsics_gripper.focal_length.x
+    fy = camera_intrinsics_gripper.focal_length.y
+    cx = camera_intrinsics_gripper.principal_point.x
+    cy = camera_intrinsics_gripper.principal_point.y
+    selected_xy_in_gripper = project_3d_to_pixel_uv(selected_point_in_gripper.reshape(1, 3), fx, fy, cx, cy)[0]
+    depth_at_selected_xy_in_gripper = depth_at_selected_xy + 0.02 #Add 2 cm in intel depth to get depth in gripper
+    print(f"Depth in gripper {depth_at_selected_xy_in_gripper}")
+    assert depth_at_selected_xy_in_gripper != 0., f"Expeceted gripper depth at point {int(selected_xy_in_gripper[1]), int(selected_xy_in_gripper[0])} to be non zero but found {depth_at_selected_xy_in_gripper}"
+    selected_point_in_gripper = get_3d_point(camera_intrinsics_gripper, selected_xy_in_gripper, depth_at_selected_xy_in_gripper)
+    
     for xy in corners_xys:
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(xy[0]), int(xy[1])), 1, (255, 0, 0)
@@ -485,14 +516,18 @@ def detect_place_point_by_pcd_method(
     img_with_bbox = cv2.circle(
         img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
     )
+    breakpoint()
     cv2.imshow("Table detection", img_with_bbox)
     cv2.waitKey(0)
-    o3d.visualization.draw_geometries([pcd, plane_pcd])
+    #o3d.visualization.draw_geometries([pcd, plane_pcd])
     cv2.imwrite("table_detection.png", img_with_bbox)
     cv2.destroyAllWindows()
     # o3d.io.write_point_cloud("plane_pcd.ply", plane_pcd)
-    point_in_vision = vision_T_hand.transform_point(mn.Vector3(*selected_point))
-    point_in_vision: np.ndarray = np.array(
-        [point_in_vision.x, point_in_vision.y, point_in_vision.z]
-    )
-    return owlvitmodel, proceesor, None, point_in_vision, selected_point
+    point_in_body = np.array(body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper)))
+    #point_in_vision_with_direct_transform = body_T_hand.transform_point(gripper_T_intel.transform_point(mn.Vector3(selected_point)))
+    #print(f"Point in body with direct transform {point_in_vision_with_direct_transform}, without direct transform {point_in_vision}")
+    return owlvitmodel, proceesor, None, point_in_body, selected_point_in_gripper, img_with_bbox
+#detected object intel RS 2D- > 3D -3D gripper- > 2D in gripper 
+#3D intel - 3D gripper problem in z coordinate
+#Intel point -> spot 
+#3D point in Intel - 3D point gripper -> 2D point in gripper + Depth at Intel with offset -> 3D point in gripper

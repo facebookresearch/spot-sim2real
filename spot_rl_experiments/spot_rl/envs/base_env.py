@@ -839,7 +839,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # The place goal should be provided relative to the local robot frame given that
         # the robot is at the place receptacle
         if use_base_rot:
-            base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+            base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body") #alter this because Z coordinate not good - > XYZ translation of this 
             ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
             body_T_ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
             # Off set for the height
