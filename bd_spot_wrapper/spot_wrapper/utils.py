@@ -137,3 +137,67 @@ def get_angle_between_forward_and_target(rel_pos):
     if not c:
         heading_angle = -1.0 * heading_angle
     return heading_angle
+
+
+def scale_velocity_lim_given_force_lim(force_limit):
+    """
+    This function is used to scale the velocity limit given
+    the force limit. This scaling ensures that when the measured arm
+    velocity is zero but desired velocity is max (vel_limit), we request
+    max (force_limit) amount of force in that direction.
+    """
+    internal_vel_tracking_gain = 7000.0 / 333.0
+    vel_limit = force_limit / internal_vel_tracking_gain
+    return vel_limit
+
+
+def scale_rot_velocity_lim_given_torque_lim(torque_limit):
+    """
+    This function is used to scale the rotational velocity limit given
+    # the torque limit. This scaling ensures that when the measured arm
+    velocity is zero but desired velocity is max (vel_limit), we request
+    max (torque_limit) amount of torque in that direction.
+    """
+    internal_vel_tracking_gain = 300.0 / 333.0
+    vel_limit = torque_limit / internal_vel_tracking_gain
+    return vel_limit
+
+
+def get_position_and_vel_values(
+    target_position,
+    velocity_normalized,
+    force_or_torque_limit,
+    position_control,
+    pure_rot_move=False,
+):
+    position_sign = 1
+    position_value = 0
+    if target_position is not None:
+        position_sign = np.sign(target_position)
+        position_value = abs(target_position)
+
+    # Scale the velocity in a way to ensure we hit force_limit when arm is not moving but velocity_normalized is max.
+    velocity_normalized = max(min(velocity_normalized, 1.0), -1.0)
+    if not pure_rot_move:
+        velocity_limit_from_force = scale_velocity_lim_given_force_lim(
+            force_or_torque_limit
+        )
+        # Tangential velocity in units of m/s
+        velocity_with_unit = velocity_normalized * velocity_limit_from_force
+    else:
+        velocity_limit_from_torque = scale_rot_velocity_lim_given_torque_lim(
+            force_or_torque_limit
+        )
+        # Rotational velocity in units or rad/s
+        velocity_with_unit = velocity_limit_from_torque * velocity_normalized
+
+    if position_control:
+        if target_position is None:
+            print(
+                "Error! In position control mode, target_position must be set. Exiting."
+            )
+            return
+        # For position moves, the velocity is treated as an unsigned velocity limit
+        velocity_with_unit = abs(velocity_with_unit)
+
+    return position_sign, position_value, velocity_with_unit

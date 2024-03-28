@@ -59,14 +59,17 @@ from bosdyn.client.robot_command import (
 from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
 from geometry_msgs.msg import Pose, TransformStamped
-from google.protobuf import wrappers_pb2
+from google.protobuf import wrappers_pb2  # type: ignore
 from perception_and_utils.utils.conversions import (
     bd_SE3Pose_to_ros_Pose,
     bd_SE3Pose_to_ros_TransformStamped,
     bd_SE3Pose_to_sophus_SE3,
 )
 from spot_rl.utils.utils import ros_frames as rf
-from spot_wrapper.utils import get_angle_between_forward_and_target
+from spot_wrapper.utils import (
+    get_angle_between_forward_and_target,
+    get_position_and_vel_values,
+)
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -98,6 +101,14 @@ HOME_TXT = osp.join(osp.dirname(osp.abspath(__file__)), "home.txt")
 
 # Get Spot DOCK ID
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
+
+# For constructing constrained manipulation task
+POSITION_MODE = (
+    basic_command_pb2.ConstrainedManipulationCommand.Request.CONTROL_MODE_POSITION
+)
+VELOCITY_MODE = (
+    basic_command_pb2.ConstrainedManipulationCommand.Request.CONTROL_MODE_VELOCITY
+)
 
 
 class SpotCamIds:
@@ -1181,6 +1192,68 @@ class Spot:
         ee_position = (base_transform.inverted() @ ee_transform).translation
         base_T_hand_yaw = get_angle_between_forward_and_target(ee_position)
         return base_T_hand_yaw
+
+    def construct_cabinet_task(
+        self,
+        velocity_normalized,
+        force_limit=40,
+        target_angle=None,
+        position_control=False,
+        reset_estimator_bool=True,
+    ):
+        """Helper function for opening/closing cabinets
+
+        params:
+        + velocity_normalized: normalized task tangential velocity in range [-1.0, 1.0]
+        In position mode, this normalized velocity is used as a velocity limit for the planned trajectory.
+        + force_limit (optional): positive value denoting max force robot will exert along task dimension
+        + target_angle: target angle displacement (rad) in task space. This is only used if position_control == True
+        + position_control: if False will move the affordance in velocity control, if True will move by target_angle
+        with a max velocity of velocity_limit
+        + reset_estimator_bool: boolean that determines if the estimator should compute a task frame from scratch.
+        Only set to False if you want to re-use the estimate from the last constrained manipulation action.
+
+        Output:
+        + command: api command object
+
+        Notes:
+        In this function, we assume the initial motion of the cabinet is
+        along the x-axis of the hand (forward and backward). If the initial
+        grasp is such that the initial motion needs to be something else,
+        change the force direction.
+        """
+        angle_sign, angle_value, tangential_velocity = get_position_and_vel_values(
+            target_angle, velocity_normalized, force_limit, position_control
+        )
+
+        frame_name = "hand"
+        force_lim = force_limit
+        # Setting a placeholder value that doesn't matter, since we don't
+        # apply a pure torque in this task.
+        torque_lim = 5.0
+        force_direction = geometry_pb2.Vec3(x=angle_sign * -1.0, y=0.0, z=0.0)
+        torque_direction = geometry_pb2.Vec3(x=0.0, y=0.0, z=0.0)
+        init_wrench_dir = geometry_pb2.Wrench(
+            force=force_direction, torque=torque_direction
+        )
+        task_type = (
+            basic_command_pb2.ConstrainedManipulationCommand.Request.TASK_TYPE_R3_CIRCLE_FORCE
+        )
+        reset_estimator = wrappers_pb2.BoolValue(value=reset_estimator_bool)
+        control_mode = POSITION_MODE if position_control else VELOCITY_MODE
+
+        command = RobotCommandBuilder.constrained_manipulation_command(
+            task_type=task_type,
+            init_wrench_direction_in_frame_name=init_wrench_dir,
+            force_limit=force_lim,
+            torque_limit=torque_lim,
+            tangential_speed=tangential_velocity,
+            frame_name=frame_name,
+            control_mode=control_mode,
+            target_angle=angle_value,
+            reset_estimator=reset_estimator,
+        )
+        return command
 
 
 class SpotLease:
