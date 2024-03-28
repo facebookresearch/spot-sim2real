@@ -59,6 +59,9 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Flag for using Boston Dynamics API to open the cabinet or not
         self._use_bd_api = False
 
+        # Get the cabinet door location
+        self._cab_door = "left"
+
     def reset(self, goal_dict=None, *args, **kwargs):
         self.spot.open_gripper()
 
@@ -107,10 +110,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the receptacle type
         self._rep_type = goal_dict["rep_type"]
 
-        assert self._rep_type in [
-            "drawer",
-            "cabinet",
-        ], f"Do not support repcetacle type {self._rep_type} in open/close skills"
+        # Get the cabinet door location
+        self._cab_door = goal_dict["cab_door"]
 
         return observations
 
@@ -169,6 +170,9 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Assuming that the cabinet door's size is panel_size
         # Assuming that the door axis is on the left side of the hand
         panel_size = 0.55
+        if self._cab_door == "right":
+            panel_size = -panel_size
+
         base_T_hand.translation = base_T_hand.transform_point(
             mn.Vector3(0.0, 0.0, -panel_size)
         )
@@ -184,6 +188,11 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
                 self.spot.open_gripper()
             # Angle in degree
             cur_ang = np.deg2rad(cur_ang_in_deg)
+
+            # For right side of the hand
+            if self._cab_door == "right":
+                cur_ang = -cur_ang
+
             # Rotate the trans by this degree
             cur_base_T_hand = base_T_hand @ mn.Matrix4.rotation_y(mn.Rad(-cur_ang))
             # Get the point in that frame
@@ -283,6 +292,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Close the gripper
         self.spot.close_gripper()
+        # Pause a bit to ensure the gripper grapes the handle
         time.sleep(2)
 
         ############################################
