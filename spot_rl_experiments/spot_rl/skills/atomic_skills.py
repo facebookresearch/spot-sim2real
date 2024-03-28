@@ -45,6 +45,7 @@ from spot_rl.utils.geometry_utils import (
     is_pose_within_bounds,
     is_position_within_bounds,
 )
+from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 
 # Import core classes
 from spot_wrapper.spot import Spot
@@ -135,6 +136,11 @@ class Skill:
             status (bool): Whether robot was able to succesfully execute the skill or not
             message (str): Message indicating description of success / failure reason
         """
+
+        # Check the current buffer to see which skill we are using right now
+        # This does not have any effect if the initial ros buffter is none
+        begin_skill_name, begin_skill_input = get_skill_name_and_input_from_ros()
+
         # Reset policy,env and update logged data at init
         try:
             observations = self.reset_skill(goal_dict)
@@ -159,6 +165,15 @@ class Skill:
                     ],
                 }
             )
+
+            # Check if we still want to use the same skill
+            # We terminate the skill if skill name or input is differnt from the one at the beginning.
+            cur_skill_name, cur_skill_input = get_skill_name_and_input_from_ros()
+            if (
+                cur_skill_name != begin_skill_name
+                or cur_skill_input != begin_skill_input
+            ):
+                done = True
 
         # Update logged data after finishing execution and get feedback (status & msg)
         return self.update_and_check_status(goal_dict)

@@ -8,6 +8,7 @@ import os.path as osp
 from collections import OrderedDict
 
 import numpy as np
+import rospy
 import yaml
 from yacs.config import CfgNode as CN
 
@@ -130,6 +131,24 @@ def object_id_to_object_name(object_id):
 def get_clutter_amounts():
     waypoints_yaml = get_waypoint_yaml(WAYPOINTS_YAML)
     return waypoints_yaml["clutter_amounts"]
+
+
+def get_skill_name_and_input_from_ros():
+    """
+    Get the ros parameters to get the current skill name and its input
+    """
+    skill_name_input = rospy.get_param("/skill_name_input", "None,None")
+    skill_name_input = skill_name_input.split(",")
+    if len(skill_name_input) == 2:
+        # We get the correct format to execute the skill
+        skill_name = skill_name_input[0]
+        skill_input = skill_name_input[1]
+    else:
+        # We do not get the skill name and input
+        skill_name = "None"
+        skill_input = "None"
+
+    return skill_name, skill_input
 
 
 def arr2str(arr):

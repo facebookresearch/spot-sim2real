@@ -181,6 +181,21 @@ git checkout main
 
 - If you are done with demo of one of the above code and want to run another code, you do not need to re-run other sessions and nodes. Running a new command in the same terminal will work just fine. But **make sure to bring robot at home location and reset its home** using `spot_reset_home` in the same terminal
 
+
+## :wrench: Call skills (non-blocking) without installing spot-sim2real in your home environment
+We provide an function that can call skills in seperate conda environment. And the calling of skill itself is a non-blocking call.
+#### Step1. Follow Running instructions section to setup image client in spot_ros conda environment
+#### Step2. Run ```skill_executor.py``` to listen to which skill to use. This will run on the background.
+```bash
+python spot_rl_experiments/spot_rl/utils/skill_executor.py 
+```
+#### Step3. Use ROS to use skill in your application. Now you can call skills in non-blocking way.
+```python
+# In your application, you import rospy for calling which skill to use 
+import rospy # This is the only package you need to install in your environment
+rospy.set_param("skill_name_input", "Navigate,desk") # Call navigation skills to navigate to the desk. This is a non-blocking call.
+```
+
 ## :eyeglasses: Run Spot-Aria project code
 Follow the steps in [the project documentation](./aria_data_loaders/README.md#scroll-steps-to-run-episodic-memory-robotic-fetch-demostration).
 
