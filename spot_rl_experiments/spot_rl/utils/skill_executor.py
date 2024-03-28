@@ -39,20 +39,28 @@ class SpotRosSkillExecutor:
         print(f"current skill_name {skill_name} skill_input {skill_input}")
 
         # Select the skill from the ros buffer and call the skill
-        if skill_name == "Navigate":
+        if skill_name == "nav":
             # Reset the skill message
             self.reset_skill_msg()
             # Call the skill
             succeded, msg = self.spotskillmanager.nav(skill_input)
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
-        elif skill_name == "Pick":
+        elif skill_name == "pick":
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.pick(skill_input)
             self.reset_skill_name_input(skill_name, succeded, msg)
-        elif skill_name == "Place":
+        elif skill_name == "place":
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.place(skill_input)
+            self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "opendrawer":
+            self.reset_skill_msg()
+            succeded, msg = self.spotskillmanager.opendrawer()
+            self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "closedrawer":
+            self.reset_skill_msg()
+            succeded, msg = self.spotskillmanager.closedrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
 
 
@@ -66,7 +74,7 @@ def main():
     rospy.set_param("/skill_name_suc_msg", "None,None,None")
 
     # Call the skill manager
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
 
     executor = None
     try:

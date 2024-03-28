@@ -136,16 +136,17 @@ class Skill:
             status (bool): Whether robot was able to succesfully execute the skill or not
             message (str): Message indicating description of success / failure reason
         """
+
+        # Check the current buffer to see which skill we are using right now
+        # This does not have any effect if the initial ros buffter is none
+        begin_skill_name, begin_skill_input = get_skill_name_and_input_from_ros()
+
         # Reset policy,env and update logged data at init
         try:
             observations = self.reset_skill(goal_dict)
         except Exception as e:
             raise e
         done = False
-
-        # Check the current buffer to see which skill we are using right now
-        # This does not have any effect if the initial ros buffter is none
-        begin_skill_name, begin_skill_input = get_skill_name_and_input_from_ros()
 
         # Execution Loop
         while not done:
