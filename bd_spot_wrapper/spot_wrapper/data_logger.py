@@ -1,3 +1,4 @@
+import os
 import os.path as osp
 import pickle as pkl
 import time
@@ -17,6 +18,7 @@ PICKLE_PROTOCOL_VERSION = 4
 
 
 def verify_sources(camera_sources: List[str]) -> bool:
+    """Verify the image source inputs"""
     for camera_source in camera_sources:
         if (
             "_depth" in camera_source
@@ -52,25 +54,29 @@ def log_data_async(spot):
                 include_image_data=True, visualize=True, verbose=False
             )
 
-            # TODO: Add 2 subs for rgb & d from NUC + Realsense
-            # TODO: Realsense Cam INtrinsics on a sepearate topic
-
+            # TODO: Future support: add 2 subs for rgb & d from NUC + Realsense
+            # TODO: Future support: Realsense Cam INtrinsics on a sepearate topic
             log_packet_list.append(log_packet)
+
     except Exception as e:
         print(f"Encountered an exception while logging data async - {e}")
         raise e
     finally:
-        # dump data as pkl
+        # Dump data as pkl
         dump_pkl(log_packet_list=log_packet_list)
 
 
 def read_pkl(logfile_name: str) -> List[Dict[str, Any]]:
+    """Read the file"""
     log_packet_list: List[Dict[str, Any]] = None
 
+    # Check if the path exsits
+    path = osp.join(PATH_TO_LOGS, logfile_name)
+    if not os.path.exists(path):
+        raise ValueError(f"Cannot find log file path for {path}!")
+
     # Read pickle file
-    with open(
-        osp.join(PATH_TO_LOGS, logfile_name), "rb"
-    ) as handle:  # should raise an error if invalid file path
+    with open(path, "rb") as handle:
         # Load pickle file
         log_packet_list = pkl.load(handle)
 
@@ -82,14 +88,15 @@ def read_pkl(logfile_name: str) -> List[Dict[str, Any]]:
 
 
 def dump_pkl(log_packet_list: List[Dict[str, Any]], filename_prefix: str = "log"):
+    """Dump the file into pkl"""
     file_name = filename_prefix + "_" + time.strftime("%Y,%m,%d-%H,%M,%S") + ".pkl"
     print(f"Saving Log file as : {file_name}")
     with open(osp.join(PATH_TO_LOGS, file_name), "wb") as handle:
         pkl.dump(log_packet_list, handle, protocol=PICKLE_PROTOCOL_VERSION)
 
 
-# Helper to convert depth to image (uint8-grayscale)
 def convert_depth_to_img(raw_depth):
+    """Helper to convert depth to image (uint8-grayscale)"""
     depth_image = (raw_depth.copy()).astype(np.float32)
     depth_image /= depth_image.max()
     depth_image *= 255.0
@@ -104,7 +111,7 @@ def log_replay(logfile_name: str):
     cam_srcs = [
         camera_data["src_info"] for camera_data in log_packet_list[0]["camera_data"]
     ]
-    print("Log packet includes data for following cameras : ", cam_srcs)
+    print(f"Log packet includes data for following cameras : {cam_srcs}")
 
     # Iterate over log packets and show images from all camera sources
     for log_packet in log_packet_list:

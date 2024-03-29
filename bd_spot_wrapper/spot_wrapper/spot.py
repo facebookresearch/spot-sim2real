@@ -147,7 +147,6 @@ SpotCamIdToFrameNameMap = {
     SpotCamIds.RIGHT_DEPTH_IN_VISUAL_FRAME: "right_fisheye",
     SpotCamIds.RIGHT_FISHEYE: "right_fisheye",
 }  # type: Dict[SpotCamIds, str]
-# TODO: Maybe move all spot related frames names to one class (including frames defined in ros_frame_names.yaml)
 
 
 # CamIds that need to be rotated by 270 degrees in order to appear upright
@@ -436,17 +435,24 @@ class Spot:
         ).matrix()  # np.ndarray
         log_packet["base_pose_xyt"] = np.asarray(
             self.get_xy_yaw()
-        )  # redundant? TODO: Check if it is consistent with vision_T_base
+        )  # TODO: Check if base_pose_xyt is consistent with vision_T_base
         log_packet["arm_pose"] = self.get_arm_joint_positions()
-        # TODO: Add Gripper states (Griper Open/Close) : How to get gripper state from BD?
         log_packet["is_gripper_closed"] = bool(
-            self.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
+            self.robot_state_client.get_robot_state().maniplfulator_state.is_gripper_holding_item
+        )
+        log_packet[
+            "gripper_open_percentage"
+        ] = (
+            self.robot_state_client.get_robot_state().manipulator_state.gripper_open_percentage
+        )
+        log_packet[
+            "gripper_force_in_hand"
+        ] = (
+            self.robot_state_client.get_robot_state().manipulator_state.estimated_end_effector_force_in_hand
         )
 
         if verbose:
             print(log_packet)
-        # TODO: Add force in gripper. How to get force reading?
-
         return log_packet
 
     def grasp_point_in_image(
@@ -1124,7 +1130,6 @@ def image_response_to_cv2(image_response, reorient=True):
         img = cv2.imdecode(img, -1)
 
     if reorient and image_response.source.name in SHOULD_ROTATE:
-        print("Image Is Getting Rotated")
         img = np.rot90(img, k=3)
 
     return img
