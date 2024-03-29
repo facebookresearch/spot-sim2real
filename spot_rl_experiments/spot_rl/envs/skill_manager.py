@@ -26,6 +26,7 @@ from spot_rl.utils.heuristic_nav import (
     ImageSearch,
     heurisitic_object_search_and_navigation,
 )
+from spot_rl.utils.search_table_location import detect_place_point_by_pcd_method
 from spot_rl.utils.utils import (
     get_waypoint_yaml,
     nav_target_from_waypoint,
@@ -366,9 +367,22 @@ class SpotSkillManager:
                 conditional_print(message=message, verbose=self.verbose)
                 return False, message
         else:
-            message = "No place target specified, skipping place"
+            message = "No place target specified, estimating point through heuristic"
             conditional_print(message=message, verbose=self.verbose)
-            return False, message
+            # estimate waypoint
+            try:
+                place_target_location, _, _ = detect_place_point_by_pcd_method(
+                    self.spot,
+                    self.pick_config.GAZE_ARM_JOINT_ANGLES,
+                    percentile=70,
+                    visualize=False,
+                )
+                print(f"Estimate Place xyz: {place_target_location}")
+            except Exception as e:
+                message = f"Failed to estimate place way point due to {str(e)}"
+                conditional_print(message=message, verbose=self.verbose)
+                print(message)
+                return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
 
