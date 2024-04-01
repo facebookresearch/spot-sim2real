@@ -181,6 +181,53 @@ git checkout main
 
 - If you are done with demo of one of the above code and want to run another code, you do not need to re-run other sessions and nodes. Running a new command in the same terminal will work just fine. But **make sure to bring robot at home location and reset its home** using `spot_reset_home` in the same terminal
 
+### Using Spot Data-logger
+All logs will get stored inside `data/data_logs` directory
+
+#### Logged keys
+The logger will capture spot's data such that each timestamp's log packet is a dict with following keys:
+```bash
+"timestamp" : double, # UTC epoch time from time.time()
+"datatime": str # human readable corresponding local time as "YY-MM-DD HH:MM:SS"
+"camera_data" : [
+                    {
+                        "src_info" : str, # this is name of camera source as defined in SpotCamIds
+                        "raw_image": np.ndarray, # this is spot's camera data as cv2 (see output of Spot.image_response_to_cv2() for more info)
+                        "camera_intrinsics": np.ndarray, # this is 3x3 matrix holding camera intrinsics
+                        "base_T_camera": np.ndarray, # this is 4x4 transformation matrix of camera w.r.t base frame of robot
+                    },
+                    ...
+                ],
+"vision_T_base": np.ndarray, # this is 4x4 transformation matrix of base frame w.r.t vision frame
+"base_pose_xyt": np.ndarray, # this is 3 element array representing x,y,yaw w.r.t home frame
+"arm_pose": np.array, # this is a 6 element array representing arm joint states (ordering : sh0, sh1, el0, el1, wr0, wr1)
+"is_gripper_holding_item": bool, # whether gripper is holding something or not
+"gripper_open_percentage": double, # how much is the gripper open
+"gripper_force_in_hand": np.ndarray, # force estimate on end-effector in hand frame
+```
+
+
+#### Logging data
+The data logger is designed to log the data provided [here](/README.md#logged-keys) at whatever rate sensor data becomes available (which depends on network setup).
+
+
+To run the logger async, simply run the following command in a new terminal
+```bash
+python -m spot_wrapper.data_logger --log_data
+```
+This will record data in a while loop, press `Ctrl+c` to spot the logger. That will save the log file inside `data/data_logs/<YY,MM,DD-HH,MM,SS>.pkl` file
+
+Warning : This logger will cause motion blur as camera data is logged while the robot moves. Currently we do not support Spot-Record-Go protocol to log
+
+#### Log replay
+It is also possible to replay the logged data (essentially the camera streams that have been logged) using the following command : 
+```bash
+python -m spot_wrapper.data_logger --replay="<name_of_log_file>.pkl"
+```
+Caution : For replay, the log file SHOULD be a pkl file with the keys provided [here](/README.md#logged-keys)
+
+Caution : Please ensure the log file is present inside `data/data_logs` dir.
+
 
 ## :wrench: Call skills (non-blocking) without installing spot-sim2real in your home environment
 We provide an function that can call skills in seperate conda environment. And the calling of skill itself is a non-blocking call.
