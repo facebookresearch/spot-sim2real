@@ -74,8 +74,10 @@ class OwlVit:
 
     def track(self, detections):
         if self.mot_tracker:
-            if not detections:
-                detections = np.empty((0, 5))
+            if len(detections) == 0:
+                detection = np.empty((0, 5))
+            elif len(detections[0]["scores"]) == 0:
+                detection = np.empty((0, 5))
             else:
                 detection = detections[0]
                 detection, score, _ = (
@@ -90,33 +92,36 @@ class OwlVit:
                     -1, 1
                 )
                 detection = np.hstack([detection, score])
-            self.max_arg = (
-                np.argmax(detection[:, -1]) + 1 if not self.max_arg else self.max_arg
-            )
+                self.max_arg = (
+                    np.argmax(detection[:, -1]) + 1
+                    if not self.max_arg
+                    else self.max_arg
+                )
             tracks = self.mot_tracker.update(detection.copy())
-            track_of_max_conf_identity = tracks[tracks[:, -1] == self.max_arg]
-            track_id_mask = np.argmax(
-                (detection[:, :4] == track_of_max_conf_identity[0][:4])[:, 0]
-            )
-            print(
-                "Track",
-                track_of_max_conf_identity[:4],
-                "Selected track id based on initial confidence",
-                self.max_arg,
-                "Where is it found in the current set of dets",
-                track_id_mask,
-            )
+            if len(tracks) > 0:
+                track_of_max_conf_identity = tracks[tracks[:, -1] == self.max_arg]
+                track_id_mask = np.argmax(
+                    (detection[:, :4] == track_of_max_conf_identity[0][:4])[:, 0]
+                )
+                print(
+                    "Track",
+                    track_of_max_conf_identity[:4],
+                    "Selected track id based on initial confidence",
+                    self.max_arg,
+                    "Where is it found in the current set of dets",
+                    track_id_mask,
+                )
 
-            # print(f"len of current detections {len(detections[0]['boxes'])}, tracks found {len(track_ids)}")
-            detections[0]["boxes"] = detections[0]["boxes"][track_id_mask].reshape(
-                -1, 4
-            )
-            detections[0]["scores"] = detections[0]["scores"][track_id_mask].reshape(
-                -1, 1
-            )
-            detections[0]["labels"] = detections[0]["labels"][track_id_mask].reshape(
-                -1, 1
-            )
+                # print(f"len of current detections {len(detections[0]['boxes'])}, tracks found {len(track_ids)}")
+                detections[0]["boxes"] = detections[0]["boxes"][track_id_mask].reshape(
+                    -1, 4
+                )
+                detections[0]["scores"] = detections[0]["scores"][
+                    track_id_mask
+                ].reshape(-1, 1)
+                detections[0]["labels"] = detections[0]["labels"][
+                    track_id_mask
+                ].reshape(-1, 1)
 
         return detections
 
