@@ -12,7 +12,13 @@ import cv2
 import numpy as np
 import torch
 from PIL import Image
-from spot_rl.utils.sort import Sort
+import rospy
+
+try:
+    from spot_rl.utils.sort import Sort
+except Exception as e:
+    SORT = False
+
 
 
 class OwlVit:
@@ -67,12 +73,29 @@ class OwlVit:
         self.show_img = show_img
         self.mot_tracker = None
         self.max_arg = None
-        self.init_tracker()  # Do this when tracking is enabled
+        self.init_tracker()  # Do this when tracking is enabled skill is called
 
     def init_tracker(self):
-        self.mot_tracker = Sort(max_age=1, min_hits=3, iou_threshold=0.3)
-
+        if self.mot_tracker is None and self.max_arg == None:
+            # Check if SORT was imported correctly
+            if SORT:
+                self.max_arg = None
+                self.mot_tracker = Sort(max_age=1, min_hits=3, iou_threshold=0.3)
+            else:
+                #if not imported correctly set is_tracking_enabled to be False
+                rospy.set_param("is_tracking_enabled", False)
+        
+    def reset_tracker(self):
+        self.max_arg = None
+        self.mot_tracker = None
+    
     def track(self, detections):
+        is_tracking_enabled = rospy.get_param("is_tracking_enabled", False)
+        if is_tracking_enabled:
+            self.init_tracker()
+        else:
+            self.reset_tracker()
+        
         if self.mot_tracker:
             if len(detections) == 0:
                 detection = np.empty((0, 5))
@@ -92,12 +115,15 @@ class OwlVit:
                     -1, 1
                 )
                 detection = np.hstack([detection, score])
+                # MAX
                 self.max_arg = (
                     np.argmax(detection[:, -1]) + 1
                     if not self.max_arg
                     else self.max_arg
                 )
-            tracks = self.mot_tracker.update(detection.copy())
+            #Tracker will return NX5 array where last column is track_id,
+            # Tracker will consume NX5 & return NX5
+            tracks = self.mot_tracker.update(detection.copy()) #NX5 -> trackid 
             if len(tracks) > 0:
                 track_of_max_conf_identity = tracks[tracks[:, -1] == self.max_arg]
                 track_id_mask = np.argmax(
@@ -188,6 +214,7 @@ class OwlVit:
         # img = img.to('cpu')
         # if self.show_img:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
+        #This will only return the bbox where we found our intial track
         results = self.track(results)
         return (
             self.get_most_confident_bounding_box_per_label(results),

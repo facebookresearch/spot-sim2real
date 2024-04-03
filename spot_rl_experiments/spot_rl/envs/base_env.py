@@ -253,7 +253,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.slowdown_base = -1
         self.prev_base_moved = False
         self.should_end = False
-
+        rospy.set_param("is_tracking_enabled", False)
         observations = self.get_observations()
         return observations
 
