@@ -167,6 +167,13 @@ cd ../../
 ```
 If you face any issues in this step, refer to [this section in ISSUES.md](/installation/ISSUES.md#issues-while-running-setuppy-for-habitat-lab)
 
+### Add SORT (tracking)
+If you already have setup spot-sim2real but not able to get Sort running please install these additional packages
+```bash
+# Install Dependencies
+pip install filterpy==1.4.5 lap==0.4.0
+```
+
 ### Download inceptionresnet weights
 
 ```bash
