@@ -9,8 +9,10 @@ import time
 from typing import List
 
 import cv2
+import numpy as np
 import torch
 from PIL import Image
+from spot_rl.utils.sort import Sort
 
 
 class OwlVit:
@@ -63,6 +65,60 @@ class OwlVit:
         self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.score_threshold = score_threshold
         self.show_img = show_img
+        self.mot_tracker = None
+        self.max_arg = None
+        self.init_tracker()  # Do this when tracking is enabled
+
+    def init_tracker(self):
+        self.mot_tracker = Sort(max_age=1, min_hits=3, iou_threshold=0.3)
+
+    def track(self, detections):
+        if self.mot_tracker:
+            if not detections:
+                detections = np.empty((0, 5))
+            else:
+                detection = detections[0]
+                detection, score, _ = (
+                    detection["boxes"],
+                    detection["scores"],
+                    detection["labels"],
+                )
+                (
+                    detection,
+                    score,
+                ) = detection.clone().cpu().numpy(), score.clone().cpu().numpy().reshape(
+                    -1, 1
+                )
+                detection = np.hstack([detection, score])
+            self.max_arg = (
+                np.argmax(detection[:, -1]) + 1 if not self.max_arg else self.max_arg
+            )
+            tracks = self.mot_tracker.update(detection.copy())
+            track_of_max_conf_identity = tracks[tracks[:, -1] == self.max_arg]
+            track_id_mask = np.argmax(
+                (detection[:, :4] == track_of_max_conf_identity[0][:4])[:, 0]
+            )
+            print(
+                "Track",
+                track_of_max_conf_identity[:4],
+                "Selected track id based on initial confidence",
+                self.max_arg,
+                "Where is it found in the current set of dets",
+                track_id_mask,
+            )
+
+            # print(f"len of current detections {len(detections[0]['boxes'])}, tracks found {len(track_ids)}")
+            detections[0]["boxes"] = detections[0]["boxes"][track_id_mask].reshape(
+                -1, 4
+            )
+            detections[0]["scores"] = detections[0]["scores"][track_id_mask].reshape(
+                -1, 1
+            )
+            detections[0]["labels"] = detections[0]["labels"][track_id_mask].reshape(
+                -1, 1
+            )
+
+        return detections
 
     def run_inference(self, img):
         """
@@ -127,7 +183,7 @@ class OwlVit:
         # img = img.to('cpu')
         # if self.show_img:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
-
+        results = self.track(results)
         return (
             self.get_most_confident_bounding_box_per_label(results),
             self.create_img_with_bounding_box(img, results)
