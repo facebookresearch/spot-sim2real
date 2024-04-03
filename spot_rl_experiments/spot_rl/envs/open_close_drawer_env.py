@@ -4,6 +4,7 @@
 
 
 import sys
+import time
 from typing import Any, Dict
 
 import magnum as mn
@@ -47,10 +48,19 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Mode for opening or closing
         self._mode = "open"
 
+        # Get the receptacle type
+        self._rep_type = "drawer"
+
         # Distance threshold to call IK to approach the drawers
         self._dis_threshold_ee_to_handle = (
             config.OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE
         )
+
+        # Flag for using Boston Dynamics API to open the cabinet or not
+        self._use_bd_api = False
+
+        # Get the cabinet door location
+        self._cab_door = "left"
 
     def reset(self, goal_dict=None, *args, **kwargs):
         self.spot.open_gripper()
@@ -97,6 +107,12 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the mode: open or close drawers
         self._mode = goal_dict["mode"]
 
+        # Get the receptacle type
+        self._rep_type = goal_dict["rep_type"]
+
+        # Get the cabinet door location
+        self._cab_door = goal_dict["cab_door"]
+
         return observations
 
     def compute_distance_to_handle(self):
@@ -108,11 +124,102 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         )
 
     def bd_open_drawer_api(self):
-        """BD API to open the drawer in x direction"""
+        """BD API to open the drawer"""
         raise NotImplementedError
 
+    def bd_open_cabinet_api(self):
+        """BD API to open the cabinet"""
+        command = self.spot.construct_cabinet_task(
+            0.25, force_limit=40, target_angle=1.74, position_control=True
+        )
+        task_duration = 10000000
+        command.full_body_command.constrained_manipulation_request.end_time.CopyFrom(
+            self.spot.robot.time_sync.robot_timestamp_from_local_secs(
+                time.time() + task_duration
+            )
+        )
+        self.spot.command_client.robot_command_async(command)
+        time.sleep(10)
+
+    def open_drawer(self):
+        """Heuristics to open the drawer"""
+        # Get the transformation
+        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
+
+        # Get the transformation of the gripper
+        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
+        pull_push_distance = -0.2 if self._mode == "open" else 0.25
+        move_target = vision_T_hand.transform_point(
+            mn.Vector3([pull_push_distance, 0, 0])
+        )
+        # Get the move_target in base frame
+        move_target = vision_T_base.inverted().transform_point(move_target)
+
+        # Retract the arm based on the current gripper location
+        self.spot.move_gripper_to_point(
+            move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
+        )
+
+    def open_cabinet(self):
+        """Heuristics to open the cabinet"""
+        # Get the location of the rotataional axis
+        base_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
+
+        # Assuming that the cabinet door's size is panel_size
+        # Assuming that the door axis is on the left side of the hand
+        panel_size = 0.55
+        if self._cab_door == "right":
+            panel_size = -panel_size
+
+        base_T_hand.translation = base_T_hand.transform_point(
+            mn.Vector3(0.0, 0.0, -panel_size)
+        )
+        target_degree = 70
+        interval = 10
+        # Loop over to create a circular motion for the gripper
+        for cur_ang_in_deg in range(10, target_degree + 10, interval):
+            if cur_ang_in_deg < target_degree:
+                # Keep closing the gripper to grasp the handle tightly
+                self.spot.close_gripper()
+            else:
+                # In the final stage, we open the gripper to let gripper be away from the handle
+                self.spot.open_gripper()
+            # Angle in degree
+            cur_ang = np.deg2rad(cur_ang_in_deg)
+
+            # For right side of the hand
+            if self._cab_door == "right":
+                cur_ang = -cur_ang
+
+            # Rotate the trans by this degree
+            cur_base_T_hand = base_T_hand @ mn.Matrix4.rotation_y(mn.Rad(-cur_ang))
+            # Get the point in that frame
+            ee_target_point = cur_base_T_hand.transform_point(
+                mn.Vector3(0.0, 0.0, panel_size)
+            )
+            # 1.5 to scale up the angle for tracking the circular motion better
+            self.spot.move_gripper_to_point(
+                np.array(ee_target_point), [np.pi / 2, -cur_ang * 1.5, 0.0]
+            )
+            print(f"Deg:{cur_ang_in_deg}; ee pos: {ee_target_point}; yaw: {-cur_ang}")
+
+        # Robot backing up a bit to avoid gripper from colliding with the handle
+        self.spot.set_base_velocity(
+            x_vel=-0.25,
+            y_vel=0,
+            ang_vel=0,
+            vel_time=0.8,
+        )
+
     def approach_handle_and_grasp(self, z, pixel_x, pixel_y):
-        """This method does IK to approach the handle and close the gripper."""
+        """This method does IK to approach the handle and close the gripper to grasp the handle."""
+
+        ########################################################
+        ### Step 1: Get the location of handle in hand frame ###
+        ########################################################
+
         imgs = self.spot.get_hand_image()
 
         # Get the camera intrinsics
@@ -137,9 +244,11 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the location relative to the gripper
         point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
         # Offset the x and z direction in hand frame
-        ee_offset_x = 0.05
-        ee_offset_z = -0.05
+        ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.05
+        ee_offset_y = 0.0 if self._rep_type == "drawer" else 0.01
+        ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.02
         point_in_hand_3d[0] += ee_offset_x
+        point_in_hand_3d[1] += ee_offset_y
         point_in_hand_3d[2] += ee_offset_z
         # Make it back to global frame
         point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
@@ -156,33 +265,56 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             ]
         )
 
+        ###############################################
+        ### Step 2: Move the gripper to that handle ###
+        ###############################################
+
         # Get the current ee rotation in body frame
         ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
 
-        # Move the gripper to target using current gripper pose in the body frame
-        # while maintaining the gripper orientation
-        self.spot.move_gripper_to_point(
-            point_in_base_3d,
-            [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
-        )
+        # For the cabnet part: rotation the gripper by 90 degree
+        if self._rep_type == "cabinet":
+            self.spot.move_gripper_to_point(
+                point_in_base_3d,
+                [np.pi / 2, 0, 0],
+            )
+        elif self._rep_type == "drawer":
+            # Move the gripper to target using current gripper pose in the body frame
+            # while maintaining the gripper orientation
+            self.spot.move_gripper_to_point(
+                point_in_base_3d,
+                [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+            )
+
+        #################################
+        ### Step 3: Close the gripper ###
+        #################################
 
         # Close the gripper
         self.spot.close_gripper()
+        # Pause a bit to ensure the gripper grapes the handle
+        time.sleep(2)
 
-        # Get the transformation of the gripper
-        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        pull_push_distance = -0.2 if self._mode == "open" else 0.25
-        move_target = vision_T_hand.transform_point(
-            mn.Vector3([pull_push_distance, 0, 0])
-        )
-        # Get the move_target in base frame
-        move_target = vision_T_base.inverted().transform_point(move_target)
+        ############################################
+        ### Step 4: Execute post-grasping motion ###
+        ############################################
 
-        # Retract the arm based on the current gripper location
-        self.spot.move_gripper_to_point(
-            move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
-        )
+        if self._rep_type == "cabinet":
+            # Call API to open cab
+            if self._use_bd_api:
+                self.bd_open_cabinet_api()
+            else:
+                self.open_cabinet()
+        elif self._rep_type == "drawer":
+            # Call API to open drawer
+            if self._use_bd_api:
+                self.bd_open_drawer_api()
+            else:
+                self.open_drawer()
+
+        #############################
+        ### Step 5: Reset the arm ###
+        #############################
 
         # Open the gripper and retract the arm
         self.spot.open_gripper()

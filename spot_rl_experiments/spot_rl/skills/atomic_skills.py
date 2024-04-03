@@ -804,6 +804,34 @@ class SemanticPlace(Place):
 
         return action_dict
 
+    def update_and_check_status(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
+        """Refer to class Skill for documentation"""
+        self.env.say("Place Skill finished.. checking status")
+
+        # Record the success
+        check_place_success = self.env.get_success({})
+
+        # Update result log
+        self.skill_result_log["time_taken"] = time.time() - self.start_time
+        self.skill_result_log["success"] = check_place_success
+
+        # Open gripper to drop the object
+        self.spot.open_gripper()
+        # Add sleep as open_gripper() is a non-blocking call
+        time.sleep(1)
+
+        # Reset the arm here
+        self.env.reset_arm()
+
+        # Check for success and return appropriately
+        status = False
+        message = "Place failed to reach the target position"
+        if check_place_success:
+            status = True
+            message = "Successfully reached the target position"
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
 
 class OpenCloseDrawer(Skill):
     """
