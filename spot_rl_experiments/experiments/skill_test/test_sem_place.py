@@ -1,43 +1,33 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
-
-import copy
-
-import cv2
-import numpy as np
-import quaternion
 import rospy
-from bosdyn.client.frame_helpers import get_a_tform_b
 from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
-from scipy.spatial.transform import Rotation
 from spot_rl.envs.skill_manager import SpotSkillManager
-from spot_rl.utils.construct_configs import construct_config
-from spot_wrapper.spot import SpotCamIds, image_response_to_cv2
 
 if __name__ == "__main__":
-
     # Know which location we are doing experiments
-    in_fremont_lab = map_user_input_to_boolean("In Fremont location ? Y/N ")
-    if in_fremont_lab:
+    in_fre_lab = map_user_input_to_boolean("Are you Tushar in FRE? Y/N ")
+    enable_estimation_before_place = map_user_input_to_boolean(
+        "Enable estimation before place? Y/N "
+    )
+
+    if in_fre_lab:
         # at FRE
-        place_target = "place_taget_test_table"
+        place_target = "study_kavit"
     else:
         # at NYC
         place_target = "test_desk"
 
-    # Initialize the skill manager
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
+
+    if enable_estimation_before_place:
+        place_target = None
 
     # Start testing
     contnue = True
     while contnue:
-        if in_fremont_lab:
-            rospy.set_param("is_gripper_blocked", 0)
-        else:
-            pass
-
+        rospy.set_param("is_gripper_blocked", 0)
         spotskillmanager.place(place_target)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
