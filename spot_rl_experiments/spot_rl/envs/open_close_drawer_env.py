@@ -192,6 +192,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Change the flag to finish
         self._success = True
+        # We reset the object tracking once it is finished
         rospy.set_param("is_tracking_enabled", False)
 
     def step(self, action_dict: Dict[str, Any]):
@@ -210,6 +211,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         z = float("inf")
         # We only compute the distance if bounding box detects something
         if np.sum(bbox) > 0:
+            # We start to do object tracking
             rospy.set_param("is_tracking_enabled", True)
             z, pixel_x, pixel_y = self.compute_distance_to_handle()
 

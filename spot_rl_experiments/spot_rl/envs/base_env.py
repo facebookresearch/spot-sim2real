@@ -201,6 +201,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             assert self.filtered_head_depth is not None, "Depth msgs not found!"
             print("...msgs received.")
 
+        # We do not enable object tracking by default
+        rospy.set_param("is_tracking_enabled", False)
+
     @property
     def filtered_hand_depth(self):
         return self.msgs[rt.FILTERED_HAND_DEPTH]
@@ -253,6 +256,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.slowdown_base = -1
         self.prev_base_moved = False
         self.should_end = False
+        # We do not enable object tracking by default
         rospy.set_param("is_tracking_enabled", False)
         observations = self.get_observations()
         return observations
