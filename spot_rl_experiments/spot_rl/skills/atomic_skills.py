@@ -192,12 +192,12 @@ class Skill:
         """
         status = False
         message = ""
-        try:
-            status, message = self.execute_rl_loop(goal_dict=goal_dict)
-            print(f"Feedback from skill: {message}")
-        except Exception as e:
-            message = f"Error encountered in skill execution - {e}"
-            conditional_print(message=message, verbose=self.verbose)
+        # try:
+        status, message = self.execute_rl_loop(goal_dict=goal_dict)
+        print(f"Feedback from skill: {message}")
+        # except Exception as e:
+        #     message = f"Error encountered in skill execution - {e}"
+        #     conditional_print(message=message, verbose=self.verbose)
 
         return status, message
 

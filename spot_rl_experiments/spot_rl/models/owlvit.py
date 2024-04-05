@@ -5,20 +5,107 @@
 
 # mypy: ignore-errors
 import argparse
+import random
 import time
 from typing import List
 
 import cv2
 import numpy as np
+import rospy
 import torch
 from PIL import Image
-import rospy
 
 try:
     from spot_rl.utils.sort import Sort
 except Exception as e:
-    SORT = False
+    print(e)
+    Sort = False
 
+
+def generate_fake_bboxes(detections, N, image_dims=(480, 640)):
+    if len(detections) == 0:
+        return detections  # don't add any fake detection if none is detected
+    if detections[0]["scores"].shape[0] == 1:
+        device = detections[0]["boxes"].device
+        bboxes = detections[0]["boxes"].cpu()
+        scores = detections[0]["scores"].cpu()
+        labels = detections[0]["labels"].cpu()
+
+        x1, y1, x2, y2 = bboxes[0].numpy()
+        original_w = x2 - x1
+        original_h = y2 - y1
+        H, W = image_dims
+
+        # List to store fake bounding boxes
+        fake_bboxes = bboxes.numpy().tolist()
+        fake_scores = scores.numpy().tolist()
+        fake_labels = labels.numpy().tolist()
+        fake_label = fake_labels[0]
+        print("Adding fake detections to test tracker")
+        for _ in range(N):
+            # Generate random dimensions based on original bbox size
+            w = np.random.randint(low=original_w // 2, high=min(W, original_w * 2))
+            h = np.random.randint(low=original_h // 2, high=min(H, original_h * 2))
+
+            # Ensure w > h by swapping if necessary
+            if h > w:
+                w, h = h, w
+
+            # Generate random top left corner within the image boundaries
+            x1_fake = np.random.randint(low=0, high=max(1, W - w))
+            y1_fake = np.random.randint(low=0, high=max(1, H - h))
+
+            # Calculate bottom right corner based on width and height
+            x2_fake = x1_fake + w
+            y2_fake = y1_fake + h
+
+            # Add the fake bbox to the list
+            fake_bboxes.append((x1_fake, y1_fake, x2_fake, y2_fake))
+            fake_scores.append(0.05)
+            fake_labels.append(fake_label)
+        indices = list(range(len(fake_bboxes)))
+        random.shuffle(indices)
+        fake_detections = [
+            {
+                "boxes": torch.from_numpy(np.array(fake_bboxes)[indices])
+                .reshape(-1, 4)
+                .to(device),
+                "scores": torch.from_numpy(np.array(fake_scores)[indices])
+                .reshape(-1)
+                .to(device),
+                "labels": torch.from_numpy(np.array(fake_labels)[indices])
+                .reshape(-1)
+                .to(device),
+            }
+        ]
+        return fake_detections
+    else:
+        return detections
+
+
+def find_matching_bbox_index(bboxes, target_bbox):
+    """
+    Find the index of the bounding box in bboxes that matches the target_bbox,
+    considering only the integer parts of their coordinates.
+
+    Parameters:
+    - bboxes (numpy.ndarray): An array of shape (n, 4) containing n bounding boxes.
+    - target_bbox (tuple): A tuple of (x1, y1, x2, y2) representing the target bounding box.
+
+    Returns:
+    - numpy.ndarray: An array of indices of the matching bounding boxes. Can be empty if no matches are found.
+    """
+    # Convert to integers by truncating the decimal part
+    bboxes_int = bboxes.astype(int)
+    target_bbox_int = np.array(target_bbox).astype(int)
+
+    # Use a vectorized comparison to check for equality with the target_bbox
+    matches = np.all(bboxes_int == target_bbox_int, axis=1)
+
+    # Find the indices where matches occur
+    matching_indices = np.where(matches)[0]
+
+    return matching_indices
 
 
 class OwlVit:
@@ -72,30 +159,34 @@ class OwlVit:
         self.score_threshold = score_threshold
         self.show_img = show_img
         self.mot_tracker = None
-        self.max_arg = None
-        self.init_tracker()  # Do this when tracking is enabled skill is called
+        self.track_id = None
 
     def init_tracker(self):
-        if self.mot_tracker is None and self.max_arg == None:
+        if not self.mot_tracker and not self.track_id:
             # Check if SORT was imported correctly
-            if SORT:
-                self.max_arg = None
-                self.mot_tracker = Sort(max_age=1, min_hits=3, iou_threshold=0.3)
+            if Sort:
+                self.track_id = None
+                self.mot_tracker = Sort(max_age=1, min_hits=1, iou_threshold=0.2)
             else:
-                #if not imported correctly set is_tracking_enabled to be False
+                # if not imported correctly set is_tracking_enabled to be False
                 rospy.set_param("is_tracking_enabled", False)
-        
+
     def reset_tracker(self):
-        self.max_arg = None
+        self.track_id = None
         self.mot_tracker = None
-    
+
+    def reinit_tracker(self):
+        # in case of id switch
+        self.reset_tracker()
+        self.init_tracker()
+
     def track(self, detections):
         is_tracking_enabled = rospy.get_param("is_tracking_enabled", False)
         if is_tracking_enabled:
             self.init_tracker()
         else:
             self.reset_tracker()
-        
+
         if self.mot_tracker:
             if len(detections) == 0:
                 detection = np.empty((0, 5))
@@ -108,6 +199,7 @@ class OwlVit:
                     detection["scores"],
                     detection["labels"],
                 )
+                device = detection.device
                 (
                     detection,
                     score,
@@ -116,38 +208,70 @@ class OwlVit:
                 )
                 detection = np.hstack([detection, score])
                 # MAX
-                self.max_arg = (
-                    np.argmax(detection[:, -1]) + 1
-                    if not self.max_arg
-                    else self.max_arg
-                )
-            #Tracker will return NX5 array where last column is track_id,
-            # Tracker will consume NX5 & return NX5
-            tracks = self.mot_tracker.update(detection.copy()) #NX5 -> trackid 
-            if len(tracks) > 0:
-                track_of_max_conf_identity = tracks[tracks[:, -1] == self.max_arg]
-                track_id_mask = np.argmax(
-                    (detection[:, :4] == track_of_max_conf_identity[0][:4])[:, 0]
-                )
-                print(
-                    "Track",
-                    track_of_max_conf_identity[:4],
-                    "Selected track id based on initial confidence",
-                    self.max_arg,
-                    "Where is it found in the current set of dets",
-                    track_id_mask,
-                )
+                # change np.argmax to be custom index based on LLM, currently its max conf index
+                det_to_track = detection[np.argmax(detection[:, -1])][:4]
 
-                # print(f"len of current detections {len(detections[0]['boxes'])}, tracks found {len(track_ids)}")
-                detections[0]["boxes"] = detections[0]["boxes"][track_id_mask].reshape(
-                    -1, 4
+            # Tracker will return NX5 array where last column is track_id,
+            # Tracker will consume NX5 & may return MX5 where M != N
+            tracks = self.mot_tracker.update(detection.copy())  # MX5 -> trackid
+            # print(f"Set of current detections {detection[:, :4]}, self.track_id {self.track_id}, tracker output {tracks}")
+            if len(tracks) > 0:
+                # once set per tracking episode, reset when tracking disabled
+                self.track_id = (
+                    tracks[
+                        find_matching_bbox_index(tracks[:, :4], det_to_track)
+                    ].flatten()[-1]
+                    if self.track_id is None
+                    else self.track_id
                 )
-                detections[0]["scores"] = detections[0]["scores"][
-                    track_id_mask
-                ].reshape(-1, 1)
-                detections[0]["labels"] = detections[0]["labels"][
-                    track_id_mask
-                ].reshape(-1, 1)
+                track_id_found_at_mask = tracks[:, -1] == self.track_id
+                if not np.any(track_id_found_at_mask):
+                    # resetting tracker because of Id switch, this happens because of abrupt motion & we should reset tracker & redo tracking for this iteration
+                    print(
+                        f"id_switch event from {self.track_id} to {tracks[0][-1]} reintializing tracker"
+                    )
+                    self.reinit_tracker()
+                    tracks = self.mot_tracker.update(detection.copy())
+                    self.track_id = tracks[
+                        find_matching_bbox_index(tracks[:, :4], det_to_track)
+                    ].flatten()[-1]
+                    track_id_found_at_mask = tracks[:, -1] == self.track_id
+                    track_filtered_by_trackid = tracks[track_id_found_at_mask]
+                track_filtered_by_trackid = tracks[
+                    track_id_found_at_mask
+                ]  # select only 1 track [x1, y1, x2, y2, track_id] where track_id == self.track_id
+
+                if len(track_filtered_by_trackid) != 1:
+                    # we didn't find any detection in current set of detections that associates with our current instance
+                    return [
+                        {
+                            "scores": torch.Tensor([]),
+                            "labels": torch.Tensor([]),
+                            "boxes": torch.Tensor([]).reshape(0, 4),
+                        }
+                    ]
+                max_i = np.argmax(detection[:, -1])
+                detections[0]["boxes"] = (
+                    torch.from_numpy(track_filtered_by_trackid[0][:4])
+                    .reshape(-1, 4)
+                    .to(device)
+                )
+                detections[0]["scores"] = detections[0]["scores"][max_i].reshape(-1, 1)
+                detections[0]["labels"] = detections[0]["labels"][max_i].reshape(-1, 1)
+                # print(
+                #     "Self.Track_id",
+                #     self.track_id,
+                #     "Det from mot_tracker where we found the self.track_id",
+                #     track_filtered_by_trackid[0][:4]
+                # )
+            else:
+                return [
+                    {
+                        "scores": torch.Tensor([]),
+                        "labels": torch.Tensor([]),
+                        "boxes": torch.Tensor([]).reshape(0, 4),
+                    }
+                ]
 
         return detections
 
@@ -214,7 +338,9 @@ class OwlVit:
         # img = img.to('cpu')
         # if self.show_img:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
-        #This will only return the bbox where we found our intial track
+        # This will only return the bbox where we found our intial track
+
+        results = generate_fake_bboxes(results, 5)
         results = self.track(results)
         return (
             self.get_most_confident_bounding_box_per_label(results),
