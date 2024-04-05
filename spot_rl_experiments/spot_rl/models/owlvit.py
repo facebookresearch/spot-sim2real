@@ -214,7 +214,9 @@ class OwlVit:
             # Tracker will return NX5 array where last column is track_id,
             # Tracker will consume NX5 & may return MX5 where M != N
             tracks = self.mot_tracker.update(detection.copy())  # MX5 -> trackid
-            # print(f"Set of current detections {detection[:, :4]}, self.track_id {self.track_id}, tracker output {tracks}")
+            print(
+                f"Num of current detections {len(detection[:, :4])}, self.track_id {self.track_id}, tracker output {tracks}"
+            )
             if len(tracks) > 0:
                 # once set per tracking episode, reset when tracking disabled
                 self.track_id = (
