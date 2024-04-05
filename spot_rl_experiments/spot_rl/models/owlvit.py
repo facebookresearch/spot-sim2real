@@ -198,7 +198,7 @@ class OwlVit:
                     detection["scores"],
                     detection["labels"],
                 )
-                # device = detection.device
+                device = detection.device
                 (
                     detection,
                     score,
@@ -218,13 +218,16 @@ class OwlVit:
             )
             if len(tracks) > 0:
                 # once set per tracking episode, reset when tracking disabled
-                self.track_id = (
-                    tracks[
-                        find_matching_bbox_index(tracks[:, :4], det_to_track)
-                    ].flatten()[-1]
-                    if self.track_id is None
-                    else self.track_id
-                )
+                try:
+                    self.track_id = (
+                        tracks[
+                            find_matching_bbox_index(tracks[:, :4], det_to_track)
+                        ].flatten()[-1]
+                        if self.track_id is None
+                        else self.track_id
+                    )
+                except:
+                    breakpoint()
                 track_id_found_at_mask = tracks[:, -1] == self.track_id
                 if not np.any(track_id_found_at_mask):
                     # resetting tracker because of Id switch, this happens because of abrupt motion & we should reset tracker & redo tracking for this iteration
@@ -251,17 +254,28 @@ class OwlVit:
                             "boxes": torch.Tensor([]).reshape(0, 4),
                         }
                     ]
-                max_i = np.argmax(detection[:, -1])
+                # max_i = np.argmax(detection[:, -1])
                 # just have one bounding box
-                # detections[0]["boxes"] = (
-                #     torch.from_numpy(track_filtered_by_trackid[0][:4])
-                #     .reshape(-1, 4)
-                #     .to(device)
-                # )
-                # detections[0]["scores"] = detections[0]["scores"][max_i].reshape(-1, 1)
-                # detections[0]["labels"] = detections[0]["labels"][max_i].reshape(-1, 1)
+
+                detections[0]["boxes"] = torch.cat(
+                    (
+                        detections[0]["boxes"],
+                        torch.from_numpy(
+                            track_filtered_by_trackid[0][:4].reshape(1, 4)
+                        ).to(device),
+                    )
+                ).reshape(-1, 4)
+                detections[0]["scores"] = torch.cat(
+                    (detections[0]["scores"], torch.Tensor([1.0]).to(device))
+                ).reshape(-1)
+                detections[0]["labels"] = (
+                    torch.cat((detections[0]["labels"], torch.Tensor([0]).to(device)))
+                    .reshape(-1)
+                    .to(torch.int64)
+                )
+
                 # Assign the one that is selected with highest score
-                detections[0]["scores"][max_i] = torch.tensor(100.0, device=self.device)
+                # detections[0]["scores"][max_i] = torch.tensor(100.0, device=self.device)
                 print(
                     "Self.Track_id",
                     self.track_id,
