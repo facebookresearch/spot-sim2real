@@ -186,7 +186,6 @@ class OwlVit:
             self.init_tracker()
         else:
             self.reset_tracker()
-
         if self.mot_tracker:
             if len(detections) == 0:
                 detection = np.empty((0, 5))
@@ -253,19 +252,22 @@ class OwlVit:
                         }
                     ]
                 max_i = np.argmax(detection[:, -1])
-                detections[0]["boxes"] = (
-                    torch.from_numpy(track_filtered_by_trackid[0][:4])
-                    .reshape(-1, 4)
-                    .to(device)
-                )
-                detections[0]["scores"] = detections[0]["scores"][max_i].reshape(-1, 1)
-                detections[0]["labels"] = detections[0]["labels"][max_i].reshape(-1, 1)
-                # print(
-                #     "Self.Track_id",
-                #     self.track_id,
-                #     "Det from mot_tracker where we found the self.track_id",
-                #     track_filtered_by_trackid[0][:4]
+                # just have one bounding box
+                # detections[0]["boxes"] = (
+                #     torch.from_numpy(track_filtered_by_trackid[0][:4])
+                #     .reshape(-1, 4)
+                #     .to(device)
                 # )
+                # detections[0]["scores"] = detections[0]["scores"][max_i].reshape(-1, 1)
+                # detections[0]["labels"] = detections[0]["labels"][max_i].reshape(-1, 1)
+                # Assign the one that is selected with highest score
+                detections[0]["scores"][max_i] = torch.tensor(100.0, device=self.device)
+                print(
+                    "Self.Track_id",
+                    self.track_id,
+                    "Det from mot_tracker where we found the self.track_id",
+                    track_filtered_by_trackid[0][:4],
+                )
             else:
                 return [
                     {
@@ -522,13 +524,18 @@ class OwlVit:
                 y = box[3] - 10
             else:
                 y = box[3] + 25
+
+            color = (255, 0, 0)
+            if ranks[idx] == 1:
+                color = (0, 255, 0)
+
             img = cv2.putText(
                 img,
                 f"{ranks[idx]}:{label}",
                 (box[0], y),
                 font,
                 1,
-                (255, 0, 0),
+                color,
                 2,
                 cv2.LINE_AA,
             )
