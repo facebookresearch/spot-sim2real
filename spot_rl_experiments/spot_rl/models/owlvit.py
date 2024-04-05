@@ -198,7 +198,7 @@ class OwlVit:
                     detection["scores"],
                     detection["labels"],
                 )
-                device = detection.device
+                # device = detection.device
                 (
                     detection,
                     score,
