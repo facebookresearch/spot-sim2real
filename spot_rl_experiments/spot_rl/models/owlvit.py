@@ -21,6 +21,12 @@ except Exception as e:
     print(e)
     Sort = False
 
+from deep_sort_realtime.deepsort_tracker import DeepSort
+from spot_rl.utils.deepsort import (
+    convert_detections,
+    convert_track_class_to_numpy_tracks,
+)
+
 
 def generate_fake_bboxes(detections, N, image_dims=(480, 640)):
     if len(detections) == 0:
@@ -108,6 +114,14 @@ def find_matching_bbox_index(bboxes, target_bbox):
     return matching_indices
 
 
+def plot_detections_on_frame(frame, detections):
+    for detection in detections:
+        detection = list(map(int, detection.tolist()))
+        x1, y1, x2, y2 = detection
+        frame = cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 45, 255))
+    return frame
+
+
 class OwlVit:
     def __init__(
         self,
@@ -166,7 +180,9 @@ class OwlVit:
             # Check if SORT was imported correctly
             if Sort:
                 self.track_id = None
-                self.mot_tracker = Sort(max_age=10, min_hits=10, iou_threshold=0.01)
+                self.mot_tracker = DeepSort(
+                    max_age=30, embedder="clip_ViT-B/32"
+                )  # Sort(max_age=10, min_hits=10, iou_threshold=0.01)
             else:
                 # if not imported correctly set is_tracking_enabled to be False
                 rospy.set_param("is_tracking_enabled", False)
@@ -180,7 +196,7 @@ class OwlVit:
         self.reset_tracker()
         self.init_tracker()
 
-    def track(self, detections):
+    def track(self, detections, frame):
         is_tracking_enabled = rospy.get_param("is_tracking_enabled", False)
         if is_tracking_enabled:
             self.init_tracker()
@@ -212,7 +228,17 @@ class OwlVit:
 
             # Tracker will return NX5 array where last column is track_id,
             # Tracker will consume NX5 & may return MX5 where M != N
-            tracks = self.mot_tracker.update(detection.copy())  # MX5 -> trackid
+
+            # tracks = self.mot_tracker.update(detection.copy())  # MX5 -> trackid
+            detection_for_tracker = convert_detections(detections[0], 0.0)
+            # frame_ = plot_detections_on_frame(frame.copy(), detection[:, :4])
+            # cv2.imshow("frame", frame_)
+            # cv2.waitKey(0)
+            # try:
+            tracks = self.mot_tracker.update_tracks(detection_for_tracker, frame=frame)
+            # except :
+            #     breakpoint()
+            tracks = convert_track_class_to_numpy_tracks(tracks)
             print(
                 f"Num of current detections {len(detection[:, :4])}, self.track_id {self.track_id}, tracker output {tracks}"
             )
@@ -360,7 +386,7 @@ class OwlVit:
         # This will only return the bbox where we found our intial track
 
         # results = generate_fake_bboxes(results, 5)
-        results = self.track(results)
+        results = self.track(results, img)
         return (
             self.get_most_confident_bounding_box_per_label(results),
             self.create_img_with_bounding_box(img, results)
