@@ -166,7 +166,7 @@ class OwlVit:
             # Check if SORT was imported correctly
             if Sort:
                 self.track_id = None
-                self.mot_tracker = Sort(max_age=1, min_hits=1, iou_threshold=0.2)
+                self.mot_tracker = Sort(max_age=10, min_hits=10, iou_threshold=0.01)
             else:
                 # if not imported correctly set is_tracking_enabled to be False
                 rospy.set_param("is_tracking_enabled", False)
@@ -207,7 +207,7 @@ class OwlVit:
                 )
                 detection = np.hstack([detection, score])
                 # MAX
-                # change np.argmax to be custom index based on LLM, currently its max conf index
+                # change np.argmax to be custom index based on LLM, currently its max conf index, can we use based on bbox y1
                 det_to_track = detection[np.argmax(detection[:, -1])][:4]
 
             # Tracker will return NX5 array where last column is track_id,
@@ -216,6 +216,7 @@ class OwlVit:
             print(
                 f"Num of current detections {len(detection[:, :4])}, self.track_id {self.track_id}, tracker output {tracks}"
             )
+            # track_id = 1 : t0  at t=n no track_id 1 from tracker output, rather it was 5
             if len(tracks) > 0:
                 # once set per tracking episode, reset when tracking disabled
                 try:
@@ -358,7 +359,7 @@ class OwlVit:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
         # This will only return the bbox where we found our intial track
 
-        results = generate_fake_bboxes(results, 5)
+        # results = generate_fake_bboxes(results, 5)
         results = self.track(results)
         return (
             self.get_most_confident_bounding_box_per_label(results),
