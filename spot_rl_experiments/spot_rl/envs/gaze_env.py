@@ -39,6 +39,7 @@ class SpotGazeEnv(SpotBaseEnv):
         )
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
+        self._has_rotated = False
 
     def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
@@ -61,6 +62,8 @@ class SpotGazeEnv(SpotBaseEnv):
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
 
+        self._has_rotated = False
+
         return observations
 
     def approach_object(self):
@@ -71,10 +74,11 @@ class SpotGazeEnv(SpotBaseEnv):
             self.obj_center_pixel[0],
             self.obj_center_pixel[1],
         )
-        while raw_z > 0.6:
+        while raw_z > 0.5:
+            self._has_rotated = False
             print(f"raw_z: {raw_z} pixel_x: {pixel_x}, pixel_y: {pixel_y}")
             # z -= 0.50
-            z = 0.20
+            z = 0.10
 
             imgs = self.spot.get_hand_image()
 
@@ -132,7 +136,7 @@ class SpotGazeEnv(SpotBaseEnv):
                 point_in_base_3d,
                 [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
             )
-
+            # Recompute the distance
             self.get_gripper_images(save_image=True)
             raw_z, pixel_x, pixel_y = (
                 self.target_object_distance,
@@ -145,6 +149,11 @@ class SpotGazeEnv(SpotBaseEnv):
 
         if grasp:
             self.approach_object()
+            # Finally, rotate the gripper to 90 degree in roll
+            if not self._has_rotated:
+                self.spot.rotate_gripper_with_delta(wrist_roll=1.57)
+                self.get_gripper_images(save_image=True)
+                self._has_rotated = True
 
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp

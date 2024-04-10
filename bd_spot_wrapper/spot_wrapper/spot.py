@@ -411,7 +411,6 @@ class Spot:
         :param apply_min_force_to_object: if we want to loose the gripper after grasping
         :return: success true or false
         """
-
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
             height = image_response.shot.image.rows
