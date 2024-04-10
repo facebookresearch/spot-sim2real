@@ -5,7 +5,9 @@
 
 from typing import Any, Dict, Tuple
 
+import magnum as mn
 import numpy as np
+import rospy
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
 from spot_rl.skills.atomic_skills import (
@@ -13,6 +15,7 @@ from spot_rl.skills.atomic_skills import (
     OpenCloseDrawer,
     Pick,
     Place,
+    SemanticPick,
     SemanticPlace,
 )
 from spot_rl.utils.construct_configs import (
@@ -26,6 +29,7 @@ from spot_rl.utils.heuristic_nav import (
     ImageSearch,
     heurisitic_object_search_and_navigation,
 )
+from spot_rl.utils.pose_estimation import OrientationSolver
 from spot_rl.utils.search_table_location import (
     contrained_place_point_estimation,
     detect_place_point_by_pcd_method,
@@ -123,6 +127,8 @@ class SpotSkillManager:
         # Initiate the controllers for nav, gaze, and place
         self.__initiate_controllers(use_policies=use_policies)
 
+        self.orientation_solver: OrientationSolver = OrientationSolver()
+
         # Power on the robot
         self.spot.power_robot()
 
@@ -215,6 +221,10 @@ class SpotSkillManager:
         self.open_close_drawer_controller = OpenCloseDrawer(
             spot=self.spot,
             config=self.open_close_drawer_config,
+        )
+        self.semantic_gaze_controller = SemanticPick(
+            spot=self.spot,
+            config=self.pick_config,
         )
 
     def reset(self):
@@ -322,12 +332,19 @@ class SpotSkillManager:
             angle_interval=self.nav_config.get("HEURISTIC_SEARCH_ANGLE_INTERVAL", 20),
         )
 
-    def pick(self, target_obj_name: str = None) -> Tuple[bool, str]:
+    def pick(
+        self,
+        target_obj_name: str = None,
+        enable_pose_estimation: bool = False,
+        enable_pose_correction: bool = False,
+    ) -> Tuple[bool, str]:
         """
         Perform the pick action on the pick target specified as string
 
         Args:
             target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
+            enable_pose_estimation (bool) : Enable pose estimation default : False
+            enable_pose_correction (bool) : Enable pose correction default : False
 
         Returns:
             bool: True if pick was successful, False otherwise
@@ -337,7 +354,53 @@ class SpotSkillManager:
             "target_object": target_obj_name,
             "take_user_input": False,
         }  # type: Dict[str, Any]
+        if enable_pose_correction:
+            assert (
+                enable_pose_estimation
+            ), "Pose estimation must be enabled if you want to perform pose correction"
+        self.gaze_controller.set_pose_estimation_flags(
+            enable_pose_estimation, enable_pose_correction
+        )
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)
+        if status and enable_pose_correction:
+            spinal_axis = rospy.get_param("spinal_axis")
+            gamma = rospy.get_param("gamma", 0)
+            spinal_axis = mn.Vector3(*spinal_axis)
+            (
+                correction_status,
+                put_back_object_status,
+            ) = self.orientation_solver.perform_orientation_correction(
+                self.spot, spinal_axis, gamma, target_obj_name
+            )
+            status = status and correction_status and put_back_object_status
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    def semanticpick(
+        self, target_obj_name: str = None, grasping_type: str = "topdown"
+    ) -> Tuple[bool, str]:
+        """
+        Perform the semantic pick action on the pick target specified as string
+
+        Args:
+            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
+            grasping_type (str): The grasping type
+
+        Returns:
+            bool: True if pick was successful, False otherwise
+            str: Message indicating the status of the pick
+        """
+        assert grasping_type in [
+            "topdown",
+            "side",
+        ], f"Do not support {grasping_type} grasping"
+
+        goal_dict = {
+            "target_object": target_obj_name,
+            "take_user_input": False,
+            "grasping_type": grasping_type,
+        }  # type: Dict[str, Any]
+        status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -382,7 +445,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.pick_config.GAZE_ARM_JOINT_ANGLES,
-                    percentile=70,
+                    percentile=40,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )

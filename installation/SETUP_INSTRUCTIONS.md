@@ -83,6 +83,7 @@ mamba init
 # Update bashrc to activate this environment
 echo 'mamba activate spot_ros' >> ~/.bashrc
 source ~/.bashrc
+pip install open3d
 ```
 
 ### Install torch and cuda packages (**through the installation preview, ensure all of the following packages are installed as CUDA versions and not CPU versions**)
@@ -134,8 +135,31 @@ git lfs install
 
 # Download weights (need only once)
 git clone https://huggingface.co/spaces/jimmytyyang/spot-sim2real-data
-unzip spot-sim2real-data/weight/weights.zip && cd weights && uzip ../spot-sim2real-data/weight/torchscript.zip && cd ..
+unzip spot-sim2real-data/weight/weights.zip && cd weights && unzip ../spot-sim2real-data/weight/torchscript.zip && wget -q 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth' && cd ..
 rm -rf spot-sim2real-data && cd ../
+```
+
+### Setup SAM (Segment Anything) Seperately
+```bash
+# Install Segment Anything Package
+cd spot_s
+pip install segment-anything
+wget -q 'https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth'
+mv sam_vit_h_4b8939.pth ./spot_rl_experiments/weights/
+
+```
+### Setup FoundationPose (as third-party)
+
+```bash
+git submodule update --init --remote third_party/FoundationPoseForSpotSim2Real
+cd third_party/FoundationPoseForSpotSim2Real
+git checkout main
+git pull
+Download all network weights from [here](https://drive.google.com/drive/folders/1DFezOAD0oD1BblsXVxqDsl8fj0qzB82i?usp=sharing) and put them under the folder `third_party/FoundationPoseForSpotSim2Real/weights/
+sh run_env_setup.sh
+cd ../..
+conda activate spot_ros
+
 ```
 
 ### Setup MaskRCNN (as third-party)

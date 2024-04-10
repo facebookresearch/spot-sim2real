@@ -181,6 +181,19 @@ git checkout main
 
 - If you are done with demo of one of the above code and want to run another code, you do not need to re-run other sessions and nodes. Running a new command in the same terminal will work just fine. But **make sure to bring robot at home location and reset its home** using `spot_reset_home` in the same terminal
 
+#### Step6. [Optional] Pick with Pose estimation (uses NVIDIA's FoundationPose Model)
+- Ensure [FoundationPoseForSpotSim2real](https://github.com/tusharsangam/FoundationPoseForSpotSim2Real) is setup as submodule in third_party folder please follow instructions in [SETUP_INSTRUCTIONS.mds](./installation/SETUP_INSTRUCTIONS.md)
+- Currently we only support pose estimation for bottle, penguine plush toy & paper cup found in FB offices' microktichen
+- New Meshes can be added using 360 video of the object from any camera (iphone, android), entire process will be described in the above repo's README 
+- Pose estimation model [FoundationPose](https://nvlabs.github.io/FoundationPose/) runs as a microservice & can be communicated through pyzmq socket
+- The [Step 1](#step1-run-the-local-launch-executable) should also start the pose estimation service & no other step is required to start this microservice
+- <b>How to use Pose Estimation ?</b>
+    - You can pass two flags `enable_pose_estimation` & `enable_pose_correction` with `pick` skill as `skillmanager.pick(enable_pose_estimation=True, enable_pose_correction=True)`
+    - If you enable pose correction, spot will first manually correct the object pose for eg. rotate horizontal object to be vertical etc & place the corrected the object at the same place.
+    - Our `orientationsolver` can also correct the object to face the camera but it incurs additional pick attempt before place can be run thus is kept to be false by default
+    - <b>Enabling pose estimation can help in two major way</b> - informs grasp api how to approach the object viz. topdown or side which increases the grasp success probability & correct object orientation before place is ran.
+
+
 ### Using Spot Data-logger
 All logs will get stored inside `data/data_logs` directory
 

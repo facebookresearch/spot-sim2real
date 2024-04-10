@@ -6,7 +6,12 @@
 from typing import Any, List, Optional, Tuple
 
 import numpy as np
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from scipy.spatial.transform import Rotation
 
 FILTER_DIST = 2.4  # in meters (distance for valid detection)

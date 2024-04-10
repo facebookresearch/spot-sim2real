@@ -9,7 +9,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import click
 import numpy as np
 import rospy
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from geometry_msgs.msg import PoseStamped
 from perception_and_utils.utils.conversions import (
     ros_PoseStamped_to_sophus_SE3,

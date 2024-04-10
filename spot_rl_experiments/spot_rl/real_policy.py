@@ -232,6 +232,41 @@ class MobileGazePolicy(RealPolicy):
         )
 
 
+class SemanticGazePolicy(RealPolicy):
+    def __init__(self, checkpoint_path, device, config: CN = CN()):
+        observation_space = SpaceDict(
+            {
+                "arm_depth_bbox_sensor": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(240, 228, 1),
+                    dtype=np.float32,
+                ),
+                "articulated_agent_arm_depth": spaces.Box(
+                    low=0.0, high=1.0, shape=(240, 228, 1), dtype=np.float32
+                ),
+                "topdown_or_side_grasping": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(1,),
+                    dtype=np.float32,
+                ),
+                "joint": spaces.Box(
+                    low=np.finfo(np.float32).min,
+                    high=np.finfo(np.float32).max,
+                    shape=(4,),
+                    dtype=np.float32,
+                ),
+            }
+        )
+        action_space = spaces.Box(
+            -1.0, 1.0, (config.get("MOBILE_GAZE_ACTION_SPACE_LENGTH", 7),)
+        )
+        super().__init__(
+            checkpoint_path, observation_space, action_space, device, config=config
+        )
+
+
 class PlacePolicy(RealPolicy):
     def __init__(self, checkpoint_path, device, config: CN = CN()):
         observation_space = SpaceDict(
