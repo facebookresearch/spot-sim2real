@@ -26,7 +26,10 @@ from spot_rl.utils.heuristic_nav import (
     ImageSearch,
     heurisitic_object_search_and_navigation,
 )
-from spot_rl.utils.search_table_location import detect_place_point_by_pcd_method
+from spot_rl.utils.search_table_location import (
+    detect_place_point_by_pcd_method,
+    plot_place_point_in_gripper_image,
+)
 from spot_rl.utils.utils import (
     get_waypoint_yaml,
     nav_target_from_waypoint,
@@ -338,7 +341,7 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False) -> Tuple[bool, str]:  # type: ignore
+    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
@@ -371,13 +374,22 @@ class SpotSkillManager:
             conditional_print(message=message, verbose=self.verbose)
             # estimate waypoint
             try:
-                place_target_location, _, _ = detect_place_point_by_pcd_method(
+                (
+                    place_target_location,
+                    place_target_in_gripper_camera,
+                    _,
+                ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.pick_config.GAZE_ARM_JOINT_ANGLES,
                     percentile=70,
-                    visualize=False,
+                    visualize=visualize,
+                    height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
                 print(f"Estimate Place xyz: {place_target_location}")
+                if visualize:
+                    plot_place_point_in_gripper_image(
+                        self.spot, place_target_in_gripper_camera
+                    )
             except Exception as e:
                 message = f"Failed to estimate place way point due to {str(e)}"
                 conditional_print(message=message, verbose=self.verbose)
