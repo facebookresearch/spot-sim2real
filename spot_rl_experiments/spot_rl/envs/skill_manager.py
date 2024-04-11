@@ -338,7 +338,7 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None) -> Tuple[bool, str]:  # type: ignore
+    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
@@ -391,6 +391,7 @@ class SpotSkillManager:
             place_y,
             place_z,
             ee_orientation_at_grasping=ee_orientation_at_grasping,
+            is_local=is_local,
         )
         conditional_print(message=message, verbose=self.verbose)
         return status, message

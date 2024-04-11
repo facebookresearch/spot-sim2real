@@ -357,7 +357,9 @@ def detect_place_point_by_pcd_method(
         cv2.destroyAllWindows()
 
     point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))
-    placexyz = convert_point_in_body_to_place_waypoint(point_in_body, spot)
+    placexyz = np.array(
+        point_in_body
+    )  # convert_point_in_body_to_place_waypoint(point_in_body, spot)
     # Static Offset adjustment
     placexyz[0] += 0.10  # reduced from 0.20
     placexyz[2] += 0.10  # reduced from 0.15

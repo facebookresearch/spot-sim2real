@@ -843,11 +843,19 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             # Offset the ee x direction
             gripper_pos[0] += 0.2
         else:
-            gripper_T_base = self.get_in_gripper_tf()
-            base_T_gripper = gripper_T_base.inverted()
-            base_frame_place_target = self.get_base_frame_place_target_spot()
-            hab_place_target = self.spot2habitat_translation(base_frame_place_target)
-            gripper_pos = base_T_gripper.transform_point(hab_place_target)
+            # gripper_T_base = self.get_in_gripper_tf()
+            # base_T_gripper = gripper_T_base.inverted()
+            # base_frame_place_target = self.get_base_frame_place_target_spot()
+            # hab_place_target = self.spot2habitat_translation(base_frame_place_target)
+            gripper_pos = np.array(
+                self.spot.get_magnum_Matrix4_spot_a_T_b("hand", "body").transform_point(
+                    mn.Vector3(*self.place_target)
+                )
+            )  # base_T_gripper.transform_point(hab_place_target)
+            # gripper_pos = self.spot2habitat_translation(gripper_pos)
+            print(
+                f"GRIPPER_POS {gripper_pos}, self.place_target {self.place_target}, Gripper Pos in base frame {self.spot.get_magnum_Matrix4_spot_a_T_b('body', 'hand').translation}"
+            )
 
         return gripper_pos
 
