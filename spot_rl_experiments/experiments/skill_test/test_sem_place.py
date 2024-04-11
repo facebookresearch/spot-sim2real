@@ -21,14 +21,16 @@ if __name__ == "__main__":
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
 
+    is_local = False
     if enable_estimation_before_place:
         place_target = None
+        is_local = True
 
     # Start testing
     contnue = True
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
-        spotskillmanager.place(place_target, is_local=True)
+        spotskillmanager.place(place_target, is_local=is_local)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
 # The following is a helpful tip to debug the arm

@@ -824,38 +824,57 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # use_base_rot=True is needed for computing the correct place target for the semantic
         # place skills. The normal place skill does not need this
         if use_base_rot:
-            # Get the transformationss
-            base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-            ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-            body_T_ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
-            # Offset for the height
-            base_height = 0.5
-            ee_height = 0.05
-            actual_ee_height = base_height + body_T_ee_T.translation[2] + ee_height
-            # Move the base's translation to ee translation
-            base_T.translation = mn.Vector3(
-                ee_T.translation[0], ee_T.translation[1], actual_ee_height
-            )
-            # Get the glocal location of the place target
-            target = np.copy(self.place_target)
-            # Get the final target point
-            gripper_pos = base_T.inverted().transform_point(target)
-            # Offset the ee x direction
-            gripper_pos[0] += 0.2
-        else:
-            # gripper_T_base = self.get_in_gripper_tf()
-            # base_T_gripper = gripper_T_base.inverted()
-            # base_frame_place_target = self.get_base_frame_place_target_spot()
-            # hab_place_target = self.spot2habitat_translation(base_frame_place_target)
-            gripper_pos = np.array(
-                self.spot.get_magnum_Matrix4_spot_a_T_b("hand", "body").transform_point(
-                    mn.Vector3(*self.place_target)
+            if self.place_target_is_local:
+                # Get the transformationss
+                origin_base_T = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                    "vision", "body"
                 )
-            )  # base_T_gripper.transform_point(hab_place_target)
-            # gripper_pos = self.spot2habitat_translation(gripper_pos)
-            print(
-                f"GRIPPER_POS {gripper_pos}, self.place_target {self.place_target}, Gripper Pos in base frame {self.spot.get_magnum_Matrix4_spot_a_T_b('body', 'hand').translation}"
-            )
+                base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+                ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+                # Move the base's translation to ee translation
+                base_T.translation = mn.Vector3(
+                    ee_T.translation[0], ee_T.translation[1], ee_T.translation[2]
+                )
+                # Get the local location of the place target
+                target = np.copy(self.place_target)
+                # Make the local one to be vision frame
+                target_vision = origin_base_T.transform_point(target)
+                # Get the final target point
+                gripper_pos = base_T.inverted().transform_point(target_vision)
+            else:
+                # Get the transformationss
+                base_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+                ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+                body_T_ee_T = self.spot.get_magnum_Matrix4_spot_a_T_b("body", "hand")
+                # Offset for the height
+                base_height = 0.5
+                ee_height = 0.05
+                actual_ee_height = base_height + body_T_ee_T.translation[2] + ee_height
+                # Move the base's translation to ee translation
+                base_T.translation = mn.Vector3(
+                    ee_T.translation[0], ee_T.translation[1], actual_ee_height
+                )
+                # Get the glocal location of the place target
+                target = np.copy(self.place_target)
+                # Get the final target point
+                gripper_pos = base_T.inverted().transform_point(target)
+                # Offset the ee x direction
+                gripper_pos[0] += 0.2
+        else:
+            if self.place_target_is_local:
+                gripper_pos = np.array(
+                    self.spot.get_magnum_Matrix4_spot_a_T_b(
+                        "hand", "body"
+                    ).transform_point(mn.Vector3(*self.place_target))
+                )
+            else:
+                gripper_T_base = self.get_in_gripper_tf()
+                base_T_gripper = gripper_T_base.inverted()
+                base_frame_place_target = self.get_base_frame_place_target_spot()
+                hab_place_target = self.spot2habitat_translation(
+                    base_frame_place_target
+                )
+                gripper_pos = base_T_gripper.transform_point(hab_place_target)
 
         return gripper_pos
 
