@@ -28,7 +28,11 @@ if __name__ == "__main__":
     contnue = True
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
-        spotskillmanager.place(place_target)
+        import numpy as np
+
+        spotskillmanager.place(
+            place_target, ee_orientation_at_grasping=np.array([0, 1.57, 0])
+        )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
 # The following is a helpful tip to debug the arm
