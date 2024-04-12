@@ -14,21 +14,23 @@ if __name__ == "__main__":
 
     if in_fre_lab:
         # at FRE
-        place_target = "study_kavit"
+        place_target = "coffee_table"
     else:
         # at NYC
         place_target = "test_desk"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
 
+    is_local = False
     if enable_estimation_before_place:
         place_target = None
+        is_local = True
 
     # Start testing
     contnue = True
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
-        spotskillmanager.place(place_target)
+        spotskillmanager.place(place_target, is_local=is_local, visualize=True)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
 # The following is a helpful tip to debug the arm

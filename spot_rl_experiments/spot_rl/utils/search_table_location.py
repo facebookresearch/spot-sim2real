@@ -61,9 +61,8 @@ def farthest_point_sampling(points, num_samples):
     """
     Downsamples N X 3 point cloud data to num_samples X 3 where num_samples <= N, selects farthest points
     """
-    assert (
-        num_samples <= points.shape[0]
-    ), f"Num of points {num_samples} greater than shape of point cloud {points.shape[0]}"
+    if num_samples <= points.shape[0]:
+        return points
     farthest_pts = np.zeros((num_samples, 3))
     farthest_pts[0] = points[np.random.randint(len(points))]
     distances = np.linalg.norm(points - farthest_pts[0], axis=1)
@@ -195,6 +194,36 @@ def plot_intel_point_in_gripper_image(
     return img_with_point
 
 
+def plot_place_point_in_gripper_image(spot: Spot, point_in_gripper_camera: np.ndarray):
+    rospy.set_param("is_gripper_blocked", 0)
+    spot.open_gripper()
+    time.sleep(1)
+    gripper_resps = spot.get_hand_image()
+    gripper_rgb = image_response_to_cv2(gripper_resps[0])
+    intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
+    pixel = project_3d_to_pixel_uv(
+        point_in_gripper_camera.reshape(1, 3),
+        intrinsics_gripper.focal_length.x,
+        intrinsics_gripper.focal_length.y,
+        intrinsics_gripper.principal_point.x,
+        intrinsics_gripper.principal_point.y,
+    )[0]
+    print(f"Pixel in gripper image {pixel}")
+    gripper_rgb = cv2.circle(
+        gripper_rgb, (int(pixel[0]), int(pixel[1])), 2, (0, 0, 255)
+    )
+    try:
+        visualization_img = cv2.imread("table_detection.png")
+        visualization_img = np.hstack((visualization_img, gripper_rgb))
+        cv2.imshow("Table detection", visualization_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    except Exception as e:
+        print(f"Visualization error {e}")
+        visualization_img = gripper_rgb
+    cv2.imwrite("table_detection.png", visualization_img)
+
+
 def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     """
     Helper function to parse intel response images from spot, intrinsics parsing, transform estimation
@@ -234,8 +263,32 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     )
 
 
+def filter_pointcloud_by_normals_in_the_given_direction(
+    pcd_with_normals: o3d.geometry.PointCloud,
+    direction_vector: np.ndarray,
+    cosine_thresh: float = 0.25,
+    visualize: bool = False,
+):
+    """Filter point clouds based on the normal"""
+    direction_vector = direction_vector.reshape(3)
+    normals = np.asarray(pcd_with_normals.normals).reshape(-1, 3)
+    # Compute the dot product to get the cosines
+    cosines = (normals @ direction_vector).reshape(-1)
+    # Filter out the point clouds
+    pcd_dir_filtered = pcd_with_normals.select_by_index(
+        np.where(cosines > cosine_thresh)[0]
+    )
+    if visualize:
+        o3d.visualization.draw_geometries([pcd_dir_filtered])
+    return pcd_dir_filtered
+
+
 def detect_place_point_by_pcd_method(
-    spot, GAZE_ARM_JOINT_ANGLES, percentile: float = 70, visualize=True
+    spot,
+    GAZE_ARM_JOINT_ANGLES,
+    percentile: float = 70,
+    visualize=True,
+    height_adjustment_offset: float = 0.10,
 ):
     """
     Tries to estimate point on the table in front of the Spot, using PCD & plane fitting heuristic
@@ -271,8 +324,21 @@ def detect_place_point_by_pcd_method(
     cy = camera_intrinsics_intel.principal_point.y
     # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
     pcd = generate_point_cloud(img, depth_raw, mask, fx, fy, cx, cy)
+
+    pcd.estimate_normals(
+        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+    )
+    # 0.25 - 0 < angle < 75
+    pcd = filter_pointcloud_by_normals_in_the_given_direction(
+        pcd, np.array([0.0, -1.0, 0.0]), 0.5, visualize=visualize
+    )
+
+    # Down-sample by using voxel
+    # pcd = pcd.voxel_down_sample(voxel_size=0.01)
+    # print(f"After Downsampling {np.array(pcd.points).shape}")
+
     plane_pcd = plane_detect(pcd)
-    # DownSample
+    # Down-sample
     plane_pcd.points = o3d.utility.Vector3dVector(
         farthest_point_sampling(np.array(plane_pcd.points), 1024)
     )
@@ -341,7 +407,6 @@ def detect_place_point_by_pcd_method(
 
     img_with_bbox = None
     if visualize:
-        o3d.visualization.draw_geometries([pcd])
         img_with_bbox = img.copy()
         for xy in corners_xys:
             img_with_bbox = cv2.circle(
@@ -350,17 +415,15 @@ def detect_place_point_by_pcd_method(
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
-        cv2.imshow("Table detection", img_with_bbox)
-        cv2.waitKey(0)
-        # o3d.visualization.draw_geometries([pcd, plane_pcd])
         cv2.imwrite("table_detection.png", img_with_bbox)
-        cv2.destroyAllWindows()
 
     point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))
-    placexyz = convert_point_in_body_to_place_waypoint(point_in_body, spot)
+    placexyz = np.array(point_in_body)
+    # This is useful if we want the place target to be in global frame:
+    # convert_point_in_body_to_place_waypoint(point_in_body, spot)
     # Static Offset adjustment
-    placexyz[0] += 0.10  # reduced from 0.20
-    placexyz[2] += 0.10  # reduced from 0.15
+    placexyz[0] += 0.10
+    placexyz[2] += height_adjustment_offset
     return placexyz, selected_point_in_gripper, img_with_bbox
 
 
