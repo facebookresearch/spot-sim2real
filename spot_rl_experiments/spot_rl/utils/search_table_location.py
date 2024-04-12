@@ -61,9 +61,6 @@ def farthest_point_sampling(points, num_samples):
     """
     Downsamples N X 3 point cloud data to num_samples X 3 where num_samples <= N, selects farthest points
     """
-    # assert (
-    #     num_samples <= points.shape[0]
-    # ), f"Num of points {num_samples} greater than shape of point cloud {points.shape[0]}"
     if num_samples <= points.shape[0]:
         return points
     farthest_pts = np.zeros((num_samples, 3))
@@ -272,9 +269,12 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     cosine_thresh: float = 0.25,
     visualize: bool = False,
 ):
+    """Filter point clouds based on the normal"""
     direction_vector = direction_vector.reshape(3)
     normals = np.asarray(pcd_with_normals.normals).reshape(-1, 3)
+    # Compute the dot product to get the cosines
     cosines = (normals @ direction_vector).reshape(-1)
+    # Filter out the point clouds
     pcd_dir_filtered = pcd_with_normals.select_by_index(
         np.where(cosines > cosine_thresh)[0]
     )
@@ -333,12 +333,12 @@ def detect_place_point_by_pcd_method(
         pcd, np.array([0.0, -1.0, 0.0]), 0.5, visualize=visualize
     )
 
-    # DownSample
+    # Down-sample by using voxel
     # pcd = pcd.voxel_down_sample(voxel_size=0.01)
     # print(f"After Downsampling {np.array(pcd.points).shape}")
 
     plane_pcd = plane_detect(pcd)
-    # DownSample
+    # Down-sample
     plane_pcd.points = o3d.utility.Vector3dVector(
         farthest_point_sampling(np.array(plane_pcd.points), 1024)
     )
@@ -407,7 +407,6 @@ def detect_place_point_by_pcd_method(
 
     img_with_bbox = None
     if visualize:
-        # o3d.visualization.draw_geometries([pcd])
         img_with_bbox = img.copy()
         for xy in corners_xys:
             img_with_bbox = cv2.circle(
@@ -416,10 +415,6 @@ def detect_place_point_by_pcd_method(
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
-        # cv2.imshow("Table detection", img_with_bbox)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
-        # o3d.visualization.draw_geometries([pcd, plane_pcd])
         cv2.imwrite("table_detection.png", img_with_bbox)
 
     point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))
@@ -427,8 +422,8 @@ def detect_place_point_by_pcd_method(
     # This is useful if we want the place target to be in global frame:
     # convert_point_in_body_to_place_waypoint(point_in_body, spot)
     # Static Offset adjustment
-    placexyz[0] += 0.10  # reduced from 0.20
-    placexyz[2] += height_adjustment_offset  # reduced from 0.15
+    placexyz[0] += 0.10
+    placexyz[2] += height_adjustment_offset
     return placexyz, selected_point_in_gripper, img_with_bbox
 
 
