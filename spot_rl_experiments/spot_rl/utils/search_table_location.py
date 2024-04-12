@@ -266,6 +266,23 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     )
 
 
+def filter_pointcloud_by_normals_in_the_given_direction(
+    pcd_with_normals: o3d.geometry.PointCloud,
+    direction_vector: np.ndarray,
+    cosine_thresh: float = 0.25,
+    visualize: bool = False,
+):
+    direction_vector = direction_vector.reshape(3)
+    normals = np.asarray(pcd_with_normals.normals).reshape(-1, 3)
+    cosines = (normals @ direction_vector).reshape(-1)
+    pcd_dir_filtered = pcd_with_normals.select_by_index(
+        np.where(cosines > cosine_thresh)[0]
+    )
+    if visualize:
+        o3d.visualization.draw_geometries([pcd_dir_filtered])
+    return pcd_dir_filtered
+
+
 def detect_place_point_by_pcd_method(
     spot,
     GAZE_ARM_JOINT_ANGLES,
@@ -307,9 +324,18 @@ def detect_place_point_by_pcd_method(
     cy = camera_intrinsics_intel.principal_point.y
     # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
     pcd = generate_point_cloud(img, depth_raw, mask, fx, fy, cx, cy)
+
+    pcd.estimate_normals(
+        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+    )
+    # 0.25 - 0 < angle < 75
+    pcd = filter_pointcloud_by_normals_in_the_given_direction(
+        pcd, np.array([0.0, -1.0, 0.0]), 0.5, visualize=visualize
+    )
+
     # DownSample
-    pcd = pcd.voxel_down_sample(voxel_size=0.01)
-    print(f"After Downsampling {np.array(pcd.points).shape}")
+    # pcd = pcd.voxel_down_sample(voxel_size=0.01)
+    # print(f"After Downsampling {np.array(pcd.points).shape}")
 
     plane_pcd = plane_detect(pcd)
     # DownSample
