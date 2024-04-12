@@ -737,7 +737,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return x1, y1, x2, y2
 
     @staticmethod
-    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.15):
+    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.55):
         cy, cx = height // 2, width // 2
         # Locked on if the center of the image is in the bbox
         if x1 < cx < x2 and y1 < cy < y2:
@@ -759,7 +759,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def should_grasp(self):
         grasp = False
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
-            if self.target_object_distance < 1.5:
+            if self.target_object_distance < 0.7:
                 if self.config.ASSERT_CENTERING:
                     x, y = self.obj_center_pixel
                     if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:

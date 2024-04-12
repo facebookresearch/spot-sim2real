@@ -25,11 +25,11 @@ if __name__ == "__main__":
         pick_from = pick_targets[i]
         i += 1
         spotskillmanager = SpotSkillManager(use_mobile_pick=True)
-        spotskillmanager.nav(pick_from)
+        # spotskillmanager.nav(pick_from)
         x = input(f"Press Enter to continue to mobile gaze from {pick_from}")
-        spotskillmanager.pick("creal_box")
-        spotskillmanager.spot.open_gripper()
+        spotskillmanager.pick("penguin plush")
+        # spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown
-    spotskillmanager.dock()
+    # spotskillmanager.dock()
