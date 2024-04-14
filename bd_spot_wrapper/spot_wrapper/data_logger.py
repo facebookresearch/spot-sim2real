@@ -6,7 +6,6 @@ from typing import Any, Dict, List
 import click
 import cv2
 import numpy as np
-from spot_wrapper.spot import Spot, SpotCamIds
 
 PATH_TO_LOGS = osp.join(
     osp.dirname(osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))))),
@@ -32,6 +31,8 @@ def verify_sources(camera_sources: List[str]) -> bool:
 
 
 def log_data_async(spot):
+    from spot_wrapper.spot import SpotCamIds
+
     source_list = [
         SpotCamIds.HAND_COLOR,
         SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
@@ -133,6 +134,8 @@ def log_replay(logfile_name: str):
 @click.option("--replay", is_flag=False, type=str, default=None)
 def main(log_data: bool, replay: str):
     if log_data:
+        from spot_wrapper.spot import Spot
+
         spot = Spot("SpotDataLogger")
         log_data_async(spot)
     else:
