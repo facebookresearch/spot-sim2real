@@ -7,8 +7,9 @@ import magnum as mn
 import numpy as np
 import open3d as o3d
 import rospy
+import zmq
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_rl.utils.heuristic_nav import get_3d_point
+from spot_rl.utils.heuristic_nav import get_3d_point, get_best_uvz_from_detection
 from spot_rl.utils.plane_detection import plane_detect
 from spot_wrapper.spot import Spot, image_response_to_cv2
 
@@ -336,6 +337,168 @@ def detect_place_point_by_pcd_method(
     # Down-sample by using voxel
     # pcd = pcd.voxel_down_sample(voxel_size=0.01)
     # print(f"After Downsampling {np.array(pcd.points).shape}")
+
+    plane_pcd = plane_detect(pcd)
+    # Down-sample
+    plane_pcd.points = o3d.utility.Vector3dVector(
+        farthest_point_sampling(np.array(plane_pcd.points), 1024)
+    )
+    color = np.zeros(np.array(plane_pcd.points).shape)
+    color[:, 0] = 1
+    color[:, 1] = 0
+    color[:, 2] = 0
+    plane_pcd.colors = o3d.utility.Vector3dVector(color)
+    target_points, selected_point = get_target_points_by_heuristic(
+        np.array(plane_pcd.points)
+    )
+    corners_xys = project_3d_to_pixel_uv(target_points, fx, fy, cx, cy)
+
+    y_threshold = np.percentile(corners_xys[:, -1], percentile)
+
+    indices_gtr_thn_y_thresh = corners_xys[:, 1] >= y_threshold
+    corners_gtr_than_y_thresh = corners_xys[indices_gtr_thn_y_thresh]
+    indices = np.argsort(corners_gtr_than_y_thresh[:, 1])
+    sorted_corners_gtr_than_y_thresh = corners_gtr_than_y_thresh[indices]
+    selected_xy = sorted_corners_gtr_than_y_thresh[0]
+    corners_xys = corners_gtr_than_y_thresh[indices]
+    print(f"Selected XY {selected_xy}")
+    depth_at_selected_xy = (
+        sample_patch_around_point(int(selected_xy[0]), int(selected_xy[1]), depth_raw)
+        / 1000.0
+    )
+    print(f"Depth in Intel {depth_at_selected_xy}")
+    assert (
+        depth_at_selected_xy != 0.0
+    ), f"Non zero depth required found {depth_at_selected_xy}"
+    selected_point = get_3d_point(
+        camera_intrinsics_intel, selected_xy, depth_at_selected_xy
+    )
+    # Convert selected point in gripper 3D to 3D then 3D to 2D then 2D to 3D using depth at Gripper
+    # Ideally body-T_hand*hand_T_intel*point_in_intel should work but hand_T_intel has errors plus depth in Intel at closer points is not same as gripper
+    # thus we convert intel 3D point to Gripper 3D, convert 3D to 2D & then again from 2D to 3D using depth map
+    selected_point_in_gripper = gripper_T_intel.transform_point(
+        mn.Vector3(*selected_point)
+    )
+    selected_point_in_gripper = np.array(
+        [
+            selected_point_in_gripper.x,
+            selected_point_in_gripper.y,
+            selected_point_in_gripper.z,
+        ]
+    )
+    fx = camera_intrinsics_gripper.focal_length.x
+    fy = camera_intrinsics_gripper.focal_length.y
+    cx = camera_intrinsics_gripper.principal_point.x
+    cy = camera_intrinsics_gripper.principal_point.y
+    selected_xy_in_gripper = project_3d_to_pixel_uv(
+        selected_point_in_gripper.reshape(1, 3), fx, fy, cx, cy
+    )[0]
+    depth_at_selected_xy_in_gripper = (
+        depth_at_selected_xy + 0.02
+    )  # Add 2 cm in intel depth to get depth in gripper
+    print(f"Depth in gripper {depth_at_selected_xy_in_gripper}")
+    assert (
+        depth_at_selected_xy_in_gripper != 0.0
+    ), f"Expeceted gripper depth at point {int(selected_xy_in_gripper[1]), int(selected_xy_in_gripper[0])} to be non zero but found {depth_at_selected_xy_in_gripper}"
+    selected_point_in_gripper = get_3d_point(
+        camera_intrinsics_gripper,
+        selected_xy_in_gripper,
+        depth_at_selected_xy_in_gripper,
+    )
+
+    img_with_bbox = None
+    if visualize:
+        img_with_bbox = img.copy()
+        for xy in corners_xys:
+            img_with_bbox = cv2.circle(
+                img_with_bbox, (int(xy[0]), int(xy[1])), 1, (255, 0, 0)
+            )
+        img_with_bbox = cv2.circle(
+            img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
+        )
+        cv2.imwrite("table_detection.png", img_with_bbox)
+
+    point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))
+    placexyz = np.array(point_in_body)
+    # This is useful if we want the place target to be in global frame:
+    # convert_point_in_body_to_place_waypoint(point_in_body, spot)
+    # Static Offset adjustment
+    placexyz[0] += 0.10
+    placexyz[2] += height_adjustment_offset
+    return placexyz, selected_point_in_gripper, img_with_bbox
+
+
+def detect_with_socket(img, object_name, thresh=0.01, device="cuda"):
+    port = 21001
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect(f"tcp://localhost:{port}")
+    print(f"Socket Connected at {port}")
+    socket.send_pyobj((img, object_name, thresh, device))
+    return socket.recv_pyobj()
+
+
+def contrained_place_point_estimation(
+    object_target: str,
+    direction: np.ndarray,
+    spot: Spot,
+    GAZE_ARM_JOINT_ANGLES: list,
+    percentile: float = 70,
+    visualize=True,
+    height_adjustment_offset: float = 0.10,
+):
+    # detect object target
+    assert osp.exists(GRIPPER_T_INTEL), f"{GRIPPER_T_INTEL} not found"
+    gripper_T_intel = np.load(GRIPPER_T_INTEL)
+    spot.close_gripper()
+    gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
+    spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
+
+    # Wait for a bit to stabalized the gripper
+    time.sleep(2.0)
+
+    (
+        img,
+        depth_raw,
+        camera_intrinsics_intel,
+        camera_intrinsics_gripper,
+        body_T_hand,
+        gripper_T_intel,
+    ) = get_arguments(spot, gripper_T_intel)
+
+    print(f"Lookign for {object_target}")
+
+    predictions = detect_with_socket(img, object_target, 0.01)
+
+    prediction = predictions[0]
+    (x1, y1, x2, y2), score = prediction[0], prediction[-1]
+    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+    z = get_best_uvz_from_detection(depth_raw, [x1, y1, x2, y2])[-1]
+    centee3d = get_3d_point(camera_intrinsics_intel, [cx, cy], z)
+
+    mask = np.ones_like(depth_raw).astype(bool)
+    # mask[y1:y2, x1:x2] = True
+    fx = camera_intrinsics_intel.focal_length.x
+    fy = camera_intrinsics_intel.focal_length.y
+    cx = camera_intrinsics_intel.principal_point.x
+    cy = camera_intrinsics_intel.principal_point.y
+    # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
+    pcd = generate_point_cloud(img, depth_raw, mask, fx, fy, cx, cy)
+    pcd.estimate_normals(
+        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+    )
+    points = np.array(pcd.points)
+
+    pcd_filtered = pcd.select_by_index(np.where(points[:, 0] - centee3d[0] < 0.1)[0])
+
+    # o3d.visualization.draw_geometries([pcd], point_show_normal=True)
+    pcd = pcd_filtered
+    if visualize:
+        o3d.visualization.draw_geometries([pcd_filtered], point_show_normal=True)
+    pcd = filter_pointcloud_by_normals_in_the_given_direction(
+        pcd, np.array([0.0, -1.0, 0.0]), 0.5, visualize=visualize
+    )
 
     plane_pcd = plane_detect(pcd)
     # Down-sample
