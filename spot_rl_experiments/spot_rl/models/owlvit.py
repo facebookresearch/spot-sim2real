@@ -26,6 +26,22 @@ from spot_rl.utils.deepsort import (
     convert_detections,
     convert_track_class_to_numpy_tracks,
 )
+from torchvision.transforms import Compose, Normalize, ToTensor
+
+
+def _convert_image_to_rgb(image):
+    return image.convert("RGB")
+
+
+frame_transform = Compose(
+    [
+        _convert_image_to_rgb,
+        ToTensor(),
+        Normalize(
+            (0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)
+        ),
+    ]
+)
 
 
 def generate_fake_bboxes(detections, N, image_dims=(480, 640)):
@@ -110,6 +126,10 @@ def find_matching_bbox_index(bboxes, target_bbox):
 
     # Find the indices where matches occur
     matching_indices = np.where(matches)[0]
+    if len(matching_indices) > 0:
+        matching_indices = matching_indices[0]
+    else:
+        matching_indices = -1
 
     return matching_indices
 
@@ -174,6 +194,11 @@ class OwlVit:
         self.show_img = show_img
         self.mot_tracker = None
         self.track_id = None
+        rospy.set_param("id_switch_since_begining", 0)
+
+    def _update_id_switch(self):
+        current_id_switch = int(rospy.get_param("id_switch_since_begining", 0)) + 1
+        return rospy.set_param("id_switch_since_begining", current_id_switch)
 
     def init_tracker(self):
         if not self.mot_tracker and not self.track_id:
@@ -181,7 +206,7 @@ class OwlVit:
             if Sort:
                 self.track_id = None
                 self.mot_tracker = DeepSort(
-                    max_age=30, embedder="clip_ViT-B/32"
+                    n_init=1, max_age=30, embedder="clip_ViT-B/32"
                 )  # Sort(max_age=10, min_hits=10, iou_threshold=0.01)
             else:
                 # if not imported correctly set is_tracking_enabled to be False
@@ -189,6 +214,7 @@ class OwlVit:
 
     def reset_tracker(self):
         self.track_id = None
+        del self.mot_tracker
         self.mot_tracker = None
 
     def reinit_tracker(self):
@@ -196,7 +222,11 @@ class OwlVit:
         self.reset_tracker()
         self.init_tracker()
 
-    def track(self, detections, frame):
+    def _preprocess_frame(self, frame_bgr):
+        frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        return frame_transform(Image.fromarray(frame_rgb)).permute(1, 2, 0).to("cuda")
+
+    def track(self, detections, frame_on_cuda, orig_frame):
         is_tracking_enabled = rospy.get_param("is_tracking_enabled", False)
         if is_tracking_enabled:
             self.init_tracker()
@@ -205,8 +235,12 @@ class OwlVit:
         if self.mot_tracker:
             if len(detections) == 0:
                 detection = np.empty((0, 5))
+                detection_for_tracker = []
+                det_to_track = None
             elif len(detections[0]["scores"]) == 0:
                 detection = np.empty((0, 5))
+                detection_for_tracker = []
+                det_to_track = None
             else:
                 detection = detections[0]
                 detection, score, _ = (
@@ -225,35 +259,33 @@ class OwlVit:
                 # MAX
                 # change np.argmax to be custom index based on LLM, currently its max conf index, can we use based on bbox y1
                 det_to_track = detection[np.argmax(detection[:, -1])][:4]
+                detection_for_tracker = convert_detections(detections[0], 0.0)
+                # frame_ = plot_detections_on_frame(orig_frame, detection[:, :4])
+                # cv2.imshow("frame", frame_)
+                # cv2.waitKey(0)
 
-            # Tracker will return NX5 array where last column is track_id,
-            # Tracker will consume NX5 & may return MX5 where M != N
-
-            # tracks = self.mot_tracker.update(detection.copy())  # MX5 -> trackid
-            detection_for_tracker = convert_detections(detections[0], 0.0)
-            # frame_ = plot_detections_on_frame(frame.copy(), detection[:, :4])
-            # cv2.imshow("frame", frame_)
-            # cv2.waitKey(0)
-            # try:
-            tracks = self.mot_tracker.update_tracks(detection_for_tracker, frame=frame)
-            # except :
-            #     breakpoint()
-            tracks = convert_track_class_to_numpy_tracks(tracks)
-            print(
-                f"Num of current detections {len(detection[:, :4])}, self.track_id {self.track_id}, tracker output {tracks}"
+            tracks = self.mot_tracker.update_tracks(
+                detection_for_tracker, frame=frame_on_cuda
             )
+            tracks = convert_track_class_to_numpy_tracks(tracks)
+
+            print(
+                f"Num of current detections {len(detection[:, :4])}, self.track_id {self.track_id}"
+            )
+
             # track_id = 1 : t0  at t=n no track_id 1 from tracker output, rather it was 5
             if len(tracks) > 0:
                 # once set per tracking episode, reset when tracking disabled
                 try:
-                    self.track_id = (
-                        tracks[
-                            find_matching_bbox_index(tracks[:, :4], det_to_track)
-                        ].flatten()[-1]
-                        if self.track_id is None
-                        else self.track_id
-                    )
-                except:
+                    if self.track_id is None and det_to_track is not None:
+                        track_id_index = find_matching_bbox_index(
+                            tracks[:, :4], det_to_track
+                        )
+                        if track_id_index == -1:
+                            return detections
+                        self.track_id = tracks[track_id_index].flatten()[-1]
+                except Exception as e:
+                    print(e)
                     breakpoint()
                 track_id_found_at_mask = tracks[:, -1] == self.track_id
                 if not np.any(track_id_found_at_mask):
@@ -261,13 +293,22 @@ class OwlVit:
                     print(
                         f"id_switch event from {self.track_id} to {tracks[0][-1]} reintializing tracker"
                     )
+                    self._update_id_switch()
                     self.reinit_tracker()
-                    tracks = self.mot_tracker.update(detection.copy())
-                    self.track_id = tracks[
-                        find_matching_bbox_index(tracks[:, :4], det_to_track)
-                    ].flatten()[-1]
+                    tracks = self.mot_tracker.update_tracks(
+                        detection_for_tracker, frame=frame_on_cuda
+                    )
+                    tracks = convert_track_class_to_numpy_tracks(tracks)
+                    if self.track_id is None and det_to_track is not None:
+                        track_id_index = find_matching_bbox_index(
+                            tracks[:, :4], det_to_track
+                        )
+                        if track_id_index == -1:
+                            return detections
+                        self.track_id = tracks[track_id_index].flatten()[-1]
                     track_id_found_at_mask = tracks[:, -1] == self.track_id
                     track_filtered_by_trackid = tracks[track_id_found_at_mask]
+
                 track_filtered_by_trackid = tracks[
                     track_id_found_at_mask
                 ]  # select only 1 track [x1, y1, x2, y2, track_id] where track_id == self.track_id
@@ -289,7 +330,7 @@ class OwlVit:
                         detections[0]["boxes"],
                         torch.from_numpy(
                             track_filtered_by_trackid[0][:4].reshape(1, 4)
-                        ).to(device),
+                        ).to("cuda:0"),
                     )
                 ).reshape(-1, 4)
                 detections[0]["scores"] = torch.cat(
@@ -358,6 +399,7 @@ class OwlVit:
         img: an open cv image in (H, W, C) format
         """
         # img = img.to(self.device)
+        frame_on_cuda = self._preprocess_frame(img.copy())
 
         inputs = self.processor(text=self.labels, images=img, return_tensors="pt")
         target_sizes = (
@@ -386,7 +428,7 @@ class OwlVit:
         # This will only return the bbox where we found our intial track
 
         # results = generate_fake_bboxes(results, 5)
-        results = self.track(results, img)
+        results = self.track(results, frame_on_cuda, img)
         return (
             self.get_most_confident_bounding_box_per_label(results),
             self.create_img_with_bounding_box(img, results)
