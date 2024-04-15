@@ -37,8 +37,7 @@ def convert_track_class_to_numpy_tracks(tracks):
         if not track.is_confirmed():
             continue
         track_id = float(track.track_id)
-        x1, y1, w, h = track.original_ltwh
-        x2, y2 = x1 + w, y1 + h
+        x1, y1, x2, y2 = track.to_ltrb(orig=True)
         nunpy_tracks.append([x1, y1, x2, y2, track_id])
     nunpy_tracks = np.array(nunpy_tracks).reshape(-1, 5).astype(np.float32)
     return nunpy_tracks
