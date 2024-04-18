@@ -302,43 +302,42 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
             time.sleep(0.5)
-            self.get_gripper_images(save_image=True)
+            # Disable this to force grasp
+            # self.get_gripper_images(save_image=True)
+            # if self.curr_forget_steps == 0:
 
-            if self.curr_forget_steps == 0:
-                if self.config.VERBOSE:
-                    print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
-                self.say("Grasping " + self.target_obj_name)
+            if self.config.VERBOSE:
+                print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
+            self.say("Grasping " + self.target_obj_name)
 
-                # The following cmd is blocking
-                success = self.attempt_grasp()
-                if success:
-                    # Just leave the object on the receptacle if desired
-                    if self.config.DONT_PICK_UP:
-                        self.say("open_gripper in don't pick up")
-                        self.spot.open_gripper()
-                    self.grasp_attempted = True
-                    arm_positions = np.deg2rad(self.config.PLACE_ARM_JOINT_ANGLES)
-                else:
-                    self.say("BD grasp API failed.")
+            # The following cmd is blocking
+            success = True  # self.attempt_grasp()
+            if success:
+                # Just leave the object on the receptacle if desired
+                if self.config.DONT_PICK_UP:
+                    self.say("open_gripper in don't pick up")
                     self.spot.open_gripper()
-                    self.locked_on_object_count = 0
-                    arm_positions = np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES)
-                    time.sleep(2)
+                self.grasp_attempted = True
+                arm_positions = np.deg2rad(self.config.PLACE_ARM_JOINT_ANGLES)
+            else:
+                self.say("BD grasp API failed.")
+                self.spot.open_gripper()
+                self.locked_on_object_count = 0
+                arm_positions = np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES)
+                time.sleep(2)
 
-                # Record the grasping pose (in roll pitch yaw) of the gripper
-                (
-                    _,
-                    self.ee_orientation_at_grasping,
-                ) = self.spot.get_ee_pos_in_body_frame()
+            # Record the grasping pose (in roll pitch yaw) of the gripper
+            (
+                _,
+                self.ee_orientation_at_grasping,
+            ) = self.spot.get_ee_pos_in_body_frame()
 
-                self.spot.set_arm_joint_positions(
-                    positions=arm_positions, travel_time=1.0
-                )
+            self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=1.0)
 
-                # Wait for arm to return to position
-                time.sleep(1.0)
-                if self.config.TERMINATE_ON_GRASP:
-                    self.should_end = True
+            # Wait for arm to return to position
+            time.sleep(1.0)
+            if self.config.TERMINATE_ON_GRASP:
+                self.should_end = True
         elif place:
             self.say("PLACE ACTION CALLED: Opening the gripper!")
             # We only turning the wrist when calling place, but not doing this for semantic place
@@ -759,7 +758,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def should_grasp(self):
         grasp = False
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
-            if self.target_object_distance < 0.2:  # Adjust the distance
+            if self.target_object_distance < 0.5:  # Adjust the distance
                 if self.config.ASSERT_CENTERING:
                     x, y = self.obj_center_pixel
                     if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:

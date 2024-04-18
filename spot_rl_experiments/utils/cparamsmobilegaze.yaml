@@ -9,8 +9,8 @@ OBSERVATIONS_DICT:
 # Define the action space output length
 ACTION_SPACE_LENGTH: 7
 # The path to load and save the models
-TARGET_HAB3_POLICY_PATH: "../weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.pth"
-OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+TARGET_HAB3_POLICY_PATH: "../weights/mobile_gaze_v2/mg97hv4_35_ckpt.66.pth"
+OUTPUT_COMBINED_NET_SAVE_PATH: "../weights/mobile_gaze_v2/mg97hv4_35_ckpt.66.torchscript"
 # If we want to use stereo pair camera for mobile gaze
 USE_STEREO_PAIR_CAMERA: False
 NEW_HABITAT_LAB_POLICY_OR_OLD: 'new'

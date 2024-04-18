@@ -9,7 +9,7 @@ WEIGHTS_TORCHSCRIPT:
 
   # Mobile Gaze torchscript module files path
   # MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
-  MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+  MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv4_24_ckpt.59.torchscript"
 
   # Static place
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
@@ -29,7 +29,7 @@ WEIGHTS:
 
   # Mobile Gaze torchscript module files path
   # MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
-  MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+  MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv4_24_ckpt.59.torchscript"
 
   # Static place
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
