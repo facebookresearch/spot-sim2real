@@ -11,7 +11,7 @@ import click
 import cv2
 import numpy as np
 import rospy
-import sophus as sp
+import sophuspy as sp
 from fairotag.scene import Scene
 from matplotlib import pyplot as plt
 from perception_and_utils.perception.detector_wrappers.april_tag_detector import (

@@ -8,7 +8,7 @@ from typing import List, Tuple
 import cv2.aruco as aruco
 import fairotag as frt
 import numpy as np
-import sophus as sp
+import sophuspy as sp
 from perception_and_utils.utils.generic_utils import conditional_print
 
 MARKER_LENGTH = 0.146

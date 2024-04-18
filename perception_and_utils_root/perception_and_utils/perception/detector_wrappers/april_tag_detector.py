@@ -8,7 +8,7 @@ import os
 from typing import Any, Dict, Tuple
 
 import numpy as np
-import sophus as sp
+import sophuspy as sp
 from perception_and_utils.perception.april_tag_pose_estimator import (
     AprilTagPoseEstimator,
 )
