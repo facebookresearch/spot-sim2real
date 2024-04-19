@@ -416,14 +416,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.stopwatch.record("get_observations")
 
         self.num_steps += 1
-        self.say(
+        print(
             f"****************************************************num_steps: {self.num_steps}"
         )
         timeout = self.num_steps >= self.max_episode_steps
         if timeout:
             print(f"Execution exceeded {self.max_episode_steps} steps. Timing out...")
         else:
-            self.say(f"Execution has not exceeded {self.max_episode_steps} steps.")
+            print(f"Execution has not exceeded {self.max_episode_steps} steps.")
         done = timeout or self.get_success(observations) or self.should_end
         self.ctrl_hz = self.config.CTRL_HZ  # revert ctrl_hz in case it slowed down
 

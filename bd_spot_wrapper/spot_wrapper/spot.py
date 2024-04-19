@@ -183,7 +183,14 @@ class Spot:
             RobotStateClient.default_service_name
         )
 
-        # Used to re-center origin of global frame
+        # Used to re-center origin of global frame (reads from the current state of updated HOME.TXT)
+        self.recenter_origin_of_global_frame()
+
+        # Print the battery charge level of the robot
+        self.loginfo(f"Current battery charge: {self.get_battery_charge()}%")
+
+    def recenter_origin_of_global_frame(self):
+        """Reads from the current state of updated HOME.TXT"""
         if osp.isfile(HOME_TXT):
             with open(HOME_TXT) as f:
                 data = f.read()
@@ -193,9 +200,6 @@ class Spot:
         else:
             self.global_T_home = None
             self.robot_recenter_yaw = None
-
-        # Print the battery charge level of the robot
-        self.loginfo(f"Current battery charge: {self.get_battery_charge()}%")
 
     def get_lease(self, hijack=False):
         # Make sure a lease for this client isn't already active
@@ -760,7 +764,9 @@ class Spot:
         as_string = list(self.global_T_home.flatten()) + [yaw]
         as_string = f"{as_string}"[1:-1]  # [1:-1] removes brackets
         with open(HOME_TXT, "w") as f:
+            print("Writing into HOME.TXT")
             f.write(as_string)
+        print(f"Wrote:\n{as_string}\nto: {HOME_TXT}")
         self.loginfo(f"Wrote:\n{as_string}\nto: {HOME_TXT}")
 
     def get_base_transform_to(self, child_frame):

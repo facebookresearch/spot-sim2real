@@ -1,0 +1,27 @@
+ROBOT_TASK_FIND_OBJECT = "findObject"
+ROBOT_TASK_PLACE_OBJECT = "placeObject"
+ROBOT_TASK_NAVIGATE_TO = "navigateTo"
+ROBOT_TASK_SHUTDOWN = "shutdown"
+ROBOT_TASK_SIT = "sit"
+ROBOT_TASK_STAND = "stand"
+ROBOT_TASK_DOCK = "dock"
+ROBOT_TASK_UNDOCK = "undock"
+
+SERVER_MESSAGE_TYPE_USER_STATE = "user_state"
+SERVER_MESSAGE_TYPE_APP_STATE = "application_state"
+SERVER_MESSAGE_TYPE_COMMAND_STATE = "command_state"
+SERVER_MESSAGE_TYPE_ROBOT_STATE = "robot_state"
+SERVER_MESSAGE_TYPE_ROOM_STATE = "room_state"
+SERVER_MESSAGE_ACTIVE_USERS = "active_users"
+
+CLIENT_MESSAGE_TYPE_PLAYER_ENTER = "user_enter"
+CLIENT_MESSAGE_TYPE_PLAYER_EXIT = "user_exit"
+CLIENT_MESSAGE_ROBOT_COMMAND = "robot_command"
+
+CLIENT_MESSAGE_COMMAND_BUILDER_UPDATE = "relay_command_builder_update"
+CLIENT_MESSAGE_GET_CONNECTED_USERS = "get_connected_users"
+
+FAKE_ROBOT_ENTER = "fake_robot_enter"
+FAKE_ROBOT_POSITION_YAW_UPDATE = "fake_robot_set_x_y_yaw"
+FAKE_ROBOT_WAYPOINTS_UPDATE = "fake_robot_waypoints_update"
+FAKE_ROBOT_FIDUCIALS_UPDATE = "fake_robot_fiducials_update"

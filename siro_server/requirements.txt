@@ -1,0 +1,7 @@
+pyyaml
+yacs
+websockets
+opencv-python==4.8.0.74
+gym==0.23.1
+rospkg
+blosc
