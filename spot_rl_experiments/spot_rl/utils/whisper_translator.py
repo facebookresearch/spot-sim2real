@@ -49,6 +49,7 @@ class WhisperTranslator:
         # Voice Activity Detection
         self.vad = webrtcvad.Vad()
         self.vad.set_mode(3)
+        self.whisper = whisper.load_model("base", device="cuda")
         print("=====================================\n")
 
     def record(self):
@@ -89,36 +90,38 @@ class WhisperTranslator:
                     iters += 1
         print("Done Recording")
 
-    def translate(self):
+    def translate(self, online=False):
         """
         Translates the audio to text using Whisper first from OPENAI CLOUD client and if it fails, then from locally downloaded model
         """
         transcript = "default"
-        try:
-            with open(self.filename, "rb") as f:
-                result = openai.Audio.transcribe("whisper-1", f)
-                transcript = result["text"]
-        except Exception as e_cloud:
-            print(
-                "Error occured while inferencing Whisper from OpenAI CLOUD client: \n",
-                e_cloud,
-            )
-
+        if online:
+            print("online whisper model")
             try:
-                whisper_model = whisper.load_model("base", device="cuda")
+                with open(self.filename, "rb") as f:
+                    result = openai.Audio.transcribe("whisper-1", f)
+                    transcript = result["text"]
+            except Exception as e_cloud:
+                print(
+                    "Error occured while inferencing Whisper from OpenAI CLOUD client: \n",
+                    e_cloud,
+                )
+        else:
+            print("offline whisper model")
+            try:
                 audio = whisper.load_audio(self.filename)
                 audio = whisper.pad_or_trim(audio)
 
                 # make log-Mel spectrogram and move to the same device as the model
-                mel = whisper.log_mel_spectrogram(audio).to(whisper_model.device)
+                mel = whisper.log_mel_spectrogram(audio).to(self.whisper.device)
 
                 # detect the spoken language
-                _, probs = whisper_model.detect_language(mel)
+                _, probs = self.whisper.detect_language(mel)
                 print(f"Detected language: {max(probs, key=probs.get)}")
 
                 # decode the audio
                 options = whisper.DecodingOptions()
-                result = whisper.decode(whisper_model, mel, options)
+                result = whisper.decode(self.whisper, mel, options)
 
                 # get the transcript out of whisper's decoded result
                 transcript = result.text

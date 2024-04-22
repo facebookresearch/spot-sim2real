@@ -133,8 +133,7 @@ def main(spot: Spot):
                 spot.open_gripper()
             elif pressed_key == "n":
                 try:
-                    spot.dock(DOCK_ID)
-                    spot.home_robot()
+                    spot.dock(DOCK_ID, home_robot=True)
                 except Exception:
                     print("Dock was not found!")
             elif pressed_key == "i":
