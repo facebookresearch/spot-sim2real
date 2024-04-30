@@ -8,8 +8,9 @@ WEIGHTS_TORCHSCRIPT:
   GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
   # Mobile Gaze torchscript module files path
-  # MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
-  MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+  MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
+
+  # Semantic gaze
   SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_15_ckpt.35.torchscript"
 
   # Semantic gaze
@@ -32,8 +33,9 @@ WEIGHTS:
   GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
   # Mobile Gaze torchscript module files path
-  # MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
-  MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+  MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
+
+  # Semantic gaze
   SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_15_ckpt.35.torchscript"
 
   # Semantic gaze
@@ -82,8 +84,8 @@ GAZE_ACTION_SPACE_LENGTH: 4
 
 # Mobile Gaze env
 MAX_LIN_DIST_MOBILE_GAZE: 0
-MAX_ANG_DIST_MOBILE_GAZE: 0 # degrees
-MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.04 # radian
+MAX_ANG_DIST_MOBILE_GAZE: 5.73 # degrees
+MAX_JOINT_MOVEMENT_MOBILE_GAZE: 0.08 # radian
 MOBILE_GAZE_ACTION_SPACE_LENGTH: 7
 HEURISTIC_SEARCH_ANGLE_INTERVAL: 20
 
