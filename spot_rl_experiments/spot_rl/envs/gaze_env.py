@@ -4,11 +4,14 @@
 
 
 import sys
+import time
 from typing import Any, Dict
 
+import magnum as mn
 import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
+from spot_rl.utils.heuristic_nav import get_3d_point
 from spot_wrapper.spot import Spot
 
 
@@ -151,8 +154,101 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
         self.grasping_type = grasping_type
         return observations
 
+    def approach_object(self):
+        """Approach the object based on pixel x, y, and the depth image"""
+        raw_z, pixel_x, pixel_y = (
+            self.target_object_distance,
+            self.obj_center_pixel[0],
+            self.obj_center_pixel[1],
+        )
+        while raw_z > 0.05:
+            print(f"raw_z: {raw_z} pixel_x: {pixel_x}, pixel_y: {pixel_y}")
+            z = raw_z
+
+            imgs = self.spot.get_hand_image()
+
+            # Get the camera intrinsics
+            cam_intrinsics = imgs[0].source.pinhole.intrinsics
+
+            # Get the transformation
+            vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+
+            # Get the 3D point in the hand RGB frame
+            point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
+
+            # Get the vision to hand
+            vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+            )
+            point_in_global_3d = vision_T_hand_image.transform_point(
+                mn.Vector3(*point_in_hand_image_3d)
+            )
+
+            # Get the transformation of the gripper
+            vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+            # Get the location relative to the gripper
+            point_in_hand_3d = vision_T_hand.inverted().transform_point(
+                point_in_global_3d
+            )
+            # Offset the x and z direction in hand frame
+            ee_offset_x = 0.0
+            ee_offset_z = 0.0
+            point_in_hand_3d[0] += ee_offset_x
+            point_in_hand_3d[2] += ee_offset_z
+            # Make it back to global frame
+            point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
+
+            # Get the point in the base frame
+            point_in_base_3d = vision_T_base.inverted().transform_point(
+                point_in_global_3d
+            )
+
+            # Make it to be numpy
+            point_in_base_3d = np.array(
+                [
+                    point_in_base_3d.x,
+                    point_in_base_3d.y,
+                    point_in_base_3d.z,
+                ]
+            )
+
+            # Get the current ee rotation in body frame
+            ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
+
+            # Move the gripper to target using current gripper pose in the body frame
+            # while maintaining the gripper orientation
+            self.spot.move_gripper_to_point(
+                point_in_base_3d,
+                [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+            )
+            # Recompute the distance
+            self.get_gripper_images(save_image=True)
+            raw_z, pixel_x, pixel_y = (
+                self.target_object_distance,
+                self.obj_center_pixel[0],
+                self.obj_center_pixel[1],
+            )
+
     def step(self, action_dict: Dict[str, Any]):
-        grasp = self.should_grasp()
+        grasp = self.should_grasp(target_object_distance_treshold=0.5)
+
+        if grasp:
+            self.approach_object()
+            self.get_gripper_images(save_image=True)
+            self.spot.close_gripper()
+            time.sleep(1.0)
+            self.grasp_attempted = True
+            arm_positions = np.deg2rad(self.config.PLACE_ARM_JOINT_ANGLES)
+            # Record the grasping pose (in roll pitch yaw) of the gripper
+            (
+                _,
+                self.ee_orientation_at_grasping,
+            ) = self.spot.get_ee_pos_in_body_frame()
+            self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=1.0)
+            # wait for arm to return
+            time.sleep(1.0)
+            # Do not need to call API
+            grasp = False
 
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp

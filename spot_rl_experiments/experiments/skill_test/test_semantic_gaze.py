@@ -12,7 +12,7 @@ if __name__ == "__main__":
     spotskillmanager = SpotSkillManager(use_mobile_pick=True)
     contnue = True
     while contnue:
-        spotskillmanager.semanticpick("penguin", "topdown")
+        spotskillmanager.semanticpick("penguin", "side")
         spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
