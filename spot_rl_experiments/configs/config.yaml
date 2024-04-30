@@ -10,6 +10,7 @@ WEIGHTS_TORCHSCRIPT:
   # Mobile Gaze torchscript module files path
   # MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
   MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+  SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_15_ckpt.35.torchscript"
 
   # Semantic gaze
   SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"
@@ -33,6 +34,7 @@ WEIGHTS:
   # Mobile Gaze torchscript module files path
   # MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
   MOBILE_GAZE: "weights/mobile_gaze_v2/mg97hv1_4_ckpt.16.torchscript"
+  SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_15_ckpt.35.torchscript"
 
   # Semantic gaze
   SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"

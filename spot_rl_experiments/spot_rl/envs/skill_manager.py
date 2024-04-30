@@ -446,6 +446,34 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
+    def semanticpick(
+        self, target_obj_name: str = None, grasping_type: str = "topdown"
+    ) -> Tuple[bool, str]:
+        """
+        Perform the semantic pick action on the pick target specified as string
+
+        Args:
+            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
+            grasping_type (str): The grasping type
+
+        Returns:
+            bool: True if pick was successful, False otherwise
+            str: Message indicating the status of the pick
+        """
+        assert grasping_type in [
+            "topdown",
+            "side",
+        ], f"Do not support {grasping_type} grasping"
+
+        goal_dict = {
+            "target_object": target_obj_name,
+            "take_user_input": False,
+            "grasping_type": grasping_type,
+        }  # type: Dict[str, Any]
+        status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
