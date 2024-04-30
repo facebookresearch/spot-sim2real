@@ -16,9 +16,11 @@ if __name__ == "__main__":
     if in_fre_lab:
         # at FRE
         place_target = "coffee_table"
+        place_reference = "ball"
     else:
         # at NYC
         place_target = "test_desk"
+        place_reference = "penguin"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
 
@@ -32,10 +34,10 @@ if __name__ == "__main__":
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
         spotskillmanager.contrainedplace(
-            "ball",
+            place_reference,
             is_local=is_local,
             visualize=True,
-            direction_vector=np.array([0.2, 0.0, 0.0]),
+            direction_vector=np.array([0.0, 0.1, 0.0]),
         )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
