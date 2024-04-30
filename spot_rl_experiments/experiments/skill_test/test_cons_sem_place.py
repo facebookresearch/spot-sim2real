@@ -37,6 +37,6 @@ if __name__ == "__main__":
             place_reference,
             is_local=is_local,
             visualize=True,
-            direction_vector=np.array([0.0, 0.1, 0.0]),
+            proposition="left",
         )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")

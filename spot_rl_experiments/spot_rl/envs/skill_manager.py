@@ -409,7 +409,7 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
-    def contrainedplace(self, object_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, direction_vector: np.ndarray = None) -> Tuple[bool, str]:  # type: ignore
+    def contrainedplace(self, object_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, proposition: str = "left") -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
@@ -418,7 +418,7 @@ class SpotSkillManager:
             ee_orientation_at_grasping (list): The ee orientation at grasping. If users specifiy, the robot will place the object in the desired pose
                 This is only used for the semantic place skills.
             is_local: if the target place point is in the local or global frame or not
-            direction_vector: the directional vector search direction
+            proposition: indicate the placement location relative to the object
 
         Returns:
             bool: True if place was successful, False otherwise
@@ -429,6 +429,12 @@ class SpotSkillManager:
             verbose=self.verbose,
         )
 
+        assert proposition in [
+            "left",
+            "right",
+            "next-to",
+        ], f"Place skill does not support proposition of {proposition}"
+
         # Esitmate the waypoint
         (
             place_target_location,
@@ -436,7 +442,7 @@ class SpotSkillManager:
             _,
         ) = contrained_place_point_estimation(
             object_target,
-            direction_vector,
+            proposition,
             self.spot,
             self.pick_config.GAZE_ARM_JOINT_ANGLES,
             percentile=30,

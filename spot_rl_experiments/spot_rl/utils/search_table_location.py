@@ -441,7 +441,7 @@ def detect_with_socket(img, object_name, thresh=0.01, device="cuda"):
 
 def contrained_place_point_estimation(
     object_target: str,
-    direction: np.ndarray,
+    proposition: str,
     spot: Spot,
     GAZE_ARM_JOINT_ANGLES: list,
     percentile: float = 70,
@@ -491,7 +491,19 @@ def contrained_place_point_estimation(
     )
     points = np.array(pcd.points)
 
-    pcd_filtered = pcd.select_by_index(np.where(points[:, 0] - centee3d[0] < 0.1)[0])
+    # First element is in x direction
+    if proposition == "left":
+        pcd_filtered = pcd.select_by_index(
+            np.where(points[:, 0] - centee3d[0] < 0.1)[0]
+        )
+    elif proposition == "right":
+        pcd_filtered = pcd.select_by_index(
+            np.where(points[:, 0] - centee3d[0] > 0.1)[0]
+        )
+    elif proposition == "next-to":
+        pcd_filtered = pcd.select_by_index(
+            np.where(abs(points[:, 0] - centee3d[0]) > 0.1)[0]
+        )
 
     # o3d.visualization.draw_geometries([pcd], point_show_normal=True)
     pcd = pcd_filtered
