@@ -429,6 +429,7 @@ def detect_place_point_by_pcd_method(
 
 
 def detect_with_socket(img, object_name, thresh=0.01, device="cuda"):
+    """Fetch the detection result"""
     port = 21001
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
@@ -478,7 +479,7 @@ def contrained_place_point_estimation(
     centee3d = get_3d_point(camera_intrinsics_intel, [cx, cy], z)
 
     mask = np.ones_like(depth_raw).astype(bool)
-    # mask[y1:y2, x1:x2] = True
+
     fx = camera_intrinsics_intel.focal_length.x
     fy = camera_intrinsics_intel.focal_length.y
     cx = camera_intrinsics_intel.principal_point.x
@@ -501,6 +502,7 @@ def contrained_place_point_estimation(
     )
 
     plane_pcd = plane_detect(pcd)
+
     # Down-sample
     plane_pcd.points = o3d.utility.Vector3dVector(
         farthest_point_sampling(np.array(plane_pcd.points), 1024)
@@ -523,7 +525,9 @@ def contrained_place_point_estimation(
     sorted_corners_gtr_than_y_thresh = corners_gtr_than_y_thresh[indices]
     selected_xy = sorted_corners_gtr_than_y_thresh[0]
     corners_xys = corners_gtr_than_y_thresh[indices]
+
     print(f"Selected XY {selected_xy}")
+
     depth_at_selected_xy = (
         sample_patch_around_point(int(selected_xy[0]), int(selected_xy[1]), depth_raw)
         / 1000.0

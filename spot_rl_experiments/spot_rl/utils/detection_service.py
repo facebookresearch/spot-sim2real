@@ -2,8 +2,6 @@ import cv2
 import numpy as np
 import torch
 import zmq
-
-# from segment_anything import SamPredictor, build_sam
 from transformers import Owlv2ForObjectDetection, Owlv2Processor
 
 socket = None
@@ -23,15 +21,6 @@ def load_model(model_name="owlvit", device="cpu"):
         ).to(device)
         processor = Owlv2Processor.from_pretrained("google/owlv2-base-patch16-ensemble")
         return model, processor
-    # run segment anything (SAM)
-    # if model_name == "sam":
-    #     print("Loading SAM")
-    #     sam = SamPredictor(
-    #         build_sam(
-    #             checkpoint="/home/tushar/Desktop/spot-sim2real/spot_rl_experiments/weights/sam_vit_h_4b8939.pth"
-    #         ).to(device)
-    #     )
-    #     return sam
 
 
 def detect(img, text_queries, score_threshold, device, model=None, processor=None):
@@ -78,8 +67,6 @@ def segment(image, boxes, size, device, sam=None):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     sam.set_image(image)
 
-    # H, W = size[1], size[0]
-
     for i in range(boxes.shape[0]):
         boxes[i] = torch.Tensor(boxes[i])
 
@@ -106,10 +93,9 @@ socket.bind(f"tcp://*:{port}")
 print(f"Detection Server Listening on port {port}")
 
 while True:
+    """A service for running VLM without using ros"""
     img, object_name, thresh, device = socket.recv_pyobj()
     print("Recieved img for Detection")
     h, w = img.shape[:2]
     predictions = detect(img, object_name, thresh, device, owlvitmodel, processor)
-    # masks = segment(img, bbox, [h, w], device, sammodel)
-    # mask = masks[0, 0].cpu().numpy()
     socket.send_pyobj(predictions)

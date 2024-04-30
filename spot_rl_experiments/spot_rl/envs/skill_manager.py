@@ -409,7 +409,6 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
-    @multimethod  # type: ignore
     def contrainedplace(self, object_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, direction_vector: np.ndarray = None) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
@@ -418,6 +417,8 @@ class SpotSkillManager:
             place_target (str): Name of the place target (as stored in waypoints.yaml)
             ee_orientation_at_grasping (list): The ee orientation at grasping. If users specifiy, the robot will place the object in the desired pose
                 This is only used for the semantic place skills.
+            is_local: if the target place point is in the local or global frame or not
+            direction_vector: the directional vector search direction
 
         Returns:
             bool: True if place was successful, False otherwise
@@ -428,8 +429,7 @@ class SpotSkillManager:
             verbose=self.verbose,
         )
 
-        # estimate waypoint
-        # try:
+        # Esitmate the waypoint
         (
             place_target_location,
             place_target_in_gripper_camera,
@@ -443,17 +443,15 @@ class SpotSkillManager:
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
         )
+
         print(f"Estimate Place xyz: {place_target_location}")
+
         if visualize:
             plot_place_point_in_gripper_image(self.spot, place_target_in_gripper_camera)
-        # except Exception as e:
-        #     message = f"Failed to estimate place way point due to {str(e)}"
-        #     conditional_print(message=message, verbose=self.verbose)
-        #     print(message)
-        #     return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
 
+        # Call place skill given the estimate waypoint
         status, message = self.place(
             place_x,
             place_y,
