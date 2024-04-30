@@ -13,6 +13,7 @@ from spot_rl.skills.atomic_skills import (
     OpenCloseDrawer,
     Pick,
     Place,
+    SemanticPick,
     SemanticPlace,
 )
 from spot_rl.utils.construct_configs import (
@@ -215,6 +216,10 @@ class SpotSkillManager:
             spot=self.spot,
             config=self.open_close_drawer_config,
         )
+        self.semantic_gaze_controller = SemanticPick(
+            spot=self.spot,
+            config=self.pick_config,
+        )
 
     def reset(self):
         # Reset the policies and environments via the controllers
@@ -337,6 +342,34 @@ class SpotSkillManager:
             "take_user_input": False,
         }  # type: Dict[str, Any]
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    def semanticpick(
+        self, target_obj_name: str = None, grasping_type: str = "topdown"
+    ) -> Tuple[bool, str]:
+        """
+        Perform the semantic pick action on the pick target specified as string
+
+        Args:
+            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
+            grasping_type (str): The grasping type
+
+        Returns:
+            bool: True if pick was successful, False otherwise
+            str: Message indicating the status of the pick
+        """
+        assert grasping_type in [
+            "topdown",
+            "side",
+        ], f"Do not support {grasping_type} grasping"
+
+        goal_dict = {
+            "target_object": target_obj_name,
+            "take_user_input": False,
+            "grasping_type": grasping_type,
+        }  # type: Dict[str, Any]
+        status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
