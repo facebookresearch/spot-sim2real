@@ -759,7 +759,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def should_grasp(self):
         grasp = False
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
-            if self.target_object_distance < 0.2:  # Adjust the distance
+            if self.target_object_distance < 1.5:
                 if self.config.ASSERT_CENTERING:
                     x, y = self.obj_center_pixel
                     if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:
