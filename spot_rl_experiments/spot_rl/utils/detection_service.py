@@ -23,15 +23,15 @@ def load_model(model_name="owlvit", device="cpu"):
         ).to(device)
         processor = Owlv2Processor.from_pretrained("google/owlv2-base-patch16-ensemble")
         return model, processor
-        # run segment anything (SAM)
-    if model_name == "sam":
-        print("Loading SAM")
-        sam = SamPredictor(
-            build_sam(
-                checkpoint="/home/tushar/Desktop/spot-sim2real/spot_rl_experiments/weights/sam_vit_h_4b8939.pth"
-            ).to(device)
-        )
-        return sam
+    # run segment anything (SAM)
+    # if model_name == "sam":
+    #     print("Loading SAM")
+    #     sam = SamPredictor(
+    #         build_sam(
+    #             checkpoint="/home/tushar/Desktop/spot-sim2real/spot_rl_experiments/weights/sam_vit_h_4b8939.pth"
+    #         ).to(device)
+    #     )
+    #     return sam
 
 
 def detect(img, text_queries, score_threshold, device, model=None, processor=None):

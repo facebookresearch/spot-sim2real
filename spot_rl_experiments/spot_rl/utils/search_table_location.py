@@ -471,7 +471,7 @@ def contrained_place_point_estimation(
     predictions = detect_with_socket(img, object_target, 0.01)
 
     prediction = predictions[0]
-    (x1, y1, x2, y2), score = prediction[0], prediction[-1]
+    (x1, y1, x2, y2), _ = prediction[0], prediction[-1]
     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
     cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
     z = get_best_uvz_from_detection(depth_raw, [x1, y1, x2, y2])[-1]
