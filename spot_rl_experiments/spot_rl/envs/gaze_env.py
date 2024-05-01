@@ -230,7 +230,7 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
             )
 
     def step(self, action_dict: Dict[str, Any]):
-        grasp = self.should_grasp(target_object_distance_treshold=0.5)
+        grasp = self.should_grasp(target_object_distance_treshold=0.3)
 
         if grasp:
             self.approach_object()
