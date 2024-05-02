@@ -100,7 +100,7 @@ def get_running_avg_a_T_b(
 
         a_T_b_position_list.append(b_position)
 
-        # Ensure quaternion's w is always positive for effective averaging as multiple quaternions can represent the same rotation
+        # Ensure quaternion's w is always negative for effective averaging as multiple quaternions can represent the same rotation
         quat = Rotation.from_matrix(a_T_b.rotationMatrix()).as_quat()
         if quat[3] > 0:
             quat = -1.0 * quat
