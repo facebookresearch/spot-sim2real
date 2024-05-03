@@ -2,6 +2,7 @@
 .vscode
 *.jpg
 *.png
+*.json
 !intel_realsense_payload_for_spotsim2real/images_for_readme/*.jpg
 !intel_realsense_payload_for_spotsim2real/images_for_readme/*.png
 **/**.egg-info/**

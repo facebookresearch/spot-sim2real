@@ -400,8 +400,8 @@ def heurisitic_object_search_and_navigation(
     )
     print(f"Nav targets adjusted on the theta direction ray {x, y, np.degrees(theta)}")
 
-    skillmanager.nav(x, y, theta)
-    skillmanager.nav_controller.nav_env.enable_nav_by_hand()
+    # skillmanager.nav(x, y, theta)
+    # skillmanager.nav_controller.nav_env.enable_nav_by_hand()
 
     spot: Spot = skillmanager.spot
     spot.open_gripper()

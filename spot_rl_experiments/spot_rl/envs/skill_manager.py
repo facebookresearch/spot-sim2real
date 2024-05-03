@@ -348,6 +348,7 @@ class SpotSkillManager:
     def pick(
         self,
         target_obj_name: str = None,
+        mesh_name: str = "",
         enable_pose_estimation: bool = False,
         enable_pose_correction: bool = False,
         enable_force_control: bool = False,
@@ -376,6 +377,9 @@ class SpotSkillManager:
                     break
 
         self.gaze_controller.set_grasp_type(grasp_mode)
+        print("enable_pose_estimation: ", enable_pose_estimation)
+        print("enable_pose_correction: ", enable_pose_correction)
+        print("enable_force_control: ", enable_force_control)
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
@@ -389,14 +393,15 @@ class SpotSkillManager:
             object_meshes = self.pick_config.get("OBJECT_MESHES", [])
             found = False
             for object_mesh_name in object_meshes:
-                if object_mesh_name in target_obj_name:
+                if object_mesh_name == mesh_name:
                     found = True
             assert (
                 found
-            ), f"{target_obj_name} not found in meshes that we have {object_meshes}"
+            ), f"{mesh_name} not found in meshes that we have {object_meshes}"
 
+        mesh_name = target_obj_name if mesh_name == "" else mesh_name
         self.gaze_controller.set_pose_estimation_flags(
-            enable_pose_estimation, enable_pose_correction
+            enable_pose_estimation, enable_pose_correction, mesh_name
         )
         self.gaze_controller.set_force_control(enable_force_control)
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)
@@ -415,34 +420,6 @@ class SpotSkillManager:
                 target_obj_name,
             )
             status = status and correction_status and put_back_object_status
-        conditional_print(message=message, verbose=self.verbose)
-        return status, message
-
-    def semanticpick(
-        self, target_obj_name: str = None, grasping_type: str = "topdown"
-    ) -> Tuple[bool, str]:
-        """
-        Perform the semantic pick action on the pick target specified as string
-
-        Args:
-            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
-            grasping_type (str): The grasping type
-
-        Returns:
-            bool: True if pick was successful, False otherwise
-            str: Message indicating the status of the pick
-        """
-        assert grasping_type in [
-            "topdown",
-            "side",
-        ], f"Do not support {grasping_type} grasping"
-
-        goal_dict = {
-            "target_object": target_obj_name,
-            "take_user_input": False,
-            "grasping_type": grasping_type,
-        }  # type: Dict[str, Any]
-        status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -518,7 +495,7 @@ class SpotSkillManager:
                     self.pick_config.GAZE_ARM_JOINT_ANGLES,
                     percentile=0 if visualize else 70,
                     visualize=visualize,
-                    height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+                    height_adjustment_offset=0.10,  # if self.use_semantic_place else 0.23,
                 )
                 print(f"Estimate Place xyz: {place_target_location}")
                 if visualize:

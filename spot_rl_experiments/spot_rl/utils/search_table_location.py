@@ -305,6 +305,7 @@ def filter_pointcloud_by_normals_in_the_given_direction(
         np.where(cosines > cosine_thresh)[0]
     )
     if visualize:
+        # o3d.visualization.draw_geometries([pcd_with_normals])
         o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 

@@ -178,7 +178,7 @@ def pose_estimation(
     pose_socket.send_pyobj(pose_args)
 
     pose, ob_in_cam_pose, to_origin, visualization = pose_socket.recv_pyobj()
-    pose_magnum = mn.Matrix4(ob_in_cam_pose)
+    pose_magnum = mn.Matrix4.from_(ob_in_cam_pose[:3, :3], ob_in_cam_pose[:3, 3])
     (
         classification_text,
         spinal_axis,
@@ -330,32 +330,32 @@ class OrientationSolver:
         self.object_orientations = {
             "object_orientation_1": (
                 mn.Vector3(0, 1.0, 0.0),
-                mn.Vector3(0, 0, -1.0),
+                mn.Vector3(0, 0, 1.0),
                 "vertical",
             ),  # object in normal vertical position
             "object_orientation_2": (
                 mn.Vector3(1, 0.0, 0.0),
-                mn.Vector3(0, -1.0, 0.0),
+                mn.Vector3(0, 1.0, 0.0),
                 "horizontal",
             ),  # object head to the left of spot; object in horizontal position
             "object_orientation_3": (
                 mn.Vector3(-1, 0.0, 0.0),
-                mn.Vector3(0.0, 1.0, 0.0),
+                mn.Vector3(0.0, -1.0, 0.0),
                 "horizontal",
             ),  # object head to the right of spot; object in horizontal position
             "object_orientation_4": (
                 mn.Vector3(0, 0, -1),
-                mn.Vector3(-1, 0, 0),
+                mn.Vector3(1, 0, 0),
                 "horizontal",
             ),  # object base towards the spot; object in horizontal position
             "object_orientation_5": (
                 mn.Vector3(0, 0, 1),
-                mn.Vector3(1, 0, 0),
+                mn.Vector3(-1, 0, 0),
                 "horizontal",
             ),  # object head towards the spot; object in horizontal position
             "object_orientation_6": (
                 mn.Vector3(0, -1.0, 0.0),
-                mn.Vector3(0.0, 0.0, 1.0),
+                mn.Vector3(0.0, 0.0, -1.0),
                 "vertical",
             ),  # object in upside down vertical position
         }
@@ -517,6 +517,7 @@ class OrientationSolver:
             )
 
         index = np.argmin(np.abs(angles))
+        print(f"spinal axis {spinal_axis}")
         print(
             f"similarity angles for object orientation {angles}, angle {angles[index]} pose name {object_orientation_names[index]}"
         )
@@ -612,6 +613,8 @@ class OrientationSolver:
         correction_status = spot.move_gripper_to_point(
             current_point, np.deg2rad(correction_angles), 5, 10
         )
+        # for testing debug
+        # spot.open_gripper()
         current_orientation_at_grasp_in_quat = (
             spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
         )

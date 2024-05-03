@@ -65,7 +65,7 @@ if __name__ == "__main__":
     assert pick_target in pick_targets
     x, y, theta = pick_targets[pick_target]
     nav_config = construct_config_for_nav()
-    spotskillmanager = SpotSkillManager(nav_config)
+    spotskillmanager = SpotSkillManager()
     print(f"Original Nav Goal {x, y, np.degrees(theta)}")
     at_pick_position = spotskillmanager.heuristic_mobile_gaze(
         x, y, theta, object_target=object_target, pull_back=False

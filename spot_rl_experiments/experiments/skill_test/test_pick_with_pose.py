@@ -9,7 +9,8 @@ if __name__ == "__main__":
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
     contnue = True
-    object_name = "penguin plush toy"
+    object_name = "toy"
+    mesh_name = "black toy car"
     while contnue:
         spotskillmanager.spot.stand()
         spotskillmanager.current_receptacle_name = (
@@ -17,10 +18,12 @@ if __name__ == "__main__":
         )
         spotskillmanager.pick(
             object_name,
-            enable_pose_correction=True,
+            mesh_name=mesh_name,
+            enable_pose_correction=False,
             enable_pose_estimation=True,
             enable_force_control=False,
         )
+        spotskillmanager.spot.open_gripper()
         spotskillmanager.get_env().reset_arm()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 

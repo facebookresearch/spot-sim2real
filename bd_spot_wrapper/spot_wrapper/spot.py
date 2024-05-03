@@ -833,6 +833,29 @@ class Spot:
                 break
 
             time.sleep(0.25)
+        self.open_gripper()
+        claw_gripper_control_parameters = [
+            (0.7, 0.0),
+            (0.6, 0.5),
+            (0.5, 0.7),
+            (0.4, 0.5),
+            (0.3, 0.6),
+            (0.2, 1.0),
+        ]
+        n: int = len(claw_gripper_control_parameters)
+        claw_gripper_command = None
+        for claw_index, (claw_gripper_angle, max_torque) in enumerate(
+            claw_gripper_control_parameters
+        ):
+            claw_gripper_command = (
+                RobotCommandBuilder.claw_gripper_open_fraction_command(
+                    claw_gripper_angle,
+                    claw_gripper_command,
+                    disable_force_on_contact=claw_index != n - 1,
+                    max_torque=max_torque,
+                )
+            )
+        self.command_client.robot_command(claw_gripper_command)
         return success
 
     def grasp_hand_depth(self, *args, **kwargs):
@@ -946,13 +969,13 @@ class Spot:
 
         if blocking:
             cmd_status = None
-            while cmd_status != 1:
-                time.sleep(0.1)
+            while cmd_status is None:
+                time.sleep(0.1) if cmd_status is not None else None
                 feedback_resp = self.get_cmd_feedback(cmd_id)
                 cmd_status = (
                     feedback_resp.feedback.synchronized_feedback
                 ).mobility_command_feedback.se2_trajectory_feedback.status
-            return None
+            return cmd_status
 
         return cmd_id
 

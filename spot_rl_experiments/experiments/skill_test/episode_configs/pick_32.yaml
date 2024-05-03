@@ -1,0 +1,34 @@
+episode1:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    - nav:
+      - "lab_desk"
+    - pick:
+      - "frosted flakes cup"
+episode2:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    - pick:
+      - "ball"
+episode3:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    - pick:
+      - "cereal box"
+episode4:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_desk"
+    - pick:
+      - "bottle"
+episode5:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    - pick:
+      - "water can"

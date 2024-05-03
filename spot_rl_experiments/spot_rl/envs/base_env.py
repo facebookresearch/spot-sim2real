@@ -143,6 +143,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # Arm action parameters
         self.initial_arm_joint_angles = np.deg2rad(config.INITIAL_ARM_JOINT_ANGLES)
+        self.stow_arm_joint_angles = np.deg2rad(config.STOW_ARM_JOINT_ANGLES)
         self.arm_lower_limits = np.deg2rad(config.ARM_LOWER_LIMITS)
         self.arm_upper_limits = np.deg2rad(config.ARM_UPPER_LIMITS)
         self.locked_on_object_count = 0
@@ -167,6 +168,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.ee_orientation_at_grasping = (
             None  # For recording grasping arm roll pitch yaw pose
         )
+
+        self.grasp_attempt_counter = 0
 
         # Neural network action scale
         self._max_joint_movement_scale = self.config[max_joint_movement_key]
@@ -325,7 +328,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     action_dict.get("enable_pose_estimation", False),
                     action_dict.get("enable_force_control", False),
                     action_dict.get("grasp_mode", "any"),
+                    action_dict.get("mesh_name", rospy.get_param("/object_target")),
                 )
+                self.grasp_attempt_counter += 1
                 if success:
                     # Just leave the object on the receptacle if desired
                     if self.config.DONT_PICK_UP:
@@ -363,6 +368,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             self.spot.open_gripper()
             time.sleep(0.3)
             self.place_attempted = True
+
+        max_grasp_attempts = self.config.get("MAX_GRASP_ATTEMPTS", 5)
+        print(
+            f"self.grasp_attempt_counter: {self.grasp_attempt_counter}, max_grasp_attempts: {max_grasp_attempts}"
+        )
+        if self.grasp_attempt_counter == max_grasp_attempts:
+            self.should_end = True
 
         if base_action is not None:
             if nav_silence_only:
@@ -478,6 +490,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         enable_pose_estimation=False,
         enable_force_control=False,
         grasp_mode: str = "any",
+        mesh_name: str = "",
     ):
         pre_grasp = time.time()
         graspmode = grasp_mode
@@ -526,7 +539,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 t2,
             ) = pose_estimation(
                 *image_responses,
-                object_name,
+                mesh_name,
                 intrinsics,
                 body_T_cam,
                 image_src,
@@ -879,7 +892,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return locked_on
 
-    def should_grasp(self, target_object_distance_treshold=1.5):
+    def should_grasp(self, target_object_distance_treshold=0.7):
         grasp = False
         if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
             if self.target_object_distance < target_object_distance_treshold:
