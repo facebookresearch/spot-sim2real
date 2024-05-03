@@ -448,6 +448,7 @@ class SpotSkillManager:
             percentile=30,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+            image_scale=self.get_env().config.IMAGE_SCALE,
         )
 
         print(f"Estimate Place xyz: {place_target_location}")

@@ -99,3 +99,15 @@ while True:
     h, w = img.shape[:2]
     predictions = detect(img, object_name, thresh, device, owlvitmodel, processor)
     socket.send_pyobj(predictions)
+
+# If you want to use detection service, then use the following code to listen to socket
+# def detect_with_socket(img, object_name, thresh=0.01, device="cuda"):
+#     """Fetch the detection result"""
+#     subprocess.Popen("spot_rl_detection_service", shell=True)
+#     port = 21001
+#     context = zmq.Context()
+#     socket = context.socket(zmq.REQ)
+#     socket.connect(f"tcp://localhost:{port}")
+#     print(f"Socket Connected at {port}")
+#     socket.send_pyobj((img, object_name, thresh, device))
+#     return socket.recv_pyobj()
