@@ -1,6 +1,5 @@
 import copy
 import os.path as osp
-import subprocess
 import time
 
 import cv2
@@ -18,7 +17,7 @@ from std_msgs.msg import String
 GRIPPER_T_INTEL = osp.join(osp.dirname(osp.abspath(__file__)), "gripper_T_intel.npy")
 
 
-class MessageSubscriber:
+class DetectionSubscriber:
     def __init__(self):
         self.latest_message = None
         rospy.Subscriber(rt.DETECTIONS_TOPIC, String, self.callback)
@@ -446,7 +445,7 @@ def detect_with_rospy_subscriber(object_name, image_scale=0.7):
     """Fetch the detection result"""
     # We use rospy approach reac the detection string from topic
     rospy.set_param("object_target", object_name)
-    subscriber = MessageSubscriber()
+    subscriber = DetectionSubscriber()
     fetch_time_threshold = 1.0
     begin_time = time.time()
     while (time.time() - begin_time) < fetch_time_threshold:
