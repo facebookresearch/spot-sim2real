@@ -255,7 +255,7 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
         action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
 
         observations, reward, done, info = super().step(
-            action_dict=action_dict,
+            action_dict=action_dict, travel_time_scale=1.0 / 0.9 * 1.75
         )
         return observations, reward, done, info
 

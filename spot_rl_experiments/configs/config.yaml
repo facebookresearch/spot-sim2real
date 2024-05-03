@@ -11,7 +11,7 @@ WEIGHTS_TORCHSCRIPT:
   MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
 
   # Semantic gaze
-  SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.44.torchscript"
+  SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"
 
   # Static place
   PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
@@ -33,7 +33,7 @@ WEIGHTS:
   MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
 
   # Semantic gaze
-  SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.44.torchscript"
+  SEMANTIC_GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"
 
   # Static place
   PLACE: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
@@ -85,7 +85,7 @@ HEURISTIC_SEARCH_ANGLE_INTERVAL: 20
 # Semantic Gaze env
 MAX_LIN_DIST_SEMANTIC_GAZE: 0
 MAX_ANG_DIST_SEMANTIC_GAZE: 0 # degrees
-MAX_JOINT_MOVEMENT_SEMANTIC_GAZE: 0.12 # radian
+MAX_JOINT_MOVEMENT_SEMANTIC_GAZE: 0.08 # radian
 SEMANTIC_GAZE_ACTION_SPACE_LENGTH: 7
 
 # Place env
