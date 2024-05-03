@@ -1,5 +1,6 @@
 import copy
 import os.path as osp
+import subprocess
 import time
 
 import cv2
@@ -430,6 +431,7 @@ def detect_place_point_by_pcd_method(
 
 def detect_with_socket(img, object_name, thresh=0.01, device="cuda"):
     """Fetch the detection result"""
+    subprocess.Popen("spot_rl_detection_service", shell=True)
     port = 21001
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
