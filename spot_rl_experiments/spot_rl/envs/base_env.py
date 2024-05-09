@@ -331,9 +331,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     self.ee_orientation_at_grasping,
                 ) = self.spot.get_ee_pos_in_body_frame()
 
-                self.spot.set_arm_joint_positions(
-                    positions=arm_positions, travel_time=1.0
-                )
+                # self.spot.set_arm_joint_positions(
+                #     positions=arm_positions, travel_time=1.0
+                # )
 
                 # Wait for arm to return to position
                 time.sleep(1.0)
