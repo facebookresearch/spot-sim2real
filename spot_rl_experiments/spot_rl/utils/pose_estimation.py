@@ -1,4 +1,5 @@
 import time
+from typing import Tuple
 
 import cv2
 import magnum as mn
@@ -70,32 +71,31 @@ def detect_orientation(cam_T_obj, to_origin, body_T_cam):
     # trans = np.eye(4)
     # trans[:3, :3] = camera_pose
     # camera_pose = mn.Matrix4(trans)
-
+    to_origin = mn.Matrix4(to_origin)
+    
     z_axis: np.ndarray = np.array([0, 0, 1])
     y_axis: np.ndarray = np.array([0, 1, 0])
     x_axis: np.ndarray = np.array([1, 0, 0])
 
     # z_axis = mn.Vector3(*z_axis)
     z_axis = (
-        mn.Matrix4(to_origin)
+        to_origin
         .inverted()
         .transform_vector(mn.Vector3(*z_axis))
         .normalized()
     )
     y_axis = (
-        mn.Matrix4(to_origin)
+        to_origin
         .inverted()
         .transform_vector(mn.Vector3(*y_axis))
         .normalized()
     )
     x_axis = (
-        mn.Matrix4(to_origin)
+        to_origin
         .inverted()
         .transform_vector(mn.Vector3(*x_axis))
         .normalized()
     )
-
-    # breakpoint()
 
     z_axis_transformed_in_body = (
         (body_T_cam @ cam_T_obj).transform_vector(z_axis).normalized()
@@ -107,31 +107,43 @@ def detect_orientation(cam_T_obj, to_origin, body_T_cam):
         (body_T_cam @ cam_T_obj).transform_vector(x_axis).normalized()
     )
 
+    z_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0, 0, -1)
+    y_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0., -1., 0.)
+    x_axis_transformed_in_body_for_nominal_pose = mn.Vector3(1., 0., 0.)
+
+    z_axis_transformed_in_camera_for_nominal_pose = mn.Vector3(0., 1., 0.)
+    y_axis_transformed_in_camera_for_nominal_pose = mn.Vector3(1., 0., 0.)
+    x_axis_transformed_in_camera_for_nominal_pose = mn.Vector3(0, 0, 1.)
+
+    #z_axis is the merudand (spinal axis)
+
     z_axis_transformed_in_camera = cam_T_obj.transform_vector(z_axis).normalized()
     y_axis_transformed_in_camera = cam_T_obj.transform_vector(y_axis).normalized()
     x_axis_transformed_in_camera = cam_T_obj.transform_vector(x_axis).normalized()
+    
 
-    # breakpoint()
+    #breakpoint()
+    # 
     # TODO: Subtract theta from 180 if greater than 100
 
-    theta = np.rad2deg(np.arccos(mn.math.dot(z_axis, z_axis_transformed_in_body)))
-
-    gamma = np.rad2deg(np.arccos(mn.math.dot(y_axis, y_axis_transformed_in_body)))
-    alpha = np.rad2deg(np.arccos(mn.math.dot(x_axis, x_axis_transformed_in_body)))
+    theta = np.rad2deg(np.arccos(mn.math.dot(z_axis_transformed_in_camera_for_nominal_pose, z_axis_transformed_in_camera)))
+    gamma = np.rad2deg(np.arccos(mn.math.dot(y_axis_transformed_in_camera_for_nominal_pose, y_axis_transformed_in_camera)))
+    alpha = np.rad2deg(np.arccos(mn.math.dot(x_axis_transformed_in_camera_for_nominal_pose, x_axis_transformed_in_camera)))
+    
 
     theta_signed = (
         -1.0
-        * np.sign(mn.math.cross(z_axis, z_axis_transformed_in_body).normalized().z)
+        * np.sign(mn.math.cross(z_axis_transformed_in_camera_for_nominal_pose, z_axis_transformed_in_camera).normalized().z)
         * theta
     )
     gamma_signed = (
         -1
-        * np.sign(mn.math.cross(y_axis, y_axis_transformed_in_body).normalized().z)
+        * np.sign(mn.math.cross(y_axis_transformed_in_camera_for_nominal_pose, y_axis_transformed_in_camera).normalized().z)
         * gamma
     )
     alpha_signed = (
         -1
-        * np.sign(mn.math.cross(x_axis, x_axis_transformed_in_body).normalized().z)
+        * np.sign(mn.math.cross(x_axis_transformed_in_camera_for_nominal_pose, x_axis_transformed_in_camera).normalized().z)
         * alpha
     )
 
@@ -143,9 +155,7 @@ def detect_orientation(cam_T_obj, to_origin, body_T_cam):
             if theta < 50
             else f"horizontal {format(theta_signed, '.2f')}, {format(gamma_signed, '.2f')}, {format(alpha_signed, '.2f')}"
         ),
-        theta_signed,
-        gamma_signed,
-        alpha_signed,
+        z_axis_transformed_in_camera
     )
 
 
@@ -156,6 +166,7 @@ def pose_estimation(
     depth_raw,
     object_name,
     cam_intrinsics,
+    image_src,
     body_T_intel,
     image_scale=0.7,
     port_seg=21001,
@@ -178,13 +189,13 @@ def pose_estimation(
     K[1, -1] = cy
 
     rgb_image = rgb_image[..., ::-1]
-    pose_args = rgb_image, depth_raw, mask, K.astype(np.double)
+    pose_args = rgb_image, depth_raw, mask, K.astype(np.double), image_src, object_name
     pose_socket = connect_socket(port_pose)
     pose_socket.send_pyobj(pose_args)
 
     pose, ob_in_cam_pose, to_origin, visualization = pose_socket.recv_pyobj()
     pose_magnum = mn.Matrix4(ob_in_cam_pose)  # @mn.Matrix4(to_origin).inverted()
-    classification_text, theta, gamma, alpha = detect_orientation(
+    classification_text, meru_dand_of_object_in_cam = detect_orientation(
         pose_magnum, to_origin, body_T_intel
     )
 
@@ -206,7 +217,7 @@ def pose_estimation(
 
     # Correct orientation
 
-    return orientation, theta, gamma, alpha
+    return orientation, meru_dand_of_object_in_cam
 
 
 class OrientationSolver:
@@ -228,9 +239,20 @@ class OrientationSolver:
             0.50674087, -0.5018484, 0.49400634, 0.49731243
         )  # top-down, intel cam on right of the spot's vision
 
-        self.object_orientations = (
-            dict()
-        )  # "name_of_the_pose":(pose_quat_in_body, "horizontal/vertical")
+        # "name_of_the_pose":(pose_quat_in_body, "horizontal/vertical")
+        self.object_orientations = {
+            "object_orientation_1": (mn.Vector3(0, 1., 0.), "vertical"), #object in normal vertical position
+            "object_orientation_2": (mn.Vector3(1, 0., 0.), "horizontal"), #object head to the left of spot; object in horizontal position
+            "object_orientation_3": (mn.Vector3(-1, 0., 0.), "horizontal"), #object head to the right of spot; object in horizontal position
+            "object_orientation_4": (mn.Vector3(0, 0, -1), "horizontal"),  #object base towards the spot; object in horizontal position
+            "object_orientation_5": (mn.Vector3(0, 0, 1), "horizontal"), #object head towards the spot; object in horizontal position
+            "object_orientation_6": (mn.Vector3(0, -1., 0.), "vertical") #object in upside down vertical position
+
+        }
+        self.object_orientation_by_axes_transform = {
+            "object_orientation_5": ((np.array([0., 0., 1.]) , np.array([0, 1., 0]), np.array([1., 0, 0])), "horizontal"),
+
+        }
         # "name_of_the_pose":(pose_quat_in_body, "topdown/side")
         self.grasp_orientations = {
             "grasp_orientation_1": (grasp_orientation_1, "topdown"),
@@ -238,9 +260,39 @@ class OrientationSolver:
             "grasp_orientation_3": (grasp_orientation_3, "topdown"),
             "grasp_orientation_4": (grasp_orientation_4, "topdown"),
         }
-        self.solution_space = (
-            dict()
-        )  # "object_pose_name_gripper_pose_name":np.ndarray([0, 0, 0])
+        # "object_pose_name_gripper_pose_name":np.ndarray([0, 0, 0])
+        self.solution_space = {
+            "object_orientation_1_grasp_orientation_1" : np.array([0, 0, 0]),
+            "object_orientation_1_grasp_orientation_2" : np.array([0, 0, 0]),
+            "object_orientation_1_grasp_orientation_3" : np.array([0, 0, 0]),
+            "object_orientation_1_grasp_orientation_4" : np.array([0, 0, 0]),
+
+            "object_orientation_2_grasp_orientation_1" : np.array([90, 0, 0]),
+            "object_orientation_2_grasp_orientation_2" : np.array([-90, 0, 0]),
+            "object_orientation_2_grasp_orientation_3" : np.array([-180, 0, 0]),
+            "object_orientation_2_grasp_orientation_4" : np.array([0, 0, 0]),
+
+            "object_orientation_3_grasp_orientation_1" : np.array([-90, 0, 0]),
+            "object_orientation_3_grasp_orientation_2" : np.array([90, 0, 0]),
+            "object_orientation_3_grasp_orientation_3" : np.array([0, 0, 0]),
+            "object_orientation_3_grasp_orientation_4" : np.array([180, 0, 0]),
+
+            "object_orientation_4_grasp_orientation_1" : np.array([0, 0, 0]),
+            "object_orientation_4_grasp_orientation_2" : np.array([180, 0, 0]),
+            "object_orientation_4_grasp_orientation_3" : np.array([90, 0, 0]),
+            "object_orientation_4_grasp_orientation_4" : np.array([-90, 0, 0]),
+
+            "object_orientation_5_grasp_orientation_1" : np.array([180, 0, 0]),
+            "object_orientation_5_grasp_orientation_2" : np.array([0, 0, 0]),
+            "object_orientation_5_grasp_orientation_3" : np.array([-90, 0, 0]),
+            "object_orientation_5_grasp_orientation_4" : np.array([90, 0, 0]),
+
+            "object_orientation_6_grasp_orientation_1" : np.array([0, 0, 0]), #infeasible to correct, upside down object can't be corrected with top-down grasp
+            "object_orientation_6_grasp_orientation_2" : np.array([0, 0, 0]), #infeasible to correct
+            "object_orientation_6_grasp_orientation_3" : np.array([0, 0, 0]), #infeasible to correct
+            "object_orientation_6_grasp_orientation_4" : np.array([0, 0, 0]), #infeasible to correct
+
+        }
 
     def _determine_anchor_grasp_pose(
         self, observed_grasp_orientation_in_quat: np.ndarray
@@ -260,16 +312,30 @@ class OrientationSolver:
                     )
                 )
             )
-        print(angles)
+        print(f"similarity angles for grasp orientation {angles}")
         return grasp_orientation_names[np.argmin(angles)]
 
     def _determine_anchor_object_pose(
-        self, observed_object_pose_in_quat: np.ndarray
-    ) -> str:
-        # find angle with all the object orientations stored, make sure orientation are in body frame
-        # returns name of the object_pose
-        pass
-
+        self, meru_dand_of_object_in_cam:mn.Vector3
+    ) -> Tuple[str, float]:
+        # find angle with all the object orientation axes stored
+        # returns name of the object_pose & delta angle to the nearest anchor pose
+        
+        object_orientation_names = list(self.object_orientations.keys())
+        object_pose_axes, _ = zip(*list(self.object_orientations.values()))
+        object_pose_axes = list(object_pose_axes)
+        angles = []
+    
+        angles = []
+        for object_pose_axis in object_pose_axes:
+            sign = np.sign(mn.math.cross(meru_dand_of_object_in_cam, object_pose_axis).normalized().z)
+            sign = 1. if sign == 0. else sign
+            angles.append(sign*np.rad2deg(np.arccos(mn.math.dot(meru_dand_of_object_in_cam, object_pose_axis))))
+            
+        print(f"similarity angles for object orientation {angles}")
+        index = np.argmin(np.abs(angles))
+        return object_orientation_names[index], angles[index]
+      
     def determine_object_orientation_from_object_pose(
         self, observed_object_pose_in_quat: np.ndarray
     ) -> str:
@@ -281,15 +347,18 @@ class OrientationSolver:
         return self.object_orientations.get(object_pose_name, "")[1]
 
     def get_correction_angle(
-        self, observed_object_pose_in_quat, observed_grasp_orientation_in_quat
+        self, observed_object_pose_in_quat:np.ndarray, meru_dand_of_object_in_cam:mn.Vector3
     ):
         # all poses are to be in body frame
         current_grasp_orientation = self._determine_anchor_grasp_pose(
             observed_object_pose_in_quat
         )
-        current_object_orientation = self._determine_anchor_object_pose(
-            observed_grasp_orientation_in_quat
+        current_object_orientation, delta_to_pose = self._determine_anchor_object_pose(
+            meru_dand_of_object_in_cam
         )
+        print(f"Object pose {current_object_orientation}, delta to anchor pose {delta_to_pose}, grasp orientation {current_grasp_orientation}")
+        assert f"{current_object_orientation}_{current_grasp_orientation}" in self.solution_space, f"Couldn't find {current_object_orientation}_{current_grasp_orientation} in solution space"
+        
         # convert solution from degtorad
         return self.solution_space.get(
             f"{current_object_orientation}_{current_grasp_orientation}",
