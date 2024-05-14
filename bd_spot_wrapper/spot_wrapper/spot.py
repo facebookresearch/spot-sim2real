@@ -340,7 +340,7 @@ class Spot:
             points.append(
                 trajectory_pb2.SE3TrajectoryPoint(
                     pose=hand_pose.to_proto(),
-                    time_since_reference=seconds_to_duration(seconds_to_goal // 2),
+                    time_since_reference=seconds_to_duration(seconds_to_goal*i),
                 )
             )
 

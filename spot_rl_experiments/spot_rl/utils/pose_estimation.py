@@ -209,6 +209,7 @@ def pose_estimation(
         3,
         cv2.LINE_AA,
     )
+    cv2.namedWindow("orientation", cv2.WINDOW_NORMAL) 
     cv2.imshow("orientation", visualization[..., ::-1])
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -295,7 +296,7 @@ class OrientationSolver:
         }
 
     def _determine_anchor_grasp_pose(
-        self, observed_grasp_orientation_in_quat: np.ndarray
+        self, observed_grasp_orientation_in_quat: np.ndarray #pick has executed & gripper is holding the object but not retracted, spot.get_ee_quaternion_in_body_frame
     ) -> str:
         # find angle with all the grasp orientations stored
         # returns name of the grasp pose
@@ -336,22 +337,22 @@ class OrientationSolver:
         index = np.argmin(np.abs(angles))
         return object_orientation_names[index], angles[index]
       
-    def determine_object_orientation_from_object_pose(
-        self, observed_object_pose_in_quat: np.ndarray
-    ) -> str:
-        # finds whether the observed object is horizontal or vertical based on anchor poses
-        # return in str as "horizontal" or "vertical"
-        object_pose_name = self._determine_anchor_object_pose(
-            observed_object_pose_in_quat
-        )
-        return self.object_orientations.get(object_pose_name, "")[1]
+    # def determine_object_orientation_from_object_pose(
+    #     self, observed_object_pose_in_quat: np.ndarray
+    # ) -> str:
+    #     # finds whether the observed object is horizontal or vertical based on anchor poses
+    #     # return in str as "horizontal" or "vertical"
+    #     object_pose_name = self._determine_anchor_object_pose(
+    #         observed_object_pose_in_quat
+    #     )
+    #     return self.object_orientations.get(object_pose_name, "")[1]
 
     def get_correction_angle(
-        self, observed_object_pose_in_quat:np.ndarray, meru_dand_of_object_in_cam:mn.Vector3
+        self, observed_grasp_pose_in_quat:np.ndarray, meru_dand_of_object_in_cam:mn.Vector3
     ):
         # all poses are to be in body frame
         current_grasp_orientation = self._determine_anchor_grasp_pose(
-            observed_object_pose_in_quat
+            observed_grasp_pose_in_quat
         )
         current_object_orientation, delta_to_pose = self._determine_anchor_object_pose(
             meru_dand_of_object_in_cam

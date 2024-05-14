@@ -406,7 +406,7 @@ def detect_place_point_by_pcd_method(
     )
 
     img_with_bbox = None
-    if visualize:
+    if True:
         img_with_bbox = img.copy()
         for xy in corners_xys:
             img_with_bbox = cv2.circle(
@@ -415,6 +415,10 @@ def detect_place_point_by_pcd_method(
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
+        cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL) 
+        cv2.imshow("table_detection", img_with_bbox)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         cv2.imwrite("table_detection.png", img_with_bbox)
 
     point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))

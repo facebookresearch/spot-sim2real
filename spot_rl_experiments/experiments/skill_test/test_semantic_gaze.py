@@ -23,7 +23,7 @@ if __name__ == "__main__":
     spot: Spot = spotskillmanager.spot
     pose_estimation_port = 2100
     segmentation_port = 21001
-    object_name = "penguin plush toy"
+    object_name = "bottle" #"penguin plush toy"
     anchor_pose_number = 4
     orientationsolver: OrientationSolver = OrientationSolver()
     image_src = 1 # 1 for intel & 0 for gripper
@@ -64,7 +64,7 @@ if __name__ == "__main__":
         body_T_intel = body_T_hand @ (hand_T_gripper @ gripper_T_intel)
         
         # cv2.imwrite(f"object_anchor_pose_{anchor_pose_number}.png", image_responses[0])
-        graspmode, meru_dand = pose_estimation(
+        graspmode, spinal_axis = pose_estimation(
             *image_responses,
             object_name,
             intrinsics,
@@ -89,19 +89,23 @@ if __name__ == "__main__":
             spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
         )
         current_point, _ = spot.get_ee_pos_in_body_frame()
-        correction_angles = orientationsolver.get_correction_angle(current_orientation_at_grasp_in_quat, meru_dand)
+        correction_angles = orientationsolver.get_correction_angle(current_orientation_at_grasp_in_quat, spinal_axis)
         
-        input(f"Should I correct the orientation ?, current ee pos point in body {current_point}")
+        input(f"Should I correct the orientation ?, current ee pos point in body {current_point}, correction_angles {correction_angles}")
         current_point_orig = current_point.copy()
         #Correct the orientation 0.2 m above the current position
         current_point[-1] += 0.2
+        correction_status = False
         correction_status = spot.move_gripper_to_points(current_point, [current_orientation_at_grasp_in_quat, np.deg2rad(correction_angles)] )
+        #input("Run semantic Place ?")
         #Put back the object
         current_orientation_at_grasp_in_quat = (
             spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
         )
-        current_point_orig[-1] += 0.05
+        current_point_orig[-1] += 0.08
         put_back_object_status = spot.move_gripper_to_point(current_point_orig, current_orientation_at_grasp_in_quat, 10, 20 )
+        #rospy.set_param("is_gripper_blocked", 0)
+        #put_back_object_status, _ = spotskillmanager.place(is_local=True, visualize=False, ee_orientation_at_grasping=np.deg2rad(correction_angles))
         print(f"Correction Status {correction_status}, Putback status {put_back_object_status}")
         #input("Open gripper ?")
         spotskillmanager.spot.open_gripper()
