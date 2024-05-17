@@ -887,17 +887,19 @@ class Spot:
         )
         return local_T_global
 
-    def home_robot(self):
+    def home_robot(self, write_to_file: bool = False):
+        print(f"Updating robot pose w.r.t home. write_to_file={write_to_file}")
         x, y, yaw = self.get_xy_yaw(use_boot_origin=True)
         local_T_global = self._get_local_T_global()
         self.global_T_home = np.linalg.inv(local_T_global)
         self.robot_recenter_yaw = yaw
 
-        as_string = list(self.global_T_home.flatten()) + [yaw]
-        as_string = f"{as_string}"[1:-1]  # [1:-1] removes brackets
-        with open(HOME_TXT, "w") as f:
-            f.write(as_string)
-        self.loginfo(f"Wrote:\n{as_string}\nto: {HOME_TXT}")
+        if write_to_file:
+            as_string = list(self.global_T_home.flatten()) + [yaw]
+            as_string = f"{as_string}"[1:-1]  # [1:-1] removes brackets
+            with open(HOME_TXT, "w") as f:
+                f.write(as_string)
+            self.loginfo(f"Wrote:\n{as_string}\nto: {HOME_TXT}")
 
     def get_base_transform_to(self, child_frame):
         kin_state = self.robot_state_client.get_robot_state().kinematic_state
@@ -918,9 +920,12 @@ class Spot:
         """
         blocking_dock_robot(self.robot, dock_id)
         if home_robot:
-            self.home_robot()
+            self.home_robot(write_to_file=True)
 
     def undock(self):
+        # Before undocking from dock, update the global_T_home transform
+        # member variable but not don't persist the changes in home.txt
+        self.home_robot(write_to_file=False)
         blocking_undock(self.robot)
 
     def power_robot(self):

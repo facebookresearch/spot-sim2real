@@ -147,6 +147,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Automatically use intelrealsense camera
         rospy.set_param("is_gripper_blocked", 1)
         observations = super().reset()
+        rospy.set_param("is_whiten_black", False)
         self.placed = False
         return observations
 

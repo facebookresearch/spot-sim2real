@@ -18,6 +18,8 @@ python main.py +instruction='Take the water from the table to the kitchen counte
 ```
 Or check `src/notebook.ipynb`
 
+For running llama3, please do `ollama run llama3` in different terminal, and leave it there
+
 ## Config 
 
 ```

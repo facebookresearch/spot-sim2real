@@ -7,6 +7,7 @@ import collections
 
 import cv2
 import numpy as np
+import rospy
 
 # Full kernels
 FULL_KERNEL_3 = np.ones((3, 3), np.uint8)
@@ -78,7 +79,8 @@ DIAMOND_KERNEL_7 = np.asarray(
 )
 
 
-def filter_depth(depth_img, max_depth, whiten_black=False):
+def filter_depth(depth_img, max_depth):
+    whiten_black = rospy.get_param("is_whiten_black", True)
     filtered_depth_img = (
         fill_in_multiscale(depth_img.astype(np.float32) * (max_depth / 255.0))[0]
         * (255.0 / max_depth)
