@@ -182,7 +182,7 @@ def detect_orientation(cam_T_obj, to_origin, body_T_cam):
             else f"horizontal {format(theta_signed, '.2f')}, {format(gamma_signed, '.2f')}, {format(alpha_signed, '.2f')}"
         ),
         z_axis_transformed_in_camera,
-        gamma,
+        gamma_signed,
     )
 
 
@@ -248,10 +248,39 @@ def pose_estimation(
     return orientation, meru_dand_of_object_in_cam, gamma
 
 
-def rotate_quaternion_around_y(quat):
-    w, x, y, z = quat
-    q_final = (1.0 / np.sqrt(2)) * np.array([(w - y), (x - z), (w + y), (z + x)])
-    return q_final
+def quaternion_multiply(q1, q2):
+    """
+    Multiplies two quaternions q1 and q2.
+    
+    Args:
+    q1, q2: Quaternions represented as arrays or lists of four elements [w, x, y, z].
+    
+    Returns:
+    A quaternion resulting from the multiplication of q1 and q2.
+    """
+    w1, x1, y1, z1 = q1
+    w2, x2, y2, z2 = q2
+    
+    w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+    x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+    y = w1*y2 + y1*w2 + z1*x2 - x1*z2
+    z = w1*z2 + z1*w2 + x1*y2 - y1*x2
+    
+    return np.array([w, x, y, z])
+
+def rotate_quaternion_around_y(quat:np.ndarray, grasp_orientation_name:str, gamma:float)->np.ndarray:
+    gamma = -1.*np.sign(gamma)*90
+    quat_r = np.array([1., 0., 0., 0.])
+    if "5" in grasp_orientation_name:
+        quat_r = np.array([np.cos(np.deg2rad(gamma)/2.), 0., np.sin(np.deg2rad(gamma)/2.), 0.])#(1./np.sqrt(2))*np.array([1., 0., 1., 0.])
+    if "7" in grasp_orientation_name:
+        quat_r = np.array([np.cos(np.deg2rad(gamma)/2.), 0., np.sin(np.deg2rad(gamma)/2.), 0.]) #(1./np.sqrt(2))*np.array([1., 0., -1., 0.])
+    if "6" in grasp_orientation_name:
+        quat_r = np.array([np.cos(np.deg2rad(gamma)/2.), 0., 0., np.sin(np.deg2rad(gamma)/2.)]) #(1./np.sqrt(2))*np.array([1., 0., 0., 1.])
+    if "8" in grasp_orientation_name:
+        quat_r = np.array([np.cos(np.deg2rad(gamma)/2.), 0., 0., np.sin(np.deg2rad(gamma)/2.)]) #(1./np.sqrt(2))*np.array([1., 0., 0., -1.])
+    print(f"Quat R {quat_r}, gamma {gamma} grasp name {grasp_orientation_name}")
+    return quaternion_multiply(quat, quat_r)
 
 
 class OrientationSolver:
@@ -513,7 +542,7 @@ class OrientationSolver:
         return gamma
 
     def perform_orientation_correction(
-        self, spot: Spot, spinal_axis: mn.Vector3, gamma: float, object_name: str
+        self, spot: Spot, spinal_axis: mn.Vector3, gamma: float, object_name: str, make_face_the_object_right:bool=True
     ) -> None:
         correction_status, put_back_object_status = False, False
 
@@ -536,12 +565,14 @@ class OrientationSolver:
         current_orientation_after_grasp_in_quat = (
             spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
         )
+        current_grasp_orientation_name = self._determine_anchor_grasp_pose(current_orientation_after_grasp_in_quat)
         current_point[-1] -= 0.10
+        
         # if gamma > 30, object needs correction along z-axis of spot frame
         gamma = self.determine_if_object_symmetric(object_name, gamma)
         q_final = (
-            rotate_quaternion_around_y(current_orientation_after_grasp_in_quat)
-            if gamma > 30
+            rotate_quaternion_around_y(current_orientation_after_grasp_in_quat, current_grasp_orientation_name, gamma)
+            if np.abs(gamma) > 30 and make_face_the_object_right
             else current_orientation_after_grasp_in_quat
         )
         put_back_object_status = spot.move_gripper_to_point(
