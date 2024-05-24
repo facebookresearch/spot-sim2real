@@ -225,7 +225,7 @@ def pose_estimation(
     classification_text, meru_dand_of_object_in_cam, gamma = detect_orientation(
         pose_magnum, to_origin, body_T_intel
     )
-
+    t2 = time.time()
     visualization = cv2.putText(
         visualization,
         classification_text,
@@ -245,7 +245,7 @@ def pose_estimation(
 
     # Correct orientation
 
-    return orientation, meru_dand_of_object_in_cam, gamma
+    return orientation, meru_dand_of_object_in_cam, gamma, t2
 
 
 def quaternion_multiply(q1, q2):

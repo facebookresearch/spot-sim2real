@@ -23,7 +23,7 @@ if __name__ == "__main__":
     spot: Spot = spotskillmanager.spot
     pose_estimation_port = 2100
     segmentation_port = 21001
-    object_name = "penguin plush toy"
+    object_name = "cup" #"penguin plush toy"
     anchor_pose_number = 4
     orientationsolver: OrientationSolver = OrientationSolver()
     image_src = 1  # 1 for intel & 0 for gripper
@@ -68,7 +68,8 @@ if __name__ == "__main__":
 
         # cv2.imwrite(f"object_anchor_pose_{anchor_pose_number}.png", image_responses[0])
         graspmode = "topdown"
-        graspmode, spinal_axis, gamma = pose_estimation(
+        t1 = time.time()
+        graspmode, spinal_axis, gamma, t2 = pose_estimation(
             *image_responses,
             object_name,
             intrinsics,
@@ -78,12 +79,12 @@ if __name__ == "__main__":
             segmentation_port,
             pose_estimation_port,
         )
-
+        print(f"Time taken for pose estimation {t2-t1} secs")
         # graspmode = "topdown"
         rospy.set_param("graspmode", graspmode)
         # exit()
         spotskillmanager.pick(object_name)
-
+        
         # Simulate pick orientation
 
         # R_pick = R.from_matrix(R.from_euler("zyx", [0, -90, 0], True).as_matrix()@R.from_euler("zyx", [0, 0, 180], True).as_matrix()).as_quat()

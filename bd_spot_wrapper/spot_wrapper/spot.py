@@ -557,6 +557,86 @@ class Spot:
             print(log_packet)
         return log_packet
 
+    def sample_patch_around_point(
+            self, cx: int, cy: int, depth_raw: np.ndarray, patch_size: int = 5
+    ) -> int:
+        """
+        Samples a median depth in 5x5 patch around given x, y (pixel location in depth image array) as center in raw depth image
+        """
+        h, w = depth_raw.shape
+        x1, x2 = cx - patch_size // 2, cx + patch_size // 2
+        y1, y2 = cy - patch_size // 2, cy + patch_size // 2
+        x1, x2 = np.clip([x1, x2], 0, w)
+        y1, y2 = np.clip([y1, y2], 0, h)
+        deph_patch = depth_raw[y1:y2, x1:x2]
+        deph_patch = deph_patch[deph_patch > 0]
+        return np.median(deph_patch)
+    
+    def get_3d_point(self, cam_intrinsics, pixel_uv, z):
+        # Get camera intrinsics
+        fx = cam_intrinsics.focal_length.x
+        fy = cam_intrinsics.focal_length.y
+        cx = cam_intrinsics.principal_point.x
+        cy = cam_intrinsics.principal_point.y
+
+        # print(fx, fy, cx, cy)
+        # Get 3D point
+        x = (pixel_uv[0] - cx) * z / fx
+        y = (pixel_uv[1] - cy) * z / fy
+        return np.array([x, y, z])
+    def project_3d_to_pixel_uv(self, points_3d, cam_intrinsics):
+        """
+        Back projects given xyz 3d point to pixel location u,v using camera intrinsics
+        """
+        fx = cam_intrinsics.focal_length.x
+        fy = cam_intrinsics.focal_length.y
+        cx = cam_intrinsics.principal_point.x
+        cy = cam_intrinsics.principal_point.y
+        Z = points_3d[:, -1]
+        X_Z = points_3d[:, 0] / Z
+        Y_Z = points_3d[:, 1] / Z
+        u = (fx * X_Z) + cx
+        v = (fy * Y_Z) + cy
+        return np.stack([u.flatten(), v.flatten()], axis=1).reshape(-1, 2)
+    
+    def grasp_point_in_image_with_IK(self, image_responses, pixel_xy=None, timeout=5, top_down_grasp=False, horizontal_grasp=False):
+        depth_raw = image_response_to_cv2(image_responses[1])
+        rgb_image = image_response_to_cv2(image_responses[0])
+        
+        intrinsics = image_responses[0].source.pinhole.intrinsics
+        Z = self.sample_patch_around_point(pixel_xy[0], pixel_xy[1], depth_raw)*1e-3
+        point_in_gripper = self.get_3d_point(intrinsics, pixel_xy, Z)
+        body_T_hand:mn.Matrix4 = self.get_magnum_Matrix4_spot_a_T_b(
+            "body",
+            "link_wr1",
+        )
+        hand_T_gripper:mn.Matrix4 = self.get_magnum_Matrix4_spot_a_T_b(
+            "arm0.link_wr1",
+            "hand_color_image_sensor",
+            image_responses[0].shot.transforms_snapshot,
+        )
+        body_T_gripper:mn.Matrix4 = body_T_hand @ hand_T_gripper
+        point_in_body = np.array(body_T_gripper.transform_point(mn.Vector3(*point_in_gripper)))
+        print(f"grasp point in body {point_in_body}")
+        point_in_body[0] += 0.10
+        point_in_body[1] += 0.02
+        #point_in_body[-1] += 0.03
+        pixel_uv = self.project_3d_to_pixel_uv(np.array(body_T_gripper.inverted().transform_point(mn.Vector3(*point_in_body))).reshape(1, 3), intrinsics)[0].tolist()
+        pixel_uv = list(map(int, pixel_uv))
+        rgb_image = cv2.circle(rgb_image, pixel_uv, 2, (0, 0, 255), 2)
+        cv2.imwrite("grasp_point.png", rgb_image)
+        
+        status = self.move_gripper_to_point(point_in_body, np.array([0.71277446, 0.70131284, 0.00662719, 0.00830902]), timeout//2, timeout)
+        
+        print(f"Grasp reached to object ? {status}")
+        
+        claw_gripper_command = RobotCommandBuilder.claw_gripper_command_helper([0.1], [1], max_torque=1, disable_force_on_contact=True)
+        self.command_client.robot_command(claw_gripper_command)
+    
+        breakpoint()
+        
+        return status
+    
     def grasp_point_in_image(
         self,
         image_response,
@@ -678,10 +758,11 @@ class Spot:
     def grasp_hand_depth(self, *args, **kwargs):
         image_responses = self.get_image_responses(
             # [SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-            [SpotCamIds.HAND_COLOR]
+            [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
         )
         hand_image_response = image_responses[0]  # only expecting one image
-        return self.grasp_point_in_image(hand_image_response, *args, **kwargs)
+        #return self.grasp_point_in_image(hand_image_response, *args, **kwargs)
+        return self.grasp_point_in_image_with_IK(image_responses, *args, **kwargs)
 
     def set_base_velocity(
         self,
