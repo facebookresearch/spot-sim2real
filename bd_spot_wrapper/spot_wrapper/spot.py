@@ -630,7 +630,11 @@ class Spot:
         
         print(f"Grasp reached to object ? {status}")
         
-        claw_gripper_command = RobotCommandBuilder.claw_gripper_command_helper([0.1], [1], max_torque=1, disable_force_on_contact=True)
+        #claw_gripper_command = RobotCommandBuilder.claw_gripper_close_command(max_acc=None, max_vel=None, disable_force_on_contact=False, max_torque=1.0)#claw_gripper_command_helper([0.1], [1], max_torque=1, disable_force_on_contact=True)
+        claw_gripper_command_1_lose_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.7, disable_force_on_contact=True, max_torque=0.0)
+        claw_gripper_command_2_little_tighter_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.6, claw_gripper_command_1_lose_grip, disable_force_on_contact=True,  max_torque=0.5)
+        claw_gripper_command_3_almost_there = RobotCommandBuilder.claw_gripper_open_fraction_command(0.5, claw_gripper_command_2_little_tighter_grip, disable_force_on_contact=True, max_torque=0.7)
+        claw_gripper_command = RobotCommandBuilder.claw_gripper_open_fraction_command(0.4, claw_gripper_command_3_almost_there, max_torque=1.0)
         self.command_client.robot_command(claw_gripper_command)
     
         breakpoint()
