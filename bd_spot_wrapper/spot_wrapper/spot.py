@@ -636,7 +636,7 @@ class Spot:
         claw_gripper_command_3_almost_there = RobotCommandBuilder.claw_gripper_open_fraction_command(0.5, claw_gripper_command_2_little_tighter_grip, disable_force_on_contact=True, max_torque=0.7)
         claw_gripper_command = RobotCommandBuilder.claw_gripper_open_fraction_command(0.4, claw_gripper_command_3_almost_there, max_torque=1.0)
         self.command_client.robot_command(claw_gripper_command)
-    
+        #adding comment for new push
         breakpoint()
         
         return status

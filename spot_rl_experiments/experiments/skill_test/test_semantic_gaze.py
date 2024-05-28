@@ -23,7 +23,7 @@ if __name__ == "__main__":
     spot: Spot = spotskillmanager.spot
     pose_estimation_port = 2100
     segmentation_port = 21001
-    object_name = "cup" #"penguin plush toy"
+    object_name = "bottle" #"penguin plush toy"
     anchor_pose_number = 4
     orientationsolver: OrientationSolver = OrientationSolver()
     image_src = 1  # 1 for intel & 0 for gripper
