@@ -5,7 +5,7 @@ WEIGHTS_TORCHSCRIPT:
   NAV: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript"
 
   # Static gaze
-  GAZE: "weights/torchscript/gaze_normal_32_seed100_1649708902_ckpt.38_combined_net.torchscript"
+  GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 
   # Mobile Gaze torchscript module files path
   MOBILE_GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"

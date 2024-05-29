@@ -33,7 +33,7 @@ from spot_rl.utils.utils import (
 from spot_rl.utils.whisper_translator import WhisperTranslator
 from spot_wrapper.spot import Spot
 
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
+DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 549))
 
 
 def main(spot, use_mixer, config, out_path=None):
@@ -81,83 +81,60 @@ def main(spot, use_mixer, config, out_path=None):
         "I am ready to take instructions!\n Sample Instructions : take the rubik cube from the dining table to the hamper"
     )
     print("-" * 100)
-    input("Are you ready?")
-    audio_to_text.record()
-    instruction = audio_to_text.translate()
-    print("Transcribed instructions : ", instruction)
+    while True:
+        audio_transcription_success = False
+        while not audio_transcription_success:
+            try:
+                input("Are you ready?")
+                audio_to_text.record()
+                instruction = audio_to_text.translate()
+                print("Transcribed instructions : ", instruction)
 
-    # Use LLM to convert user input to an instructions set
-    # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
-    nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
-    print("PARSED", nav_1, pick, nav_2)
+                # Use LLM to convert user input to an instructions set
+                # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
+                nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
+                print("PARSED", nav_1, pick, nav_2)
 
-    # Find closest nav_targets to the ones robot knows locations of
-    nav_1 = sentence_similarity.get_most_similar_in_list(
-        nav_1, list(waypoints_yaml_dict["nav_targets"].keys())
-    )
-    nav_2 = sentence_similarity.get_most_similar_in_list(
-        nav_2, list(waypoints_yaml_dict["nav_targets"].keys())
-    )
-    print("MOST SIMILAR: ", nav_1, pick, nav_2)
+                # Find closest nav_targets to the ones robot knows locations of
+                nav_1 = sentence_similarity.get_most_similar_in_list(
+                    nav_1, list(waypoints_yaml_dict["nav_targets"].keys())
+                )
+                nav_2 = sentence_similarity.get_most_similar_in_list(
+                    nav_2, list(waypoints_yaml_dict["nav_targets"].keys())
+                )
+                print("MOST SIMILAR: ", nav_1, pick, nav_2)
+                audio_transcription_success = True
+            except Exception as e:
+                print(f"Exception encountered in Speech to text : {e} \n\n Retrying...")
 
-    # Used for Owlvit
-    rospy.set_param("object_target", pick)
+        # Used for Owlvit
+        rospy.set_param("object_target", pick)
 
-    # Used for Visualizations
-    rospy.set_param("viz_pick", nav_1)
-    rospy.set_param("viz_object", pick)
-    rospy.set_param("viz_place", nav_2)
+        # Used for Visualizations
+        rospy.set_param("viz_pick", nav_1)
+        rospy.set_param("viz_object", pick)
+        rospy.set_param("viz_place", nav_2)
 
-    spot.power_robot()
-    time.sleep(1)
-    out_data = []
+        # Ensure the parameters are correct
+        rospy.set_param("is_gripper_blocked", 0)
+        rospy.set_param("is_whiten_black", True)
 
-    waypoint = nav_target_from_waypoint(nav_1, waypoints_yaml=waypoints_yaml_dict)
-    observations = env.reset(waypoint=waypoint)
+        spot.power_robot()
+        # time.sleep(1)
+        out_data = []
 
-    policy.reset()
-    done = False
-    if use_mixer:
-        expert = None
-    else:
-        expert = Tasks.NAV
-    env.stopwatch.reset()
-    while not done:
-        out_data.append((time.time(), env.x, env.y, env.yaw))
-        base_action, arm_action = policy.act(observations, expert=expert)
-        nav_silence_only = True
-        env.stopwatch.record("policy_inference")
-        action_dict = {
-            "base_action": base_action,
-            "arm_action": arm_action,
-        }  # type: Dict[str, Any]
-        observations, _, done, info = env.step(
-            action_dict=action_dict,
-            nav_silence_only=nav_silence_only,
-        )
-
-        if use_mixer and info.get("grasp_success", False):
-            policy.policy.prev_nav_masks *= 0
-
-        if not use_mixer:
-            expert = info["correct_skill"]
-        print("Expert:", expert)
-
-        # We reuse nav, so we have to reset it before we use it again.
-        if not use_mixer and expert != Tasks.NAV:
-            policy.nav_policy.reset()
-
-        env.stopwatch.print_stats(latest=True)
-
-    # Go to the dock
-    # TODO: This needs to be cleaned up
-    env.say(f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}.")
-    if return_to_base:
-        waypoint = nav_target_from_waypoint("dock", waypoints_yaml=waypoints_yaml_dict)
+        waypoint = nav_target_from_waypoint(nav_1, waypoints_yaml=waypoints_yaml_dict)
         observations = env.reset(waypoint=waypoint)
-        expert = Tasks.NAV
 
-        while True:
+        policy.reset()
+        done = False
+        if use_mixer:
+            expert = None
+        else:
+            expert = Tasks.NAV
+        env.stopwatch.reset()
+        while not done:
+            out_data.append((time.time(), env.x, env.y, env.yaw))
             base_action, arm_action = policy.act(observations, expert=expert)
             nav_silence_only = True
             env.stopwatch.record("policy_inference")
@@ -169,29 +146,68 @@ def main(spot, use_mixer, config, out_path=None):
                 action_dict=action_dict,
                 nav_silence_only=nav_silence_only,
             )
-            try:
-                spot.dock(dock_id=DOCK_ID, home_robot=True)
-                spot.home_robot()
-                break
-            except Exception:
-                print("Dock not found... trying again")
-                time.sleep(0.1)
-    else:
-        env.say("Since RETURN_TO_BASE was set to false in config.yaml, will sit down.")
-        time.sleep(2)
-        spot.sit()
 
-    print("Done!")
+            if use_mixer and info.get("grasp_success", False):
+                policy.policy.prev_nav_masks *= 0
 
-    out_data.append((time.time(), env.x, env.y, env.yaw))
+            if not use_mixer:
+                expert = info["correct_skill"]
+            print("Expert:", expert)
 
-    if out_path is not None:
-        data = (
-            "\n".join([",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data])
-            + "\n"
-        )
-        with open(out_path, "w") as f:
-            f.write(data)
+            # We reuse nav, so we have to reset it before we use it again.
+            if not use_mixer and expert != Tasks.NAV:
+                policy.nav_policy.reset()
+
+            env.stopwatch.print_stats(latest=True)
+
+        # Go to the dock
+        # TODO: This needs to be cleaned up
+        env.say(f"Finished object rearrangement. RETURN_TO_BASE - {return_to_base}.")
+        if return_to_base:
+            waypoint = nav_target_from_waypoint(
+                "dock", waypoints_yaml=waypoints_yaml_dict
+            )
+            observations = env.reset(waypoint=waypoint)
+            expert = Tasks.NAV
+
+            while True:
+                base_action, arm_action = policy.act(observations, expert=expert)
+                nav_silence_only = True
+                env.stopwatch.record("policy_inference")
+                action_dict = {
+                    "base_action": base_action,
+                    "arm_action": arm_action,
+                }  # type: Dict[str, Any]
+                observations, _, done, info = env.step(
+                    action_dict=action_dict,
+                    nav_silence_only=nav_silence_only,
+                )
+                try:
+                    spot.dock(dock_id=DOCK_ID)
+                    break
+                except Exception:
+                    print("Dock not found... trying again")
+                    time.sleep(0.1)
+        else:
+            env.say(
+                "Since RETURN_TO_BASE was set to false in config.yaml, will sit down."
+            )
+            time.sleep(2)
+            spot.sit()
+
+        print("Done!")
+
+        out_data.append((time.time(), env.x, env.y, env.yaw))
+
+        if out_path is not None:
+            data = (
+                "\n".join(
+                    [",".join([str(i) for i in t_x_y_yaw]) for t_x_y_yaw in out_data]
+                )
+                + "\n"
+            )
+            with open(out_path, "w") as f:
+                f.write(data)
 
 
 class Tasks:

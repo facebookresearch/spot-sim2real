@@ -9,7 +9,10 @@ import os
 import hydra
 import openai
 import regex as re
+from meta_ai_api import MetaAI
 from omegaconf import DictConfig, OmegaConf
+
+from .llama3_local_api import MetaAI as MetaAIlocal
 
 
 class OpenAI:
@@ -39,7 +42,15 @@ class RearrangeEasyChain:
     def __init__(self, conf):
         self.conf = conf
         self._build_prompt()
-        self.llm = OpenAI(conf)
+        self._llm_type = self.conf.llm_type
+        if self._llm_type == "openai":
+            self.llm = OpenAI(conf)
+        elif self._llm_type == "metaai":
+            self.llm = MetaAI()
+        elif self._llm_type == "metaailocal":
+            self.llm = MetaAIlocal()
+        else:
+            raise NotImplementedError
         self.input_variable = f"<{self.conf.prompt.input_variable}>"
 
     def _build_prompt(self):
@@ -51,11 +62,21 @@ class RearrangeEasyChain:
 
     def generate(self, input):
         prompt = self.prompt.replace(self.input_variable, input)
-        return self.llm.generate(prompt)
+        if self._llm_type == "openai":
+            return self.llm.generate(prompt)
+        elif self._llm_type == "metaai" or self._llm_type == "metaailocal":
+            return self.llm.prompt(message=prompt)
+        else:
+            raise NotImplementedError
 
     def parse_instructions(self, input):
         gn_op = self.generate(input)
-        msg_content = gn_op["choices"][0]["message"]["content"]
+        if self._llm_type == "openai":
+            msg_content = gn_op["choices"][0]["message"]["content"]
+        elif self._llm_type == "metaai" or self._llm_type == "metaailocal":
+            msg_content = gn_op["message"]
+        else:
+            raise NotImplementedError
         matches = re.findall("\(.*?\)", msg_content)  # noqa
         matches = [match.replace("(", "").replace(")", "") for match in matches]
         nav_1, pick, nav_2, place = matches

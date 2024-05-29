@@ -2,4 +2,5 @@ defaults:
   - llm: openai
   - prompt: rearrange_easy_few_shot
 
+llm_type: metaai # it could be "openai", "metaai", "metaailocal"
 verbose: false

@@ -28,6 +28,7 @@ from spot_rl.utils.heuristic_nav import (
     heurisitic_object_search_and_navigation,
 )
 from spot_rl.utils.search_table_location import (
+    contrained_place_point_estimation,
     detect_place_point_by_pcd_method,
     plot_place_point_in_gripper_image,
 )
@@ -431,6 +432,66 @@ class SpotSkillManager:
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
 
+        status, message = self.place(
+            place_x,
+            place_y,
+            place_z,
+            ee_orientation_at_grasping=ee_orientation_at_grasping,
+            is_local=is_local,
+        )
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    def contrainedplace(self, object_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, proposition: str = "left") -> Tuple[bool, str]:  # type: ignore
+        """
+        Perform the place action on the place target specified as known string
+
+        Args:
+            place_target (str): Name of the place target (as stored in waypoints.yaml)
+            ee_orientation_at_grasping (list): The ee orientation at grasping. If users specifiy, the robot will place the object in the desired pose
+                This is only used for the semantic place skills.
+            is_local: if the target place point is in the local or global frame or not
+            proposition: indicate the placement location relative to the object
+
+        Returns:
+            bool: True if place was successful, False otherwise
+            str: Message indicating the status of the place
+        """
+        conditional_print(
+            message=f"Received place target request for - {object_target}",
+            verbose=self.verbose,
+        )
+
+        assert proposition in [
+            "left",
+            "right",
+            "next-to",
+        ], f"Place skill does not support proposition of {proposition}"
+
+        # Esitmate the waypoint
+        (
+            place_target_location,
+            place_target_in_gripper_camera,
+            _,
+        ) = contrained_place_point_estimation(
+            object_target,
+            proposition,
+            self.spot,
+            self.pick_config.GAZE_ARM_JOINT_ANGLES,
+            percentile=30,
+            visualize=visualize,
+            height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+            image_scale=self.get_env().config.IMAGE_SCALE,
+        )
+
+        print(f"Estimate Place xyz: {place_target_location}")
+
+        if visualize:
+            plot_place_point_in_gripper_image(self.spot, place_target_in_gripper_camera)
+
+        place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
+
+        # Call place skill given the estimate waypoint
         status, message = self.place(
             place_x,
             place_y,
