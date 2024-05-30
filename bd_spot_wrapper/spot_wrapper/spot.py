@@ -25,7 +25,7 @@ import magnum as mn
 import numpy as np
 import quaternion
 import rospy
-import sophus as sp
+import sophuspy as sp
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,

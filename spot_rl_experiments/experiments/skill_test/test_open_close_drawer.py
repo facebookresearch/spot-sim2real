@@ -16,6 +16,7 @@ if __name__ == "__main__":
     contnue = True
     while contnue:
         spotskillmanager.opendrawer()
+        spotskillmanager.pick("cup")
         close_drawer = map_user_input_to_boolean(
             "Do you want to close the drawer ? Y/N "
         )

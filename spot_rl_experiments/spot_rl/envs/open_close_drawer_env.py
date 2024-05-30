@@ -11,11 +11,76 @@ import magnum as mn
 import numpy as np
 import quaternion
 import rospy
+from spot_rl.utils.utils import ros_topics as rt
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.heuristic_nav import get_3d_point
-from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
+from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img, RobotCommandBuilder
 from spot_wrapper.utils import angle_between_quat
+from std_msgs.msg import String
+import cv2
 
+def project_3d_to_pixel_uv(points_3d, cam_intrinsics):
+    """
+    Back projects given xyz 3d point to pixel location u,v using camera intrinsics
+    """
+    fx = cam_intrinsics.focal_length.x
+    fy = cam_intrinsics.focal_length.y
+    cx = cam_intrinsics.principal_point.x
+    cy = cam_intrinsics.principal_point.y
+    Z = points_3d[:, -1]
+    X_Z = points_3d[:, 0] / Z
+    Y_Z = points_3d[:, 1] / Z
+    u = (fx * X_Z) + cx
+    v = (fy * Y_Z) + cy
+    return np.stack([u.flatten(), v.flatten()], axis=1).reshape(-1, 2)
+
+def sample_patch_around_point(
+        cx: int, cy: int, depth_raw: np.ndarray, patch_size: int = 10
+) -> int:
+    """
+    Samples a median depth in 5x5 patch around given x, y (pixel location in depth image array) as center in raw depth image
+    """
+    h, w = depth_raw.shape
+    x1, x2 = cx - patch_size // 2, cx + patch_size // 2
+    y1, y2 = cy - patch_size // 2, cy + patch_size // 2
+    x1, x2 = np.clip([x1, x2], 0, w)
+    y1, y2 = np.clip([y1, y2], 0, h)
+    deph_patch = depth_raw[y1:y2, x1:x2]
+    deph_patch = deph_patch[deph_patch > 0]
+    return np.median(deph_patch)
+
+class DetectionSubscriber:
+    def __init__(self):
+        self.latest_message = None
+        rospy.Subscriber(rt.DETECTIONS_TOPIC, String, self.callback)
+
+    def callback(self, data):
+        self.latest_message = data.data
+
+    def get_latest_message(self):
+        return self.latest_message
+
+def detect_with_rospy_subscriber(object_name, image_scale=0.7):
+    """Fetch the detection result"""
+    # We use rospy approach reac the detection string from topic
+    rospy.set_param("object_target", object_name)
+    subscriber = DetectionSubscriber()
+    fetch_time_threshold = 1.0
+    time.sleep(1.0)
+    begin_time = time.time()
+    while (time.time() - begin_time) < fetch_time_threshold:
+        try:
+            latest_message = subscriber.get_latest_message()
+            if "None" in latest_message:
+                continue
+            bbox_str = latest_message.split(",")[-4:]
+            break
+        except Exception:
+            pass
+
+    prediction = [int(float(num) / image_scale) for num in bbox_str]
+    cx, cy = (prediction[0] + prediction[2]) // 2, (prediction[1] + prediction[3]) // 2
+    return cx, cy
 
 class SpotOpenCloseDrawerEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
@@ -64,7 +129,6 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
     def reset(self, goal_dict=None, *args, **kwargs):
         self.spot.open_gripper()
-
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
@@ -98,7 +162,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         self.initial_ee_orientation = self.spot.get_ee_quaternion_in_body_frame()
 
         # Update target object name as provided in config
-        observations = super().reset(target_obj_name="drawer handle", *args, **kwargs)
+        observations = super().reset(target_obj_name="taped handle", *args, **kwargs)
         rospy.set_param("object_target", self.target_obj_name)
 
         # Flag for done
@@ -150,7 +214,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the transformation of the gripper
         vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
         # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        pull_push_distance = -0.2 if self._mode == "open" else 0.25
+        pull_push_distance = -0.42 if self._mode == "open" else 0.25
         move_target = vision_T_hand.transform_point(
             mn.Vector3([pull_push_distance, 0, 0])
         )
@@ -221,40 +285,77 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         ########################################################
 
         imgs = self.spot.get_hand_image()
-
+        
+        image_rgb = image_response_to_cv2(imgs[0])
+        depth_raw = image_response_to_cv2(imgs[1])
+        my_pixel = detect_with_rospy_subscriber("taped handle", self.config.IMAGE_SCALE)
+        #breakpoint()
+        #z = sample_patch_around_point(*my_pixel, depth_raw)*1e-3
+        pixel_x_backup, pixel_y_backup = pixel_x, pixel_y
+        pixel_x, pixel_y = my_pixel
+        print(pixel_x, pixel_y, z)
+        
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
 
-        # Get the transformation
-        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-
-        # Get the 3D point in the hand RGB frame
         point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
-
-        # Get the vision to hand
-        vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-            "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        print("Drawer point in 3D", point_in_hand_image_3d)
+        
+        body_T_hand:mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            "body",
+            "link_wr1",
         )
-        point_in_global_3d = vision_T_hand_image.transform_point(
-            mn.Vector3(*point_in_hand_image_3d)
+        hand_T_gripper:mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            "arm0.link_wr1",
+            "hand_color_image_sensor",
+            imgs[0].shot.transforms_snapshot,
         )
+        body_T_gripper:mn.Matrix4 = body_T_hand @ hand_T_gripper
+        point_in_base_3d = body_T_gripper.transform_point(mn.Vector3(*point_in_hand_image_3d))
+        adjust_point_in_base_3d = np.array(point_in_base_3d).copy()
+        adjust_point_in_base_3d[0] += 0.02
 
-        # Get the transformation of the gripper
-        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the location relative to the gripper
-        point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
-        # Offset the x and z direction in hand frame
-        ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.05
-        ee_offset_y = 0.0 if self._rep_type == "drawer" else 0.01
-        ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.02
-        point_in_hand_3d[0] += ee_offset_x
-        point_in_hand_3d[1] += ee_offset_y
-        point_in_hand_3d[2] += ee_offset_z
-        # Make it back to global frame
-        point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
+        #adjust_point_in_base_3d[-1] += 0.03
+        adjust_point_in_gripper = body_T_gripper.inverted().transform_point(mn.Vector3(*adjust_point_in_base_3d))
+        pixel_adjusted = project_3d_to_pixel_uv(np.array(adjust_point_in_gripper).reshape(1, 3), cam_intrinsics)[0]
+        
+        image_rgb = cv2.circle(image_rgb, (int(pixel_x), int(pixel_y)), radius=4, color=(0, 0, 255))
+        image_rgb = cv2.circle(image_rgb, (int(pixel_adjusted[0]), int(pixel_adjusted[1])), radius=4, color=(255, 0, 0))
+        image_rgb = cv2.circle(image_rgb, (int(pixel_x_backup), int(pixel_y_backup)), radius=4, color=(0, 255, 0))
+        #cv2.namedWindow("Handle", cv2.WINDOW_NORMAL)
+        #cv2.imshow("Handle", image_rgb)
+        #cv2.waitKey(0)
+        #cv2.destroyAllWindows()
+        point_in_base_3d = mn.Vector3(*adjust_point_in_base_3d)
+        # # Get the transformation
+        # vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
 
-        # Get the point in the base frame
-        point_in_base_3d = vision_T_base.inverted().transform_point(point_in_global_3d)
+        # # Get the 3D point in the hand RGB frame
+        # point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
+
+        # # Get the vision to hand
+        # vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+        #     "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        # )
+        # point_in_global_3d = vision_T_hand_image.transform_point(
+        #     mn.Vector3(*point_in_hand_image_3d)
+        # )
+
+        # # Get the transformation of the gripper
+        # vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
+        # # Get the location relative to the gripper
+        # point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
+        # # Offset the x and z direction in hand frame
+        # ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.05
+        # ee_offset_y = 0.0 if self._rep_type == "drawer" else 0.01
+        # ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.02
+        # point_in_hand_3d[0] += ee_offset_x
+        # point_in_hand_3d[1] += ee_offset_y
+        # point_in_hand_3d[2] += ee_offset_z
+        # # Make it back to global frame
+   
+        # # Get the point in the base frame    
+        # point_in_base_3d = vision_T_base.inverted().transform_point(point_in_global_3d)
 
         # Make it to be numpy
         point_in_base_3d = np.array(
@@ -283,7 +384,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             # while maintaining the gripper orientation
             self.spot.move_gripper_to_point(
                 point_in_base_3d,
-                [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+                [0.99998224, 0.00505713, 0.00285832, 0.00132725]
+                #[ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
             )
 
         #################################
@@ -291,6 +393,14 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         #################################
 
         # Close the gripper
+        
+        # claw_gripper_command_1_lose_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.5, disable_force_on_contact=True, max_torque=0.0)
+        # claw_gripper_command_2_little_tighter_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.4, claw_gripper_command_1_lose_grip, disable_force_on_contact=True,  max_torque=0.5)
+        # claw_gripper_command_3_almost_there = RobotCommandBuilder.claw_gripper_open_fraction_command(0.3, claw_gripper_command_2_little_tighter_grip, disable_force_on_contact=True, max_torque=0.7)
+        # claw_gripper_command = RobotCommandBuilder.claw_gripper_open_fraction_command(0.1, claw_gripper_command_3_almost_there, max_torque=2.0)
+        # #breakpoint()
+        # self.spot.command_client.robot_command(claw_gripper_command)
+        
         self.spot.close_gripper()
         # Pause a bit to ensure the gripper grapes the handle
         time.sleep(2)
@@ -330,7 +440,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Update the action_dict with place flag
         action_dict["place"] = False
         observations, reward, done, info = super().step(
-            action_dict=action_dict,
+            action_dict=action_dict, travel_time_scale=3.0
         )
 
         # Get bounding box

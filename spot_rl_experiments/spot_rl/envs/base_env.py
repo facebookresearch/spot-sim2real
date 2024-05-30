@@ -409,6 +409,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif arm_action is not None:
+                print(f"Travel Time Scale {travel_time_scale}")
                 self.spot.set_arm_joint_positions(
                     positions=arm_action,
                     travel_time=1 / self.ctrl_hz * 0.9 * travel_time_scale,
