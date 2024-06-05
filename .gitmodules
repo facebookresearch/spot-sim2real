@@ -13,3 +13,8 @@
 	url = https://github.com/naokiyokoyama/mask_rcnn_detectron2
 	branch = main
 	ignore = dirty
+[submodule "third_party/FoundationPoseForSpotSim2Real"]
+	path = third_party/FoundationPoseForSpotSim2Real
+	url = https://github.com/tusharsangam/FoundationPoseForSpotSim2Real
+	branch = main
+	ignore = dirty 

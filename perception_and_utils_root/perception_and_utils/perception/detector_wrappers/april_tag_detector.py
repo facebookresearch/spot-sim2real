@@ -8,7 +8,12 @@ import os
 from typing import Any, Dict, Tuple
 
 import numpy as np
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from perception_and_utils.perception.april_tag_pose_estimator import (
     AprilTagPoseEstimator,
 )

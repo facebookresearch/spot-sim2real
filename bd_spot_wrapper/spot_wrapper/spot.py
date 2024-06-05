@@ -15,7 +15,7 @@ import os
 import os.path as osp
 import time
 from collections import OrderedDict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import bosdyn.client
 import bosdyn.client.lease
@@ -25,7 +25,12 @@ import magnum as mn
 import numpy as np
 import quaternion
 import rospy
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -311,6 +316,65 @@ class Spot:
         self.set_arm_joint_positions(new_arm_joint_states)
         time.sleep(0.5)
 
+    def move_gripper_to_points(
+        self,
+        point: List[float],
+        rotations: List[Tuple],
+        seconds_to_goal: float = 10.0,
+        timeout_sec: float = 20,
+    ):
+        """
+        Moves EE to a point relative to body frame
+        However it can accept list of rotations such that you can add interpolated rotations in between such that move_gripper_ never fails
+        :param point: XYZ location
+        :param rotations: list[Euler roll-pitch-yaw or WXYZ quaternion]
+        :return: cmd_id
+        """
+        points = []
+        for i, rotation in enumerate(rotations):
+            if len(rotation) == 3:  # roll pitch yaw Euler angles
+                roll, pitch, yaw = rotation  # xyz
+                quat = geometry.EulerZXY(
+                    yaw=yaw, roll=roll, pitch=pitch
+                ).to_quaternion()
+            elif len(rotation) == 4:  # w, x, y, z quaternion
+                w, x, y, z = rotation
+                quat = math_helpers.Quat(w=w, x=x, y=y, z=z)
+            else:
+                raise RuntimeError(
+                    "rotation needs to have length 3 (euler) or 4 (quaternion),"
+                    f"got {len(rotation)}"
+                )
+
+            hand_pose = math_helpers.SE3Pose(*point, quat)
+            points.append(
+                trajectory_pb2.SE3TrajectoryPoint(
+                    pose=hand_pose.to_proto(),
+                    time_since_reference=seconds_to_duration(seconds_to_goal * i),
+                )
+            )
+
+        hand_trajectory = trajectory_pb2.SE3Trajectory(points=points)
+        arm_cartesian_command = arm_command_pb2.ArmCartesianCommand.Request(
+            pose_trajectory_in_task=hand_trajectory,
+            root_frame_name=GRAV_ALIGNED_BODY_FRAME_NAME,
+        )
+
+        # Pack everything up in protos.
+        arm_command = arm_command_pb2.ArmCommand.Request(
+            arm_cartesian_command=arm_cartesian_command
+        )
+        synchronized_command = synchronized_command_pb2.SynchronizedCommand.Request(
+            arm_command=arm_command
+        )
+        command = robot_command_pb2.RobotCommand(
+            synchronized_command=synchronized_command
+        )
+        cmd_id = self.command_client.robot_command(command)
+
+        success_status = self.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+        return success_status
+
     def move_gripper_to_point(
         self, point, rotation, seconds_to_goal=3.0, timeout_sec=10
     ):
@@ -321,7 +385,7 @@ class Spot:
         :return: cmd_id
         """
         if len(rotation) == 3:  # roll pitch yaw Euler angles
-            roll, pitch, yaw = rotation
+            roll, pitch, yaw = rotation  # x, y, z
             quat = geometry.EulerZXY(yaw=yaw, roll=roll, pitch=pitch).to_quaternion()
         elif len(rotation) == 4:  # w, x, y, z quaternion
             w, x, y, z = rotation
@@ -511,6 +575,7 @@ class Spot:
         data_edge_timeout=2,
         top_down_grasp=False,
         horizontal_grasp=False,
+        add_threshold_on_grasp=True,
     ):
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
@@ -526,6 +591,7 @@ class Spot:
             camera_model=image_response.source.pinhole,
             walk_gaze_mode=3,
         )
+
         if top_down_grasp or horizontal_grasp:
             if top_down_grasp:
                 # Add a constraint that requests that the x-axis of the gripper is
@@ -559,7 +625,8 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            if add_threshold_on_grasp:
+                constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(

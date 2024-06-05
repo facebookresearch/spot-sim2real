@@ -12,7 +12,7 @@ from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
 )
-from spot_rl.envs.gaze_env import SpotGazeEnv
+from spot_rl.envs.gaze_env import SpotGazeEnv, SpotSemanticGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
@@ -26,6 +26,7 @@ from spot_rl.real_policy import (
     NavPolicy,
     OpenCloseDrawerPolicy,
     PlacePolicy,
+    SemanticGazePolicy,
     SemanticPlacePolicy,
 )
 
@@ -449,8 +450,16 @@ class Pick(Skill):
                 config=self.config,
             )
         self.policy.reset()
+        self.enable_pose_estimation: bool = False
+        self.enable_pose_correction: bool = False
 
         self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
+
+    def set_pose_estimation_flags(
+        self, enable_pose_estimation: bool = False, enable_pose_correction: bool = False
+    ) -> None:
+        self.enable_pose_estimation = enable_pose_estimation
+        self.enable_pose_correction = enable_pose_correction
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""
@@ -532,13 +541,116 @@ class Pick(Skill):
             action_dict = {
                 "arm_action": action[0:4],
                 "base_action": action[4:6],
+                "enable_pose_estimation": self.enable_pose_estimation,
+                "enable_pose_correction": self.enable_pose_correction,
             }
         else:
             action_dict = {
                 "arm_action": action,
                 "base_action": None,
+                "enable_pose_estimation": self.enable_pose_estimation,
+                "enable_pose_correction": self.enable_pose_correction,
             }
 
+        return action_dict
+
+
+class SemanticPick(Pick):
+    """
+    Semantic Pick is used to gaze at, and pick given objects.
+
+    CAUTION: The robot will drop the object after picking it, please use objects that are not fragile
+
+    Expected goal_dict input:
+        goal_dict = {
+            "target_object": "apple", # (Necessary) Name of the target object to pick
+            "take_user_input": False, # (Optional) Whether to take user input for verifying success of the gaze
+        }
+
+    Args:
+        spot (Spot): Spot object
+        config (Config): Config object
+
+    How to use:
+        1. Create a Pick object
+        2. Call execute(goal_dict) method with "target"object" as a str in input goal_dict
+        3. Call get_most_recent_result_log() to get the result from the most recent pick operation
+
+    Example:
+        config = construct_config_for_gaze(opts=[])
+        spot = Spot("spot_client_name")
+        with spot.get_lease(hijack=True):
+            spot.power_robot()
+
+            gaze_target_list = ["apple", "banana"]
+            results = []
+            pick = Pick(spot, config)
+            for target_object in gaze_target_list:
+                goal_dict = {"target_object": target_object}
+                status, feedback = pick.execute(goal_dict=goal_dict)
+                results.append(pick.get_most_recent_result_log())
+            spot.shutdown(should_dock=True)
+    """
+
+    def __init__(self, spot, config=None) -> None:
+        if not config:
+            config = construct_config_for_gaze()
+        super().__init__(spot, config)
+
+        self.policy = SemanticGazePolicy(
+            self.config.WEIGHTS.SEMANTIC_GAZE,
+            device=self.config.DEVICE,
+            config=self.config,
+        )
+
+        self.policy.reset()
+
+        self.env = SpotSemanticGazeEnv(self.config, spot)
+
+    def reset_skill(self, goal_dict: Dict[str, Any]) -> Any:
+        """Refer to class Skill for documentation"""
+        try:
+            self.sanity_check(goal_dict)
+        except Exception as e:
+            raise e
+
+        target_obj_name = goal_dict.get("target_object", None)
+        take_user_input = goal_dict.get("take_user_input", False)  # type: bool
+        grasping_type = goal_dict.get("grasping_type", "topdown")
+        conditional_print(
+            message=f"Gaze at object : {target_obj_name}  - {'WILL' if take_user_input else 'WILL NOT'} take user input at the end for verification of pick",
+            verbose=self.verbose,
+        )
+
+        # Reset the env and policy
+        observations = self.env.reset(
+            target_obj_name=target_obj_name, grasping_type=grasping_type
+        )
+        self.policy.reset()
+
+        # Logging and Debug
+        self.env.say(
+            f"Gaze at target object - {target_obj_name} with {grasping_type} grasping"
+        )
+        print(
+            "The robot will drop the object after picking it, please use objects that are not fragile"
+        )
+
+        # Reset logged data at init
+        self.reset_logger()
+
+        return observations
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        # Mobile pick uses both base & arm but static pick only uses arm
+        action_dict = None
+
+        # first 4 are arm actions, then 2 are base actions & last bit is unused
+        action_dict = {
+            "arm_action": action[0:4],
+            "base_action": action[4:6],
+        }
         return action_dict
 
 

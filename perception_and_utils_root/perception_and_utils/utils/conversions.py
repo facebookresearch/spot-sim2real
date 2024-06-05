@@ -5,7 +5,12 @@
 
 import numpy as np
 import rospy
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from bosdyn.api.geometry_pb2 import SE3Pose
 from geometry_msgs.msg import Pose, PoseStamped, TransformStamped
 from scipy.spatial.transform import Rotation
