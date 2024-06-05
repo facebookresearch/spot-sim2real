@@ -358,6 +358,17 @@ class SpotSkillManager:
             assert (
                 enable_pose_estimation
             ), "Pose estimation must be enabled if you want to perform pose correction"
+
+        if enable_pose_estimation:
+            object_meshes = self.pick_config.get("OBJECT_MESHES", [])
+            found = False
+            for object_mesh_name in object_meshes:
+                if object_mesh_name in target_obj_name:
+                    found = True
+            assert (
+                found
+            ), f"{target_obj_name} not found in meshes that we have {object_meshes}"
+
         self.gaze_controller.set_pose_estimation_flags(
             enable_pose_estimation, enable_pose_correction
         )
@@ -445,7 +456,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.pick_config.GAZE_ARM_JOINT_ANGLES,
-                    percentile=40,
+                    percentile=70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )

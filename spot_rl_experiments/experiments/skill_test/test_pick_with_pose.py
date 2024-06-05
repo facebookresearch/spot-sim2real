@@ -13,7 +13,7 @@ if __name__ == "__main__":
     while contnue:
         spotskillmanager.spot.stand()
         spotskillmanager.pick(
-            object_name, enable_pose_correction=True, enable_pose_estimation=True
+            object_name, enable_pose_correction=False, enable_pose_estimation=False
         )
         spotskillmanager.get_env().reset_arm()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")

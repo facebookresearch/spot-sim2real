@@ -330,7 +330,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     arm_positions = np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES)
                     time.sleep(2)
 
-                # TODO: This changes the behavior of post grasping
                 # Record the grasping pose (in roll pitch yaw) of the gripper
                 (
                     _,
@@ -496,7 +495,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 mask=mask,
             )
             print(f"Time taken for pose estimation {t2-t1} secs")
-            # graspmode = "topdown"
 
             rospy.set_param(
                 "spinal_axis",
@@ -510,6 +508,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             top_down_grasp=graspmode == "topdown",
             horizontal_grasp=graspmode == "side",
             timeout=10,
+            add_threshold_on_grasp=not enable_pose_estimation,
         )
         if self.config.USE_REMOTE_SPOT:
             ret = time.time() - pre_grasp > 3  # TODO: Make this better...
@@ -785,7 +784,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         return x1, y1, x2, y2
 
     @staticmethod
-    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.55):
+    def locked_on_object(x1, y1, x2, y2, height, width, radius=0.35):
         cy, cx = height // 2, width // 2
         # Locked on if the center of the image is in the bbox
         if x1 < cx < x2 and y1 < cy < y2:

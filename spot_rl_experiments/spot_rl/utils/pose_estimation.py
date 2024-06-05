@@ -129,7 +129,7 @@ def detect_orientation(
     return (
         (
             f"vertical {format(theta_signed, '.2f')}, {format(gamma_signed, '.2f')}, {format(alpha_signed, '.2f')}"
-            if np.abs(theta) < 30 or np.abs(180 - np.abs(theta)) < 30
+            if np.abs(theta) < 50 or np.abs(180 - np.abs(theta)) < 50
             else f"horizontal {format(theta_signed, '.2f')}, {format(gamma_signed, '.2f')}, {format(alpha_signed, '.2f')}"
         ),
         z_axis_transformed_in_camera,
@@ -539,7 +539,7 @@ class OrientationSolver:
         # Correct the orientation 0.1 m above the current position
         current_point[-1] += 0.10
         correction_status = spot.move_gripper_to_points(
-            current_point, [np.deg2rad([0, 0, 0]), np.deg2rad(correction_angles)]
+            current_point, [np.deg2rad([0, 0, 0]), np.deg2rad(correction_angles)], 5, 10
         )
         current_orientation_after_grasp_in_quat = (
             spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
@@ -560,9 +560,7 @@ class OrientationSolver:
             if np.abs(gamma) > 30 and make_face_the_object_right
             else current_orientation_after_grasp_in_quat
         )
-        put_back_object_status = spot.move_gripper_to_point(
-            current_point, q_final, 10, 20
-        )
+        put_back_object_status = spot.move_gripper_to_point(current_point, q_final)
 
         spot.open_gripper()
         return correction_status, put_back_object_status
