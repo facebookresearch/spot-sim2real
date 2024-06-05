@@ -7,7 +7,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 import rospy
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from bosdyn.client.frame_helpers import get_a_tform_b
 from perception_and_utils.perception.detector_wrappers.april_tag_detector import (
     AprilTagDetectorWrapper,

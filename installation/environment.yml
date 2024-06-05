@@ -591,5 +591,5 @@ dependencies:
     - zipp==3.8.0
     - sophuspy
     - pybullet
-    - open3d
+    - segment-anything
 prefix: ~/miniconda3/envs/spot_ros

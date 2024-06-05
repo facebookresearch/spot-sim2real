@@ -450,8 +450,16 @@ class Pick(Skill):
                 config=self.config,
             )
         self.policy.reset()
+        self.enable_pose_estimation: bool = False
+        self.enable_pose_correction: bool = False
 
         self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
+
+    def set_pose_estimation_flags(
+        self, enable_pose_estimation: bool = False, enable_pose_correction: bool = False
+    ) -> None:
+        self.enable_pose_estimation = enable_pose_estimation
+        self.enable_pose_correction = enable_pose_correction
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""
@@ -533,11 +541,15 @@ class Pick(Skill):
             action_dict = {
                 "arm_action": action[0:4],
                 "base_action": action[4:6],
+                "enable_pose_estimation": self.enable_pose_estimation,
+                "enable_pose_correction": self.enable_pose_correction,
             }
         else:
             action_dict = {
                 "arm_action": action,
                 "base_action": None,
+                "enable_pose_estimation": self.enable_pose_estimation,
+                "enable_pose_correction": self.enable_pose_correction,
             }
 
         return action_dict
