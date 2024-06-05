@@ -66,11 +66,11 @@ PARALLEL_INFERENCE_MODE: True
 
 # General env params
 CTRL_HZ: 2.0
-MAX_EPISODE_STEPS: 500
+MAX_EPISODE_STEPS: 100
 
 # Nav env
-SUCCESS_DISTANCE: 0.3
-SUCCESS_ANGLE_DIST: 5
+SUCCESS_DISTANCE: 1.10
+SUCCESS_ANGLE_DIST: 20
 DISABLE_OBSTACLE_AVOIDANCE: False
 USE_OA_FOR_NAV: True
 USE_HEAD_CAMERA: True
@@ -123,6 +123,12 @@ RECEPTACLES:
   dining_table : "any"
   kitchen_island: "topdown"
   white_table: "any"
+
+# Semantic Pick
+IMG_SRC: 0 # 1 for intel & 0 for gripper
+SEG_PORT: 21001 # port for segmentation service
+POSE_PORT: 2100 # port for pose estimation
+OBJECT_MESHES: ["bottle", "penguin", "cup"]
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters

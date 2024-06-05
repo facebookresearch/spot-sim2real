@@ -8,6 +8,7 @@ import os
 import os.path as osp
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict
 
 import cv2
@@ -18,6 +19,10 @@ from bosdyn.client.frame_helpers import (
     VISION_FRAME_NAME,
     get_a_tform_b,
     get_vision_tform_body,
+)
+from spot_rl.utils.grasp_affordance_prediction import (
+    affordance_prediction,
+    grasp_control_parmeters,
 )
 from spot_rl.utils.grasp_affordance_prediction import (
     affordance_prediction,
@@ -49,7 +54,6 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
-from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pose_estimation import pose_estimation
 from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
@@ -600,6 +604,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
         at_goal = dist_to_goal < success_distance
         good_heading = abs(observations["goal_heading"][0]) < success_angle
+        tt = "goal_heading"
+        print(f"success_distance: {success_distance} {dist_to_goal}; success_angle: {success_angle} {abs(observations[tt][0])}")
         return at_goal and good_heading
 
     def print_nav_stats(self, observations):

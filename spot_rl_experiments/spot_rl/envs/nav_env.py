@@ -3,6 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import magnum as mn
 import numpy as np
 from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
@@ -48,9 +49,27 @@ class SpotNavEnv(SpotBaseEnv):
 
         return observations
 
-    def get_success(self, observations):
+    def get_success(self, observations, succ_set_base=True):
+        gps = observations["target_point_goal_gps_and_compass_sensor"]
+        goal_heading = observations["goal_heading"]
+
+        # Compute angle_facing_target
+        vector_robot_to_target = self._goal_xy - np.array([self.x, self.y])
+        vector_robot_to_target = vector_robot_to_target / np.linalg.norm(
+            vector_robot_to_target
+        )
+        vector_forward_robot = np.array(
+            self.curr_transform.transform_vector(mn.Vector3(1, 0, 0))
+        )[[0, 1]]
+        vector_forward_robot = vector_forward_robot / np.linalg.norm(
+            vector_forward_robot
+        )
+        angle_facing_target = np.dot(vector_robot_to_target, vector_forward_robot)
+        print(
+            f"Nav info: gps: {gps}; goal_heading of obs: {goal_heading}; facing_goal: {angle_facing_target}"
+        )
         succ = self.get_nav_success(observations, self.succ_distance, self.succ_angle)
-        if succ:
+        if succ and succ_set_base:
             self.spot.set_base_velocity(0.0, 0.0, 0.0, 1 / self.ctrl_hz)
         return succ
 
@@ -95,4 +114,30 @@ class SpotNavEnv(SpotBaseEnv):
         return observations
 
     def get_observations(self):
+        # Modify the goal_heading here based on the current robot orientation
+        vector_robot_to_target = self._goal_xy - np.array([self.x, self.y])
+        vector_robot_to_target = vector_robot_to_target / np.linalg.norm(
+            vector_robot_to_target
+        )
+        vector_forward_robot = np.array(
+            self.curr_transform.transform_vector(mn.Vector3(1, 0, 0))
+        )[[0, 1]]
+        vector_forward_robot = vector_forward_robot / np.linalg.norm(
+            vector_forward_robot
+        )
+
+        x1 = (
+            vector_robot_to_target[1] * vector_forward_robot[0]
+            - vector_robot_to_target[0] * vector_forward_robot[1]
+        )
+        x2 = (
+            vector_robot_to_target[0] * vector_forward_robot[0]
+            + vector_robot_to_target[1] * vector_forward_robot[1]
+        )
+        rotation_delta = np.arctan2(x1, x2)
+        # breakpoint()
+        self.goal_heading = wrap_heading(self.yaw + rotation_delta)
+        print(
+            f"goal_heading: {self.goal_heading}; self.yaw {self.yaw}; rotation_delta: {rotation_delta}"
+        )
         return self.get_nav_observation(self._goal_xy, self.goal_heading)

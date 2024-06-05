@@ -36,32 +36,77 @@ class SpotRosSkillExecutor:
 
         # Get the current skill name
         skill_name, skill_input = get_skill_name_and_input_from_ros()
-        print(f"current skill_name {skill_name} skill_input {skill_input}")
 
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             # Reset the skill message
             self.reset_skill_msg()
+            # For navigation target
+            nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
             # Call the skill
-            succeded, msg = self.spotskillmanager.nav(skill_input)
+            if "None" not in nav_target_xyz:
+                nav_target_xyz = nav_target_xyz.split("|")[0:-1]
+                for nav_i, nav_target in enumerate(nav_target_xyz):
+                    _nav_target = nav_target.split(",")
+                    # This z and y are flipped due to hab convention
+                    x, y, theta = (
+                        float(_nav_target[0]),
+                        float(_nav_target[2]),
+                        float(0.0),
+                    )
+                    print(f"nav to {x} {y} {theta}, {nav_i+1}/{len(nav_target_xyz)}")
+                    succeded, msg = self.spotskillmanager.nav(x, y, theta)
+                    if not succeded:
+                        break
+            else:
+                succeded, msg = self.spotskillmanager.nav(skill_input)
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
+            # Reset the navigation target
+            rospy.set_param("nav_target_xyz", "None,None,None|")
         elif skill_name == "pick":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.pick(skill_input)
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "place":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
-            succeded, msg = self.spotskillmanager.place(skill_input)
+            # Use the following for the hardcode waypoint place
+            # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, True)
+            # Call semantic place skills
+            succeded, msg = self.spotskillmanager.place(
+                None, is_local=True, visualize=False
+            )
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.opendrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "closedrawer":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.closedrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
+        # elif skill_name == "findreceptacle":
+        #     self.reset_skill_msg()
+        #     succeded, msg = True, rospy.get_param("findreceptacle", "cabinet")
+        #     self.reset_skill_name_input(skill_name, succeded, msg)
+        # elif skill_name == "findobject":
+        #     self.reset_skill_msg()
+        #     succeded, msg = True, rospy.get_param("findobject", "cup")
+        #     self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "findagentaction":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
+            self.reset_skill_msg()
+            succeded, msg = True, rospy.get_param("human_state", "standing")
+            self.reset_skill_name_input(skill_name, succeded, msg)
+        # elif skill_name == "findroom":
+        #     self.reset_skill_msg()
+        #     succeded, msg = True, rospy.get_param("findroom", "nyc_lab")
+        #     self.reset_skill_name_input(skill_name, succeded, msg)
 
 
 def main():
@@ -75,7 +120,6 @@ def main():
 
     # Call the skill manager
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
-
     executor = None
     try:
         executor = SpotRosSkillExecutor(spotskillmanager)
