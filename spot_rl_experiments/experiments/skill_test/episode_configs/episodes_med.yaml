@@ -1,0 +1,80 @@
+# episode9:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_island"
+#     - pick:
+#       - "pen box"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "study_room_table"
+#     - place:
+#       - null
+# episode10:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_island"
+#     - pick:
+#       - "can"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "coffee_table"
+#     - place:
+#       - null
+# episode11:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_left"
+#     - pick:
+#       - "bottle"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "dining_table"
+#     - place:
+#       - null
+# episode12:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: False
+#   actions:
+#     - nav:
+#       - "kitchen_counter"
+#     - pick:
+#       - "popcorn bag"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "study_room_table"
+#     - place:
+#       - null
+episode13:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: True
+  actions:
+    - nav:
+      - "dining_table"
+    - pick:
+      - "coffee cup"
+      # - True
+      # - False
+      # - True
+    - nav:
+      - "study_room_table"
+    - place:
+      - null

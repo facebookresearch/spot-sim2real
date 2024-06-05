@@ -274,6 +274,7 @@ class SpotFilteredDepthImagesPublisher(SpotProcessedImagesPublisher):
     filtered_depth_topic = ""
 
     def _publish(self):
+        print("PUBLISHING FILTERED DEPTH")
         depth = self.msg_to_cv2(self.img_msg)
         filtered_depth = filter_depth(depth, max_depth=self.max_depth)
         img_msg = self.cv_bridge.cv2_to_imgmsg(filtered_depth, "mono8")
@@ -359,7 +360,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.detection_topic].publish(bbox_data)
 
     def publish_viz_img(self, viz_img, header):
-        viz_img_msg = self.cv2_to_msg(viz_img)
+        viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
         viz_img_msg.header = header
         self.pubs[self.viz_topic].publish(viz_img_msg)
 

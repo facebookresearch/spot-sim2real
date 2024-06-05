@@ -51,6 +51,7 @@ WEIGHTS:
   MRCNN: "weights/ikea_apricot_large_only_model_0002999.pth"
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
   DEBLURGAN: "weights/fpn_inception.h5"
+  SAM: "weights/sam_vit_h_4b8939.pth"
 
 DEVICE: "cuda:0"
 USE_REMOTE_SPOT: False
@@ -104,6 +105,19 @@ MAX_ANG_DIST_OPEN_CLOSE_DRAWER: 3.73 # degrees
 OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
 OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
 
+# Semantic Pick
+IMG_SRC: 0 # 1 for intel & 0 for gripper
+SEG_PORT: 21001 # port for segmentation service
+POSE_PORT: 2100 # port for pose estimation
+OBJECT_MESHES: ["blender bottle", "penguin", "cup", "cereal box", "hint can", "toy cup", "frosted flakes cup", "bowl", "oat creamer bottle", "yogurt cup", "water can", "pen box", "tajin bottle", "lion toy", "rubber duck toy", "rubix cube", "bulldozer toy car", "black toy car"]
+
+# Grasp Parameters: any (default, let BD decides grasping), topdown, side
+RECEPTACLES:
+  coffee_table: "topdown"
+  sofa: "topdown"
+  dining_table: "any"
+  study_room_table: "topdown"
+
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
@@ -114,11 +128,13 @@ MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 MAX_JOINT_MOVEMENT_OPEN_CLOSE_DRAWER: 0.06
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
+INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER: [0, -91, 33, 0, 100, 0]
+INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER: [0, -100, 33, 0, 89, 0]
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping (gripper is in object's right hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # The initial orientation of the arm for side grasping (gripper is in object's left hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
-GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
+GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 75, 0] #[0, -160, 100, 0, 90, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
 ARM_UPPER_LIMITS: [45, 0, 180, 0, 90, 0]
@@ -132,6 +148,7 @@ JOINT_BLACKLIST_OPEN_CLOSE_DRAWER: [3]
 ACTUALLY_MOVE_ARM: True
 GRASP_EVERY_STEP: False
 TERMINATE_ON_GRASP: False
+# MAX_GRASP_ATTEMPTS: 5
 
 # Mask RCNN
 GRAYSCALE_MASK_RCNN: False

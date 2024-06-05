@@ -1,0 +1,91 @@
+episode14:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "sofa"
+    - pick:
+      - "rubix_cube"
+    - nav:
+      - "living_room_console"
+    - place:
+      - null
+episode15:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "coffee_table"
+    - pick:
+      - "rubber_duck"
+    - nav:
+      - "living_room_console"
+    - place:
+      - null
+episode16:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "sofa"
+    - pick:
+      - "penguin"
+    - nav:
+      - "kitchen_island"
+    - place:
+      - null
+episode17:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "bedroom_dresser"
+    - pick:
+      - "lion"
+    - nav:
+      - "kitchen_island"
+    - place:
+      - null
+episode18:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "bedroom_dresser"
+    - pick:
+      - "ball"
+    - nav:
+      - "kitchen_island"
+    - place:
+      - null
+episode19:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "coffee_table"
+    - pick:
+      - "red_car"
+    - nav:
+      - "study_shelf"
+    - place:
+      - null
+episode20:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: False
+  actions:
+    - nav:
+      - "study_room_shelf"
+    - pick:
+      - "bulldozer"
+    - nav:
+      - "living_room_console"
+    - place:
+      - null

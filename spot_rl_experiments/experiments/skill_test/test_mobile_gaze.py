@@ -9,11 +9,12 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 if __name__ == "__main__":
     from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=False)
     contnue = True
     while contnue:
-        spotskillmanager.pick("cup")
-        spotskillmanager.spot.open_gripper()
+        spotskillmanager.nav("white_desk_lab")
+        spotskillmanager.pick("bowl")
+        # spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown

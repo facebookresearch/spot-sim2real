@@ -1,0 +1,40 @@
+episode11:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    - nav:
+      - "lab_box"
+    - pick:
+      - "penguin"
+episode12:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_box"
+    - pick:
+      - "rubber duck"
+episode13:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_box"
+    - pick:
+      - "toy lion"
+episode14:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_box"
+    - pick:
+      - "red car"
+episode15:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_box"
+    - pick:
+      - "bulldozer"

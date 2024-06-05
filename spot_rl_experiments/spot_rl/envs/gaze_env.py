@@ -67,7 +67,6 @@ class SpotGazeEnv(SpotBaseEnv):
 
     def step(self, action_dict: Dict[str, Any]):
         grasp = self.should_grasp()
-
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp
         action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
