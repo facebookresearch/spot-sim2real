@@ -592,7 +592,7 @@ class Spot:
         point_in_body = np.array(
             body_T_gripper.transform_point(mn.Vector3(*point_in_gripper))
         )
-        point_in_body[0] += 0.09
+        point_in_body[0] += 0.10
         # point_in_body[1] += 0.02
         print(f"grasp point in body {point_in_body}")
 
