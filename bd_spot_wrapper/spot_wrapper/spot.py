@@ -31,6 +31,7 @@ try:
 except Exception as e:
     print(f"Cannot import sophuspy due to {e}. Import sophus instead")
     import sophus as sp
+
 from bosdyn import geometry
 from bosdyn.api import (
     arm_command_pb2,
@@ -70,6 +71,7 @@ from perception_and_utils.utils.conversions import (
     bd_SE3Pose_to_ros_TransformStamped,
     bd_SE3Pose_to_sophus_SE3,
 )
+from spot_rl.utils.pixel_to_3d_conversion_utils import project_3d_to_pixel_uv
 from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.utils import (
     get_angle_between_forward_and_target,
@@ -566,6 +568,82 @@ class Spot:
         if verbose:
             print(log_packet)
         return log_packet
+
+    def grasp_point_in_image_with_IK(
+        self,
+        point_in_gripper: np.ndarray,
+        transforms_snapshot,
+        gripper_pose_quat: List[float] = None,
+        timeout=10,
+        claw_gripper_control_parameters: List[Tuple] = [],
+        visualize: Tuple[Any, np.ndarray] = None,
+    ):
+
+        body_T_hand: mn.Matrix4 = self.get_magnum_Matrix4_spot_a_T_b(
+            "body",
+            "link_wr1",
+        )
+        hand_T_gripper: mn.Matrix4 = self.get_magnum_Matrix4_spot_a_T_b(
+            "arm0.link_wr1",
+            "hand_color_image_sensor",
+            transforms_snapshot,
+        )
+        body_T_gripper: mn.Matrix4 = body_T_hand @ hand_T_gripper
+        point_in_body = np.array(
+            body_T_gripper.transform_point(mn.Vector3(*point_in_gripper))
+        )
+        point_in_body[0] += 0.09
+        # point_in_body[1] += 0.02
+        print(f"grasp point in body {point_in_body}")
+
+        if visualize is not None:
+            intrinsics, predicted_pixel, rgb_image = visualize
+            pixel_uv = project_3d_to_pixel_uv(
+                np.array(
+                    body_T_gripper.inverted().transform_point(
+                        mn.Vector3(*point_in_body)
+                    )
+                ).reshape(1, 3),
+                intrinsics,
+            )[0].tolist()
+            pixel_uv = list(map(int, pixel_uv))
+            predicted_pixel = list(map(int, predicted_pixel))
+            rgb_image = cv2.circle(rgb_image, pixel_uv, 2, (0, 255, 0), 2)
+            rgb_image = cv2.circle(rgb_image, predicted_pixel, 2, (0, 0, 255), 2)
+            cv2.imwrite("grasp_point.png", rgb_image)
+
+        if gripper_pose_quat is None:
+            gripper_pose_quat = [0.71277446, 0.70131284, 0.00662719, 0.00830902]
+        status = self.move_gripper_to_point(
+            point_in_body, np.array(gripper_pose_quat), timeout // 2, timeout
+        )
+
+        print(f"Grasp reached to object ? {status}")
+
+        n: int = len(claw_gripper_control_parameters)
+        claw_gripper_command = None
+        for claw_index, (claw_gripper_angle, max_torque) in enumerate(
+            claw_gripper_control_parameters
+        ):
+            claw_gripper_command = (
+                RobotCommandBuilder.claw_gripper_open_fraction_command(
+                    claw_gripper_angle,
+                    claw_gripper_command,
+                    disable_force_on_contact=claw_index > n - 1,
+                    max_torque=max_torque,
+                )
+            )
+
+        # #claw_gripper_command = RobotCommandBuilder.claw_gripper_close_command(max_acc=None, max_vel=None, disable_force_on_contact=False, max_torque=1.0)#claw_gripper_command_helper([0.1], [1], max_torque=1, disable_force_on_contact=True)
+        # claw_gripper_command_1_lose_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.7, disable_force_on_contact=True, max_torque=0.0)
+        # claw_gripper_command_2_little_tighter_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.6, claw_gripper_command_1_lose_grip, disable_force_on_contact=True,  max_torque=0.5)
+        # claw_gripper_command_3_almost_there = RobotCommandBuilder.claw_gripper_open_fraction_command(0.5, claw_gripper_command_2_little_tighter_grip, disable_force_on_contact=True, max_torque=0.7)
+        # claw_gripper_command = RobotCommandBuilder.claw_gripper_open_fraction_command(0.4, claw_gripper_command_3_almost_there, max_torque=1.0)
+
+        self.command_client.robot_command(claw_gripper_command)
+        input("continue to open gripper ?")
+        self.open_gripper()
+        return status
 
     def grasp_point_in_image(
         self,

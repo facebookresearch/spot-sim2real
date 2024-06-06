@@ -1,5 +1,5 @@
 import time
-from typing import Tuple
+from typing import List, Tuple
 
 import cv2
 import magnum as mn
@@ -149,7 +149,7 @@ def pose_estimation(
     bbox=None,
     mask=None,
     visualizationflag: bool = True,
-):
+) -> Tuple[str, mn.Vector3, float, List[float], float]:
     """
     Gets the pose estimate using zmq socket to FoundationPose thirdparty service
     rgb_image : np.ndarray [h,w,c], 0-255
@@ -166,6 +166,7 @@ def pose_estimation(
     returns orientation:str (vertical or horizontal), spinal_axis:mn.vector3, angle_to_make_object_face_camera:float, t2:float time at which we get pose estimate
 
     """
+    orientation_solver = OrientationSolver()
     fx = cam_intrinsics.focal_length.x
     fy = cam_intrinsics.focal_length.y
     cx = cam_intrinsics.principal_point.x
@@ -210,9 +211,21 @@ def pose_estimation(
         cv2.imwrite("pose.png", visualization[..., ::-1])
     orientation = "side" if "vertical" in classification_text else "topdown"
 
-    # Correct orientation
+    # Decide which gripper orientation is suitable
+    (
+        object_pose_anchor_name,
+        dangle_to_anchor_pose,
+    ) = orientation_solver._determine_anchor_object_pose(spinal_axis)
+    print(f"Dangle to anchor object pose {dangle_to_anchor_pose}")
+    gripper_pose_quat = None
+    if "6" in object_pose_anchor_name or "1" in object_pose_anchor_name:
+        gripper_pose_quat = (
+            orientation_solver.grasp_orientations["grasp_orientation_5"][0]
+            .view((np.double, 4))
+            .tolist()
+        )
 
-    return orientation, spinal_axis, gamma, t2
+    return orientation, spinal_axis, gamma, gripper_pose_quat, t2
 
 
 def quaternion_multiply(q1, q2):

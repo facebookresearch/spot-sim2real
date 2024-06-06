@@ -337,6 +337,7 @@ class SpotSkillManager:
         target_obj_name: str = None,
         enable_pose_estimation: bool = False,
         enable_pose_correction: bool = False,
+        enable_force_control: bool = False,
     ) -> Tuple[bool, str]:
         """
         Perform the pick action on the pick target specified as string
@@ -354,10 +355,10 @@ class SpotSkillManager:
             "target_object": target_obj_name,
             "take_user_input": False,
         }  # type: Dict[str, Any]
-        if enable_pose_correction:
+        if enable_pose_correction or enable_force_control:
             assert (
                 enable_pose_estimation
-            ), "Pose estimation must be enabled if you want to perform pose correction"
+            ), "Pose estimation must be enabled if you want to perform pose correction or force control"
 
         if enable_pose_estimation:
             object_meshes = self.pick_config.get("OBJECT_MESHES", [])
@@ -372,6 +373,7 @@ class SpotSkillManager:
         self.gaze_controller.set_pose_estimation_flags(
             enable_pose_estimation, enable_pose_correction
         )
+        self.gaze_controller.set_force_control(enable_force_control)
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)
         if status and enable_pose_correction:
             spinal_axis = rospy.get_param("spinal_axis")
