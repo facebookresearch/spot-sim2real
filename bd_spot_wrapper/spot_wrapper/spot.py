@@ -619,7 +619,7 @@ class Spot:
         )
 
         print(f"Grasp reached to object ? {status}")
-
+        breakpoint()
         n: int = len(claw_gripper_control_parameters)
         claw_gripper_command = None
         for claw_index, (claw_gripper_angle, max_torque) in enumerate(

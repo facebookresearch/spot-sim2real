@@ -32,7 +32,16 @@ def affordance_prediction(
     center_pixel: np.array of length 2
     Returns: Suitable point on object to grasp
     """
-    Z = sample_patch_around_point(center_pixel[0], center_pixel[1], depth_raw) * 1e-3
+
+    mask = np.where(mask > 0, 1, 0).astype(depth_raw.dtype)
+    depth_image_masked = depth_raw * mask[...].astype(depth_raw.dtype)
+
+    non_zero_indices = np.nonzero(depth_image_masked)
+    # Calculate the bounding box coordinates
+    y_min, y_max = non_zero_indices[0].min(), non_zero_indices[0].max()
+    x_min, x_max = non_zero_indices[1].min(), non_zero_indices[1].max()
+    cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
+    Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1e-3)
     point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
 
     return point_in_gripper
