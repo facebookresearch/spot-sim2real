@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 
 
@@ -33,12 +35,12 @@ def project_3d_to_pixel_uv(points_3d, cam_intrinsics):
     return np.stack([u.flatten(), v.flatten()], axis=1).reshape(-1, 2)
 
 
-def get_3d_point(cam_intrinsics, pixel_uv, z):
+def get_3d_point(cam_intrinsics, pixel_uv: List[int], z: float):
     # Get camera intrinsics
-    fx = cam_intrinsics.focal_length.x
-    fy = cam_intrinsics.focal_length.y
-    cx = cam_intrinsics.principal_point.x
-    cy = cam_intrinsics.principal_point.y
+    fx = float(cam_intrinsics.focal_length.x)
+    fy = float(cam_intrinsics.focal_length.y)
+    cx = float(cam_intrinsics.principal_point.x)
+    cy = float(cam_intrinsics.principal_point.y)
 
     # print(fx, fy, cx, cy)
     # Get 3D point

@@ -210,22 +210,11 @@ def pose_estimation(
         # cv2.destroyAllWindows()
         cv2.imwrite("pose.png", visualization[..., ::-1])
     orientation = "side" if "vertical" in classification_text else "topdown"
-
-    # Decide which gripper orientation is suitable
     (
-        object_pose_anchor_name,
-        dangle_to_anchor_pose,
-    ) = orientation_solver._determine_anchor_object_pose(spinal_axis)
-    print(f"Dangle to anchor object pose {dangle_to_anchor_pose}")
-    gripper_pose_quat = None
-    if "6" in object_pose_anchor_name or "1" in object_pose_anchor_name:
-        gripper_pose_quat = (
-            orientation_solver.grasp_orientations["grasp_orientation_5"][0]
-            .view((np.double, 4))
-            .tolist()
-        )
-
-    return orientation, spinal_axis, gamma, gripper_pose_quat, t2
+        gripper_pose_quat,
+        orientation,
+    ) = orientation_solver.get_target_grasp_quat_based_on_object_pose(spinal_axis)
+    return orientation, spinal_axis, gamma, gripper_pose_quat.flatten().tolist(), t2
 
 
 def quaternion_multiply(q1, q2):
@@ -271,6 +260,23 @@ def rotate_quaternion_around_y(
             [np.cos(np.deg2rad(gamma) / 2.0), 0.0, 0.0, np.sin(np.deg2rad(gamma) / 2.0)]
         )  # (1./np.sqrt(2))*np.array([1., 0., 0., -1.])
     print(f"Quat R {quat_r}, gamma {gamma} grasp name {grasp_orientation_name}")
+    return quaternion_multiply(quat, quat_r)
+
+
+def rotate_around_x_by_given_angle(
+    quat: np.ndarray, grasp_orientation_name: str, dangle: float
+):
+
+    grasp_orientation_index = int(grasp_orientation_name.split("_")[-1])
+    if grasp_orientation_index in [2, 4]:
+        dangle *= -1.0
+    if grasp_orientation_index in [1, 3]:
+        dangle *= -1.0
+    if grasp_orientation_index in [5, 7]:
+        dangle *= 0.0
+    quat_r: np.ndarray = np.array(
+        [np.cos(np.deg2rad(dangle) / 2.0), np.sin(np.deg2rad(dangle) / 2.0), 0.0, 0.0]
+    )
     return quaternion_multiply(quat, quat_r)
 
 
@@ -439,7 +445,14 @@ class OrientationSolver:
             "object_orientation_6_grasp_orientation_7": np.array([90, 0, 0]),
             "object_orientation_6_grasp_orientation_8": np.array([0, 0, 0]),
         }
-
+        self.grasp_solution_for_object_pose = {
+            "object_orientation_1": "grasp_orientation_5",
+            "object_orientation_6": "grasp_orientation_7",
+            "object_orientation_2": "grasp_orientation_1",
+            "object_orientation_3": "grasp_orientation_2",
+            "object_orientation_4": "grasp_orientation_3",
+            "object_orientation_5": "grasp_orientation_3",
+        }
         self.symmetric_object_dict = {"bottle": True, "penguin": False, "cup": True}
 
     def _determine_anchor_grasp_pose(
@@ -482,8 +495,11 @@ class OrientationSolver:
                 sign * np.rad2deg(np.arccos(mn.math.dot(spinal_axis, object_pose_axis)))
             )
 
-        print(f"similarity angles for object orientation {angles}")
         index = np.argmin(np.abs(angles))
+        print(
+            f"similarity angles for object orientation {angles}, pose name {object_orientation_names[index]}"
+        )
+
         return object_orientation_names[index], angles[index]
 
     # def determine_object_orientation_from_object_pose(
@@ -495,6 +511,27 @@ class OrientationSolver:
     #         observed_object_pose_in_quat
     #     )
     #     return self.object_orientations.get(object_pose_name, "")[1]
+    def get_target_grasp_quat_based_on_object_pose(
+        self, spinal_axis: mn.Vector3
+    ) -> Tuple[np.ndarray, str]:
+        """
+        Given object pose tell us, how to orient the gripper to pickup & tells us whether it's top-down or side
+        """
+        object_anchor_pose_name, danchor_angle = self._determine_anchor_object_pose(
+            spinal_axis
+        )
+        grasp_orientation_name = self.grasp_solution_for_object_pose.get(
+            object_anchor_pose_name
+        )
+        grasp_orientation_quat, grasp_type = self.grasp_orientations.get(
+            grasp_orientation_name
+        )
+        grasp_orientation_quat_rotated: np.ndarray = rotate_around_x_by_given_angle(
+            grasp_orientation_quat.view((np.double, 4)),
+            grasp_orientation_name,
+            -1 * danchor_angle,
+        )
+        return grasp_orientation_quat_rotated, grasp_type
 
     def get_correction_angle(
         self,

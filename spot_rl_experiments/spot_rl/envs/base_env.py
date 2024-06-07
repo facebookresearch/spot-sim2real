@@ -539,9 +539,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         if enable_force_control:
             ret = self.spot.grasp_point_in_image_with_IK(
-                point_in_gripper,
-                transform_snapshot,
-                gripper_pose_quat,
+                point_in_gripper,  # 3D point in gripper camera
+                transform_snapshot,  # will convert 3D point in gripper to body
+                gripper_pose_quat,  # quat for gripper
                 10,
                 claw_gripper_control_parameters,
                 visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
