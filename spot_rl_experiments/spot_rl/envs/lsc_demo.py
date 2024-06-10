@@ -44,6 +44,7 @@ def main(spot, config):
     )
     print("-" * 100)
     pre_in_dock = False
+    spot = None
     while True:
         audio_transcription_success = False
         while not audio_transcription_success:
@@ -66,9 +67,11 @@ def main(spot, config):
                     nav_2, list(waypoints_yaml_dict["nav_targets"].keys())
                 )
                 print("MOST SIMILAR: ", nav_1, pick, nav_2)
+                audio_transcription_success = True
             except Exception as e:
                 print(f"Exception encountered in Speech to text : {e} \n\n Retrying...")
 
+        spot = SpotSkillManager(use_mobile_pick=True) if spot is None else spot
         # Used for Owlvit
         rospy.set_param("object_target", pick)
 
@@ -101,5 +104,5 @@ if __name__ == "__main__":
     parser.add_argument("--output")
     args = parser.parse_args()
     config = construct_config(opts=args.opts)
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True)
-    main(spotskillmanager, config)
+
+    main(None, config)
