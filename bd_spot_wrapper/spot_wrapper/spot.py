@@ -614,12 +614,19 @@ class Spot:
 
         if gripper_pose_quat is None:
             gripper_pose_quat = [0.71277446, 0.70131284, 0.00662719, 0.00830902]
+        current_point_in_body = self.get_ee_pos_in_body_frame()[0]
         status = self.move_gripper_to_point(
-            point_in_body, np.array(gripper_pose_quat), timeout // 2, timeout
+            current_point_in_body, np.array(gripper_pose_quat), timeout // 2, timeout
         )
-
+        current_gripper_quat = self.get_ee_quaternion_in_body_frame().view(
+            (np.double, 4)
+        )
+        input("Continue to move to point ?")
+        status = self.move_gripper_to_point(
+            point_in_body, current_gripper_quat, timeout // 2, timeout
+        )
         print(f"Grasp reached to object ? {status}")
-        breakpoint()
+        input("continue to close gripper ?")
         n: int = len(claw_gripper_control_parameters)
         claw_gripper_command = None
         for claw_index, (claw_gripper_angle, max_torque) in enumerate(

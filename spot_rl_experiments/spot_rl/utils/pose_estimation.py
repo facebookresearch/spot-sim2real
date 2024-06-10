@@ -268,10 +268,10 @@ def rotate_around_x_by_given_angle(
 ):
 
     grasp_orientation_index = int(grasp_orientation_name.split("_")[-1])
-    if grasp_orientation_index in [2, 4]:
+    if grasp_orientation_index in [2, 4, 3]:
         dangle *= -1.0
-    if grasp_orientation_index in [1, 3]:
-        dangle *= -1.0
+    if grasp_orientation_index in [1]:
+        dangle *= 1.0
     if grasp_orientation_index in [5, 7]:
         dangle *= 0.0
     quat_r: np.ndarray = np.array(
