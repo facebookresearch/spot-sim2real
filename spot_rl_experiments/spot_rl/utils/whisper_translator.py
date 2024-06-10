@@ -14,8 +14,6 @@ import soundfile as sf
 import webrtcvad
 import whisper
 
-openai.api_key = os.environ["OPENAI_API_KEY"]
-
 
 class WhisperTranslator:
     def __init__(self):
@@ -49,7 +47,7 @@ class WhisperTranslator:
         # Voice Activity Detection
         self.vad = webrtcvad.Vad()
         self.vad.set_mode(3)
-        self.whisper = whisper.load_model("base", device="cuda")
+        self.whisper = whisper.load_model("base", device="cuda:1", in_memory=True)
         print("=====================================\n")
 
     def record(self):
@@ -96,6 +94,7 @@ class WhisperTranslator:
         """
         transcript = "default"
         if online:
+            openai.api_key = os.environ["OPENAI_API_KEY"]
             print("online whisper model")
             try:
                 with open(self.filename, "rb") as f:
