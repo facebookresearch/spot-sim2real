@@ -48,30 +48,29 @@ def main(spot, config):
     while True:
         audio_transcription_success = False
         while not audio_transcription_success:
-            try:
-                input("Are you ready?")
-                audio_to_text.record()
-                instruction = audio_to_text.translate()
-                print("Transcribed instructions : ", instruction)
+            # try:
+            input("Are you ready?")
+            audio_to_text.record()
+            instruction = audio_to_text.translate()
+            print("Transcribed instructions : ", instruction)
 
-                # Use LLM to convert user input to an instructions set
-                # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
-                nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
-                print("PARSED", nav_1, pick, nav_2)
+            # Use LLM to convert user input to an instructions set
+            # Eg: nav_1, pick, nav_2 = 'bowl_counter', "container", 'coffee_counter'
+            t1 = time.time()
+            nav_1, pick, nav_2, _ = llm.parse_instructions(instruction)
+            print("PARSED", nav_1, pick, nav_2, f"Time {time.time()- t1} secs")
 
-                # Find closest nav_targets to the ones robot knows locations of
-                nav_1 = sentence_similarity.get_most_similar_in_list(
-                    nav_1, list(waypoints_yaml_dict["nav_targets"].keys())
-                )
-                nav_2 = sentence_similarity.get_most_similar_in_list(
-                    nav_2, list(waypoints_yaml_dict["nav_targets"].keys())
-                )
-                print("MOST SIMILAR: ", nav_1, pick, nav_2)
-                audio_transcription_success = True
-            except Exception as e:
-                print(f"Exception encountered in Speech to text : {e} \n\n Retrying...")
-
-        spot = SpotSkillManager(use_mobile_pick=True) if spot is None else spot
+            # Find closest nav_targets to the ones robot knows locations of
+            nav_1 = sentence_similarity.get_most_similar_in_list(
+                nav_1, list(waypoints_yaml_dict["nav_targets"].keys())
+            )
+            nav_2 = sentence_similarity.get_most_similar_in_list(
+                nav_2, list(waypoints_yaml_dict["nav_targets"].keys())
+            )
+            print("MOST SIMILAR: ", nav_1, pick, nav_2)
+            audio_transcription_success = True
+            # except Exception as e:
+            #     print(f"Exception encountered in Speech to text : {e} \n\n Retrying...")
         # Used for Owlvit
         rospy.set_param("object_target", pick)
 
@@ -80,6 +79,7 @@ def main(spot, config):
         rospy.set_param("viz_object", pick)
         rospy.set_param("viz_place", nav_2)
 
+        spot = SpotSkillManager(use_mobile_pick=True) if spot is None else spot
         if pre_in_dock:
             spot.spot.power_robot()
 
