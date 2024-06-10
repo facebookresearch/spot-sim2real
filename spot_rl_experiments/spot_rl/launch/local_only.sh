@@ -15,8 +15,8 @@ tmux new -s img_pub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.img_publishers
 tmux new -s propio_pub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.helper_nodes --proprioception'
 tmux new -s tts_sub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.helper_nodes --text-to-speech'
 tmux new -s spotWorld_static_tf2_pub -d 'rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 /map /spotWorld'
-tmux new -s segmentation_service -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.segmentation_service'
-tmux new -s pose_estimation_service -d 'cd third_party/FoundationPoseForSpotSim2Real/ && sh run_pose_estimation_service.sh'
+#tmux new -s segmentation_service -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.segmentation_service'
+#tmux new -s pose_estimation_service -d 'cd third_party/FoundationPoseForSpotSim2Real/ && sh run_pose_estimation_service.sh'
 sleep 3
 tmux ls
 

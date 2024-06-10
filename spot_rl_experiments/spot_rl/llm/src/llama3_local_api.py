@@ -3,16 +3,18 @@ from typing import Dict
 
 import requests
 
-
 # LLAMA3 is supposed to be working locally
 # Run OLLAMA3 as ollama run llama3
+model_name = "llama3:70b"
+
+
 class MetaAI:
     def __init__(self):
         self.url = "http://localhost:11434/api/generate"
 
     def prompt(self, message: str = "Hey, are you LLAMA3 ?") -> Dict[str, str]:
-        data = {"model": "llama3", "prompt": message, "stream": False}
-        response = requests.post(self.url, json=data)
+        data = {"model": model_name, "prompt": message, "stream": False}
+        response = requests.post(self.url, json=data, timeout=30)
         status_code = response.status_code
         assert (
             status_code == 200
