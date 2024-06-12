@@ -478,12 +478,31 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             pose_port = self.config.POSE_PORT
             object_name = rospy.get_param("/object_target")
             image_src = self.config.IMG_SRC
+
             rospy.set_param(
                 "is_gripper_blocked", image_src
             )  # can be removed if we do mesh rescaling for gripper camera
             image_resps = self.spot.get_hand_image()  # IntelImages
             intrinsics = image_resps[0].source.pinhole.intrinsics
             transform_snapshot = image_resps[0].shot.transforms_snapshot
+            body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "body",
+                "link_wr1",
+            )
+            hand_T_gripper: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "arm0.link_wr1",
+                "hand_color_image_sensor",
+                transform_snapshot,
+            )
+            gripper_T_intel = (
+                np.load(
+                    "/home/tushar/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/gripper_T_intel.npy"
+                )
+                if image_src == 1
+                else np.eye(4)
+            )
+            gripper_T_intel = mn.Matrix4(gripper_T_intel)
+            body_T_cam: mn.Matrix4 = body_T_hand @ hand_T_gripper @ gripper_T_intel
             image_responses = [
                 image_response_to_cv2(image_rep) for image_rep in image_resps
             ]
@@ -499,6 +518,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     *image_responses,
                     object_name,
                     intrinsics,
+                    body_T_cam,
                     image_src,
                     image_scale,
                     seg_port,
@@ -518,11 +538,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     grasp_control_parmeters, object_name
                 )
                 for future in as_completed(
-                    [future_pose, future_affordance, future_grasp_controls]
+                    [future_affordance, future_grasp_controls, future_pose]
                 ):
                     result = future.result()
                     if future == future_pose:
-                        graspmode, spinal_axis, gamma, gripper_pose_quat, t2 = result
+                        (
+                            graspmode,
+                            spinal_axis,
+                            gamma,
+                            gripper_pose_quat,
+                            solution_angles,
+                            t2,
+                        ) = result
                     if future == future_affordance:
                         point_in_gripper = result
                     if future == future_grasp_controls:
@@ -540,8 +567,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if enable_force_control:
             ret = self.spot.grasp_point_in_image_with_IK(
                 point_in_gripper,  # 3D point in gripper camera
-                transform_snapshot,  # will convert 3D point in gripper to body
+                body_T_cam,  # will convert 3D point in gripper to body
                 gripper_pose_quat,  # quat for gripper
+                solution_angles,
                 10,
                 claw_gripper_control_parameters,
                 visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),

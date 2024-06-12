@@ -45,19 +45,28 @@ from bosdyn.api import (
 )
 from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, Vec2
 from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
+from bosdyn.api.spot.inverse_kinematics_pb2 import (
+    InverseKinematicsRequest,
+    InverseKinematicsResponse,
+)
 from bosdyn.client import math_helpers
 from bosdyn.client.docking import blocking_dock_robot, blocking_undock
 from bosdyn.client.frame_helpers import (
     GRAV_ALIGNED_BODY_FRAME_NAME,
+    GROUND_PLANE_FRAME_NAME,
+    ODOM_FRAME_NAME,
     VISION_FRAME_NAME,
     get_a_tform_b,
     get_vision_tform_body,
 )
 from bosdyn.client.image import ImageClient, build_image_request
+from bosdyn.client.inverse_kinematics import InverseKinematicsClient
 from bosdyn.client.manipulation_api_client import ManipulationApiClient
+from bosdyn.client.math_helpers import Quat, SE3Pose
 from bosdyn.client.robot_command import (
     RobotCommandBuilder,
     RobotCommandClient,
+    block_for_trajectory_cmd,
     block_until_arm_arrives,
     blocking_selfright,
     blocking_stand,
@@ -212,7 +221,9 @@ class Spot:
         self.robot_state_client = robot.ensure_client(
             RobotStateClient.default_service_name
         )
-
+        self.ik_client = robot.ensure_client(
+            InverseKinematicsClient.default_service_name
+        )
         # Logging srcs init
         self.source_list = []  # type: List[str]
 
@@ -320,7 +331,7 @@ class Spot:
 
     def move_gripper_to_points(
         self,
-        point: List[float],
+        point_list: List[np.ndarray],
         rotations: List[Tuple],
         seconds_to_goal: float = 10.0,
         timeout_sec: float = 20,
@@ -333,7 +344,12 @@ class Spot:
         :return: cmd_id
         """
         points = []
-        for i, rotation in enumerate(rotations):
+
+        assert len(point_list) == len(
+            rotations
+        ), f"len(point) {len(point_list)} not matching len(rotations) {len(rotations)}"
+
+        for i, (rotation, point) in enumerate(zip(rotations, point_list)):
             if len(rotation) == 3:  # roll pitch yaw Euler angles
                 roll, pitch, yaw = rotation  # xyz
                 quat = geometry.EulerZXY(
@@ -347,7 +363,7 @@ class Spot:
                     "rotation needs to have length 3 (euler) or 4 (quaternion),"
                     f"got {len(rotation)}"
                 )
-
+            point = point.tolist() if type(point) == type(np.array([])) else point
             hand_pose = math_helpers.SE3Pose(*point, quat)
             points.append(
                 trajectory_pb2.SE3TrajectoryPoint(
@@ -569,40 +585,171 @@ class Spot:
             print(log_packet)
         return log_packet
 
+    def query_IK_reachability_of_gripper(self, se3querypose: SE3Pose) -> bool:
+        task_T_desired_tool: SE3Pose = (
+            se3querypose  # SE3Pose(*point_in_body, Quat(*gripper_pose_quat))
+        )
+
+        wr1_T_tool: SE3Pose = SE3Pose(
+            0, 0, 0, Quat()
+        )  # get_a_tform_b(transform_snapshot, "arm0.link_wr1", "hand_color_image_sensor")
+
+        odom_T_ground_body: SE3Pose = get_a_tform_b(
+            self.get_robot_state().kinematic_state.transforms_snapshot,
+            ODOM_FRAME_NAME,
+            "body",
+        )
+
+        # Now, construct a task frame as body frame
+        odom_T_task: SE3Pose = odom_T_ground_body
+
+        ik_request = InverseKinematicsRequest(
+            root_frame_name=ODOM_FRAME_NAME,
+            scene_tform_task=odom_T_task.to_proto(),
+            wrist_mounted_tool=InverseKinematicsRequest.WristMountedTool(
+                wrist_tform_tool=wr1_T_tool.to_proto()
+            ),
+            tool_pose_task=InverseKinematicsRequest.ToolPoseTask(
+                task_tform_desired_tool=task_T_desired_tool.to_proto()
+            ),
+        )
+        ik_response = self.ik_client.inverse_kinematics(ik_request)
+        if ik_response.status == InverseKinematicsResponse.STATUS_OK:
+            return True
+        return False
+
+    def move_arm_to_point_with_body_follow(
+        self,
+        point_in_body: np.ndarray,
+        gripper_pose_quat: List[float],
+        seconds: int = 5,
+    ) -> bool:
+
+        hand_pos_rt_body = geometry_pb2.Vec3(
+            x=point_in_body[0], y=point_in_body[1], z=point_in_body[-1]
+        )
+
+        # Rotation as a quaternion.
+        qw, qx, qy, qz = gripper_pose_quat
+        body_Q_hand = geometry_pb2.Quaternion(w=qw, x=qx, y=qy, z=qz)
+
+        # Build the SE(3) pose of the desired hand position in the moving body frame.
+        body_T_hand = geometry_pb2.SE3Pose(
+            position=hand_pos_rt_body, rotation=body_Q_hand
+        )
+
+        # Transform the desired from the moving body frame to the odom frame.
+        robot_state = self.get_robot_state()
+        odom_T_body = get_a_tform_b(
+            robot_state.kinematic_state.transforms_snapshot, ODOM_FRAME_NAME, "body"
+        )
+        odom_T_hand = odom_T_body * math_helpers.SE3Pose.from_proto(body_T_hand)
+
+        # duration in seconds
+        # Create the arm command.
+        arm_command = RobotCommandBuilder.arm_pose_command(
+            odom_T_hand.x,
+            odom_T_hand.y,
+            odom_T_hand.z,
+            odom_T_hand.rot.w,
+            odom_T_hand.rot.x,
+            odom_T_hand.rot.y,
+            odom_T_hand.rot.z,
+            ODOM_FRAME_NAME,
+            seconds,
+        )
+
+        # Tell the robot's body to follow the arm
+        follow_arm_command = RobotCommandBuilder.follow_arm_command()
+
+        # Combine the arm and mobility commands into one synchronized command.
+        command = RobotCommandBuilder.build_synchro_command(
+            follow_arm_command, arm_command
+        )
+
+        # Send the request
+        move_command_id = self.command_client.robot_command(command)
+        self.robot.logger.info("Moving arm to position.")
+
+        return block_until_arm_arrives(
+            self.command_client, move_command_id, seconds + 1
+        )
+
     def grasp_point_in_image_with_IK(
         self,
         point_in_gripper: np.ndarray,
-        transforms_snapshot,
+        body_T_cam: mn.Matrix4,
         gripper_pose_quat: List[float] = None,
+        solution_angles: np.ndarray = np.zeros((3,)),
         timeout=10,
         claw_gripper_control_parameters: List[Tuple] = [],
         visualize: Tuple[Any, np.ndarray] = None,
     ):
 
-        body_T_hand: mn.Matrix4 = self.get_magnum_Matrix4_spot_a_T_b(
-            "body",
-            "link_wr1",
-        )
-        hand_T_gripper: mn.Matrix4 = self.get_magnum_Matrix4_spot_a_T_b(
-            "arm0.link_wr1",
-            "hand_color_image_sensor",
-            transforms_snapshot,
-        )
-        body_T_gripper: mn.Matrix4 = body_T_hand @ hand_T_gripper
         point_in_body = np.array(
-            body_T_gripper.transform_point(mn.Vector3(*point_in_gripper))
+            body_T_cam.transform_point(mn.Vector3(*point_in_gripper))
         )
-        point_in_body[0] += 0.10
-        # point_in_body[1] += 0.02
-        print(f"grasp point in body {point_in_body}")
+        point_in_body[0] += 0.05  # static offset
+        status = self.move_arm_to_point_with_body_follow(
+            point_in_body, gripper_pose_quat
+        )
 
+        """
+        reach_threshold = 1.1
+        speed = 0.1
+        current_reach_distance = np.sqrt(np.square(point_in_body).sum())
+        max_pull_back_distance = float(point_in_body[0]) - 0.45
+        pull_back_step = 0.1
+        num_iters = int(max_pull_back_distance // pull_back_step)
+        hypothetical_point = point_in_body.copy()
+        dx = 0.
+        min_dx = np.inf
+        for _ in range(num_iters):
+            hypothetical_point[0] -= pull_back_step
+            dx += pull_back_step
+            if self.query_IK_reachability_of_gripper(SE3Pose(*hypothetical_point, Quat(*gripper_pose_quat))):
+                min_dx = min(min_dx, dx)
+        if min_dx == np.inf:
+            print(f"Can't reach the point in body {point_in_body.tolist()}, as IK didn't find any solution")
+            return False
+        dx = min(min_dx, dx)
+        if dx:
+            #new_x = np.sqrt(np.square(reach_threshold) - np.square(point_in_body[2:]).sum())
+            #dx = np.around(point_in_body[0] - new_x, 1)
+            print(f"Need to walk {dx}")
+            bx, by, byaw = self.get_xy_yaw()
+            print(f"Base position before walking {bx, by, np.rad2deg(byaw)}")
+            mobility_status = self.set_base_position(bx+dx, by, byaw, dx/speed, relative=False, max_fwd_vel=speed, disable_obstacle_avoidance=True, blocking=True)
+
+            nbx, nby, byaw = self.get_xy_yaw()
+            print(f"Base position after walking {nbx, nby, np.rad2deg(byaw)}, mobility_status {mobility_status}")
+            point_in_body[0] -= (nbx - bx) - 0.08 #0.1 is static offset
+            point_in_body[1] -= (nby - by)
+
+        
+        point_in_body_up = point_in_body.copy()
+        if grasp_type == "topdown":
+            point_in_body_up[-1] += 0.1
+        
+        print(f"grasp point in body {point_in_body}")
+        
+        
+        
+        
+        status = self.move_gripper_to_points(
+            [point_in_body_up, point_in_body], [gripper_pose_quat, gripper_pose_quat], timeout//2, timeout
+        )
+        # point_in_body[1] += 0.02
+        """
+        (
+            point_before_gripper_manipulation_has_started,
+            _,
+        ) = self.get_ee_pos_in_body_frame()
         if visualize is not None:
             intrinsics, predicted_pixel, rgb_image = visualize
             pixel_uv = project_3d_to_pixel_uv(
                 np.array(
-                    body_T_gripper.inverted().transform_point(
-                        mn.Vector3(*point_in_body)
-                    )
+                    body_T_cam.inverted().transform_point(mn.Vector3(*point_in_body))
                 ).reshape(1, 3),
                 intrinsics,
             )[0].tolist()
@@ -612,19 +759,6 @@ class Spot:
             rgb_image = cv2.circle(rgb_image, predicted_pixel, 2, (0, 0, 255), 2)
             cv2.imwrite("grasp_point.png", rgb_image)
 
-        if gripper_pose_quat is None:
-            gripper_pose_quat = [0.71277446, 0.70131284, 0.00662719, 0.00830902]
-        current_point_in_body = self.get_ee_pos_in_body_frame()[0]
-        status = self.move_gripper_to_point(
-            current_point_in_body, np.array(gripper_pose_quat), timeout // 2, timeout
-        )
-        current_gripper_quat = self.get_ee_quaternion_in_body_frame().view(
-            (np.double, 4)
-        )
-        input("Continue to move to point ?")
-        status = self.move_gripper_to_point(
-            point_in_body, current_gripper_quat, timeout // 2, timeout
-        )
         print(f"Grasp reached to object ? {status}")
         input("continue to close gripper ?")
         n: int = len(claw_gripper_control_parameters)
@@ -636,20 +770,18 @@ class Spot:
                 RobotCommandBuilder.claw_gripper_open_fraction_command(
                     claw_gripper_angle,
                     claw_gripper_command,
-                    disable_force_on_contact=claw_index > n - 1,
+                    disable_force_on_contact=claw_index != n - 1,
                     max_torque=max_torque,
                 )
             )
-
-        # #claw_gripper_command = RobotCommandBuilder.claw_gripper_close_command(max_acc=None, max_vel=None, disable_force_on_contact=False, max_torque=1.0)#claw_gripper_command_helper([0.1], [1], max_torque=1, disable_force_on_contact=True)
-        # claw_gripper_command_1_lose_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.7, disable_force_on_contact=True, max_torque=0.0)
-        # claw_gripper_command_2_little_tighter_grip = RobotCommandBuilder.claw_gripper_open_fraction_command(0.6, claw_gripper_command_1_lose_grip, disable_force_on_contact=True,  max_torque=0.5)
-        # claw_gripper_command_3_almost_there = RobotCommandBuilder.claw_gripper_open_fraction_command(0.5, claw_gripper_command_2_little_tighter_grip, disable_force_on_contact=True, max_torque=0.7)
-        # claw_gripper_command = RobotCommandBuilder.claw_gripper_open_fraction_command(0.4, claw_gripper_command_3_almost_there, max_torque=1.0)
-
         self.command_client.robot_command(claw_gripper_command)
-        input("continue to open gripper ?")
-        self.open_gripper()
+        # TODO: Imitate Reset Arm without orientation change
+        self.move_gripper_to_point(
+            point_before_gripper_manipulation_has_started,
+            np.deg2rad(solution_angles).tolist(),
+            timeout // 2,
+            timeout,
+        )
         return status
 
     def grasp_point_in_image(
@@ -872,14 +1004,15 @@ class Spot:
         )
 
         if blocking:
+            time.sleep(end_time)
             cmd_status = None
-            while cmd_status != 1:
-                time.sleep(0.1)
+            while cmd_status is None:
+                time.sleep(0.1) if cmd_status is not None else None
                 feedback_resp = self.get_cmd_feedback(cmd_id)
                 cmd_status = (
                     feedback_resp.feedback.synchronized_feedback
                 ).mobility_command_feedback.se2_trajectory_feedback.status
-            return None
+            return cmd_status
 
         return cmd_id
 
