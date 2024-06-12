@@ -15,7 +15,10 @@ from spot_wrapper.utils import angle_between_quat
 
 
 def detect_orientation(
-    cam_T_obj: mn.Matrix4, to_origin: np.ndarray
+    cam_T_obj: mn.Matrix4,
+    to_origin: np.ndarray,
+    body_T_cam: mn.Matrix4,
+    orientation_solver: "OrientationSolver" = None,
 ) -> Tuple[str, mn.Vector3, float]:
     """
     Given the pose of object in camera, detect whether object is vertical or horizontal & predict angles
@@ -34,15 +37,17 @@ def detect_orientation(
     y_axis = to_origin.inverted().transform_vector(mn.Vector3(*y_axis)).normalized()
     x_axis = to_origin.inverted().transform_vector(mn.Vector3(*x_axis)).normalized()
 
-    # z_axis_transformed_in_body = (
-    #     (body_T_cam @ cam_T_obj).transform_vector(z_axis).normalized()
-    # )
-    # y_axis_transformed_in_body = (
-    #     (body_T_cam @ cam_T_obj).transform_vector(y_axis).normalized()
-    # )
-    # x_axis_transformed_in_body = (
-    #     (body_T_cam @ cam_T_obj).transform_vector(x_axis).normalized()
-    # )
+    z_axis_transformed_in_body = (
+        (body_T_cam @ cam_T_obj)
+        .transform_vector(mn.Vector3(0.0, 1.0, 0.0))
+        .normalized()
+    )
+    y_axis_transformed_in_body = (
+        (body_T_cam @ cam_T_obj).transform_vector(y_axis).normalized()
+    )
+    x_axis_transformed_in_body = (
+        (body_T_cam @ cam_T_obj).transform_vector(x_axis).normalized()
+    )
 
     # z_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0, 0, -1)
     # y_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0.0, -1.0, 0.0)
@@ -125,11 +130,15 @@ def detect_orientation(
     )
 
     # if theta < 30:
-
+    anchor_pose_name, _ = orientation_solver._determine_anchor_object_pose(
+        z_axis_transformed_in_camera
+    )
+    anchor_index: int = int(anchor_pose_name.split("_")[-1])
+    # Old condition (np.abs(theta) < 50 or np.abs(180 - np.abs(theta)) < 50) or
     return (
         (
             f"vertical {format(theta_signed, '.2f')}, {format(gamma_signed, '.2f')}, {format(alpha_signed, '.2f')}"
-            if np.abs(theta) < 50 or np.abs(180 - np.abs(theta)) < 50
+            if anchor_index in [1, 6]
             else f"horizontal {format(theta_signed, '.2f')}, {format(gamma_signed, '.2f')}, {format(alpha_signed, '.2f')}"
         ),
         z_axis_transformed_in_camera,
@@ -142,6 +151,7 @@ def pose_estimation(
     depth_raw: np.ndarray,
     object_name: str,
     cam_intrinsics,
+    body_T_cam: mn.Matrix4,
     image_src: int,
     image_scale: float = 0.7,
     port_seg: int = 21001,
@@ -191,7 +201,9 @@ def pose_estimation(
 
     pose, ob_in_cam_pose, to_origin, visualization = pose_socket.recv_pyobj()
     pose_magnum = mn.Matrix4(ob_in_cam_pose)  # @mn.Matrix4(to_origin).inverted()
-    classification_text, spinal_axis, gamma = detect_orientation(pose_magnum, to_origin)
+    classification_text, spinal_axis, gamma = detect_orientation(
+        pose_magnum, to_origin, body_T_cam, orientation_solver
+    )
     t2 = time.time()
     if visualizationflag:
         visualization = cv2.putText(
@@ -212,9 +224,16 @@ def pose_estimation(
     orientation = "side" if "vertical" in classification_text else "topdown"
     (
         gripper_pose_quat,
-        orientation,
+        solution_angles,
     ) = orientation_solver.get_target_grasp_quat_based_on_object_pose(spinal_axis)
-    return orientation, spinal_axis, gamma, gripper_pose_quat.flatten().tolist(), t2
+    return (
+        orientation,
+        spinal_axis,
+        gamma,
+        gripper_pose_quat.flatten().tolist(),
+        solution_angles,
+        t2,
+    )
 
 
 def quaternion_multiply(q1, q2):
@@ -497,7 +516,7 @@ class OrientationSolver:
 
         index = np.argmin(np.abs(angles))
         print(
-            f"similarity angles for object orientation {angles}, pose name {object_orientation_names[index]}"
+            f"similarity angles for object orientation {angles}, angle {angles[index]} pose name {object_orientation_names[index]}"
         )
 
         return object_orientation_names[index], angles[index]
@@ -513,7 +532,7 @@ class OrientationSolver:
     #     return self.object_orientations.get(object_pose_name, "")[1]
     def get_target_grasp_quat_based_on_object_pose(
         self, spinal_axis: mn.Vector3
-    ) -> Tuple[np.ndarray, str]:
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Given object pose tell us, how to orient the gripper to pickup & tells us whether it's top-down or side
         """
@@ -523,15 +542,17 @@ class OrientationSolver:
         grasp_orientation_name = self.grasp_solution_for_object_pose.get(
             object_anchor_pose_name
         )
-        grasp_orientation_quat, grasp_type = self.grasp_orientations.get(
-            grasp_orientation_name
-        )
-        grasp_orientation_quat_rotated: np.ndarray = rotate_around_x_by_given_angle(
+        grasp_orientation_quat, _ = self.grasp_orientations.get(grasp_orientation_name)
+        grasp_orientation_quat = rotate_around_x_by_given_angle(
             grasp_orientation_quat.view((np.double, 4)),
             grasp_orientation_name,
             -1 * danchor_angle,
         )
-        return grasp_orientation_quat_rotated, grasp_type
+        solution_angle = self.solution_space.get(
+            f"{object_anchor_pose_name}_{grasp_orientation_name}",
+            np.array([0, 0, 0]),
+        )
+        return grasp_orientation_quat, solution_angle
 
     def get_correction_angle(
         self,
