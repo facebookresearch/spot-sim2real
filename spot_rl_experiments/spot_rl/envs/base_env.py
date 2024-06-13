@@ -486,7 +486,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             intrinsics = image_resps[0].source.pinhole.intrinsics
             transform_snapshot = image_resps[0].shot.transforms_snapshot
             body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-                "body",
+                GRAV_ALIGNED_BODY_FRAME_NAME,  # "body",
                 "link_wr1",
             )
             hand_T_gripper: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
@@ -512,20 +512,39 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             self.obj_center_pixel = [cx, cy]
             mask = segment_with_socket(image_responses[0], obj_bbox, port=seg_port)
             t1 = time.time()
+            (
+                graspmode,
+                spinal_axis,
+                gamma,
+                gripper_pose_quat,
+                solution_angles,
+                t2,
+            ) = pose_estimation(
+                *image_responses,
+                object_name,
+                intrinsics,
+                body_T_cam,
+                image_src,
+                image_scale,
+                seg_port,
+                pose_port,
+                obj_bbox,
+                mask,
+            )
             with ThreadPoolExecutor() as executor:
-                future_pose = executor.submit(
-                    pose_estimation,
-                    *image_responses,
-                    object_name,
-                    intrinsics,
-                    body_T_cam,
-                    image_src,
-                    image_scale,
-                    seg_port,
-                    pose_port,
-                    obj_bbox,
-                    mask,
-                )
+                # future_pose = executor.submit(
+                #     pose_estimation,
+                #     *image_responses,
+                #     object_name,
+                #     intrinsics,
+                #     body_T_cam,
+                #     image_src,
+                #     image_scale,
+                #     seg_port,
+                #     pose_port,
+                #     obj_bbox,
+                #     mask,
+                # )
                 future_affordance = executor.submit(
                     affordance_prediction,
                     object_name,
@@ -538,18 +557,21 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     grasp_control_parmeters, object_name
                 )
                 for future in as_completed(
-                    [future_affordance, future_grasp_controls, future_pose]
+                    [
+                        future_affordance,
+                        future_grasp_controls,
+                    ]  # future_pose]
                 ):
                     result = future.result()
-                    if future == future_pose:
-                        (
-                            graspmode,
-                            spinal_axis,
-                            gamma,
-                            gripper_pose_quat,
-                            solution_angles,
-                            t2,
-                        ) = result
+                    # if future == future_pose:
+                    #     (
+                    #         graspmode,
+                    #         spinal_axis,
+                    #         gamma,
+                    #         gripper_pose_quat,
+                    #         solution_angles,
+                    #         t2,
+                    #     ) = result
                     if future == future_affordance:
                         point_in_gripper = result
                     if future == future_grasp_controls:

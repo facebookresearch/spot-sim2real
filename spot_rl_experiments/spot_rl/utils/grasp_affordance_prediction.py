@@ -11,7 +11,7 @@ def grasp_control_parmeters(object_name: str):
     These parameters consist of list of (claw_fraction_open_angle, max_torque) which controls the slow closing of the gripper & force applied to hold the object.
     """
     if object_name == "cup":
-        return [(0.7, 0.0), (0.6, 0.5), (0.5, 0.7), (0.4, 0.5)]
+        return [(0.7, 0.0), (0.6, 0.5), (0.5, 0.7), (0.4, 0.5), (0.3, 0.6), (0.2, 1.0)]
 
 
 def affordance_prediction(
