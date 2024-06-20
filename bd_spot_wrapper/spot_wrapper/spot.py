@@ -722,9 +722,10 @@ class Spot:
         point_in_body = np.array(
             body_T_cam.transform_point(mn.Vector3(*point_in_gripper))
         )
-        point_in_body[0] += 0.05  # static offset
+        print(f"Point in body {point_in_body}")
+        #point_in_body[0] += 0.05  # static offset
         bx, by, byaw = self.get_xy_yaw(False)
-        current_gripper_pose = self.get_ee_quaternion_in_body_frame().view(
+        current_gripper_pose = self.get_ee_quaternion_in_body_frame(frame_name=GRAV_ALIGNED_BODY_FRAME_NAME).view(
             (np.double, 4)
         )
         up_thresh = 0.2
@@ -737,19 +738,22 @@ class Spot:
         is_point_reachable_without_mobility = self.query_IK_reachability_of_gripper(
             SE3Pose(*point_in_body, Quat(*gripper_pose_quat))
         )
+        # if not is_point_reachable_without_mobility:
+        #     point_in_body_uppeest[0] -= 0.05
+        
         status = self.move_arm_to_point_with_body_follow(
             [point_in_body_uppeest],
             [gripper_pose_quat],
             allow_body_follow=not is_point_reachable_without_mobility,
         )
 
-        pos = self.get_ee_pos_in_body_frame()[0]
-        pos[-1] -= up_thresh - 0.05
-        current_gripper_pose = self.get_ee_quaternion_in_body_frame().view(
+        pos = self.get_ee_pos_in_body_frame(GRAV_ALIGNED_BODY_FRAME_NAME)[0]
+        pos[-1] -= up_thresh 
+        current_gripper_pose = self.get_ee_quaternion_in_body_frame(GRAV_ALIGNED_BODY_FRAME_NAME).view(
             (np.double, 4)
         )
         status = self.move_arm_to_point_with_body_follow(
-            [pos], [current_gripper_pose], 1, False
+            [pos], [current_gripper_pose], allow_body_follow=False
         )
 
         speed = 0.1
@@ -1484,12 +1488,12 @@ class Spot:
         quat = se3_pose.rotation.normalize()
         return sp.SE3(quat.to_matrix(), pos)
 
-    def get_ee_pos_in_body_frame(self):
+    def get_ee_pos_in_body_frame(self, frame_name:str="body"):
         """
         Return ee xyz position and roll, pitch, yaw
         """
         # Get transformation
-        body_T_hand = self.get_ee_transform()
+        body_T_hand = self.get_ee_transform(frame_name)
 
         # Get rotation. BD API returns values with the order of yaw, pitch, roll.
         theta = math_helpers.quat_to_eulerZYX(body_T_hand.rotation)
@@ -1505,13 +1509,13 @@ class Spot:
 
         return np.array([position.x, position.y, position.z]), theta
 
-    def get_ee_transform(self):
+    def get_ee_transform(self, frame_name:str="body"):
         """
         Get ee transformation from base (body) to hand frame
         """
         body_T_hand = get_a_tform_b(
             self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            "body",
+            frame_name, #"body",
             "hand",
         )
         return body_T_hand
@@ -1528,11 +1532,11 @@ class Spot:
         )
         return vision_T_hand
 
-    def get_ee_quaternion_in_body_frame(self):
+    def get_ee_quaternion_in_body_frame(self, frame_name="body"):
         """
         Get ee's quaternion
         """
-        body_T_hand = self.get_ee_transform()
+        body_T_hand = self.get_ee_transform(frame_name)
         quat = body_T_hand.rotation
         quat = quaternion.quaternion(quat.w, quat.x, quat.y, quat.z)
         return quat

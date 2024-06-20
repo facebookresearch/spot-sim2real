@@ -1,4 +1,5 @@
 import numpy as np
+
 from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     sample_patch_around_point,
@@ -43,5 +44,32 @@ def affordance_prediction(
     cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
     Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1e-3)
     point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
+
+    # y1, y2, x1, x2 = y_min, y_max, x_min, x_max
+    # offset = 5
+    # max_width_in_meters = 6.0 * 0.0254  # Convert inches to meters
+
+    # best_point = None
+    # best_distance = float('inf')
+
+    # for y in range(max(y1 + offset, y1), min(y2 - offset, y2)):
+    #     row = mask[y, x1:x2]
+    #     non_zero_indices = np.nonzero(row)[0]
+        
+    #     if non_zero_indices.size > 0:
+    #         for idx in non_zero_indices:
+    #             x = x1 + idx
+    #             depth = sample_patch_around_point(depth_map, y, x)
+    #             if depth > 0:
+    #                 width_in_pixels = np.count_nonzero(binary_mask[y, x1:x2])
+    #                 width_in_meters = calculate_width(depth, width_in_pixels, intrinsic_matrix)
+                    
+    #                 if width_in_meters <= max_width_in_meters:
+    #                     distance = np.sqrt((cx - x)**2 + (cy - y)**2)
+    #                     if distance < best_distance:
+    #                         best_distance = distance
+    #                         best_point = (x, y)
+
+    # return best_point
 
     return point_in_gripper

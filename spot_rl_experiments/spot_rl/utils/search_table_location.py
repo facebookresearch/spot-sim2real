@@ -482,7 +482,7 @@ def contrained_place_point_estimation(
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
 
     # Wait for a bit to stabalized the gripper
-    time.sleep(2.0)
+    #time.sleep(2.0)
 
     (
         img,
@@ -492,7 +492,7 @@ def contrained_place_point_estimation(
         body_T_hand,
         gripper_T_intel,
     ) = get_arguments(spot, gripper_T_intel)
-
+    time.sleep(1.5)
     print(f"Lookign for {object_target}")
 
     x1, y1, x2, y2 = detect_with_rospy_subscriber(object_target, image_scale)
