@@ -39,11 +39,12 @@ from bosdyn.api import (
     geometry_pb2,
     image_pb2,
     manipulation_api_pb2,
+    mobility_command_pb2,
     robot_command_pb2,
     synchronized_command_pb2,
     trajectory_pb2,
 )
-from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, Vec2
+from bosdyn.api.geometry_pb2 import SE2Velocity, SE2VelocityLimit, Vec2, Vec3
 from bosdyn.api.spot import robot_command_pb2 as spot_command_pb2
 from bosdyn.api.spot.inverse_kinematics_pb2 import (
     InverseKinematicsRequest,
@@ -693,7 +694,18 @@ class Spot:
 
         if allow_body_follow and len(arm_command_list) == 1:
             # Tell the robot's body to follow the arm
-            follow_arm_command = RobotCommandBuilder.follow_arm_command()
+            mobility_command = mobility_command_pb2.MobilityCommand.Request(
+                follow_arm_request=basic_command_pb2.FollowArmCommand.Request(
+                    body_offset_from_hand=Vec3(x=0.5, y=0, z=0)
+                )
+            )
+            synchronized_command = synchronized_command_pb2.SynchronizedCommand.Request(
+                mobility_command=mobility_command
+            )
+            follow_arm_command = robot_command_pb2.RobotCommand(
+                synchronized_command=synchronized_command
+            )
+            # follow_arm_command = RobotCommandBuilder.follow_arm_command()
 
             # Combine the arm and mobility commands into one synchronized command.
             command = RobotCommandBuilder.build_synchro_command(
@@ -723,11 +735,11 @@ class Spot:
             body_T_cam.transform_point(mn.Vector3(*point_in_gripper))
         )
         print(f"Point in body {point_in_body}")
-        #point_in_body[0] += 0.05  # static offset
+
         bx, by, byaw = self.get_xy_yaw(False)
-        current_gripper_pose = self.get_ee_quaternion_in_body_frame(frame_name=GRAV_ALIGNED_BODY_FRAME_NAME).view(
-            (np.double, 4)
-        )
+        current_gripper_pose = self.get_ee_quaternion_in_body_frame(
+            frame_name=GRAV_ALIGNED_BODY_FRAME_NAME
+        ).view((np.double, 4))
         up_thresh = 0.2
         point_in_body_uppeest = point_in_body.copy()
         point_in_body_uppeest[-1] += up_thresh
@@ -738,9 +750,9 @@ class Spot:
         is_point_reachable_without_mobility = self.query_IK_reachability_of_gripper(
             SE3Pose(*point_in_body, Quat(*gripper_pose_quat))
         )
-        # if not is_point_reachable_without_mobility:
-        #     point_in_body_uppeest[0] -= 0.05
-        
+        if not is_point_reachable_without_mobility:
+            point_in_body_uppeest[0] += 0.05
+
         status = self.move_arm_to_point_with_body_follow(
             [point_in_body_uppeest],
             [gripper_pose_quat],
@@ -748,10 +760,10 @@ class Spot:
         )
 
         pos = self.get_ee_pos_in_body_frame(GRAV_ALIGNED_BODY_FRAME_NAME)[0]
-        pos[-1] -= up_thresh 
-        current_gripper_pose = self.get_ee_quaternion_in_body_frame(GRAV_ALIGNED_BODY_FRAME_NAME).view(
-            (np.double, 4)
-        )
+        pos[-1] -= up_thresh - 0.1
+        current_gripper_pose = self.get_ee_quaternion_in_body_frame(
+            GRAV_ALIGNED_BODY_FRAME_NAME
+        ).view((np.double, 4))
         status = self.move_arm_to_point_with_body_follow(
             [pos], [current_gripper_pose], allow_body_follow=False
         )
@@ -1488,7 +1500,7 @@ class Spot:
         quat = se3_pose.rotation.normalize()
         return sp.SE3(quat.to_matrix(), pos)
 
-    def get_ee_pos_in_body_frame(self, frame_name:str="body"):
+    def get_ee_pos_in_body_frame(self, frame_name: str = "body"):
         """
         Return ee xyz position and roll, pitch, yaw
         """
@@ -1509,13 +1521,13 @@ class Spot:
 
         return np.array([position.x, position.y, position.z]), theta
 
-    def get_ee_transform(self, frame_name:str="body"):
+    def get_ee_transform(self, frame_name: str = "body"):
         """
         Get ee transformation from base (body) to hand frame
         """
         body_T_hand = get_a_tform_b(
             self.robot_state_client.get_robot_state().kinematic_state.transforms_snapshot,
-            frame_name, #"body",
+            frame_name,  # "body",
             "hand",
         )
         return body_T_hand

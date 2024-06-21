@@ -274,7 +274,7 @@ def rotate_around_x_by_given_angle(
     if grasp_pose_index == 3 and object_pose_index == 5:
         dangle *= 1.0
     if grasp_pose_index == 1 and object_pose_index == 2:
-        dangle *= 1.0
+        dangle *= -1.0
     if grasp_pose_index == 1 and object_pose_index == 3:
         dangle *= -1.0
 
