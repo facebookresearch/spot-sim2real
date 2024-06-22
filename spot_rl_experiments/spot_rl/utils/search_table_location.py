@@ -261,7 +261,7 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     hand_T_intel = gripper_T_intel if place_point_generation_src else np.identity(4)
     # hand_T_intel[:3, :3] = np.identity(3)
     hand_T_intel = mn.Matrix4(
-        hand_T_intel.T.tolist()
+        hand_T_intel.tolist()
     )  # Load hand_T_intel from caliberation
     image_resps = [image_response_to_cv2(image_resp) for image_resp in image_resps]
     body_T_hand: mn.Matrix4 = spot.get_magnum_Matrix4_spot_a_T_b(
@@ -291,28 +291,23 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     direction_vector: np.ndarray,
     cosine_thresh: float = 0.25,
     body_T_hand: np.ndarray = np.eye(4),
-    gripper__T_intel: np.ndarray = np.eye(4),
+    gripper_T_intel: np.ndarray = np.eye(4),
     visualize: bool = False,
 ):
     """Filter point clouds based on the normal"""
     direction_vector = direction_vector.reshape(3)
     normals = np.asarray(pcd_with_normals.normals).reshape(-1, 3)
-    body_T_intel = np.array(body_T_hand @ gripper__T_intel)
-    normals_in_body = np.dot(normals, body_T_intel[:3, :3].T).reshape(-1, 3)
-    normals_in_body_coordinate_axes_camera = np.zeros_like(
-        normals_in_body, dtype=normals_in_body.dtype
-    )
-    normals_in_body_coordinate_axes_camera[:, 0] = -1 * normals_in_body[:, 1]
-    normals_in_body_coordinate_axes_camera[:, 1] = -1 * normals_in_body[:, -1]
-    normals_in_body_coordinate_axes_camera[:, -1] = -1 * normals_in_body[:, 0]
-
+    body_T_intel = np.array(body_T_hand @ gripper_T_intel)
+    normals_in_body = np.dot(body_T_intel[:3, :3], normals.T).T.reshape(-1, 3)
     # Compute the dot product to get the cosines
     cosines = (normals @ direction_vector).reshape(-1)
+    cosines = (normals_in_body @ np.array([0.0, 0.0, 1.0])).reshape(-1)
     # Filter out the point clouds
     pcd_dir_filtered = pcd_with_normals.select_by_index(
         np.where(cosines > cosine_thresh)[0]
     )
     if visualize:
+        #o3d.visualization.draw_geometries([pcd_with_normals])
         o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 
@@ -363,7 +358,6 @@ def detect_place_point_by_pcd_method(
         search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
     )
     # 0.25 - 0 < angle < 75
-    breakpoint()
     pcd = filter_pointcloud_by_normals_in_the_given_direction(
         pcd,
         np.array([0.0, -1.0, 0.0]),
@@ -558,7 +552,7 @@ def contrained_place_point_estimation(
     if visualize:
         o3d.visualization.draw_geometries([pcd_filtered], point_show_normal=True)
     pcd = filter_pointcloud_by_normals_in_the_given_direction(
-        pcd, np.array([0.0, -1.0, 0.0]), 0.5, np.array(body_T_hand), visualize=visualize
+        pcd, np.array([0.0, -1.0, 0.0]), 0.5, body_T_hand, gripper_T_intel, visualize=visualize
     )
 
     plane_pcd = plane_detect(pcd)

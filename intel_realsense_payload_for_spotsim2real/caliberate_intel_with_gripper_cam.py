@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import rospy
-
+from perception_and_utils.utils.image_utils import decorate_img_with_text_for_qr
 try:
     import sophuspy as sp
 except Exception as e:
@@ -62,6 +62,7 @@ if __name__ == "__main__":
         ],
         verbose=False,
     )
+    breakpoint()
     prev_diff = np.zeros((4, 4), dtype=np.float32)
     while True:
         intel_image = get_intel_image(spot)
@@ -74,6 +75,21 @@ if __name__ == "__main__":
         gripper_image, gripper_T_marker = aprilposeestimator_gripper.process_frame(
             gripper_image
         )
+
+        if intel_T_marker is None or gripper_T_marker is None:
+            continue
+        gripper_image = decorate_img_with_text_for_qr(
+            img=gripper_image,
+            frame_name_str="gripper",
+            qr_position=gripper_T_marker.translation(),
+        )
+
+        intel_image = decorate_img_with_text_for_qr(
+            img=intel_image,
+            frame_name_str="intel",
+            qr_position=intel_T_marker.translation(),
+        )
+
         cv2.imshow("QR detection", np.hstack((intel_image, gripper_image)))
         marker_T_intel = intel_T_marker.inverse()
         gripper_T_intel = (gripper_T_marker * marker_T_intel).matrix()
