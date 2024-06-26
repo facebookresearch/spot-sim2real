@@ -212,7 +212,7 @@ def plot_intel_point_in_gripper_image(
 def plot_place_point_in_gripper_image(spot: Spot, point_in_gripper_camera: np.ndarray):
     rospy.set_param("is_gripper_blocked", 0)
     spot.open_gripper()
-    time.sleep(1)
+    time.sleep(0.5)
     gripper_resps = spot.get_hand_image()
     gripper_rgb = image_response_to_cv2(gripper_resps[0])
     intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
@@ -230,6 +230,7 @@ def plot_place_point_in_gripper_image(spot: Spot, point_in_gripper_camera: np.nd
     try:
         visualization_img = cv2.imread("table_detection.png")
         visualization_img = np.hstack((visualization_img, gripper_rgb))
+        cv2.namedWindow("Table detection", cv2.WINDOW_NORMAL)
         cv2.imshow("Table detection", visualization_img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
@@ -260,9 +261,8 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
 
     hand_T_intel = gripper_T_intel if place_point_generation_src else np.identity(4)
     # hand_T_intel[:3, :3] = np.identity(3)
-    hand_T_intel = mn.Matrix4(
-        hand_T_intel.tolist()
-    )  # Load hand_T_intel from caliberation
+    hand_T_intel = mn.Matrix4.from_(hand_T_intel[:3, :3], hand_T_intel[:3, 3])
+    # Load hand_T_intel from caliberation
     image_resps = [image_response_to_cv2(image_resp) for image_resp in image_resps]
     body_T_hand: mn.Matrix4 = spot.get_magnum_Matrix4_spot_a_T_b(
         GRAV_ALIGNED_BODY_FRAME_NAME,  # "body",
@@ -300,14 +300,14 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     body_T_intel = np.array(body_T_hand @ gripper_T_intel)
     normals_in_body = np.dot(body_T_intel[:3, :3], normals.T).T.reshape(-1, 3)
     # Compute the dot product to get the cosines
-    cosines = (normals @ direction_vector).reshape(-1)
-    cosines = (normals_in_body @ np.array([0.0, 0.0, 1.0])).reshape(-1)
+    # cosines = (normals @ direction_vector).reshape(-1)
+    cosines = (normals_in_body @ direction_vector).reshape(-1)
     # Filter out the point clouds
     pcd_dir_filtered = pcd_with_normals.select_by_index(
         np.where(cosines > cosine_thresh)[0]
     )
     if visualize:
-        #o3d.visualization.draw_geometries([pcd_with_normals])
+        # o3d.visualization.draw_geometries([pcd_with_normals])
         o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 
@@ -360,7 +360,7 @@ def detect_place_point_by_pcd_method(
     # 0.25 - 0 < angle < 75
     pcd = filter_pointcloud_by_normals_in_the_given_direction(
         pcd,
-        np.array([0.0, -1.0, 0.0]),
+        np.array([0.0, 0.0, 1.0]),
         0.5,
         body_T_hand,
         gripper_T_intel,
@@ -409,35 +409,30 @@ def detect_place_point_by_pcd_method(
     # Convert selected point in gripper 3D to 3D then 3D to 2D then 2D to 3D using depth at Gripper
     # Ideally body-T_hand*hand_T_intel*point_in_intel should work but hand_T_intel has errors plus depth in Intel at closer points is not same as gripper
     # thus we convert intel 3D point to Gripper 3D, convert 3D to 2D & then again from 2D to 3D using depth map
-    selected_point_in_gripper = gripper_T_intel.transform_point(
-        mn.Vector3(*selected_point)
-    )
     selected_point_in_gripper = np.array(
-        [
-            selected_point_in_gripper.x,
-            selected_point_in_gripper.y,
-            selected_point_in_gripper.z,
-        ]
+        gripper_T_intel.transform_point(mn.Vector3(*selected_point))
     )
-    fx = camera_intrinsics_gripper.focal_length.x
-    fy = camera_intrinsics_gripper.focal_length.y
-    cx = camera_intrinsics_gripper.principal_point.x
-    cy = camera_intrinsics_gripper.principal_point.y
-    selected_xy_in_gripper = project_3d_to_pixel_uv(
-        selected_point_in_gripper.reshape(1, 3), fx, fy, cx, cy
-    )[0]
-    depth_at_selected_xy_in_gripper = (
-        depth_at_selected_xy + 0.02
-    )  # Add 2 cm in intel depth to get depth in gripper
-    print(f"Depth in gripper {depth_at_selected_xy_in_gripper}")
-    assert (
-        depth_at_selected_xy_in_gripper != 0.0
-    ), f"Expeceted gripper depth at point {int(selected_xy_in_gripper[1]), int(selected_xy_in_gripper[0])} to be non zero but found {depth_at_selected_xy_in_gripper}"
-    selected_point_in_gripper = get_3d_point(
-        camera_intrinsics_gripper,
-        selected_xy_in_gripper,
-        depth_at_selected_xy_in_gripper,
-    )
+    print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
+
+    # fx = camera_intrinsics_gripper.focal_length.x
+    # fy = camera_intrinsics_gripper.focal_length.y
+    # cx = camera_intrinsics_gripper.principal_point.x
+    # cy = camera_intrinsics_gripper.principal_point.y
+    # selected_xy_in_gripper = project_3d_to_pixel_uv(
+    #     selected_point_in_gripper.reshape(1, 3), fx, fy, cx, cy
+    # )[0]
+    # depth_at_selected_xy_in_gripper = (
+    #     depth_at_selected_xy + 0.02
+    # )  # Add 2 cm in intel depth to get depth in gripper
+    # print(f"Depth in gripper {depth_at_selected_xy_in_gripper}")
+    # assert (
+    #     depth_at_selected_xy_in_gripper != 0.0
+    # ), f"Expeceted gripper depth at point {int(selected_xy_in_gripper[1]), int(selected_xy_in_gripper[0])} to be non zero but found {depth_at_selected_xy_in_gripper}"
+    # selected_point_in_gripper = get_3d_point(
+    #     camera_intrinsics_gripper,
+    #     selected_xy_in_gripper,
+    #     depth_at_selected_xy_in_gripper,
+    # )
 
     img_with_bbox = None
     if visualize:
@@ -449,10 +444,10 @@ def detect_place_point_by_pcd_method(
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
-        cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
-        cv2.imshow("table_detection", img_with_bbox)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
+        # cv2.imshow("table_detection", img_with_bbox)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
         cv2.imwrite("table_detection.png", img_with_bbox)
 
     point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))
@@ -552,7 +547,12 @@ def contrained_place_point_estimation(
     if visualize:
         o3d.visualization.draw_geometries([pcd_filtered], point_show_normal=True)
     pcd = filter_pointcloud_by_normals_in_the_given_direction(
-        pcd, np.array([0.0, -1.0, 0.0]), 0.5, body_T_hand, gripper_T_intel, visualize=visualize
+        pcd,
+        np.array([0.0, -1.0, 0.0]),
+        0.5,
+        body_T_hand,
+        gripper_T_intel,
+        visualize=visualize,
     )
 
     plane_pcd = plane_detect(pcd)
