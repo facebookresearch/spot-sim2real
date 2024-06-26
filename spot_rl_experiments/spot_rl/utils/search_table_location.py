@@ -406,33 +406,11 @@ def detect_place_point_by_pcd_method(
     selected_point = get_3d_point(
         camera_intrinsics_intel, selected_xy, depth_at_selected_xy
     )
-    # Convert selected point in gripper 3D to 3D then 3D to 2D then 2D to 3D using depth at Gripper
-    # Ideally body-T_hand*hand_T_intel*point_in_intel should work but hand_T_intel has errors plus depth in Intel at closer points is not same as gripper
-    # thus we convert intel 3D point to Gripper 3D, convert 3D to 2D & then again from 2D to 3D using depth map
+
     selected_point_in_gripper = np.array(
         gripper_T_intel.transform_point(mn.Vector3(*selected_point))
     )
     print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
-
-    # fx = camera_intrinsics_gripper.focal_length.x
-    # fy = camera_intrinsics_gripper.focal_length.y
-    # cx = camera_intrinsics_gripper.principal_point.x
-    # cy = camera_intrinsics_gripper.principal_point.y
-    # selected_xy_in_gripper = project_3d_to_pixel_uv(
-    #     selected_point_in_gripper.reshape(1, 3), fx, fy, cx, cy
-    # )[0]
-    # depth_at_selected_xy_in_gripper = (
-    #     depth_at_selected_xy + 0.02
-    # )  # Add 2 cm in intel depth to get depth in gripper
-    # print(f"Depth in gripper {depth_at_selected_xy_in_gripper}")
-    # assert (
-    #     depth_at_selected_xy_in_gripper != 0.0
-    # ), f"Expeceted gripper depth at point {int(selected_xy_in_gripper[1]), int(selected_xy_in_gripper[0])} to be non zero but found {depth_at_selected_xy_in_gripper}"
-    # selected_point_in_gripper = get_3d_point(
-    #     camera_intrinsics_gripper,
-    #     selected_xy_in_gripper,
-    #     depth_at_selected_xy_in_gripper,
-    # )
 
     img_with_bbox = None
     if visualize:
