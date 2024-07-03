@@ -12,6 +12,7 @@ from typing import Any, Dict, Tuple
 import numpy as np
 import rospy
 import sophus as sp
+from geometry_msgs.msg import PoseStamped
 from hydra import compose, initialize
 from perception_and_utils.utils.conversions import (
     ros_PoseStamped_to_sophus_SE3,
@@ -153,6 +154,9 @@ def main(spot, config):
     spot_qr = SpotQRDetector(spot=spot.spot, cam_ids=[cam_id])
     avg_spotWorld_T_marker = spot_qr.get_avg_spotWorld_T_marker(cam_id=cam_id)
 
+    nav_PoseStamped_pub_for_place = rospy.Publisher(
+        "/nav_pose_for_place_viz", PoseStamped, queue_size=10
+    )
     # Publish marker w.r.t spotWorld transforms for 5 seconds so it can be seen in rviz
     # Instantiate static transform broadcaster for publishing marker w.r.t spotWorld transforms
     static_tf_broadcaster = StaticTransformBroadcaster()
@@ -228,6 +232,7 @@ def main(spot, config):
         if pre_in_dock:
             spot.spot.power_robot()
 
+        input("Start LSC-HITL?")
         # Do LSC by calling skills
         slow_down = 0.5  # slow down time to increase the skill execution stability
         spot.nav(nav_1)

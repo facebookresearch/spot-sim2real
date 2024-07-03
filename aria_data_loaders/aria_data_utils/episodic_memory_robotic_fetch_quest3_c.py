@@ -85,54 +85,54 @@ class EpisodicMemoryRoboticFetchQuest3:
     Warning: Do not create objects of this class directly. It is a standalone node
     """
 
-    def __init__(self, spot: Spot, verbose: bool = True, use_policies: bool = True):
-        # @FIXME: This is initializing a ros-node silently (at core of inheritence in
-        # SpotRobotSubscriberMixin). Make it explicit
-        self.skill_manager = SpotSkillManager(
-            spot=spot,
-            verbose=verbose,
-            use_policies=use_policies,
-        )
+    def __init__(self):
+        # # @FIXME: This is initializing a ros-node silently (at core of inheritence in
+        # # SpotRobotSubscriberMixin). Make it explicit
+        # self.skill_manager = SpotSkillManager(
+        #     spot=spot,
+        #     verbose=verbose,
+        #     use_policies=use_policies,
+        # )
 
         # Navigate Spot to SPOT_DOCK_OBSERVER_WAYPOINT_LEFT so that it can see the marker
-        status, msg = self.skill_manager.nav(
-            SPOT_DOCK_OBSERVER_WAYPOINT_LEFT[0],
-            SPOT_DOCK_OBSERVER_WAYPOINT_LEFT[1],
-            np.deg2rad(SPOT_DOCK_OBSERVER_WAYPOINT_LEFT[2]),
-        )
-        if not status:
-            rospy.logerr(
-                f"Failed to navigate to spot dock observer waypoint. Error: {msg}. Exiting..."
-            )
-            return
+        # status, msg = self.skill_manager.nav(
+        #     SPOT_DOCK_OBSERVER_WAYPOINT_LEFT[0],
+        #     SPOT_DOCK_OBSERVER_WAYPOINT_LEFT[1],
+        #     np.deg2rad(SPOT_DOCK_OBSERVER_WAYPOINT_LEFT[2]),
+        # )
+        # if not status:
+        #     rospy.logerr(
+        #         f"Failed to navigate to spot dock observer waypoint. Error: {msg}. Exiting..."
+        #     )
+        #     return
 
-        # Sit Spot down
-        self.skill_manager.sit()
+        # # Sit Spot down
+        # self.skill_manager.sit()
 
-        # Instantiate static transform broadcaster for publishing marker w.r.t spotWorld transforms
-        self.static_tf_broadcaster = StaticTransformBroadcaster()
+        # # Instantiate static transform broadcaster for publishing marker w.r.t spotWorld transforms
+        # self.static_tf_broadcaster = StaticTransformBroadcaster()
 
-        self._spot_fetch_trigger_sub = rospy.Subscriber(
-            "/spot_fetch_trigger", Bool, self.spot_fetch_trigger_callback
-        )
-        self._spot_fetch_flag = False
+        # self._spot_fetch_trigger_sub = rospy.Subscriber(
+        #     "/spot_fetch_trigger", Bool, self.spot_fetch_trigger_callback
+        # )
+        # self._spot_fetch_flag = False
 
         # Detect the marker and get the average pose of marker w.r.t spotWorld frame
-        cam_id = SpotCamIds.HAND_COLOR
-        spot_qr = SpotQRDetector(spot=spot, cam_ids=[cam_id])
-        avg_spotWorld_T_marker = spot_qr.get_avg_spotWorld_T_marker(cam_id=cam_id)
+        # cam_id = SpotCamIds.HAND_COLOR
+        # spot_qr = SpotQRDetector(spot=spot, cam_ids=[cam_id])
+        # avg_spotWorld_T_marker = spot_qr.get_avg_spotWorld_T_marker(cam_id=cam_id)
 
-        # Publish marker w.r.t spotWorld transforms for 5 seconds so it can be seen in rviz
-        start_time = rospy.Time.now()
-        while rospy.Time.now() - start_time < rospy.Duration(2.0):
-            self.static_tf_broadcaster.sendTransform(
-                sophus_SE3_to_ros_TransformStamped(
-                    sp_se3=avg_spotWorld_T_marker,
-                    parent_frame=rf.SPOT_WORLD,
-                    child_frame=rf.MARKER,
-                )
-            )
-            rospy.sleep(0.5)
+        # # Publish marker w.r.t spotWorld transforms for 5 seconds so it can be seen in rviz
+        # start_time = rospy.Time.now()
+        # while rospy.Time.now() - start_time < rospy.Duration(2.0):
+        #     self.static_tf_broadcaster.sendTransform(
+        #         sophus_SE3_to_ros_TransformStamped(
+        #             sp_se3=avg_spotWorld_T_marker,
+        #             parent_frame=rf.SPOT_WORLD,
+        #             child_frame=rf.MARKER,
+        #         )
+        #     )
+        #     rospy.sleep(0.5)
 
         # Instantiate publisher for publishing go-to pose for handoff
         self._nav_PoseStamped_pub_for_place = rospy.Publisher(
@@ -145,7 +145,7 @@ class EpisodicMemoryRoboticFetchQuest3:
         self._tf_listener = TransformListener(self._tf_buffer)
 
         # Wait for transform from camera to spotWorld to be available
-        while not rospy.is_shutdown() and not self._spot_fetch_flag:
+        while not rospy.is_shutdown():
             while not rospy.is_shutdown() and not self._tf_buffer.can_transform(
                 target_frame=rf.SPOT_WORLD, source_frame="camera", time=rospy.Time()
             ):
@@ -178,24 +178,24 @@ class EpisodicMemoryRoboticFetchQuest3:
                 )
             )
 
-            rospy.logwarn_throttle(
-                5.0, "Waiting for demo trigger on /spot_fetch_trigger topic"
-            )
+            # rospy.logwarn_throttle(
+            #     5.0, "Waiting for demo trigger on /spot_fetch_trigger topic"
+            # )
             rospy.sleep(1.0)
 
         # Set run status to true in the beginning
-        run_status = True
+        # run_status = True
 
-        if run_status:
-            # Nav to x,y,theta of interest (Aria's cpf frame when it saw the object)
-            nav_xyt_for_handoff = self.nav_xyt_for_handoff
-            rospy.loginfo(f"Nav 2D location for pick: {nav_xyt_for_handoff}")
+        # if run_status:
+        #     # Nav to x,y,theta of interest (Aria's cpf frame when it saw the object)
+        #     nav_xyt_for_handoff = self.nav_xyt_for_handoff
+        #     rospy.loginfo(f"Nav 2D location for pick: {nav_xyt_for_handoff}")
 
-            self.skill_manager.nav(
-                nav_xyt_for_handoff[0], nav_xyt_for_handoff[1], nav_xyt_for_handoff[2]
-            )
+        #     self.skill_manager.nav(
+        #         nav_xyt_for_handoff[0], nav_xyt_for_handoff[1], nav_xyt_for_handoff[2]
+        #     )
 
-            self.skill_manager.sit()
+        #     self.skill_manager.sit()
 
     def spot_fetch_trigger_callback(self, msg):
         """
@@ -253,19 +253,17 @@ class EpisodicMemoryRoboticFetchQuest3:
 @click.option("--verbose", type=bool, default=True)
 @click.option("--use-policies", type=bool, default=False)
 def main(verbose: bool, use_policies: bool):
-    # rospy.init_node("episode")
-    # rospy.logwarn("Starting up ROS node")
+    rospy.init_node("episode")
+    rospy.logwarn("Starting up ROS node")
 
-    spot = Spot("EpisodicMemoryRoboticFetchQuest3Node")
-    with spot.get_lease(hijack=True) as lease:
-        if lease is None:
-            raise RuntimeError("Could not get lease")
-        else:
-            rospy.loginfo("Acquired lease")
+    # spot = Spot("EpisodicMemoryRoboticFetchQuest3Node")
+    # with spot.get_lease(hijack=True) as lease:
+    # if lease is None:
+    # raise RuntimeError("Could not get lease")
+    # else:
+    # rospy.loginfo("Acquired lease")
 
-        _ = EpisodicMemoryRoboticFetchQuest3(
-            spot=spot, verbose=verbose, use_policies=use_policies
-        )
+    _ = EpisodicMemoryRoboticFetchQuest3()
 
 
 if __name__ == "__main__":
