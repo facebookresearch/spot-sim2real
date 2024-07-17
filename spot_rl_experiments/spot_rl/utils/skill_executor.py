@@ -30,13 +30,16 @@ class SpotRosSkillExecutor:
         """Reset skill name and input, and publish the message"""
         rospy.set_param("/skill_name_input", "None,None")
         rospy.set_param("/skill_name_suc_msg", f"{skill_name},{succeded},{msg}")
+        print("skill done")
 
     def execute_skills(self):
         """Execute skills."""
 
         # Get the current skill name
         skill_name, skill_input = get_skill_name_and_input_from_ros()
-        print(f"current skill_name {skill_name} skill_input {skill_input}")
+
+        if skill_name != "None":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
 
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
@@ -74,7 +77,7 @@ def main():
     rospy.set_param("/skill_name_suc_msg", "None,None,None")
 
     # Call the skill manager
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=False)
 
     executor = None
     try:
