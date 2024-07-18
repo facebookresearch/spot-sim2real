@@ -857,7 +857,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             out_path = osp.join(GRASP_VIS_DIR, f"{time.time()}.png")
             cv2.imwrite(out_path, marked_img)
             print("Saved grasp image as", out_path)
-            img_msg = self.cv_bridge.cv2_to_imgmsg(marked_img)
+            img_msg = self.cv_bridge.cv2_to_imgmsg(marked_img, "bgr8")
             self.mrcnn_viz_pub.publish(img_msg)
 
         height, width = (480, 640)

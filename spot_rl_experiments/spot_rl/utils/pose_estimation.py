@@ -43,7 +43,7 @@ def detect_orientation(
     to_origin: np.ndarray,
     body_T_cam: mn.Matrix4,
     orientation_solver: "OrientationSolver" = None,
-) -> Tuple[str, mn.Vector3, float]:
+) -> Tuple[str, mn.Vector3, float, np.ndarray, np.ndarray]:
     """
     Given the pose of object in camera, detect whether object is vertical or horizontal & predict angles
     cam_T_obj : mn.Matrix4 4x4 pose; object pose
@@ -54,7 +54,7 @@ def detect_orientation(
     to_origin_inverted = to_origin.inverted()
     center_pose = cam_T_obj @ to_origin_inverted
     center_pose_body = body_T_cam @ cam_T_obj @ to_origin_inverted
-    pose_body = body_T_cam @ cam_T_obj
+    # pose_body = body_T_cam @ cam_T_obj
 
     z_axis: mn.Vector3 = mn.Vector3(0, 0, 1)
     y_axis: mn.Vector3 = mn.Vector3(0, 1, 0)
@@ -66,12 +66,12 @@ def detect_orientation(
     # x_axis = to_origin.inverted().transform_vector(mn.Vector3(*x_axis)).normalized()
 
     z_axis_transformed_in_body = center_pose_body.transform_vector(z_axis).normalized()
-    y_axis_transformed_in_body = center_pose_body.transform_vector(y_axis).normalized()
-    x_axis_transformed_in_body = center_pose_body.transform_vector(x_axis).normalized()
+    # y_axis_transformed_in_body = center_pose_body.transform_vector(y_axis).normalized()
+    # x_axis_transformed_in_body = center_pose_body.transform_vector(x_axis).normalized()
 
-    z_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0, 0, -1)
-    y_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0.0, -1.0, 0.0)
-    x_axis_transformed_in_body_for_nominal_pose = mn.Vector3(1.0, 0.0, 0.0)
+    # z_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0, 0, -1)
+    # y_axis_transformed_in_body_for_nominal_pose = mn.Vector3(0.0, -1.0, 0.0)
+    # x_axis_transformed_in_body_for_nominal_pose = mn.Vector3(1.0, 0.0, 0.0)
 
     z_axis_transformed_in_camera_for_nominal_pose = mn.Vector3(0.0, 1.0, 0.0)
     y_axis_transformed_in_camera_for_nominal_pose = mn.Vector3(1.0, 0.0, 0.0)
@@ -137,7 +137,7 @@ def pose_estimation(
     bbox=None,
     mask=None,
     visualizationflag: bool = True,
-) -> Tuple[str, mn.Vector3, float, List[float], float]:
+) -> Tuple[str, mn.Vector3, float, List[float], List[float], float]:
     """
     Gets the pose estimate using zmq socket to FoundationPose thirdparty service
     rgb_image : np.ndarray [h,w,c], 0-255

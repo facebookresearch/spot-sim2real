@@ -19,7 +19,10 @@ from scipy import stats as st
 from spot_rl.models import OwlVit
 from spot_rl.models.yolov8predictor import YOLOV8Predictor
 from spot_rl.utils.mask_rcnn_utils import get_deblurgan_model
-from spot_rl.utils.pixel_to_3d_conversion_utils import *
+from spot_rl.utils.pixel_to_3d_conversion_utils import (
+    get_3d_point,
+    get_best_uvz_from_detection,
+)
 from spot_rl.utils.utils import construct_config
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
 
@@ -293,7 +296,7 @@ class ImageSearch:
         x1, y1, x2, y2, conf = det
         x1_int, y1_int, x2_int, y2_int = int(x1), int(y1), int(x2), int(y2)
 
-        (u, v), z = get_best_uvz_from_detection(unscaled_depth, [x1, y1, x2, y2])
+        (u, v), z = get_best_uvz_from_detection(unscaled_depth, [x1, y1, x2, y2])  # type: ignore
 
         if self.visualize:
             rgb_img_vis = cv2.rectangle(
@@ -308,7 +311,7 @@ class ImageSearch:
             binary_depth_img = np.where(hand_depth_img > 0, 1, 0)
             binary_depth_img = np.uint8(binary_depth_img)
             mixed_image = rgb_img * binary_depth_img[:, :, None]
-            point_in_local_3d = get_3d_point(cam_intrinsics, (u, v), z)
+            point_in_local_3d = get_3d_point(cam_intrinsics, (u, v), z)  # type: ignore
             (
                 corner_det_status,
                 best_z,
