@@ -11,7 +11,7 @@ if __name__ == "__main__":
     contnue = True
     object_name = "cup"  # "penguin plush toy"
     while contnue:
-        spotskillmanager.nav("dining_table_demo")#spot.stand()
+        spotskillmanager.nav("dining_table_demo")  # spot.stand()
         spotskillmanager.pick(
             object_name,
             enable_pose_correction=False,
@@ -20,7 +20,7 @@ if __name__ == "__main__":
         )
         spotskillmanager.nav("kitchen_counter")
         spotskillmanager.place(None, is_local=True, visualize=False)
-        #spotskillmanager.get_env().reset_arm()
+        # spotskillmanager.get_env().reset_arm()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown
