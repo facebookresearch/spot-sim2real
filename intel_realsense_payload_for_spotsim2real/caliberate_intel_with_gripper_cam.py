@@ -74,7 +74,9 @@ if __name__ == "__main__":
         gripper_image, gripper_T_marker = aprilposeestimator_gripper.process_frame(
             gripper_image
         )
-        print(f"{np.linalg.norm(gripper_T_marker.matrix()[:3, 3])}, {np.linalg.norm(intel_T_marker.matrix()[:3, 3])}")
+        print(
+            f"{np.linalg.norm(gripper_T_marker.matrix()[:3, 3])}, {np.linalg.norm(intel_T_marker.matrix()[:3, 3])}"
+        )
         print(f"{gripper_T_marker.matrix()[:3, 3]}, {intel_T_marker.matrix()[:3, 3]}")
         cv2.imshow("QR detection", np.hstack((intel_image, gripper_image)))
         marker_T_intel = intel_T_marker.inverse()
