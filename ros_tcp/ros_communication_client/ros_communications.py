@@ -129,7 +129,7 @@ class Subscriber:
         self,
         topic_name: str,
         msg_type: str,
-        callback_fn: None,
+        callback_fn = None,
         host="localhost",
         port=9090,
     ) -> None:
