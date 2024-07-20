@@ -20,28 +20,29 @@ class FPSCounter:
     def __init__(self):
         self.last_time = None
         self.frame_count = 0
+        self.fps = None
         self.start_time = time.time()
 
-    def update(self):
+    def update(self, verbose:bool=False):
         current_time = time.time()
         if self.last_time is not None:
             self.frame_count += 1
             elapsed_time = current_time - self.start_time
             if elapsed_time > 0:
-                fps = self.frame_count / elapsed_time
-                print(f"FPS: {fps:.2f}")
-        self.last_time = current_time
+                self.fps = self.frame_count / elapsed_time
+                print(f"FPS: {self.fps:.2f}") if verbose else None
+        self.last_time = current_time 
 
 
 class RosbridgeBSONTCPClient:
-    def __init__(self, host="localhost", port=9090, timeoutinsec: int = 60) -> None:
-        self.host = host
-        self.port = port
-        self.socket = None
-        self.socket_id = None
-        self.keep_recv = False
-        self.timeoutsec = timeoutinsec
-        self.connected = False
+    def __init__(self, host="localhost", port=9090, timeoutinsec: int = 60, verbose: bool = False) -> None:
+        self.host:str = host
+        self.port:int = port
+        self.socket:socket = None
+        self.socket_id:int = None
+        self.timeoutsec:int = timeoutinsec
+        self.connected:bool = False
+        self.verbose = verbose
 
     def __del__(self):
         self.disconnect()
@@ -50,20 +51,10 @@ class RosbridgeBSONTCPClient:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.socket.settimeout(self.timeoutsec)
-        self.socket_id = self.socket.fileno()
         self.socket.connect((self.host, self.port))
+        self.socket_id = self.socket.fileno()
         self.connected = True
-        print("Connected to ROS bridge server.")
-
-    def _recieve_cont(self):
-        while self.connected:
-            self.data = self.recv_bson()
-            if self.call_back_fn is not None:
-                self.call_back_fn(self.data)
-            else:
-                print(self.data)
-        else:
-            return
+        print("Connected to ROS bridge server.") if self.verbose else None
 
     def _recvall(self, n):
         # http://stackoverflow.com/questions/17667903/python-socket-receive-large-amount-of-data
@@ -76,17 +67,15 @@ class RosbridgeBSONTCPClient:
         return data
 
     def disconnect(self):
-        if not self.connected:
-            self.keep_recv = False
+        if self.connected:
             self.socket.sendall(
                 struct.pack("i", 0)
             )  # Send 0-length message to indicate disconnection
             self.socket_id = None
-            self.call_back_fn = None
             self.connected = False
             self.socket.shutdown(socket.SHUT_RDWR)
             self.socket.close()
-            print("Disconnected from ROS bridge server.")
+            print("Disconnected from ROS bridge server.") if self.verbose else None
 
     def send(self, message: Dict[str, Any]):
         """

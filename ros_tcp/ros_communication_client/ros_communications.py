@@ -21,11 +21,12 @@ class Publisher:
         queue_size: int = 1,
         host="localhost",
         port=9090,
+        verbose:bool=False
     ) -> None:
         assert (
             msg_type in MessageFactory
         ), f"{msg_type} couldn't be found in message factory please write your own message conversion adapter"
-        self.tcp_connection = RosbridgeBSONTCPClient(host=host, port=port)
+        self.tcp_connection = RosbridgeBSONTCPClient(host=host, port=port, verbose=verbose)
         self.tcp_connection.connect()
         self.topic_name = topic_name
         self.pub_id = f"{self.tcp_connection.socket_id}_pub:{self.topic_name}"
@@ -36,6 +37,8 @@ class Publisher:
         self._advertise_id = None if doadvertise else 1
         self.seq: int = 0
         self.latch = latch
+        self.verbose = verbose
+        self.unadvertise() 
 
     @property
     def is_advertised(self):
@@ -52,7 +55,7 @@ class Publisher:
             print(data)
 
     def __del__(self):
-        print("Destroying Publisher")
+        print("Destroying Publisher") if self.verbose else None
         self.unadvertise()
         del self.tcp_connection
 
@@ -73,10 +76,10 @@ class Publisher:
         self._advertise_id = advertis_id
 
     def unadvertise(self):
-        if self.doadvertise and self.is_advertised:
+        if self.doadvertise:
+            if self.verbose: print("Doing Unadvertisment")
             unadvertise_msg = {
                 "op": "unadvertise",
-                "id": self.pub_id,
                 "topic": self.topic_name,
             }
             self.tcp_connection.send(unadvertise_msg)
@@ -95,7 +98,6 @@ class Publisher:
             self.seq += 1
         publish_msg = {
             "op": "publish",
-            "id": self.pub_id,
             "topic": self.topic_name,
             "latch": self.latch,
             "msg": rosmsg,
@@ -129,16 +131,21 @@ class Subscriber:
         self,
         topic_name: str,
         msg_type: str,
+        throttle_rate: int = 0,
+        queue_length:int = 0,
         callback_fn = None,
         host="localhost",
         port=9090,
+        verbose:bool=False
     ) -> None:
         assert (
             msg_type in MessageFactory
         ), f"{msg_type} couldn't be found in message factory please write your own message conversion adapter"
-        self.tcp_connection = RosbridgeBSONTCPClient(host=host, port=port)
+        self.tcp_connection = RosbridgeBSONTCPClient(host=host, port=port, verbose=verbose)
         self.tcp_connection.connect()
         self.topic_name = topic_name
+        self.queue_length = queue_length
+        self.throttle_rate = throttle_rate
         self.sub_id = f"{self.tcp_connection.socket_id}_sub:{self.topic_name}"
         self.msg_type = msg_type
         self.from_msg_type = MessageFactory[msg_type]["from"]
@@ -148,15 +155,18 @@ class Subscriber:
         self.keep_reciving = True
         self.fps_counter = None
         self.recieve_thread = threading.Thread(target=self.recieve)
+        self.stop_event = threading.Event()
         self.subscribe()
         self.recieve_thread.start()
+        self.verbose = verbose
 
     def __del__(self):
+        print('Destroying Subscriber') if self.verbose else None
         self.unsubscribe()
         del self.tcp_connection
 
     def recieve(self):
-        while self.keep_reciving:
+        while not self.stop_event.is_set():
             rosmsg = self.tcp_connection.recv_bson()
             self.fps_counter = (
                 FPSCounter() if self.fps_counter is None else self.fps_counter
@@ -164,7 +174,7 @@ class Subscriber:
             # print(f"Data recieved {rosmsg['msg'].keys()}")
             if rosmsg["op"] == "publish" and rosmsg["topic"] == self.topic_name:
                 data = self.from_msg_type(rosmsg)
-                self.fps_counter.update()
+                self.fps_counter.update(verbose=self.verbose)
                 if self.callback_fn is not None:
                     self.callback_fn(data)
                 else:
@@ -175,14 +185,16 @@ class Subscriber:
             "op": "subscribe",
             "id": self.sub_id,
             "topic": self.topic_name,
-            "queue_length": 1,
+            "throttle_rate" : self.throttle_rate,
+            "queue_length": self.queue_length,
             "type": self.msg_type,
         }
         self.tcp_connection.send(subscription_msg)
 
     def unsubscribe(self):
         if not self.has_unsubscribed:
-            self.keep_reciving = False
+            #self.keep_reciving = False
+            self.stop_event.set()
             if self.recieve_thread.is_alive():
                 self.recieve_thread.join()
             unsubscribe_msg = {
@@ -208,12 +220,11 @@ class Param:
 
     def init():
         if Param._client is None:
-            Param._client = RosbridgeBSONTCPClient()
+            Param._client = RosbridgeBSONTCPClient(verbose=False)
             Param._client.connect()
         Param._instance_count += 1
 
-    def delete():
-        Param._instance_count -= 1
+    def __del__():
         if Param._instance_count == 0 and Param._client is not None:
             del Param._client
             Param._client = None
@@ -271,7 +282,7 @@ class Param:
             ), f"Service ID: {sid} sent in set_param service request doens't match with returned service_response {response}"
             assert response["result"], f"Couldn't get the value for param {param_name}"
             response = response.get("values", {"value": "null"}).get("value", "null")
-            Param.delete()
+            Param._instance_count -= 1
             return default_value if response == "null" else json.loads(response)
 
 
@@ -298,17 +309,17 @@ def show_image(nparr):
 
 
 if __name__ == "__main__":
-    # start_time = time.time()
-    # publisher_thread = threading.Thread(target=start_publishing)
-    # publisher_thread.start()
+    start_time = time.time()
+    publisher_thread = threading.Thread(target=start_publishing)
+    publisher_thread.start()
 
-    # subscriber = Subscriber("/new_image_pub", "sensor_msgs/Image", show_image)
-    # #time.sleep(0.5)
-    # while time.time() - start_time <= 60:
-    #      time.sleep(1)
-    # subscriber.unsubscribe()
-    # stop_publishing = True
-    # publisher_thread.join()
+    subscriber = Subscriber("/new_image_pub", "sensor_msgs/Image", callback_fn=show_image)
+    #time.sleep(0.5)
+    while time.time() - start_time <= 60:
+         time.sleep(1)
+    subscriber.unsubscribe()
+    stop_publishing = True
+    publisher_thread.join()
 
     # image = np.zeros((480, 640, 3), dtype=np.uint8)
     # publisher = Publisher("/new_image_pub", "sensor_msgs/Image")
@@ -322,7 +333,7 @@ if __name__ == "__main__":
     #     #break
     # is_set = Param.set_param("/skill_name_input", "pick, bottle")
     # print(f'Is the param set ? {is_set}')
-    print(Param.get_param("/skill_name_suc_msg", "Not found"))
+    #print(Param.get_param("/skill_name_suc_msg", "Not found"))
     # value = "None,None,None"
     # while value != "None,None,None":
     #     value = Param.get_param("/skill_name_suc_msg", value)

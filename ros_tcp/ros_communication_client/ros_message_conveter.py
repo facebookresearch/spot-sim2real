@@ -1,7 +1,7 @@
 import base64
 import json
 import time
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import cv2
 import numpy as np
@@ -140,11 +140,42 @@ def to_ros_string(string: str):
 
 
 def from_ros_string(message: Dict[str, Any]):
-    return str(message["data"])
+    return str(message["msg"]["data"])
 
+
+def to_ros_Float32MultiArray(np_array:np.ndarray, dim_labels:List[str]=[], data_offset:int=0):
+    assert type(np_array) == np.ndarray, f"Expected numpy.ndarray object got {type(np_array)}"
+    assert np_array.dtype == np.float32, f"expected numpy array with np.float32 datatype got {np_array.dtype}"
+    shape = np_array.shape
+    ndim = len(shape)
+    if len(dim_labels):
+        assert len(dim_labels) == ndim, f"Expected dim_labels to be List[str] of length {ndim}, got {len(dim_labels)}"
+    else:
+        dim_labels = [f'{i}thdim' for i in range(ndim)]
+    
+    layout = {'dim':[], 'data_offset':data_offset}
+    if len(shape) > 1:
+        for i, dimsize in enumerate(shape):
+            layout['dim'].append({'label': dim_labels[i], 'size':dimsize, 'stride':int(np.prod(shape[i:]))})
+    data = np_array.flatten().tolist()
+    return {
+        "layout": layout,
+        "data": data
+    }
+
+def from_ros_Float32MultiArray(msg):
+    #print(msg["msg"])
+    msg = msg["msg"]
+    layout = msg['layout']
+    data_points = msg["data"]
+    data_offset = int(layout['data_offset'])
+    np_array = np.array(data_points[data_offset:], dtype=np.float32)
+    shape = [int(dim["size"]) for dim in layout["dim"]]
+    return np_array.reshape(shape) if shape else np_array
 
 factory = {
     "sensor_msgs/Image": {"to": to_ros_image, "from": from_ros_image},
     "tf2_msgs/TFMessage": {"to": to_ros_transforms, "from": from_ros_transforms},
     "std_msgs/String": {"to": to_ros_string, "from": from_ros_string},
+    "std_msgs/Float32MultiArray": {"to":to_ros_Float32MultiArray , "from":from_ros_Float32MultiArray}
 }
