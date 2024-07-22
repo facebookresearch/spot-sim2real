@@ -502,7 +502,7 @@ class SpotSkillManager:
                 return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
-        breakpoint()
+
         status, message = self.place(
             place_x,
             place_y,

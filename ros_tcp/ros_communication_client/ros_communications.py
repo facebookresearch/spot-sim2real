@@ -173,7 +173,13 @@ class Subscriber:
             )
             # print(f"Data recieved {rosmsg['msg'].keys()}")
             if rosmsg["op"] == "publish" and rosmsg["topic"] == self.topic_name:
-                data = self.from_msg_type(rosmsg)
+                # print("ros msg:", rosmsg["msg"]["encoding"], self.topic_name)
+                try:
+                    data = self.from_msg_type(rosmsg)
+                except Exception as e:
+                    print("ros msg:", rosmsg["msg"]["encoding"], self.topic_name)
+                    raise e
+
                 self.fps_counter.update(verbose=self.verbose)
                 if self.callback_fn is not None:
                     self.callback_fn(data)
@@ -255,7 +261,7 @@ class Param:
             assert (
                 status_message["id"] == sid
             ), f"Service ID: {sid} sent in set_param service request doens't match with returned service_response {status_message}"
-            Param.delete()
+            Param._instance_count -= 1
             return status_message["result"]
 
     @staticmethod

@@ -359,7 +359,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.detection_topic].publish(bbox_data)
 
     def publish_viz_img(self, viz_img, header):
-        viz_img_msg = self.cv2_to_msg(viz_img)
+        viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
         viz_img_msg.header = header
         self.pubs[self.viz_topic].publish(viz_img_msg)
 

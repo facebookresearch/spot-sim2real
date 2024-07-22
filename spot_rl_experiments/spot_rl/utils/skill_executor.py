@@ -74,7 +74,7 @@ def main():
     rospy.set_param("/skill_name_suc_msg", "None,None,None")
 
     # Call the skill manager
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=False)
 
     executor = None
     try:

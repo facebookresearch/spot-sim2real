@@ -32,7 +32,7 @@ def from_ros_image(message: Dict[str, Any]):
         nparr = nparr.reshape((height, width))
     elif "rgb" in encoding:
         nparr = cv2.cvtColor(nparr, cv2.COLOR_RGB2BGR)
-    return nparr
+    return {"data":nparr, "header": data["header"]}
 
 
 def to_ros_image(nparr_bgr: np.ndarray):
