@@ -1,5 +1,4 @@
 import numpy as np
-
 from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     sample_patch_around_point,
@@ -55,7 +54,7 @@ def affordance_prediction(
     # for y in range(max(y1 + offset, y1), min(y2 - offset, y2)):
     #     row = mask[y, x1:x2]
     #     non_zero_indices = np.nonzero(row)[0]
-        
+
     #     if non_zero_indices.size > 0:
     #         for idx in non_zero_indices:
     #             x = x1 + idx
@@ -63,7 +62,7 @@ def affordance_prediction(
     #             if depth > 0:
     #                 width_in_pixels = np.count_nonzero(binary_mask[y, x1:x2])
     #                 width_in_meters = calculate_width(depth, width_in_pixels, intrinsic_matrix)
-                    
+
     #                 if width_in_meters <= max_width_in_meters:
     #                     distance = np.sqrt((cx - x)**2 + (cy - y)**2)
     #                     if distance < best_distance:

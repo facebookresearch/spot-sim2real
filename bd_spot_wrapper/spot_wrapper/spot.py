@@ -365,7 +365,7 @@ class Spot:
                     "rotation needs to have length 3 (euler) or 4 (quaternion),"
                     f"got {len(rotation)}"
                 )
-            point = point.tolist() if type(point) == type(np.array([])) else point
+            point = point.tolist() if isinstance(point, type(np.array([]))) else point
             hand_pose = math_helpers.SE3Pose(*point, quat)
             points.append(
                 trajectory_pb2.SE3TrajectoryPoint(
@@ -637,7 +637,8 @@ class Spot:
         )
 
         # Rotation as a quaternion
-        if type(gripper_pose_quat) == type(geometry.EulerZXY().to_quaternion()):
+        # type(gripper_pose_quat) == type(geometry.EulerZXY().to_quaternion())
+        if isinstance(gripper_pose_quat, type(geometry.EulerZXY().to_quaternion())):
             qw, qx, qy, qz = (
                 gripper_pose_quat.w,
                 gripper_pose_quat.x,
@@ -768,7 +769,7 @@ class Spot:
             [pos], [current_gripper_pose], allow_body_follow=False
         )
 
-        speed = 0.1
+        # speed = 0.1
         """
         #Optimization based loop, which can let us know how much to walk
         reach_threshold = 1.1
@@ -801,17 +802,10 @@ class Spot:
             print(f"Base position after walking {nbx, nby, np.rad2deg(byaw)}, mobility_status {mobility_status}")
             point_in_body[0] -= (nbx - bx) - 0.08 #0.1 is static offset
             point_in_body[1] -= (nby - by)
-
-        
         point_in_body_up = point_in_body.copy()
         if grasp_type == "topdown":
             point_in_body_up[-1] += 0.1
-        
         print(f"grasp point in body {point_in_body}")
-        
-        
-        
-        
         status = self.move_gripper_to_points(
             [point_in_body_up, point_in_body], [gripper_pose_quat, gripper_pose_quat], timeout//2, timeout
         )
@@ -849,8 +843,8 @@ class Spot:
             )
         self.command_client.robot_command(claw_gripper_command)
         nbx, nby, nbyaw = self.get_xy_yaw()
-        x_dis_base, y_dis_base = np.abs(nbx - bx), np.abs(nby - by)
-        total_dis = np.sqrt(np.square([x_dis_base, y_dis_base]).sum())
+        # x_dis_base, y_dis_base = np.abs(nbx - bx), np.abs(nby - by)
+        # total_dis = np.sqrt(np.square([x_dis_base, y_dis_base]).sum())
 
         current_position_of_gripper_in_body = self.get_ee_pos_in_body_frame()[0]
         current_position_of_gripper_in_body[-1] += 0.1
