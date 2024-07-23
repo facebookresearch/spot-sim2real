@@ -62,6 +62,22 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.closedrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "findreceptacle":
+            self.reset_skill_msg()
+            succeded, msg = True, rospy.get_param("findreceptacle", "cabinet")
+            self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "findobject":
+            self.reset_skill_msg()
+            succeded, msg = True, rospy.get_param("findobject", "cup")
+            self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "findagentaction":
+            self.reset_skill_msg()
+            succeded, msg = True, rospy.get_param("human_state", "standing")
+            self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "findroom":
+            self.reset_skill_msg()
+            succeded, msg = True, rospy.get_param("findroom", "nyc_lab")
+            self.reset_skill_name_input(skill_name, succeded, msg)
 
 
 def main():
