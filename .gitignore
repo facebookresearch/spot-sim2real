@@ -8,6 +8,8 @@
 
 intel_realsense_payload_for_spotsim2real/dist/*
 intel_realsense_payload_for_spotsim2real/build/*
+aria_data_loaders/aria_data_utils/quest3_streamer/**
+
 bd_spot_wrapper/spot_wrapper.egg-info/**
 bd_spot_wrapper/spot_wrapper/home.txt
 spot_rl_experiments/spot_rl.egg-info/**
