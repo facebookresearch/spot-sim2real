@@ -21,6 +21,8 @@ from perception_and_utils.perception.detector_wrappers.generic_detector_interfac
     GenericDetector,
 )
 from perception_and_utils.utils.image_utils import decorate_img_with_text_for_qr
+from perception_and_utils.utils.data_frame import DataFrame
+
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 520))
 
@@ -103,7 +105,7 @@ class AprilTagDetectorWrapper(GenericDetector):
 
     def process_frame(
         self,
-        img_frame: np.ndarray,
+        frame: DataFrame,
     ) -> Tuple[np.ndarray, sp.SE3]:
         """
         Process image frame to detect QR code and estimate marker pose wrt camera
@@ -115,6 +117,8 @@ class AprilTagDetectorWrapper(GenericDetector):
             updated_img_frame (np.ndarray) : Image frame with detections and text for visualization
             camera_T_marker (sp.SE3) : SE3 matrix representing marker frame as detected in camera frame
         """
+        img_frame = frame._rgb_frame
+
         # Do nothing if detector is not enabled
         if self.is_enabled is False:
             self._logger.warning(
@@ -131,11 +135,12 @@ class AprilTagDetectorWrapper(GenericDetector):
 
     def get_outputs(
         self,
-        img_frame: np.ndarray,
+        frame: DataFrame,
         outputs: Dict,
         base_T_marker: sp.SE3,
         timestamp: int,
         img_metadata: Any,
+        viz_img: np.ndarray,
     ) -> Tuple[np.ndarray, Dict]:
         """
         Update the outputs dictionary with the processed image frame and pose data
@@ -156,18 +161,20 @@ class AprilTagDetectorWrapper(GenericDetector):
                 - tag_image_metadata_list (List[Any]) : List of image metadata
 
         """
+        img_frame = frame._rgb_frame
+
         # Decorate image with text for visualization
-        img = decorate_img_with_text_for_qr(
-            img=img_frame,
+        viz_img = decorate_img_with_text_for_qr(
+            img=viz_img,
             frame_name_str="device",
             qr_position=base_T_marker.translation(),
         )
         self._logger.debug(f"Time stamp with AprilTag Detections- {timestamp}")
 
         # Append data to lists for return
-        outputs["tag_image_list"].append(img)
+        outputs["tag_image_list"].append(viz_img)
         outputs["tag_base_T_marker_list"].append(base_T_marker)
         if img_metadata is not None:
             outputs["tag_image_metadata_list"].append(img_metadata)
 
-        return img, outputs
+        return viz_img, outputs
