@@ -36,10 +36,10 @@ class SpotRosSkillExecutor:
 
         # Get the current skill name
         skill_name, skill_input = get_skill_name_and_input_from_ros()
-        print(f"current skill_name {skill_name} skill_input {skill_input}")
-
+        
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             # Reset the skill message
             self.reset_skill_msg()
             # For navigation target
@@ -60,18 +60,22 @@ class SpotRosSkillExecutor:
             # Reset the navigation target
             rospy.set_param("nav_target_xyz", "None,None,None")
         elif skill_name == "pick":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.pick(skill_input)
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "place":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.place(skill_input)
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.opendrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "closedrawer":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.closedrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
@@ -84,6 +88,7 @@ class SpotRosSkillExecutor:
         #     succeded, msg = True, rospy.get_param("findobject", "cup")
         #     self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "findagentaction":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = True, rospy.get_param("human_state", "standing")
             self.reset_skill_name_input(skill_name, succeded, msg)
