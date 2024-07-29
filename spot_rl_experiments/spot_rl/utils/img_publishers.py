@@ -379,7 +379,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     subscriber_topic = rt.HAND_RGB
-    publisher_topics = [str]
+    publisher_topics = [rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC]
 
     def __init__(self, model, spot):
         super().__init__()
@@ -399,6 +399,10 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         # For the depth images
         self.img_msg_depth = None
         rospy.Subscriber(rt.HAND_DEPTH, Image, self.depth_cb, queue_size=1)
+        rospy.loginfo(f"[{self.name}]: is waiting for images...")
+        while self.img_msg_depth is None:
+            pass
+        rospy.loginfo(f"[{self.name}]: has received images!")
 
     def depth_cb(self, msg: Image):
         self.img_msg_depth = msg
@@ -450,11 +454,12 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             hand_rgb_preprocessed, timestamp, stopwatch
         )
         # Split the detection
-        new_detections = new_detection.split(";")
-
+        timestamp, new_detections = new_detection.split("|")
+        new_detections = new_detections.split(";")
         object_info = []
-        for new_detection in new_detections:
-            timestamp, detection_str = new_detection.split("|")
+        for detection_str in new_detections:
+            if detection_str == "None":
+                continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
             # Compute the center pixel
             x1, y1, x2, y2 = [
@@ -471,7 +476,9 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             arm_depth_bbox[y1_distance:y2_distance, x1_distance:x2_distance] = 1.0
             # Estimate distance from the gripper to the object
             depth_box = arm_depth[y1_distance:y2_distance, x1_distance:x2_distance]
-            z = np.median(depth_box) * MAX_HAND_DEPTH
+            if depth_box.size == 0:
+                continue
+            z = np.median(depth_box) / 255.0 * MAX_HAND_DEPTH
 
             # Get the 3D point in the hand RGB frame
             point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
@@ -481,8 +488,12 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             )
 
             object_info.append(
-                f"translation:{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]}"
+                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]}"
             )
+            if class_label == "cup":
+                print(
+                    f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y} {z}"
+                )
 
         # publish data
         self.publish_new_detection(";".join(object_info))
@@ -523,7 +534,7 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # Add new classes here to the model
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
-        multi_classes = [["cup", "table", "cabinet", "chair", "sofa"]]
+        multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
         self.owlvit.update_label(multi_classes)
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
@@ -565,6 +576,7 @@ if __name__ == "__main__":
     parser.add_argument("--raw", action="store_true")
     parser.add_argument("--compress", action="store_true")
     parser.add_argument("--owlvit", action="store_true")
+    parser.add_argument("--open-voc", action="store_true")
     parser.add_argument("--mrcnn", action="store_true")
     parser.add_argument("--core", action="store_true", help="running on the Core")
     parser.add_argument("--listen", action="store_true", help="listening to Core")
@@ -594,6 +606,7 @@ if __name__ == "__main__":
     bounding_box_detector = args.bounding_box_detector
     mrcnn = args.mrcnn
     owlvit = args.owlvit
+    open_voc = args.open_voc
 
     node = None  # type: Any
     model = None  # type: Any
@@ -605,10 +618,10 @@ if __name__ == "__main__":
         model = MRCNNModel()
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
-        # TODO dynamic label
-        rospy.set_param("object_target", "ball")
+        rospy.set_param("object_target", "ball,cup,table,cabinet,chair,sofa")
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
+    elif open_voc:
         # Add open voc object detector here
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
         model = OWLVITModelMultiClasses()
@@ -638,6 +651,7 @@ if __name__ == "__main__":
                 flags.append("--decompress")
             elif local:
                 flags.append("--raw")
+                flags.append("--open-voc")
             else:
                 raise RuntimeError("This should be impossible.")
         cmds = [f"python {osp.abspath(__file__)} {flag}" for flag in flags]
