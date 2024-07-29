@@ -12,6 +12,7 @@ from typing import Any, List
 
 import blosc
 import cv2
+import magnum as mn
 import numpy as np
 import rospy
 from cv_bridge import CvBridge
@@ -29,6 +30,7 @@ from std_msgs.msg import (
 )
 
 try:
+    from spot_rl.utils.heuristic_nav import get_3d_point
     from spot_rl.utils.mask_rcnn_utils import (
         generate_mrcnn_detections,
         get_deblurgan_model,
@@ -47,6 +49,15 @@ from spot_rl.utils.utils import ros_topics as rt
 MAX_PUBLISH_FREQ = 20
 MAX_DEPTH = 3.5
 MAX_HAND_DEPTH = 1.7
+DETECTIONS_BUFFER_LEN = 30
+LEFT_CROP = 124
+RIGHT_CROP = 60
+NEW_WIDTH = 228
+NEW_HEIGHT = 240
+ORIG_WIDTH = 640
+ORIG_HEIGHT = 480
+WIDTH_SCALE = 0.5
+HEIGHT_SCALE = 0.5
 
 
 class SpotImagePublisher:
@@ -364,6 +375,124 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
 
+class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
+
+    name = "spot_open_voc_object_detector_publisher"
+    subscriber_topic = rt.HAND_RGB
+    publisher_topics = [str]
+
+    def __init__(self, model, spot):
+        super().__init__()
+        self.model = model
+        self.spot = spot
+        self.detection_topic = rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC
+
+        self.config = config = construct_config()
+        self.image_scale = config.IMAGE_SCALE
+        self.deblur_gan = get_deblurgan_model(config)
+        self.grayscale = self.config.GRAYSCALE_MASK_RCNN
+
+        self.pubs[self.detection_topic] = rospy.Publisher(
+            self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        )
+
+        # For the depth images
+        self.img_msg_depth = None
+        rospy.Subscriber(rt.HAND_DEPTH, Image, self.depth_cb, queue_size=1)
+
+    def depth_cb(self, msg: Image):
+        self.img_msg_depth = msg
+
+    def preprocess_image(self, img):
+        if self.image_scale != 1.0:
+            img = cv2.resize(
+                img,
+                (0, 0),
+                fx=self.image_scale,
+                fy=self.image_scale,
+                interpolation=cv2.INTER_AREA,
+            )
+
+        if self.deblur_gan is not None:
+            img = self.deblur_gan(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        if self.grayscale:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+        return img
+
+    def _publish(self):
+        stopwatch = Stopwatch()
+        header = self.img_msg.header
+        timestamp = header.stamp
+        hand_rgb = self.msg_to_cv2(self.img_msg)
+        arm_depth = self.msg_to_cv2(self.img_msg_depth)
+        arm_depth = arm_depth[:, LEFT_CROP:-RIGHT_CROP]
+        arm_depth = cv2.resize(
+            arm_depth, (NEW_WIDTH, NEW_HEIGHT), interpolation=cv2.INTER_AREA
+        )
+
+        # Get camera pose of view and the location of the robot
+        # These two should be fast and limited delay
+        imgs = self.spot.get_hand_image()  # only for getting intrinsics
+        # Get the camera intrinsics
+        cam_intrinsics = imgs[0].source.pinhole.intrinsics
+        # Get the vision to hand
+        vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        )
+
+        # Internal model
+        hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
+        new_detection, viz_img = self.model.inference(
+            hand_rgb_preprocessed, timestamp, stopwatch
+        )
+        # Split the detection
+        new_detections = new_detection.split(";")
+
+        object_info = []
+        for new_detection in new_detections:
+            timestamp, detection_str = new_detection.split("|")
+            class_label, score, x1, y1, x2, y2 = detection_str.split(",")
+            # Compute the center pixel
+            x1, y1, x2, y2 = [
+                int(float(i) / self.image_scale) for i in [x1, y1, x2, y2]
+            ]
+            pixel_x = int(np.mean([x1, x2]))
+            pixel_y = int(np.mean([y1, y2]))
+            # Get the distance between arm and the object
+            x1_distance = max(int(float(x1 - LEFT_CROP) * WIDTH_SCALE), 0)
+            x2_distance = max(int(float(x2 - LEFT_CROP) * WIDTH_SCALE), 0)
+            y1_distance = int(float(y1) * HEIGHT_SCALE)
+            y2_distance = int(float(y2) * HEIGHT_SCALE)
+            arm_depth_bbox = np.zeros_like(arm_depth, dtype=np.float32)
+            arm_depth_bbox[y1_distance:y2_distance, x1_distance:x2_distance] = 1.0
+            # Estimate distance from the gripper to the object
+            depth_box = arm_depth[y1_distance:y2_distance, x1_distance:x2_distance]
+            z = np.median(depth_box) * MAX_HAND_DEPTH
+
+            # Get the 3D point in the hand RGB frame
+            point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
+
+            point_in_global_3d = vision_T_hand_image.transform_point(
+                mn.Vector3(*point_in_hand_image_3d)
+            )
+
+            object_info.append(
+                f"translation:{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]}"
+            )
+
+        # publish data
+        self.publish_new_detection(";".join(object_info))
+
+        stopwatch.print_stats()
+
+    def publish_new_detection(self, new_object):
+        self.pubs[self.detection_topic].publish(new_object)
+
+
 class OWLVITModel:
     def __init__(self, score_threshold=0.05, show_img=False):
         self.config = config = construct_config()
@@ -376,6 +505,29 @@ class OWLVITModel:
         self.owlvit.update_label([params])
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
 
+        if bbox_xy is not None and bbox_xy != []:
+            detections = []
+            for detection in bbox_xy:
+                str_det = f'{detection[0]},{detection[1]},{",".join([str(i) for i in detection[2]])}'
+                detections.append(str_det)
+            bbox_xy_string = ";".join(detections)
+        else:
+            bbox_xy_string = "None"
+        detections_str = f"{str(timestamp)}|{bbox_xy_string}"
+
+        return detections_str, viz_img
+
+
+class OWLVITModelMultiClasses(OWLVITModel):
+    def inference(self, hand_rgb, timestamp, stopwatch):
+        # Add new classes here to the model
+        # We decide to hardcode these classes first as this will be more robust
+        # and gives us the way to control the detection
+        multi_classes = [["cup", "table", "cabinet", "chair", "sofa"]]
+        self.owlvit.update_label(multi_classes)
+        # TODO: spot-sim2real: right now for each class, we only return the most confident detection
+        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
+        # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
         if bbox_xy is not None and bbox_xy != []:
             detections = []
             for detection in bbox_xy:
@@ -457,6 +609,10 @@ if __name__ == "__main__":
         rospy.set_param("object_target", "ball")
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
+        # Add open voc object detector here
+        spot = Spot("SpotOpenVocObjectDetectorPublisher")
+        model = OWLVITModelMultiClasses()
+        node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()
     elif raw or compress:
