@@ -379,7 +379,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     subscriber_topic = rt.HAND_RGB
-    publisher_topics = [rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC]
+    # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
+    publisher_topics = ["temp"]
 
     def __init__(self, model, spot):
         super().__init__()
@@ -490,10 +491,9 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             object_info.append(
                 f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]}"
             )
-            if class_label == "cup":
-                print(
-                    f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y} {z}"
-                )
+            print(
+                f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y} {z}"
+            )
 
         # publish data
         self.publish_new_detection(";".join(object_info))
@@ -618,7 +618,7 @@ if __name__ == "__main__":
         model = MRCNNModel()
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
-        rospy.set_param("object_target", "ball,cup,table,cabinet,chair,sofa")
+        rospy.set_param("object_target", "ball")
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
     elif open_voc:
