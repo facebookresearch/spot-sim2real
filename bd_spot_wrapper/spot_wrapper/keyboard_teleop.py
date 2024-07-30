@@ -82,10 +82,10 @@ def main(spot: Spot):
     spot.open_gripper()
 
     # Init logger for hand cameras
-    # log_packet_list = []  # type: List[Dict[str, Any]]
-    # spot.setup_logging_sources(
-    #     [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-    # )
+    log_packet_list = []  # type: List[Dict[str, Any]]
+    spot.setup_logging_sources(
+        [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+    )
 
     # Move arm to initial configuration
     point, rpy = move_to_initial(spot)
@@ -162,10 +162,10 @@ def main(spot: Spot):
                     key_not_applicable = True
 
                 # Update data log
-                # log_packet = spot.update_logging_data(
-                #     include_image_data=True, visualize=True, verbose=False
-                # )
-                # log_packet_list.append(log_packet)
+                log_packet = spot.update_logging_data(
+                    include_image_data=True, visualize=True, verbose=False
+                )
+                log_packet_list.append(log_packet)
 
             if not key_not_applicable:
                 last_execution = time.time()
@@ -177,7 +177,7 @@ def main(spot: Spot):
         curses.endwin()
 
         # Save log data
-        # dump_pkl(log_packet_list)
+        dump_pkl(log_packet_list)
 
 
 if __name__ == "__main__":
