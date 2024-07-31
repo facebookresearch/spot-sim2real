@@ -36,7 +36,7 @@ class SpotRosSkillExecutor:
 
         # Get the current skill name
         skill_name, skill_input = get_skill_name_and_input_from_ros()
-        
+
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -50,10 +50,14 @@ class SpotRosSkillExecutor:
                 # Need a way to find the theta value
                 nav_target_xyz = nav_target_xyz.split(",")
                 # This z and y are flipped due to hab convention
-                x, y, theta = float(nav_target_xyz[0]), float(nav_target_xyz[2]), float(0.0)
+                x, y, theta = (
+                    float(nav_target_xyz[0]),
+                    float(nav_target_xyz[2]),
+                    float(0.0),
+                )
                 print(x, y, theta)
                 succeded, msg = self.spotskillmanager.nav(x, y, theta)
-            else:   
+            else:
                 succeded, msg = self.spotskillmanager.nav(skill_input)
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
@@ -67,7 +71,9 @@ class SpotRosSkillExecutor:
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
-            succeded, msg = self.spotskillmanager.place(skill_input)
+            # We do not give the place target here, and we just do local placing
+            # TODO: spot-sim2real: make this using intel camera to detect the waypoint
+            succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, True)
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -109,7 +115,6 @@ def main():
 
     # Call the skill manager
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=False)
-
     executor = None
     try:
         executor = SpotRosSkillExecutor(spotskillmanager)
