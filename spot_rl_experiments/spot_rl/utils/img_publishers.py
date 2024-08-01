@@ -445,9 +445,13 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
         # Get the vision to hand
-        vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-            "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
-        )
+        try:
+            vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+            )
+        except Exception as e:
+            print(f"Cannot get Spot T due to {e}. Online detection might be off")
+            return
 
         # Internal model
         hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
