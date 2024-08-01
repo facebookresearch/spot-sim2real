@@ -82,8 +82,8 @@ class SpotRosSkillExecutor:
         # Compute the final number
         for mm in metrics:
             data = [metrics[mm] for metrics in metrics_list]
-            _mean = np.mean(data)
-            _std = np.std(data)
+            _mean = round(np.mean(data), 2)
+            _std = round(np.std(data), 2)
             print(f"{mm}: {_mean} +- {_std}")
 
 
