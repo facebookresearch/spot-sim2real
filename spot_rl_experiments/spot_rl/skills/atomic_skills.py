@@ -355,19 +355,23 @@ class Navigation(Skill):
         """Refer to class Skill for documentation"""
         self.env.say("Navigation Skill finished .. checking status")
 
-        nav_target = goal_dict["nav_target"]  # safe to access as sanity check passed
+        # nav_target = goal_dict["nav_target"]  # safe to access as sanity check passed
         # Make the angle from rad to deg
-        _nav_target_pose_deg = (
-            nav_target[0],
-            nav_target[1],
-            np.rad2deg(nav_target[2]),
-        )
-        check_navigation_success = is_pose_within_bounds(
-            self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
-            _nav_target_pose_deg,
-            self.config.SUCCESS_DISTANCE,
-            self.config.SUCCESS_ANGLE_DIST,
-        )
+        # _nav_target_pose_deg = (
+        #     nav_target[0],
+        #     nav_target[1],
+        #     np.rad2deg(nav_target[2]),
+        # )
+        # TODO: since we are using concept graph, the yaw is dynamically changed
+        # We cannot use this function to check
+        # check_navigation_success = is_pose_within_bounds(
+        #     self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
+        #     _nav_target_pose_deg,
+        #     self.config.SUCCESS_DISTANCE,
+        #     self.config.SUCCESS_ANGLE_DIST,
+        # )
+        obs = self.env.get_observations()
+        check_navigation_success = self.env.get_success(obs, False)
 
         # Update result log
         self.skill_result_log["time_taken"] = time.time() - self.start_time
@@ -376,7 +380,7 @@ class Navigation(Skill):
         # Check for success and return appropriately
         status = False
         message = "Navigation failed to reach the target pose"
-        if check_navigation_success or True:
+        if check_navigation_success:
             status = True
             message = "Successfully reached the target pose by default"
         conditional_print(message=message, verbose=self.verbose)

@@ -14,7 +14,8 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-WAYPOINT_TEST = [[1.8, 1.1, 0.0]] * 10  # x, y, yaw
+NUM_REPEAT = 5
+WAYPOINT_TEST = [[1.8, 1.1, 0.0]] * NUM_REPEAT  # x, y, yaw
 
 
 class SpotRosSkillExecutor:
@@ -56,7 +57,7 @@ class SpotRosSkillExecutor:
         }
 
     def benchmark(self):
-        """ "Run the benchmark code"""
+        """ "Run the benchmark code to test skills"""
 
         metrics_list = []
         for waypoint in WAYPOINT_TEST:
@@ -79,29 +80,11 @@ class SpotRosSkillExecutor:
             self.spotskillmanager.dock()
 
         # Compute the final number
-        print(metrics_list)
-        num_steps = np.mean([metrics["num_steps"] for metrics in metrics_list])
-        num_steps_std = np.std([metrics["num_steps"] for metrics in metrics_list])
-        distance = np.mean([metrics["distance"] for metrics in metrics_list])
-        distance_std = np.std([metrics["distance"] for metrics in metrics_list])
-        dot_product_facing_target = np.mean(
-            [metrics["dot_product_facing_target"] for metrics in metrics_list]
-        )
-        dot_product_facing_target_std = np.std(
-            [metrics["dot_product_facing_target"] for metrics in metrics_list]
-        )
-        angle_facing_target = np.mean(
-            [metrics["angle_facing_target"] for metrics in metrics_list]
-        )
-        angle_facing_target_std = np.std(
-            [metrics["angle_facing_target"] for metrics in metrics_list]
-        )
-        suc = np.mean([metrics["suc"] for metrics in metrics_list])
-        suc_std = np.std([metrics["suc"] for metrics in metrics_list])
-        print(
-            f"num_steps: {num_steps} +- {num_steps_std}; distance: {distance} +- {distance_std}; dot_product_facing_target: {dot_product_facing_target} +- {dot_product_facing_target_std}; angle_facing_target: {angle_facing_target} +- {angle_facing_target_std}; suc: {suc} +- {suc_std}"
-        )
-        breakpoint()
+        for mm in metrics:
+            data = [metrics[mm] for metrics in metrics_list]
+            _mean = np.mean(data)
+            _std = np.std(data)
+            print(f"{mm}: {_mean} +- {_std}")
 
 
 def main():
