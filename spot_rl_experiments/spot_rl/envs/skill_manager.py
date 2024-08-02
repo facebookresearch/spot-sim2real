@@ -270,7 +270,7 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float, theta=float) -> Tuple[bool, str]:  # noqa
+    def nav(self, x: float, y: float, theta: float) -> Tuple[bool, str]:  # noqa
         """
         Perform the nav action on the navigation target specified as a metric location
 
