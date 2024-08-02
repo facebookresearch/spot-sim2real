@@ -229,7 +229,8 @@ class Param:
     _set_param_service_name: str = "/rosapi/set_param"
     _get_param_service_name: str = "/rosapi/get_param"
 
-    def init(self):
+    @staticmethod
+    def init():
         if Param._client is None:
             Param._client = RosbridgeBSONTCPClient(verbose=False)
             Param._client.connect()

@@ -47,9 +47,9 @@ if __name__ == "__main__":
         verbose=True,
     )
     # time.sleep(0.5)
-    # while time.time() - start_time <= 2:
-    #      #print(subscriber.data)
-    #      time.sleep(1)
-    # subscriber.unsubscribe()
+    while time.time() - start_time <= 2:
+        #      #print(subscriber.data)
+        time.sleep(1)
+    subscriber.unsubscribe()
     # stop_publishing = True
     # publisher_thread.join()
