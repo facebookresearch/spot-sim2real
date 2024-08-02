@@ -449,6 +449,7 @@ class SpotSkillManager:
         else:
             message = "No place target specified, estimating point through heuristic"
             conditional_print(message=message, verbose=self.verbose)
+            is_local = True
             # estimate waypoint
             try:
                 (
@@ -458,7 +459,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.pick_config.GAZE_ARM_JOINT_ANGLES,
-                    percentile=0,
+                    percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
@@ -474,7 +475,6 @@ class SpotSkillManager:
                 return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
-        breakpoint()
         status, message = self.place(
             place_x,
             place_y,
