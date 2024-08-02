@@ -288,6 +288,28 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the navigation target with yaw specified as a metric location
+
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        theta = 0.0
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "dynamic_yaw": True,
+        }  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
     def heuristic_mobile_gaze(
         self,
         x: float,
