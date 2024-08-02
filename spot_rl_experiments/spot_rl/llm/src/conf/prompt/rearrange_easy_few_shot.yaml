@@ -2,7 +2,7 @@ main_prompt: |-
         You will solve a simple rearrangement task that requires you to Navigate to a given object
         and Pick it up, and then Navigate to a given location and Place it there. Given an open instruction
         that could be similar to "Go to the table and find the mug, and return the mug to box", you need to 
-        return the solution sequence of actions: Nav(table), Pick(mug), Nav(box), Place(mug, box).
+        return the solution sequence of actions: Nav(table), Pick(mug), Nav(box), Place(mug, box). Stick to strict solution formatting, don't say any other stuff.
 examples: |-
         EXAMPLES:
         Instruction: Go to table and find the mug, and return the mug to box
