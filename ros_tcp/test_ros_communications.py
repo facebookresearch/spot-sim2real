@@ -9,6 +9,7 @@ stop_publishing = False
 
 
 def show_image(nparr):
+    nparr = nparr["data"]
     if nparr.dtype == np.uint16:
         h, w = nparr.shape[:2]
         nparr = nparr.astype(np.float32) / nparr.max()
