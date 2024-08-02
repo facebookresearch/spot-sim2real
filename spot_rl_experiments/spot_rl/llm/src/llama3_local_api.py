@@ -24,7 +24,8 @@ class MetaAI:
         response = requests.post(self.url + "generate", json=self.data)
         status_code = response.status_code
         response = json.loads(response.text)
-        self.context = response.get("context", [])
+        # We can use the following code to get context
+        # context = response.get("context", [])
         assert (
             status_code == 200
         ), f"ollama returned status code {status_code}, failed to start ollama with {self.model_name}"

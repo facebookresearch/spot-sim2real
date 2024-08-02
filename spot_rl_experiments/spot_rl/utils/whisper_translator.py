@@ -47,7 +47,7 @@ class WhisperTranslator:
         # Voice Activity Detection
         self.vad = webrtcvad.Vad()
         self.vad.set_mode(3)
-        self.whisper = whisper.load_model("base", device="cuda:1", in_memory=True)
+        self.whisper = whisper.load_model("base", device="cuda", in_memory=True)
         print("=====================================\n")
 
     def record(self):
