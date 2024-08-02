@@ -49,7 +49,7 @@ def create_realsense_pipeline(
     # Start streaming
     profile = pipeline.start(config)
     intrinsics = (
-        profile.get_stream(rs.stream.depth).as_video_stream_profile().get_intrinsics()
+        profile.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
     )
     align_to = rs.stream.color
     align = rs.align(align_to)

@@ -12,6 +12,8 @@ MASK_RCNN_VIZ_TOPIC: "/mask_rcnn_visualizations"
 DETECTIONS_TOPIC: "/mask_rcnn_detections"
 IMAGE_SCALE: "/image_scale"
 
+OPEN_VOC_OBJECT_DETECTOR_TOPIC: "/open_voc_object_detector"
+
 ROBOT_STATE: "/robot_state"
 TEXT_TO_SPEECH: "/text_to_speech"
 

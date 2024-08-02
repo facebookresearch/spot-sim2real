@@ -62,8 +62,8 @@ CTRL_HZ: 2.0
 MAX_EPISODE_STEPS: 500
 
 # Nav env
-SUCCESS_DISTANCE: 0.3
-SUCCESS_ANGLE_DIST: 5
+SUCCESS_DISTANCE: 1.25
+SUCCESS_ANGLE_DIST: 20
 DISABLE_OBSTACLE_AVOIDANCE: False
 USE_OA_FOR_NAV: True
 USE_HEAD_CAMERA: True
@@ -109,7 +109,7 @@ OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
 IMG_SRC: 0 # 1 for intel & 0 for gripper
 SEG_PORT: 21001 # port for segmentation service
 POSE_PORT: 2100 # port for pose estimation
-OBJECT_MESHES: ["bottle", "penguin"]
+OBJECT_MESHES: ["bottle", "penguin", "cup"]
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters

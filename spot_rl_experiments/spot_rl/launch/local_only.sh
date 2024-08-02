@@ -6,6 +6,7 @@ tmux kill-session -t tts_sub
 tmux kill-session -t spotWorld_static_tf2_pub
 tmux kill-session -t segmentation_service
 tmux kill-session -t pose_estimation_service
+tmux kill-session -t ros_bridge_server
 
 sleep 1
 echo "Starting roscore tmux..."
@@ -18,6 +19,7 @@ tmux new -s spotWorld_static_tf2_pub -d 'rosrun tf2_ros static_transform_publish
 tmux new -s segmentation_service -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.segmentation_service'
 tmux new -s pose_estimation_service -d 'cd third_party/FoundationPoseForSpotSim2Real/ && sh run_pose_estimation_service.sh'
 sleep 3
+tmux new -s ros_bridge_server -d 'roslaunch rosbridge_server rosbridge_tcp.launch'
 tmux ls
 
 # This for running mask rcnn in img_publishers, which needs input images to be in grayscale

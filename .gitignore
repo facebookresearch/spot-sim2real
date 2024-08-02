@@ -18,3 +18,4 @@ spot_rl_experiments/configs/waypoints.yaml
 
 **/**/.ipynb_checkpoints
 *capture_the_moment.py
+data/*
