@@ -53,8 +53,8 @@ def detect_orientation(
     to_origin = mn.Matrix4(to_origin)
     to_origin_inverted = to_origin.inverted()
     center_pose = cam_T_obj @ to_origin_inverted
-    center_pose_body = body_T_cam @ cam_T_obj @ to_origin_inverted
-    # pose_body = body_T_cam @ cam_T_obj
+    # center_pose_body = body_T_cam @ cam_T_obj @ to_origin_inverted
+    center_pose_body = body_T_cam @ cam_T_obj
 
     z_axis: mn.Vector3 = mn.Vector3(0, 0, 1)
     y_axis: mn.Vector3 = mn.Vector3(0, 1, 0)
@@ -596,6 +596,7 @@ class OrientationSolver:
         self,
         spot: Spot,
         spinal_axis: mn.Vector3,
+        point_before_gaze: np.ndarray,
         gamma: float,
         object_name: str,
         make_face_the_object_right: bool = False,
@@ -615,29 +616,38 @@ class OrientationSolver:
 
         # Correct the orientation 0.1 m above the current position
         current_point[-1] += 0.10
-        correction_status = spot.move_gripper_to_points(
-            current_point, [np.deg2rad([0, 0, 0]), np.deg2rad(correction_angles)], 5, 10
+
+        correction_status = spot.move_gripper_to_point(
+            current_point, np.deg2rad(correction_angles), 5, 10
         )
-        current_orientation_after_grasp_in_quat = (
+        current_orientation_at_grasp_in_quat = (
             spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
         )
-        current_grasp_orientation_name = self._determine_anchor_grasp_pose(
-            current_orientation_after_grasp_in_quat
+        spot.move_gripper_to_point(
+            point_before_gaze, current_orientation_at_grasp_in_quat
         )
-        current_point[-1] -= 0.10
 
-        # if gamma > 30, object needs correction along z-axis of spot frame
-        gamma = self.determine_if_object_symmetric(object_name, gamma)
-        q_final = (
-            rotate_quaternion_around_y(
-                current_orientation_after_grasp_in_quat,
-                current_grasp_orientation_name,
-                gamma,
-            )
-            if np.abs(gamma) > 30 and make_face_the_object_right
-            else current_orientation_after_grasp_in_quat
-        )
-        put_back_object_status = spot.move_gripper_to_point(current_point, q_final)
+        # current_orientation_after_grasp_in_quat = (
+        #     spot.get_ee_quaternion_in_body_frame().view((np.double, 4))
+        # )
+        # current_grasp_orientation_name = self._determine_anchor_grasp_pose(
+        #     current_orientation_after_grasp_in_quat
+        # )
+        # #current_point[-1] -= 0.10
 
-        spot.open_gripper()
+        # # if gamma > 30, object needs correction along z-axis of spot frame
+        # gamma = self.determine_if_object_symmetric(object_name, gamma)
+        # q_final = (
+        #     rotate_quaternion_around_y(
+        #         current_orientation_after_grasp_in_quat,
+        #         current_grasp_orientation_name,
+        #         gamma,
+        #     )
+        #     if np.abs(gamma) > 30 and make_face_the_object_right
+        #     else current_orientation_after_grasp_in_quat
+        # )
+        # put_back_object_status = spot.move_gripper_to_point(current_point, q_final)
+
+        # spot.open_gripper()
+        put_back_object_status = correction_status
         return correction_status, put_back_object_status

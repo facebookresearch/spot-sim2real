@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
     contnue = True
-    object_name = "cup"  # "penguin plush toy"
+    object_name = "tajin bottle"  # "penguin plush toy"
     while contnue:
         spotskillmanager.spot.stand()
         spotskillmanager.pick(

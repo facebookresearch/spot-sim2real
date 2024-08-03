@@ -149,6 +149,9 @@ class Skill:
             raise e
         done = False
 
+        self.ee_point_before_starting_the_skill = self.spot.get_ee_pos_in_body_frame()[
+            0
+        ]
         # Execution Loop
         while not done:
             action = self.policy.act(observations)  # type: ignore

@@ -383,7 +383,11 @@ class SpotSkillManager:
                 correction_status,
                 put_back_object_status,
             ) = self.orientation_solver.perform_orientation_correction(
-                self.spot, spinal_axis, gamma, target_obj_name
+                self.spot,
+                spinal_axis,
+                self.gaze_controller.ee_point_before_starting_the_skill,
+                gamma,
+                target_obj_name,
             )
             status = status and correction_status and put_back_object_status
         conditional_print(message=message, verbose=self.verbose)
