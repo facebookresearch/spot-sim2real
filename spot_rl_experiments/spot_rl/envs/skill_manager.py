@@ -272,7 +272,7 @@ class SpotSkillManager:
     @multimethod  # type: ignore
     def nav(  # noqa: F811 # type: ignore
         self, nav_targets: List[Tuple[float, float, float]]
-    ) -> Tuple[bool, str]:  # # type: ignore
+    ) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the nav action on the list of navigation targets specified as a metric location
 
