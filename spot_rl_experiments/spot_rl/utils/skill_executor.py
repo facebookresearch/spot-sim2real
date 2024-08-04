@@ -43,26 +43,28 @@ class SpotRosSkillExecutor:
             # Reset the skill message
             self.reset_skill_msg()
             # For navigation target
-            nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None")
+            nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
             # Call the skill
             if "None" not in nav_target_xyz:
                 # TODO: spot-sim2real: A temp hack for theta value
                 # Need a way to find the theta value
-                nav_target_xyz = nav_target_xyz.split(",")
-                # This z and y are flipped due to hab convention
-                x, y, theta = (
-                    float(nav_target_xyz[0]),
-                    float(nav_target_xyz[2]),
-                    float(0.0),
-                )
-                print(x, y, theta)
-                succeded, msg = self.spotskillmanager.nav(x, y, theta)
+                nav_target_xyz = nav_target_xyz.split("|")[0:-1]
+                for nav_target in nav_target_xyz:
+                    # This z and y are flipped due to hab convention
+                    x, y, theta = (
+                        float(nav_target[0]),
+                        float(nav_target[2]),
+                        float(0.0),
+                    )
+                    succeded, msg = self.spotskillmanager.nav(x, y, theta)
+                    if not succeded:
+                        break
             else:
                 succeded, msg = self.spotskillmanager.nav(skill_input)
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
             # Reset the navigation target
-            rospy.set_param("nav_target_xyz", "None,None,None")
+            rospy.set_param("nav_target_xyz", "None,None,None|")
         elif skill_name == "pick":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
