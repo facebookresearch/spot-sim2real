@@ -46,10 +46,8 @@ class SpotRosSkillExecutor:
             nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
             # Call the skill
             if "None" not in nav_target_xyz:
-                # TODO: spot-sim2real: A temp hack for theta value
-                # Need a way to find the theta value
                 nav_target_xyz = nav_target_xyz.split("|")[0:-1]
-                for nav_target in nav_target_xyz:
+                for nav_i, nav_target in enumerate(nav_target_xyz):
                     _nav_target = nav_target.split(",")
                     # This z and y are flipped due to hab convention
                     x, y, theta = (
@@ -57,6 +55,7 @@ class SpotRosSkillExecutor:
                         float(_nav_target[2]),
                         float(0.0),
                     )
+                    print(f"nav to {x} {y} {theta}, {nav_i+1}/{len(nav_target_xyz)}")
                     succeded, msg = self.spotskillmanager.nav(x, y, theta)
                     if not succeded:
                         break
