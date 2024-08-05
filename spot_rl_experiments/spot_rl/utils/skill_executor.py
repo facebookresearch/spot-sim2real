@@ -50,10 +50,11 @@ class SpotRosSkillExecutor:
                 # Need a way to find the theta value
                 nav_target_xyz = nav_target_xyz.split("|")[0:-1]
                 for nav_target in nav_target_xyz:
+                    _nav_target = nav_target.split(",")
                     # This z and y are flipped due to hab convention
                     x, y, theta = (
-                        float(nav_target[0]),
-                        float(nav_target[2]),
+                        float(_nav_target[0]),
+                        float(_nav_target[2]),
                         float(0.0),
                     )
                     succeded, msg = self.spotskillmanager.nav(x, y, theta)
