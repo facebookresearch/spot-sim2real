@@ -3,7 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import magnum as mn
 import numpy as np
@@ -231,8 +231,8 @@ class SpotSkillManager:
         # Reset the policies and environments via the controllers
         raise NotImplementedError
 
-    @multimethod  # type: ignore
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    @multimethod
+    def nav(self, nav_target: str = None) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a known string
 
@@ -270,7 +270,30 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float, theta=float) -> Tuple[bool, str]:  # noqa
+    def nav(  # noqa: F811 # type: ignore
+        self, nav_targets: List[Tuple[float, float, float]]
+    ) -> Tuple[bool, str]:  # type: ignore
+        """
+        Perform the nav action on the list of navigation targets specified as a metric location
+
+        Args:
+            nav_targets (List[Tuple[float, float, float]]): A list of navigation targets in x, y, theta
+
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        for nav_target in nav_targets:
+            x, y, theta = nav_target
+            status, message = self.nav(x, y, theta)
+            # If the one of the navigation fails, return the last status and message
+            if not status:
+                break
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float, theta: float) -> Tuple[bool, str]:  # noqa
         """
         Perform the nav action on the navigation target specified as a metric location
 
@@ -284,6 +307,28 @@ class SpotSkillManager:
             str: Message indicating the status of the navigation
         """
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the navigation target with yaw specified as a metric location
+
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        theta = 0.0
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "dynamic_yaw": True,
+        }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
