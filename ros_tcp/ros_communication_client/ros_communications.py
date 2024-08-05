@@ -176,7 +176,7 @@ class Subscriber:
             self.fps_counter = (
                 FPSCounter() if self.fps_counter is None else self.fps_counter
             )
-            # print(f"Data recieved {rosmsg['msg'].keys()}")
+
             if rosmsg["op"] == "publish" and rosmsg["topic"] == self.topic_name:
                 try:
                     data = self.from_msg_type(rosmsg)
@@ -204,7 +204,6 @@ class Subscriber:
 
     def unsubscribe(self):
         if not self.has_unsubscribed:
-            # self.keep_reciving = False
             self.stop_event.set()
             if self.recieve_thread.is_alive():
                 self.recieve_thread.join()
@@ -307,7 +306,6 @@ def start_publishing():
     publisher = Publisher("/new_image_pub", "sensor_msgs/Image")
     while not stop_publishing:
         publisher.publish(image)
-    # del(publisher)
 
 
 def show_image(nparr):
@@ -328,35 +326,9 @@ if __name__ == "__main__":
     subscriber = Subscriber(
         "/new_image_pub", "sensor_msgs/Image", callback_fn=show_image
     )
-    # time.sleep(0.5)
+
     while time.time() - start_time <= 60:
         time.sleep(1)
     subscriber.unsubscribe()
     stop_publishing = True
     publisher_thread.join()
-
-    # image = np.zeros((480, 640, 3), dtype=np.uint8)
-    # publisher = Publisher("/new_image_pub", "sensor_msgs/Image")
-    # #publisher = Publisher("/new_message_pub", "std_msgs/String")
-    # i =0
-    # while not stop_publishing:
-    #     publisher.publish(image)
-    #     #publisher.publish(f"Hello: {i}")
-    #     i+=1
-    #     time.sleep(0.5)
-    #     #break
-    # is_set = Param.set_param("/skill_name_input", "pick, bottle")
-    # print(f'Is the param set ? {is_set}')
-    # print(Param.get_param("/skill_name_suc_msg", "Not found"))
-    # value = "None,None,None"
-    # while value != "None,None,None":
-    #     value = Param.get_param("/skill_name_suc_msg", value)
-    #     print(value)
-    #     time.sleep(2)
-    # print(f'Get /non_existent : {Param.get_param("/object_target", "my default")}')
-    # tf2Broadcaster = StaticTransformBroadcaster()
-    # start_time  = time.time()
-    # while True:
-    #     tf2Broadcaster.send_transform("/spotWorld", "/newFrame", [0., 0., 0.], [0., 0., 0., 1.])
-    #     break
-    #     #if time.time() - start_time >= 1: break

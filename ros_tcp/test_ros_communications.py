@@ -30,16 +30,13 @@ def start_publishing():
     while not stop_publishing:
         publisher.publish(image)
         break
-    # del(publisher)
 
 
 if __name__ == "__main__":
     start_time = time.time()
-    # start_publishing()
-    # stop_publishing = True
 
-    # publisher_thread = threading.Thread(target=start_publishing)
-    # publisher_thread.start()
+    publisher_thread = threading.Thread(target=start_publishing)
+    publisher_thread.start()
 
     subscriber = ros.Subscriber(
         "/mask_rcnn_visualizations",
@@ -47,10 +44,12 @@ if __name__ == "__main__":
         callback_fn=show_image,
         verbose=True,
     )
-    # time.sleep(0.5)
+
     while time.time() - start_time <= 2:
-        #      #print(subscriber.data)
+        # Cannot image the data
+        # print(subscriber.data)
         time.sleep(1)
     subscriber.unsubscribe()
-    # stop_publishing = True
-    # publisher_thread.join()
+
+    stop_publishing = True
+    publisher_thread.join()

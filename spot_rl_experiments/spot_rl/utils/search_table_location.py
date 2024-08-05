@@ -300,14 +300,12 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     body_T_intel = np.array(body_T_hand @ gripper_T_intel)
     normals_in_body = np.dot(body_T_intel[:3, :3], normals.T).T.reshape(-1, 3)
     # Compute the dot product to get the cosines
-    # cosines = (normals @ direction_vector).reshape(-1)
     cosines = (normals_in_body @ direction_vector).reshape(-1)
     # Filter out the point clouds
     pcd_dir_filtered = pcd_with_normals.select_by_index(
         np.where(cosines > cosine_thresh)[0]
     )
     if visualize:
-        # o3d.visualization.draw_geometries([pcd_with_normals])
         o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 
@@ -422,6 +420,7 @@ def detect_place_point_by_pcd_method(
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
+        # For debug
         # cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
         # cv2.imshow("table_detection", img_with_bbox)
         # cv2.waitKey(0)
@@ -473,9 +472,6 @@ def contrained_place_point_estimation(
     spot.close_gripper()
     gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
-
-    # Wait for a bit to stabalized the gripper
-    # time.sleep(2.0)
 
     (
         img,

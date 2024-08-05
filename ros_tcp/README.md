@@ -18,7 +18,7 @@ With spot_ros or env for spot-sim2real activated; cd into `ros_tcp` <br>
 ### Step 2: Install ros_communication_client as pip module in non-ROS env
 
 With any conda env activated & cd into `ros_tcp` run the following command <br>
-    ``` (habllm) username@somedesktop ros_tcp ~ pip install -e . ```
+    ``` (user_conda_env) username@somedesktop ros_tcp ~ pip install -e . ```
 
 ## Usage
 In any other non-ROS env you can import ros_communication_client to use ROS functionalities without needing to setup ROS (uses tcp socket).
@@ -40,23 +40,23 @@ while True:
 
 #Subscriber
 
-callback_fn = None #or it can be something that gets the data in this example np array image
+callback_fn = None #or it can be something that gets the data in this example np.array image
 subscriber = Subscriber("/new_image_pub", "sensor_msgs/Image", callback_fn=callback_fn)
 while True:
-    #get latest data
+    # get latest data
     subscriber.data
 
-#RosMessageTypes Supported & adding new support; 
+#RosMessageTypes Supported & adding new support;
 
 currently we have written sensor_msgs/Image, tf2_msgs/TFMessage, std_msgs/String message types. You can add new ones as per your need in ros_message_converter.py, you need to write two functions, say you want to add support for new ROS message type Vector2 with structure {float x, float y }
-then you need to write two functions, 
+then you need to write two functions,
 def to_ros_vector2(x, y) :
     data = {'x': float(x), 'y':float(y)}
     return data
 
 def from_ros_vecto2(data):
-    return (data['x'], data['y']) #or parsing in any other format you desire 
-Lastly add these two functions in 
+    return (data['x'], data['y']) #or parsing in any other format you desire
+Lastly add these two functions in
 
 factory = {
     "std_msgs/String" : {}

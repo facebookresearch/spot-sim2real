@@ -51,6 +51,7 @@ class RosbridgeBSONTCPClient:
 
     def connect(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Backup for candidate socket selection
         # self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.socket.settimeout(self.timeoutsec)
         self.socket.connect((self.host, self.port))
@@ -59,7 +60,7 @@ class RosbridgeBSONTCPClient:
         print("Connected to ROS bridge server.") if self.verbose else None
 
     def _recvall(self, n):
-        # http://stackoverflow.com/questions/17667903/python-socket-receive-large-amount-of-data
+        # Source: http://stackoverflow.com/questions/17667903/python-socket-receive-large-amount-of-data
         # Helper function to recv n bytes or return None if EOF is hit
         data = bytearray()
         while len(data) < n:
@@ -84,6 +85,7 @@ class RosbridgeBSONTCPClient:
         message : python dict
         """
         bson_message = bson.encode(message)
+        # For debug
         # print(f"bson_message len {len(bson_message)}, packet len {struct.unpack('i', bson_message[:4])[0]}")
         self.socket.sendall(bson_message)  # type: ignore
 
@@ -125,8 +127,6 @@ class RosbridgeJSONTCPClient:
         self.socket.connect((self.host, self.port))
         print(self.socket_id)
         self.connected = True
-        # self.receive_thread = threading.Thread(target=self.receive)
-        # self.receive_thread.start()
         handshake_message = "HANDSHAKE_HEADER"
         self.socket.sendall(handshake_message.encode("utf-8"))
         print("Handshake message sent.")
@@ -139,16 +139,6 @@ class RosbridgeJSONTCPClient:
 
     def send(self, message, extra_chunk: int = 0):
         if self.connected:
-            # chunk_size = FRAGMENT_SIZE+extra_chunk
-            # data_len = len(message)
-            # total_sent = 0
-            # while total_sent < data_len:
-            #     #breakpoint()
-            #     sent = self.socket.send(message[total_sent:min(total_sent + chunk_size, data_len)])
-            #     if sent == 0:
-            #         raise RuntimeError("Socket connection broken")
-            #     total_sent += sent
-            # return 1
             message = json.dumps(message).encode("utf-8")
             bytessent = self.socket.sendall(message)
             self.socket.sendall(b"\r\n")
@@ -184,6 +174,7 @@ class RosbridgeJSONTCPClient:
                 self.connected = False
 
     def receive(self):
+        """Json method to receive data from the socket."""
         buffer = ""
         remaining_data = ""
         self.fps_counter = FPSCounter()
@@ -194,7 +185,7 @@ class RosbridgeJSONTCPClient:
                 )
                 remaining_data = ""
                 print("Raw data", data)
-                # continue
+
                 if not data:
                     break
                 if "}{" in data:
@@ -261,7 +252,6 @@ class RosbridgeJSONTCPClient:
             print(data)
 
         self.caller_id = {f"{caller_id}": call_back}
-        # self.recieve_once()
 
     def subscribe(self, topic: str, msg_type: str):
         self.send(
@@ -307,6 +297,3 @@ if __name__ == "__main__":
     }
     client.send(get_param_msg)
     print(client.recv_bson())
-    # client.disconnect()
-    # print(client.recv_bson())
-    # client.disconnect()

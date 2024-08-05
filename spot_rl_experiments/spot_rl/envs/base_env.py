@@ -49,6 +49,7 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
+from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL
 from spot_rl.utils.pose_estimation import pose_estimation
 from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
@@ -61,6 +62,8 @@ MAX_CMD_DURATION = 5
 GRASP_VIS_DIR = osp.join(
     osp.dirname(osp.dirname(osp.abspath(__file__))), "grasp_visualizations"
 )
+
+
 if not osp.isdir(GRASP_VIS_DIR):
     os.mkdir(GRASP_VIS_DIR)
 
@@ -486,7 +489,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             intrinsics = image_resps[0].source.pinhole.intrinsics
             transform_snapshot = image_resps[0].shot.transforms_snapshot
             body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-                GRAV_ALIGNED_BODY_FRAME_NAME,  # "body",
+                GRAV_ALIGNED_BODY_FRAME_NAME,
                 "link_wr1",
             )
             hand_T_gripper: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
@@ -494,13 +497,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 "hand_color_image_sensor",
                 transform_snapshot,
             )
-            gripper_T_intel = (
-                np.load(
-                    "/home/tushar/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/gripper_T_intel.npy"
-                )
-                if image_src == 1
-                else np.eye(4)
-            )
+            gripper_T_intel = np.load(GRIPPER_T_INTEL) if image_src == 1 else np.eye(4)
             gripper_T_intel = mn.Matrix4(gripper_T_intel)
             body_T_cam: mn.Matrix4 = body_T_hand @ hand_T_gripper @ gripper_T_intel
             image_responses = [
@@ -532,19 +529,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 mask,
             )
             with ThreadPoolExecutor() as executor:
-                # future_pose = executor.submit(
-                #     pose_estimation,
-                #     *image_responses,
-                #     object_name,
-                #     intrinsics,
-                #     body_T_cam,
-                #     image_src,
-                #     image_scale,
-                #     seg_port,
-                #     pose_port,
-                #     obj_bbox,
-                #     mask,
-                # )
                 future_affordance = executor.submit(
                     affordance_prediction,
                     object_name,
@@ -560,18 +544,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     [
                         future_affordance,
                         future_grasp_controls,
-                    ]  # future_pose]
+                    ]
                 ):
                     result = future.result()
-                    # if future == future_pose:
-                    #     (
-                    #         graspmode,
-                    #         spinal_axis,
-                    #         gamma,
-                    #         gripper_pose_quat,
-                    #         solution_angles,
-                    #         t2,
-                    #     ) = result
                     if future == future_affordance:
                         point_in_gripper = result
                     if future == future_grasp_controls:

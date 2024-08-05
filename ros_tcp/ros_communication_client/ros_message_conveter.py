@@ -20,12 +20,11 @@ class Time:
 
 def from_ros_image(message: Dict[str, Any]):
     data = message["msg"]
+    # For debug
     # print("Keys", [data[key] for key in data.keys() if key != "data"])
     height, width = int(data["height"]), int(data["width"])
     encoding = data["encoding"]
     dtype = np.uint8 if encoding[-1] == "8" else np.uint16
-    # base64_bytes = data['data'].encode('ascii')
-    # image_bytes = base64.b64decode(base64_bytes)
     nparr = np.frombuffer(data["data"], dtype)
     nparr = nparr.reshape((height, width, -1))
     if nparr.shape[-1] == 1:
@@ -49,11 +48,7 @@ def to_ros_image(nparr_bgr: np.ndarray):
 
     height, width = nparr_bgr.shape[:2]
     image_bytes = nparr_bgr.flatten().tobytes()
-    # Encode bytes to base64
-    # image_data_base64 = base64.b64encode(image_bytes).decode('ascii')
-    # base64_bytes = base64.b64encode(image_bytes)
-    # Decode base64 bytes to ASCII string
-    # base64_string = base64_bytes.decode('ascii')
+
     msg = {
         "header": {"seq": 0, "stamp": Time.now(), "frame_id": ""},
         "height": height,
@@ -176,7 +171,6 @@ def to_ros_Float32MultiArray(
 
 
 def from_ros_Float32MultiArray(msg):
-    # print(msg["msg"])
     msg = msg["msg"]
     layout = msg["layout"]
     data_points = msg["data"]

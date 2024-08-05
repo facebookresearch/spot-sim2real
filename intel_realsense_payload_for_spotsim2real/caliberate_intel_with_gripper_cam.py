@@ -75,9 +75,8 @@ if __name__ == "__main__":
             gripper_image
         )
         print(
-            f"{np.linalg.norm(gripper_T_marker.matrix()[:3, 3])}, {np.linalg.norm(intel_T_marker.matrix()[:3, 3])}"
+            f"Check if the z is close to each other -- gripper_T_marker: {gripper_T_marker.matrix()[:3, 3]}, intel_T_marker: {intel_T_marker.matrix()[:3, 3]}"
         )
-        print(f"{gripper_T_marker.matrix()[:3, 3]}, {intel_T_marker.matrix()[:3, 3]}")
         cv2.imshow("QR detection", np.hstack((intel_image, gripper_image)))
         marker_T_intel = intel_T_marker.inverse()
         gripper_T_intel = (gripper_T_marker * marker_T_intel).matrix()
