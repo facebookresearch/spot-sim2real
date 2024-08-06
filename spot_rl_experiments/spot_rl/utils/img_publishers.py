@@ -582,7 +582,7 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
         # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
-        multi_classes = [["cup"]]
+        multi_classes = [["glass bottle"]]
         self.owlvit.update_label(multi_classes)
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
@@ -666,7 +666,7 @@ if __name__ == "__main__":
         model = MRCNNModel()
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
-        rospy.set_param("object_target", "cup")
+        rospy.set_param("object_target", "glass bottle")
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
     elif open_voc:
