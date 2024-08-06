@@ -111,7 +111,7 @@ SEG_PORT: 21001 # port for segmentation service
 POSE_PORT: 2100 # port for pose estimation
 OBJECT_MESHES: ["bottle", "penguin", "cup", "cereal box", "hint can", "toy cup", "frosted flakes cup", "bowl", "oat creamer bottle"]
 
-#Grasp Parameters
+# Grasp Parameters: any (default, let BD decides grasping), topdown, side
 RECEPTACLES:
   dining_table : "any"
   kitchen_island: "topdown"

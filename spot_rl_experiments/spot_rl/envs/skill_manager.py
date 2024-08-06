@@ -285,11 +285,14 @@ class SpotSkillManager:
             x (float): x coordinate of the nav target (in meters) specified in the world frame
             y (float): y coordinate of the nav target (in meters) specified in the world frame
             theta (float): yaw for the nav target (in radians) specified in the world frame
+            reset_current_receptacle_name (bool): reset the current receptacle name to None
 
         Returns:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
+        # Keep track of the current receptacle that the robot navigates to for later grasping
+        # mode of gaze skill
         self.current_receptacle_name = (
             None if reset_current_receptacle_name else self.current_receptacle_name
         )
@@ -362,7 +365,8 @@ class SpotSkillManager:
             str: Message indicating the status of the pick
         """
         grasp_mode = "any"
-        # try to determine current receptacle & see if we set any preferred grasping type for it
+        # Try to determine current receptacle and
+        # see if we set any preferred grasping type for it
         current_receptacle_name = getattr(self, "current_receptacle_name", None)
         if current_receptacle_name is not None:
             receptacles = self.pick_config.get("RECEPTACLES", {})
@@ -370,6 +374,7 @@ class SpotSkillManager:
                 if receptacle_name == current_receptacle_name:
                     grasp_mode = grasp_type
                     break
+
         self.gaze_controller.set_grasp_type(grasp_mode)
         goal_dict = {
             "target_object": target_obj_name,
