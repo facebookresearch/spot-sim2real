@@ -30,7 +30,6 @@ from std_msgs.msg import (
 )
 
 try:
-    from spot_rl.utils.heuristic_nav import get_3d_point
     from spot_rl.utils.mask_rcnn_utils import (
         generate_mrcnn_detections,
         get_deblurgan_model,
@@ -42,6 +41,10 @@ except ModuleNotFoundError:
 
 # owlvit
 from spot_rl.models import OwlVit
+from spot_rl.utils.pixel_to_3d_conversion_utils import (
+    get_3d_point,
+    sample_patch_around_point,
+)
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
@@ -428,6 +431,35 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         return img
 
+    def affordance_prediction(
+        self,
+        depth_raw: np.ndarray,
+        mask: np.ndarray,
+        camera_intrinsics,
+        center_pixel: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Accepts
+        depth_raw: np.array HXW, 0.-2000.
+        mask: HXW, bool mask
+        camera_intrinsics:spot camera intrinsic object
+        center_pixel: np.array of length 2
+        Returns: Suitable point on object to grasp
+        """
+
+        mask = np.where(mask > 0, 1, 0).astype(depth_raw.dtype)
+        depth_image_masked = depth_raw * mask[...].astype(depth_raw.dtype)
+
+        non_zero_indices = np.nonzero(depth_image_masked)
+        # Calculate the bounding box coordinates
+        y_min, y_max = non_zero_indices[0].min(), non_zero_indices[0].max()
+        x_min, x_max = non_zero_indices[1].min(), non_zero_indices[1].max()
+        cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
+        Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1.0)
+        point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
+
+        return point_in_gripper
+
     def _publish(self):
         stopwatch = Stopwatch()
         header = self.img_msg.header
@@ -444,6 +476,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         imgs = self.spot.get_hand_image()  # only for getting intrinsics
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
+
         # Get the vision to hand
         try:
             vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
@@ -484,12 +517,22 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             if depth_box.size == 0:
                 continue
             z = np.median(depth_box) / 255.0 * MAX_HAND_DEPTH
+            try:
+                point_in_gripper = self.affordance_prediction(
+                    depth_raw=arm_depth / 255.0 * MAX_HAND_DEPTH,
+                    mask=arm_depth_bbox,
+                    camera_intrinsics=cam_intrinsics,
+                    center_pixel=np.array([pixel_x, pixel_y]),
+                )
+            except Exception as e:
+                print(f"Issue of predicting location: {e}")
+                continue
 
-            # Get the 3D point in the hand RGB frame
-            point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
+            if np.isnan(point_in_gripper).any():
+                continue
 
             point_in_global_3d = vision_T_hand_image.transform_point(
-                mn.Vector3(*point_in_hand_image_3d)
+                mn.Vector3(*point_in_gripper)
             )
 
             object_info.append(
@@ -538,7 +581,8 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # Add new classes here to the model
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
-        multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
+        # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
+        multi_classes = [["cup"]]
         self.owlvit.update_label(multi_classes)
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
@@ -622,7 +666,7 @@ if __name__ == "__main__":
         model = MRCNNModel()
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
-        rospy.set_param("object_target", "ball")
+        rospy.set_param("object_target", "cup")
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
     elif open_voc:
