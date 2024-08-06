@@ -17,7 +17,7 @@ if __name__ == "__main__":
         place_target = "coffee_table"
     else:
         # at NYC
-        place_target = "test_desk"
+        place_target = "test_semantic_place_white_desk"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
 
