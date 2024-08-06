@@ -109,7 +109,13 @@ OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
 IMG_SRC: 0 # 1 for intel & 0 for gripper
 SEG_PORT: 21001 # port for segmentation service
 POSE_PORT: 2100 # port for pose estimation
-OBJECT_MESHES: ["bottle", "penguin"]
+OBJECT_MESHES: ["bottle", "penguin", "cup", "cereal box", "hint can", "toy cup", "frosted flakes cup", "bowl", "oat creamer bottle"]
+
+# Grasp Parameters: any (default, let BD decides grasping), topdown, side
+RECEPTACLES:
+  dining_table : "any"
+  kitchen_island: "topdown"
+  white_table: "any"
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters

@@ -7,6 +7,7 @@
 import os
 import os.path as osp
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict
 
 import cv2
@@ -17,6 +18,10 @@ from bosdyn.client.frame_helpers import (
     VISION_FRAME_NAME,
     get_a_tform_b,
     get_vision_tform_body,
+)
+from spot_rl.utils.grasp_affordance_prediction import (
+    affordance_prediction,
+    grasp_control_parmeters,
 )
 from spot_rl.utils.img_publishers import MAX_HAND_DEPTH
 from spot_rl.utils.mask_rcnn_utils import (
@@ -44,6 +49,7 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
+from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL
 from spot_rl.utils.pose_estimation import pose_estimation
 from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
@@ -56,6 +62,8 @@ MAX_CMD_DURATION = 5
 GRASP_VIS_DIR = osp.join(
     osp.dirname(osp.dirname(osp.abspath(__file__))), "grasp_visualizations"
 )
+
+
 if not osp.isdir(GRASP_VIS_DIR):
     os.mkdir(GRASP_VIS_DIR)
 
@@ -314,7 +322,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
                 # The following cmd is blocking
                 success = self.attempt_grasp(
-                    action_dict.get("enable_pose_estimation", False)
+                    action_dict.get("enable_pose_estimation", False),
+                    action_dict.get("enable_force_control", False),
+                    action_dict.get("grasp_mode", "any"),
                 )
                 if success:
                     # Just leave the object on the receptacle if desired
@@ -463,37 +473,91 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations, reward, done, info
 
-    def attempt_grasp(self, enable_pose_estimation=False):
+    def attempt_grasp(
+        self,
+        enable_pose_estimation=False,
+        enable_force_control=False,
+        grasp_mode: str = "any",
+    ):
         pre_grasp = time.time()
-        graspmode = "topdown"
+        graspmode = grasp_mode
         if enable_pose_estimation:
             image_scale = self.config.IMAGE_SCALE
             seg_port = self.config.SEG_PORT
             pose_port = self.config.POSE_PORT
             object_name = rospy.get_param("/object_target")
             image_src = self.config.IMG_SRC
+
             rospy.set_param(
                 "is_gripper_blocked", image_src
             )  # can be removed if we do mesh rescaling for gripper camera
             image_resps = self.spot.get_hand_image()  # IntelImages
             intrinsics = image_resps[0].source.pinhole.intrinsics
+            transform_snapshot = image_resps[0].shot.transforms_snapshot
+            body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                GRAV_ALIGNED_BODY_FRAME_NAME,
+                "link_wr1",
+            )
+            hand_T_gripper: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "arm0.link_wr1",
+                "hand_color_image_sensor",
+                transform_snapshot,
+            )
+            gripper_T_intel = np.load(GRIPPER_T_INTEL) if image_src == 1 else np.eye(4)
+            gripper_T_intel = mn.Matrix4(gripper_T_intel)
+            body_T_cam: mn.Matrix4 = body_T_hand @ hand_T_gripper @ gripper_T_intel
             image_responses = [
                 image_response_to_cv2(image_rep) for image_rep in image_resps
             ]
             obj_bbox = detect_with_rospy_subscriber(object_name, image_scale)
+            x1, y1, x2, y2 = obj_bbox
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            self.obj_center_pixel = [cx, cy]
             mask = segment_with_socket(image_responses[0], obj_bbox, port=seg_port)
             t1 = time.time()
-            graspmode, spinal_axis, gamma, t2 = pose_estimation(
+            (
+                graspmode,
+                spinal_axis,
+                gamma,
+                gripper_pose_quat,
+                solution_angles,
+                t2,
+            ) = pose_estimation(
                 *image_responses,
                 object_name,
                 intrinsics,
+                body_T_cam,
                 image_src,
                 image_scale,
-                port_seg=seg_port,
-                port_pose=pose_port,
-                bbox=obj_bbox,
-                mask=mask,
+                seg_port,
+                pose_port,
+                obj_bbox,
+                mask,
             )
+            with ThreadPoolExecutor() as executor:
+                future_affordance = executor.submit(
+                    affordance_prediction,
+                    object_name,
+                    *image_responses,
+                    mask,
+                    intrinsics,
+                    self.obj_center_pixel,
+                )
+                future_grasp_controls = executor.submit(
+                    grasp_control_parmeters, object_name
+                )
+                for future in as_completed(
+                    [
+                        future_affordance,
+                        future_grasp_controls,
+                    ]
+                ):
+                    result = future.result()
+                    if future == future_affordance:
+                        point_in_gripper = result
+                    if future == future_grasp_controls:
+                        claw_gripper_control_parameters = result
+
             print(f"Time taken for pose estimation {t2-t1} secs")
 
             rospy.set_param(
@@ -503,13 +567,23 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             rospy.set_param("gamma", float(gamma))
             rospy.set_param("is_gripper_blocked", 0)
 
-        ret = self.spot.grasp_hand_depth(
-            self.obj_center_pixel,
-            top_down_grasp=graspmode == "topdown",
-            horizontal_grasp=graspmode == "side",
-            timeout=10,
-            add_threshold_on_grasp=not enable_pose_estimation,
-        )
+        if enable_force_control:
+            ret = self.spot.grasp_point_in_image_with_IK(
+                point_in_gripper,  # 3D point in gripper camera
+                body_T_cam,  # will convert 3D point in gripper to body
+                gripper_pose_quat,  # quat for gripper
+                solution_angles,
+                10,
+                claw_gripper_control_parameters,
+                visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
+            )
+        else:
+            ret = self.spot.grasp_hand_depth(
+                self.obj_center_pixel,
+                top_down_grasp=graspmode == "topdown",
+                horizontal_grasp=graspmode == "side",
+                timeout=10,
+            )
         if self.config.USE_REMOTE_SPOT:
             ret = time.time() - pre_grasp > 3  # TODO: Make this better...
         return ret
@@ -763,7 +837,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             out_path = osp.join(GRASP_VIS_DIR, f"{time.time()}.png")
             cv2.imwrite(out_path, marked_img)
             print("Saved grasp image as", out_path)
-            img_msg = self.cv_bridge.cv2_to_imgmsg(marked_img)
+            img_msg = self.cv_bridge.cv2_to_imgmsg(marked_img, "bgr8")
             self.mrcnn_viz_pub.publish(img_msg)
 
         height, width = (480, 640)

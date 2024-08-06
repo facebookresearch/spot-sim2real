@@ -19,63 +19,12 @@ from scipy import stats as st
 from spot_rl.models import OwlVit
 from spot_rl.models.yolov8predictor import YOLOV8Predictor
 from spot_rl.utils.mask_rcnn_utils import get_deblurgan_model
+from spot_rl.utils.pixel_to_3d_conversion_utils import (
+    get_3d_point,
+    get_best_uvz_from_detection,
+)
 from spot_rl.utils.utils import construct_config
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
-
-
-def get_3d_point(cam_intrinsics, pixel_uv, z):
-    # Get camera intrinsics
-    fx = cam_intrinsics.focal_length.x
-    fy = cam_intrinsics.focal_length.y
-    cx = cam_intrinsics.principal_point.x
-    cy = cam_intrinsics.principal_point.y
-
-    # print(fx, fy, cx, cy)
-    # Get 3D point
-    x = (pixel_uv[0] - cx) * z / fx
-    y = (pixel_uv[1] - cy) * z / fy
-    return np.array([x, y, z])
-
-
-def get_3d_points(cam_intrinsics, pixels_uv: np.ndarray, zs: np.ndarray):
-    """
-    Vectorized version of the above method, pass n, 2D points & get n 3D points
-    """
-    # pixels_uv = nx2 xs -> :, 1
-    # Get camera intrinsics
-    fx = cam_intrinsics.focal_length.x
-    fy = cam_intrinsics.focal_length.y
-    cx = cam_intrinsics.principal_point.x
-    cy = cam_intrinsics.principal_point.y
-    # Get 3D point
-    xs = (pixels_uv[:, 1] - cx) * zs / fx  # n
-    ys = (pixels_uv[:, 0] - cy) * zs / fy  # n
-    return np.array([xs.flatten(), ys.flatten(), zs]).reshape(-1, 3)
-
-
-def get_best_uvz_from_detection(
-    unscaled_dep_img, detection, depth_scale: float = 0.001
-):
-    """
-    Sample best z depth for the given bounding box
-    """
-    center_x, center_y = (detection[0] + detection[2]) / 2, (
-        detection[1] + detection[3]
-    ) / 2
-    # select the patch of the depth
-    depth_patch_in_bbox = unscaled_dep_img[
-        int(detection[1]) : int(detection[3]), int(detection[0]) : int(detection[2])
-    ]
-    # keep only non zero values
-    depth_patch_in_bbox = depth_patch_in_bbox[depth_patch_in_bbox > 0.0].flatten()
-    if len(depth_patch_in_bbox) > 0:
-        # find mu & sigma
-        mu = np.median(depth_patch_in_bbox)
-        closest_depth_to_mu = np.argmin(np.absolute(depth_patch_in_bbox - mu))
-        return (center_x, center_y), depth_patch_in_bbox[
-            closest_depth_to_mu
-        ] * depth_scale
-    return (center_x, center_y), 0
 
 
 def get_z_offset_by_corner_detection(
@@ -347,7 +296,7 @@ class ImageSearch:
         x1, y1, x2, y2, conf = det
         x1_int, y1_int, x2_int, y2_int = int(x1), int(y1), int(x2), int(y2)
 
-        (u, v), z = get_best_uvz_from_detection(unscaled_depth, [x1, y1, x2, y2])
+        (u, v), z = get_best_uvz_from_detection(unscaled_depth, [x1, y1, x2, y2])  # type: ignore
 
         if self.visualize:
             rgb_img_vis = cv2.rectangle(
@@ -362,7 +311,7 @@ class ImageSearch:
             binary_depth_img = np.where(hand_depth_img > 0, 1, 0)
             binary_depth_img = np.uint8(binary_depth_img)
             mixed_image = rgb_img * binary_depth_img[:, :, None]
-            point_in_local_3d = get_3d_point(cam_intrinsics, (u, v), z)
+            point_in_local_3d = get_3d_point(cam_intrinsics, (u, v), z)  # type: ignore
             (
                 corner_det_status,
                 best_z,

@@ -149,6 +149,9 @@ class Skill:
             raise e
         done = False
 
+        self.ee_point_before_starting_the_skill = self.spot.get_ee_pos_in_body_frame()[
+            0
+        ]
         # Execution Loop
         while not done:
             action = self.policy.act(observations)  # type: ignore
@@ -452,6 +455,7 @@ class Pick(Skill):
         self.policy.reset()
         self.enable_pose_estimation: bool = False
         self.enable_pose_correction: bool = False
+        self.enable_force_control: bool = False
 
         self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
 
@@ -460,6 +464,12 @@ class Pick(Skill):
     ) -> None:
         self.enable_pose_estimation = enable_pose_estimation
         self.enable_pose_correction = enable_pose_correction
+
+    def set_force_control(self, enable_force_control: bool = False):
+        self.enable_force_control = enable_force_control
+
+    def set_grasp_type(self, grasp_mode: str = "any"):
+        self.grasp_mode = grasp_mode
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""
@@ -543,6 +553,8 @@ class Pick(Skill):
                 "base_action": action[4:6],
                 "enable_pose_estimation": self.enable_pose_estimation,
                 "enable_pose_correction": self.enable_pose_correction,
+                "enable_force_control": self.enable_force_control,
+                "grasp_mode": self.grasp_mode,
             }
         else:
             action_dict = {
@@ -550,6 +562,8 @@ class Pick(Skill):
                 "base_action": None,
                 "enable_pose_estimation": self.enable_pose_estimation,
                 "enable_pose_correction": self.enable_pose_correction,
+                "enable_force_control": self.enable_force_control,
+                "grasp_mode": self.grasp_mode,
             }
 
         return action_dict

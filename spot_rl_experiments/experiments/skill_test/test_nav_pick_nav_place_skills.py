@@ -7,21 +7,19 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 if __name__ == "__main__":
     from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
-    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=False)
     contnue = True
-    object_name = "penguin plush toy"
+    object_name = "cup"
     while contnue:
-        spotskillmanager.spot.stand()
-        spotskillmanager.current_receptacle_name = (
-            "white_table"  # To test the grasping config
-        )
+        spotskillmanager.nav("dining_table_demo")
         spotskillmanager.pick(
             object_name,
-            enable_pose_correction=True,
+            enable_pose_correction=False,
             enable_pose_estimation=True,
-            enable_force_control=False,
+            enable_force_control=True,
         )
-        spotskillmanager.get_env().reset_arm()
+        spotskillmanager.nav("kitchen_counter")
+        spotskillmanager.place(None, is_local=True, visualize=False)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown

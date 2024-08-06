@@ -74,6 +74,9 @@ if __name__ == "__main__":
         gripper_image, gripper_T_marker = aprilposeestimator_gripper.process_frame(
             gripper_image
         )
+        print(
+            f"Check if the z is close to each other -- gripper_T_marker: {gripper_T_marker.matrix()[:3, 3]}, intel_T_marker: {intel_T_marker.matrix()[:3, 3]}"
+        )
         cv2.imshow("QR detection", np.hstack((intel_image, gripper_image)))
         marker_T_intel = intel_T_marker.inverse()
         gripper_T_intel = (gripper_T_marker * marker_T_intel).matrix()

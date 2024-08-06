@@ -254,6 +254,7 @@ class SpotSkillManager:
                 nav_target_tuple = nav_target_from_waypoint(
                     nav_target, self.waypoints_yaml_dict
                 )
+                self.current_receptacle_name = nav_target
             except Exception:
                 message = (
                     f"Failed - nav target {nav_target} not found - use the exact name"
@@ -265,12 +266,18 @@ class SpotSkillManager:
             return False, msg
 
         nav_x, nav_y, nav_theta = nav_target_tuple
-        status, message = self.nav(nav_x, nav_y, nav_theta)
+        status, message = self.nav(nav_x, nav_y, nav_theta, False)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float, theta=float) -> Tuple[bool, str]:  # noqa
+    def nav(  # noqa
+        self,
+        x: float,
+        y: float,
+        theta=float,
+        reset_current_receptacle_name: bool = True,
+    ) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a metric location
 
@@ -278,11 +285,17 @@ class SpotSkillManager:
             x (float): x coordinate of the nav target (in meters) specified in the world frame
             y (float): y coordinate of the nav target (in meters) specified in the world frame
             theta (float): yaw for the nav target (in radians) specified in the world frame
+            reset_current_receptacle_name (bool): reset the current receptacle name to None
 
         Returns:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
+        # Keep track of the current receptacle that the robot navigates to for later grasping
+        # mode of gaze skill
+        self.current_receptacle_name = (
+            None if reset_current_receptacle_name else self.current_receptacle_name
+        )
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
@@ -337,6 +350,7 @@ class SpotSkillManager:
         target_obj_name: str = None,
         enable_pose_estimation: bool = False,
         enable_pose_correction: bool = False,
+        enable_force_control: bool = False,
     ) -> Tuple[bool, str]:
         """
         Perform the pick action on the pick target specified as string
@@ -350,14 +364,26 @@ class SpotSkillManager:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
+        grasp_mode = "any"
+        # Try to determine current receptacle and
+        # see if we set any preferred grasping type for it
+        current_receptacle_name = getattr(self, "current_receptacle_name", None)
+        if current_receptacle_name is not None:
+            receptacles = self.pick_config.get("RECEPTACLES", {})
+            for receptacle_name, grasp_type in receptacles.items():
+                if receptacle_name == current_receptacle_name:
+                    grasp_mode = grasp_type
+                    break
+
+        self.gaze_controller.set_grasp_type(grasp_mode)
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
         }  # type: Dict[str, Any]
-        if enable_pose_correction:
+        if enable_pose_correction or enable_force_control:
             assert (
                 enable_pose_estimation
-            ), "Pose estimation must be enabled if you want to perform pose correction"
+            ), "Pose estimation must be enabled if you want to perform pose correction or force control"
 
         if enable_pose_estimation:
             object_meshes = self.pick_config.get("OBJECT_MESHES", [])
@@ -372,6 +398,7 @@ class SpotSkillManager:
         self.gaze_controller.set_pose_estimation_flags(
             enable_pose_estimation, enable_pose_correction
         )
+        self.gaze_controller.set_force_control(enable_force_control)
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)
         if status and enable_pose_correction:
             spinal_axis = rospy.get_param("spinal_axis")
@@ -381,7 +408,11 @@ class SpotSkillManager:
                 correction_status,
                 put_back_object_status,
             ) = self.orientation_solver.perform_orientation_correction(
-                self.spot, spinal_axis, gamma, target_obj_name
+                self.spot,
+                spinal_axis,
+                self.gaze_controller.ee_point_before_starting_the_skill,
+                gamma,
+                target_obj_name,
             )
             status = status and correction_status and put_back_object_status
         conditional_print(message=message, verbose=self.verbose)
@@ -447,6 +478,7 @@ class SpotSkillManager:
         else:
             message = "No place target specified, estimating point through heuristic"
             conditional_print(message=message, verbose=self.verbose)
+            is_local = True
             # estimate waypoint
             try:
                 (
@@ -456,7 +488,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.pick_config.GAZE_ARM_JOINT_ANGLES,
-                    percentile=70,
+                    percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
@@ -472,7 +504,6 @@ class SpotSkillManager:
                 return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
-
         status, message = self.place(
             place_x,
             place_y,
@@ -519,7 +550,7 @@ class SpotSkillManager:
             proposition,
             self.spot,
             self.pick_config.GAZE_ARM_JOINT_ANGLES,
-            percentile=30,
+            percentile=70,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
             image_scale=self.get_env().config.IMAGE_SCALE,
