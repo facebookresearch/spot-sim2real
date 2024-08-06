@@ -111,6 +111,12 @@ SEG_PORT: 21001 # port for segmentation service
 POSE_PORT: 2100 # port for pose estimation
 OBJECT_MESHES: ["bottle", "penguin", "cup", "cereal box", "hint can", "toy cup", "frosted flakes cup", "bowl", "oat creamer bottle"]
 
+#Grasp Parameters
+RECEPTACLES:
+  dining_table : "any"
+  kitchen_island: "topdown"
+  white_table: "any"
+
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees

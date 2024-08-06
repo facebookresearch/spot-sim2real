@@ -254,6 +254,7 @@ class SpotSkillManager:
                 nav_target_tuple = nav_target_from_waypoint(
                     nav_target, self.waypoints_yaml_dict
                 )
+                self.current_receptacle_name = nav_target
             except Exception:
                 message = (
                     f"Failed - nav target {nav_target} not found - use the exact name"
@@ -265,12 +266,18 @@ class SpotSkillManager:
             return False, msg
 
         nav_x, nav_y, nav_theta = nav_target_tuple
-        status, message = self.nav(nav_x, nav_y, nav_theta)
+        status, message = self.nav(nav_x, nav_y, nav_theta, False)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float, theta=float) -> Tuple[bool, str]:  # noqa
+    def nav(  # noqa
+        self,
+        x: float,
+        y: float,
+        theta=float,
+        reset_current_receptacle_name: bool = True,
+    ) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a metric location
 
@@ -283,6 +290,9 @@ class SpotSkillManager:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
+        self.current_receptacle_name = (
+            None if reset_current_receptacle_name else self.current_receptacle_name
+        )
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
@@ -351,6 +361,16 @@ class SpotSkillManager:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
+        grasp_mode = "any"
+        # try to determine current receptacle & see if we set any preferred grasping type for it
+        current_receptacle_name = getattr(self, "current_receptacle_name", None)
+        if current_receptacle_name is not None:
+            receptacles = self.pick_config.get("RECEPTACLES", {})
+            for receptacle_name, grasp_type in receptacles.items():
+                if receptacle_name == current_receptacle_name:
+                    grasp_mode = grasp_type
+                    break
+        self.gaze_controller.set_grasp_type(grasp_mode)
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
@@ -390,34 +410,6 @@ class SpotSkillManager:
                 target_obj_name,
             )
             status = status and correction_status and put_back_object_status
-        conditional_print(message=message, verbose=self.verbose)
-        return status, message
-
-    def semanticpick(
-        self, target_obj_name: str = None, grasping_type: str = "topdown"
-    ) -> Tuple[bool, str]:
-        """
-        Perform the semantic pick action on the pick target specified as string
-
-        Args:
-            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
-            grasping_type (str): The grasping type
-
-        Returns:
-            bool: True if pick was successful, False otherwise
-            str: Message indicating the status of the pick
-        """
-        assert grasping_type in [
-            "topdown",
-            "side",
-        ], f"Do not support {grasping_type} grasping"
-
-        goal_dict = {
-            "target_object": target_obj_name,
-            "take_user_input": False,
-            "grasping_type": grasping_type,
-        }  # type: Dict[str, Any]
-        status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 

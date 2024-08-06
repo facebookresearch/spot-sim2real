@@ -9,13 +9,15 @@ if __name__ == "__main__":
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
     contnue = True
-    object_name = "penguin plush toy"
+    object_name = "bottle"
     while contnue:
         spotskillmanager.spot.stand()
+        # Nav("kitchen_counter", xy, theta) -> self.current_receptacle= "kitchen_counter"
+        spotskillmanager.current_receptacle_name = "white_table"
         spotskillmanager.pick(
             object_name,
-            enable_pose_correction=True,
-            enable_pose_estimation=True,
+            enable_pose_correction=False,
+            enable_pose_estimation=False,
             enable_force_control=False,
         )
         spotskillmanager.get_env().reset_arm()
