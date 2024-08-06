@@ -324,6 +324,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 success = self.attempt_grasp(
                     action_dict.get("enable_pose_estimation", False),
                     action_dict.get("enable_force_control", False),
+                    action_dict.get("grasp_mode", "any"),
                 )
                 if success:
                     # Just leave the object on the receptacle if desired
@@ -472,9 +473,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations, reward, done, info
 
-    def attempt_grasp(self, enable_pose_estimation=False, enable_force_control=False):
+    def attempt_grasp(
+        self,
+        enable_pose_estimation=False,
+        enable_force_control=False,
+        grasp_mode: str = "any",
+    ):
         pre_grasp = time.time()
-        graspmode = "topdown"
+        graspmode = grasp_mode
         if enable_pose_estimation:
             image_scale = self.config.IMAGE_SCALE
             seg_port = self.config.SEG_PORT
@@ -577,7 +583,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 top_down_grasp=graspmode == "topdown",
                 horizontal_grasp=graspmode == "side",
                 timeout=10,
-                add_threshold_on_grasp=not enable_pose_estimation,
             )
         if self.config.USE_REMOTE_SPOT:
             ret = time.time() - pre_grasp > 3  # TODO: Make this better...

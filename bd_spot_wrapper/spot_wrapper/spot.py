@@ -823,7 +823,6 @@ class Spot:
         data_edge_timeout=2,
         top_down_grasp=False,
         horizontal_grasp=False,
-        add_threshold_on_grasp=True,
     ):
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
@@ -873,8 +872,7 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            if add_threshold_on_grasp:
-                constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            constraint.vector_alignment_with_tolerance.threshold_radians = 0.17
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(

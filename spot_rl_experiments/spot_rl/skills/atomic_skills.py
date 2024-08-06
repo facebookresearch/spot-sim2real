@@ -468,6 +468,9 @@ class Pick(Skill):
     def set_force_control(self, enable_force_control: bool = False):
         self.enable_force_control = enable_force_control
 
+    def set_grasp_type(self, grasp_mode: str = "any"):
+        self.grasp_mode = grasp_mode
+
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""
         target_obj_name = goal_dict.get("target_object", None)  # type: str
@@ -551,6 +554,7 @@ class Pick(Skill):
                 "enable_pose_estimation": self.enable_pose_estimation,
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
+                "grasp_mode": self.grasp_mode,
             }
         else:
             action_dict = {
@@ -559,6 +563,7 @@ class Pick(Skill):
                 "enable_pose_estimation": self.enable_pose_estimation,
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
+                "grasp_mode": self.grasp_mode,
             }
 
         return action_dict

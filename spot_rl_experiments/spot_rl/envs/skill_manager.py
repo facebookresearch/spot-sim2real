@@ -254,6 +254,7 @@ class SpotSkillManager:
                 nav_target_tuple = nav_target_from_waypoint(
                     nav_target, self.waypoints_yaml_dict
                 )
+                self.current_receptacle_name = nav_target
             except Exception:
                 message = (
                     f"Failed - nav target {nav_target} not found - use the exact name"
@@ -265,12 +266,18 @@ class SpotSkillManager:
             return False, msg
 
         nav_x, nav_y, nav_theta = nav_target_tuple
-        status, message = self.nav(nav_x, nav_y, nav_theta)
+        status, message = self.nav(nav_x, nav_y, nav_theta, False)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float, theta=float) -> Tuple[bool, str]:  # noqa
+    def nav(  # noqa
+        self,
+        x: float,
+        y: float,
+        theta=float,
+        reset_current_receptacle_name: bool = True,
+    ) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a metric location
 
@@ -278,11 +285,17 @@ class SpotSkillManager:
             x (float): x coordinate of the nav target (in meters) specified in the world frame
             y (float): y coordinate of the nav target (in meters) specified in the world frame
             theta (float): yaw for the nav target (in radians) specified in the world frame
+            reset_current_receptacle_name (bool): reset the current receptacle name to None
 
         Returns:
             bool: True if navigation was successful, False otherwise
             str: Message indicating the status of the navigation
         """
+        # Keep track of the current receptacle that the robot navigates to for later grasping
+        # mode of gaze skill
+        self.current_receptacle_name = (
+            None if reset_current_receptacle_name else self.current_receptacle_name
+        )
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
@@ -351,6 +364,18 @@ class SpotSkillManager:
             bool: True if pick was successful, False otherwise
             str: Message indicating the status of the pick
         """
+        grasp_mode = "any"
+        # Try to determine current receptacle and
+        # see if we set any preferred grasping type for it
+        current_receptacle_name = getattr(self, "current_receptacle_name", None)
+        if current_receptacle_name is not None:
+            receptacles = self.pick_config.get("RECEPTACLES", {})
+            for receptacle_name, grasp_type in receptacles.items():
+                if receptacle_name == current_receptacle_name:
+                    grasp_mode = grasp_type
+                    break
+
+        self.gaze_controller.set_grasp_type(grasp_mode)
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
