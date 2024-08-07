@@ -13,6 +13,10 @@ bd_spot_wrapper/spot_wrapper/home.txt
 spot_rl_experiments/spot_rl.egg-info/**
 spot_rl_experiments/configs/waypoints.yaml
 
+
+spot_rl_experiments/spot_rl/utils/gripper_T_intel.npy
+intel_realsense_payload_for_spotsim2real/gripper_T_intel.npy
+
 **/grasp_visualizations/**
 **/temp_recordings/**
 
