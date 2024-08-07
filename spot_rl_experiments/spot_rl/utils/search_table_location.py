@@ -9,13 +9,12 @@ import open3d as o3d
 import rospy
 from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
 from spot_rl.envs.base_env import SpotBaseEnv
+from spot_rl.utils.gripper_T_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.heuristic_nav import get_3d_point, get_best_uvz_from_detection
 from spot_rl.utils.plane_detection import plane_detect
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot, image_response_to_cv2
 from std_msgs.msg import String
-
-GRIPPER_T_INTEL = osp.join(osp.dirname(osp.abspath(__file__)), "gripper_T_intel.npy")
 
 
 class DetectionSubscriber:
@@ -325,8 +324,8 @@ def detect_place_point_by_pcd_method(
         3D point in gripper is further back projected to pixel space u,v
         Resample depth at u,v in gripper & then project to 3D
     """
-    assert osp.exists(GRIPPER_T_INTEL), f"{GRIPPER_T_INTEL} not found"
-    gripper_T_intel = np.load(GRIPPER_T_INTEL)
+    assert osp.exists(GRIPPER_T_INTEL_PATH), f"{GRIPPER_T_INTEL_PATH} not found"
+    gripper_T_intel = np.load(GRIPPER_T_INTEL_PATH)
     spot.close_gripper()
     gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
@@ -467,8 +466,8 @@ def contrained_place_point_estimation(
     image_scale: float = 0.7,
 ):
     # detect object target
-    assert osp.exists(GRIPPER_T_INTEL), f"{GRIPPER_T_INTEL} not found"
-    gripper_T_intel = np.load(GRIPPER_T_INTEL)
+    assert osp.exists(GRIPPER_T_INTEL_PATH), f"{GRIPPER_T_INTEL_PATH} not found"
+    gripper_T_intel = np.load(GRIPPER_T_INTEL_PATH)
     spot.close_gripper()
     gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)

@@ -10,8 +10,9 @@ import signal
 import time
 from typing import Any, Dict, List
 
+import click
 import numpy as np
-from spot_wrapper.data_logger import dump_pkl
+from spot_wrapper.data_logger import DataLogger, dump_pkl
 from spot_wrapper.spot import Spot, SpotCamIds
 
 MOVE_INCREMENT = 0.02
@@ -23,7 +24,11 @@ UPDATE_PERIOD = 0.2
 
 # Where the gripper goes to upon initialization
 INITIAL_POINT = np.array([0.5, 0.0, 0.35])
-INITIAL_RPY = np.deg2rad([0.0, 45.0, 0.0])
+INITIAL_RPY = np.deg2rad([0.0, np.pi / 4, 0.0])
+
+INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER = np.deg2rad([0, -91, 33, 0, 100, 0])
+INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER = np.deg2rad([0, -100, 33, 0, 75, 0])  # 89
+
 KEY2GRIPPERMOVEMENT = {
     "w": np.array([0.0, 0.0, MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move up
     "s": np.array([0.0, 0.0, -MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move down
@@ -31,10 +36,12 @@ KEY2GRIPPERMOVEMENT = {
     "d": np.array([0.0, -MOVE_INCREMENT, 0.0, 0.0, 0.0, 0.0]),  # move right
     "q": np.array([MOVE_INCREMENT, 0.0, 0.0, 0.0, 0.0, 0.0]),  # move forward
     "e": np.array([-MOVE_INCREMENT, 0.0, 0.0, 0.0, 0.0, 0.0]),  # move backward
-    "i": np.deg2rad([0.0, 0.0, 0.0, 0.0, -TILT_INCREMENT, 0.0]),  # pitch up
-    "k": np.deg2rad([0.0, 0.0, 0.0, 0.0, TILT_INCREMENT, 0.0]),  # pitch down
-    "j": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, TILT_INCREMENT]),  # pan left
-    "l": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, -TILT_INCREMENT]),  # pan right
+    "k": np.deg2rad([0.0, 0.0, 0.0, 0.0, -TILT_INCREMENT, 0.0]),  # pitch up
+    "m": np.deg2rad([0.0, 0.0, 0.0, 0.0, TILT_INCREMENT, 0.0]),  # pitch down
+    "h": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, TILT_INCREMENT]),  # pan left
+    "j": np.deg2rad([0.0, 0.0, 0.0, 0.0, 0.0, -TILT_INCREMENT]),  # pan right
+    "y": np.deg2rad([0.0, 0.0, 0.0, TILT_INCREMENT, 0.0, 0.0]),  # roll up
+    "u": np.deg2rad([0.0, 0.0, 0.0, -TILT_INCREMENT, 0.0, 0.0]),  # roll down
 }
 KEY2BASEMOVEMENT = {
     "q": [0.0, 0.0, BASE_ANGULAR_VEL],  # turn left
@@ -53,12 +60,27 @@ INSTRUCTIONS = (
 )
 
 
-def move_to_initial(spot):
-    point = INITIAL_POINT
-    rpy = INITIAL_RPY
-    spot.move_gripper_to_point(point, rpy, timeout_sec=2)
-    cement_arm_joints(spot)
-
+def move_to_initial(spot, initial_arm_state=0):
+    point, rpy = INITIAL_POINT, INITIAL_RPY
+    if initial_arm_state == 0:
+        spot.move_gripper_to_point(point, rpy, timeout_sec=2)
+        cement_arm_joints(spot)
+    elif initial_arm_state == 1:
+        spot.set_arm_joint_positions(
+            positions=INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER,
+            travel_time=UPDATE_PERIOD * 5,
+        )
+    elif initial_arm_state == 2:
+        # IntelConfig is giving bad data
+        # spot.set_arm_joint_positions(positions=INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER, travel_time=UPDATE_PERIOD*5)
+        spot.set_arm_joint_positions(
+            positions=INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER,
+            travel_time=UPDATE_PERIOD * 5,
+        )
+    else:
+        raise KeyError(
+            f"Invalid initial arm state provided {initial_arm_state}. Provide a value between 0-2. 0 for default, 1 for gripperCam logger, 2 for intel realsense logger"
+        )
     return point, rpy
 
 
@@ -74,22 +96,42 @@ def raise_error(sig, frame):
     raise RuntimeError
 
 
-def main(spot: Spot):
+def rotate(datalogger: DataLogger, n_intervals: int = 16, n_captures: int = 2) -> List:
+    x0, y0, theta0 = spot.get_xy_yaw()
+    for i in range(n_intervals):
+        spot.set_base_position(
+            x_pos=x0,
+            y_pos=y0,
+            yaw=theta0 + (i + 1) * 2 * np.pi / n_intervals,
+            end_time=100,
+            blocking=True,
+        )
+        datalogger.log_data_finite(n_captures)
+
+
+def main(spot: Spot, initial_arm_state: int = 1):
     """Uses IK to move the arm by setting hand poses"""
     spot.power_robot()
 
     # Open the gripper
     spot.open_gripper()
 
-    # Init logger for hand cameras
-    log_packet_list = []  # type: List[Dict[str, Any]]
-    spot.setup_logging_sources(
-        [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-    )
+    sources = []
+    if initial_arm_state == 2:
+        sources = [SpotCamIds.INTEL_REALSENSE_COLOR, SpotCamIds.INTEL_REALSENSE_DEPTH]
+    else:
+        sources = [SpotCamIds.HAND_COLOR, SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME]
 
+    # Init logger for hand cameras
+    datalogger = DataLogger(spot=spot)
+    datalogger.setup_logging_sources(camera_sources=sources)
+
+    # TODO: Add code for moving arm to higher perspective for better view
     # Move arm to initial configuration
-    point, rpy = move_to_initial(spot)
+    point, rpy = move_to_initial(spot, initial_arm_state)
     control_arm = False
+
+    enable_logger_during_teleop = False
 
     # Start in-terminal GUI
     stdscr = curses.initscr()
@@ -114,6 +156,18 @@ def main(spot: Spot):
             if pressed_key == "z":
                 # Quit
                 break
+
+            elif pressed_key == "r":
+                rotate(datalogger=datalogger)
+
+            elif pressed_key == "l":
+                if enable_logger_during_teleop:
+                    spot.loginfo(f"{time.time()} - Disabling Logger during teleop")
+                    enable_logger_during_teleop = False
+                else:
+                    spot.loginfo(f"{time.time()} - Enabling Logger during teleop")
+                    enable_logger_during_teleop = True
+
             elif pressed_key == "t":
                 # Toggle between controlling arm or base
                 control_arm = not control_arm
@@ -127,8 +181,8 @@ def main(spot: Spot):
                 hand_image_response = image_responses[0]  # only expecting one image
                 spot.grasp_point_in_image(hand_image_response)
                 # Retract arm back to initial configuration
-                point, rpy = move_to_initial(spot)
-            elif pressed_key == "r":
+                point, rpy = move_to_initial(spot, 0)
+            elif pressed_key == "o":
                 # Open gripper
                 spot.open_gripper()
             elif pressed_key == "n":
@@ -137,7 +191,7 @@ def main(spot: Spot):
                 except Exception:
                     print("Dock was not found!")
             elif pressed_key == "i":
-                point, rpy = move_to_initial(spot)
+                point, rpy = move_to_initial(spot, initial_arm_state)
             else:
                 # Tele-operate either the gripper pose or the base
                 if control_arm:
@@ -146,9 +200,13 @@ def main(spot: Spot):
                         point_rpy += KEY2GRIPPERMOVEMENT[pressed_key]
                         point, rpy = point_rpy[:3], point_rpy[3:]
                         print("Gripper destination: ", point, rpy)
-                        spot.move_gripper_to_point(
+                        status = spot.move_gripper_to_point(
                             point, rpy, timeout_sec=UPDATE_PERIOD * 0.5
                         )
+                        if status is False:
+                            print(
+                                "Pose out of reach, please bring gripper within valid bounds"
+                            )
                 elif pressed_key in KEY2BASEMOVEMENT:
                     # Move base
                     x_vel, y_vel, ang_vel = KEY2BASEMOVEMENT[pressed_key]
@@ -161,11 +219,10 @@ def main(spot: Spot):
                 else:
                     key_not_applicable = True
 
-                # Update data log
-                log_packet = spot.update_logging_data(
-                    include_image_data=True, visualize=True, verbose=False
-                )
-                log_packet_list.append(log_packet)
+                # Log data
+                if enable_logger_during_teleop:
+                    # datalogger.log_data()
+                    datalogger.log_data_finite(2)
 
             if not key_not_applicable:
                 last_execution = time.time()
@@ -177,7 +234,7 @@ def main(spot: Spot):
         curses.endwin()
 
         # Save log data
-        dump_pkl(log_packet_list)
+        dump_pkl(datalogger.log_packet_list)
 
 
 if __name__ == "__main__":
