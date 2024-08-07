@@ -18,6 +18,7 @@ spot_rl_experiments_dir = osp.join(osp.dirname(spot_rl_dir))
 configs_dir = osp.join(spot_rl_experiments_dir, "configs")
 DEFAULT_CONFIG = osp.join(configs_dir, "config.yaml")
 WAYPOINTS_YAML = osp.join(configs_dir, "waypoints.yaml")
+DATA_WAYPOINTS_JSON = osp.join(configs_dir, "data_waypoints.json")
 
 ROS_TOPICS = osp.join(configs_dir, "ros_topic_names.yaml")
 ros_topics = CN()
@@ -167,3 +168,32 @@ class FixSizeOrderedDict(OrderedDict):
         if self._maxlen > 0:
             if len(self) > self._maxlen:
                 self.popitem(False)
+
+
+def runner():
+    import json
+
+    import yaml
+
+    # Read the YAML file
+    with open(WAYPOINTS_YAML, "rb") as file:
+        data = yaml.safe_load(file)
+
+    # Prepare to store all waypoint data in a single JSON structure
+    all_waypoints = []
+
+    # Iterate over each waypoint and add it to the list
+    for key, values in data["nav_targets"].items():
+        if len(values) == 3:
+            x, y, _ = values
+            all_waypoints.append({key: {"x": x, "y": y}})
+
+    # Write the combined JSON data to a file
+    with open(DATA_WAYPOINTS_JSON, "w") as file:
+        json.dump(all_waypoints, file, indent=2)
+
+    print("Combined JSON data has been written to 'all_waypoints.json'.")
+
+
+if __name__ == "__main__":
+    runner()
