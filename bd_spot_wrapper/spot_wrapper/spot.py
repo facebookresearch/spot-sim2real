@@ -1357,7 +1357,7 @@ class Spot:
         )
         return img_resp
 
-    def get_hand_image(self, is_rgb=True):
+    def get_hand_image(self, is_rgb=True, force_get_gripper=False):
         """
         Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
         If is_gripper_blocked is True then returns intel realsense images
@@ -1369,7 +1369,7 @@ class Spot:
             SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
 
-        if self.is_gripper_blocked:  # return intelrealsense
+        if self.is_gripper_blocked and not force_get_gripper:  # return intelrealsense
             return self.select_hand_image(img_src=realsense_img_srcs)
         else:
             return self.select_hand_image(is_rgb=is_rgb)

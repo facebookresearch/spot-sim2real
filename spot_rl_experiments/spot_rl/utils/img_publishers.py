@@ -473,7 +473,10 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
-        imgs = self.spot.get_hand_image()  # only for getting intrinsics
+        rospy.set_param("is_gripper_blocked", 0)  # Want to get the gripper images
+        imgs = self.spot.get_hand_image(
+            force_get_gripper=True
+        )  # for getting gripper intrinsics
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
 
@@ -483,6 +486,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
                 "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
             )
         except Exception as e:
+            print("ee:", imgs[0].shot.transforms_snapshot is None)
             print(f"Cannot get Spot T due to {e}. Online detection might be off")
             return
 
