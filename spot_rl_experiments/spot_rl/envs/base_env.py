@@ -49,7 +49,7 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
-from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL
+from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pose_estimation import pose_estimation
 from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
@@ -503,7 +503,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 "hand_color_image_sensor",
                 transform_snapshot,
             )
-            gripper_T_intel = np.load(GRIPPER_T_INTEL) if image_src == 1 else np.eye(4)
+            gripper_T_intel = (
+                np.load(GRIPPER_T_INTEL_PATH) if image_src == 1 else np.eye(4)
+            )
             gripper_T_intel = mn.Matrix4(gripper_T_intel)
             body_T_cam: mn.Matrix4 = body_T_hand @ hand_T_gripper @ gripper_T_intel
             image_responses = [
