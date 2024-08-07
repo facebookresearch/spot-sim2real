@@ -473,7 +473,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
-        rospy.set_param("is_gripper_blocked", 0)  # Want to get the gripper images
         imgs = self.spot.get_hand_image(
             force_get_gripper=True
         )  # for getting gripper intrinsics
