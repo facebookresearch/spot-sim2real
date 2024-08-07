@@ -247,7 +247,7 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     place_point_generation_src: int = 1
     # Garther gripper image response -> snapshot tree
     gripper_resps = spot.get_hand_image()
-
+    rospy.set_param("is_gripper_blocked", 0)
     intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
     snapshot_tree = gripper_resps[0].shot.transforms_snapshot
     # Switch to intel/gripper depending on place_point_generation_src
