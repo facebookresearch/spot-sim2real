@@ -833,14 +833,15 @@ class Spot:
                 break
 
             time.sleep(0.25)
-        self.open_gripper()
+        # self.open_gripper()
+        # time.sleep(0.25)
         claw_gripper_control_parameters = [
             (0.7, 0.0),
             (0.6, 0.5),
             (0.5, 0.7),
             (0.4, 0.5),
             (0.3, 0.6),
-            (0.2, 1.0),
+            (0.2, 0.5),
         ]
         n: int = len(claw_gripper_control_parameters)
         claw_gripper_command = None

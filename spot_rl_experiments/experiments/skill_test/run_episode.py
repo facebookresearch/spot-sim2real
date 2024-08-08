@@ -33,7 +33,7 @@ def save_logs_as_json(arg1=None, arg2=None):
         episode_log["total_time"] = total_time
         episode_log["final_success"] = final_success
         episode_log["total_steps"] = total_steps
-        file_path = f"logs/place_test/8-1-24/{episode_name}.json"
+        file_path = f"logs/integration_test/8-8-24/{episode_name}.json"
         with open(file_path, "w") as file:
             json.dump(episode_log, file, indent=4)
             print(f"Saved log: {file_path}")

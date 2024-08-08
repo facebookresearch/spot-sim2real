@@ -113,9 +113,10 @@ OBJECT_MESHES: ["blender bottle", "penguin", "cup", "cereal box", "hint can", "t
 
 # Grasp Parameters: any (default, let BD decides grasping), topdown, side
 RECEPTACLES:
-  dining_table : "any"
-  kitchen_island: "topdown"
-  white_table: "any"
+  coffee_table: "topdown"
+  sofa: "topdown"
+  dining_table: "topdown"
+  study_room_table: "topdown"
 
 # Base action params
 MAX_LIN_DIST: 0.25  # meters

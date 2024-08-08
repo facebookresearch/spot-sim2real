@@ -14,12 +14,12 @@ if __name__ == "__main__":
 
     if in_fre_lab:
         # at FRE
-        place_target = "dining_table"
+        place_target = "kitchen_right_inside"
     else:
         # at NYC
         place_target = "test_desk"
 
-    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=False)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
 
     is_local = False
     if enable_estimation_before_place:
