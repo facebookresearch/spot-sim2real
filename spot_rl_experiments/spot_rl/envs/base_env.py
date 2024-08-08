@@ -49,7 +49,7 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
-from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL
+from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pose_estimation import pose_estimation
 from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
@@ -324,6 +324,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 success = self.attempt_grasp(
                     action_dict.get("enable_pose_estimation", False),
                     action_dict.get("enable_force_control", False),
+                    action_dict.get("grasp_mode", "any"),
                 )
                 if success:
                     # Just leave the object on the receptacle if desired
@@ -472,9 +473,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return observations, reward, done, info
 
-    def attempt_grasp(self, enable_pose_estimation=False, enable_force_control=False):
+    def attempt_grasp(
+        self,
+        enable_pose_estimation=False,
+        enable_force_control=False,
+        grasp_mode: str = "any",
+    ):
         pre_grasp = time.time()
-        graspmode = "topdown"
+        graspmode = grasp_mode
         if enable_pose_estimation:
             image_scale = self.config.IMAGE_SCALE
             seg_port = self.config.SEG_PORT
@@ -497,7 +503,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 "hand_color_image_sensor",
                 transform_snapshot,
             )
-            gripper_T_intel = np.load(GRIPPER_T_INTEL) if image_src == 1 else np.eye(4)
+            gripper_T_intel = (
+                np.load(GRIPPER_T_INTEL_PATH) if image_src == 1 else np.eye(4)
+            )
             gripper_T_intel = mn.Matrix4(gripper_T_intel)
             body_T_cam: mn.Matrix4 = body_T_hand @ hand_T_gripper @ gripper_T_intel
             image_responses = [
@@ -577,7 +585,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 top_down_grasp=graspmode == "topdown",
                 horizontal_grasp=graspmode == "side",
                 timeout=10,
-                add_threshold_on_grasp=not enable_pose_estimation,
             )
         if self.config.USE_REMOTE_SPOT:
             ret = time.time() - pre_grasp > 3  # TODO: Make this better...

@@ -81,6 +81,7 @@ from perception_and_utils.utils.conversions import (
     bd_SE3Pose_to_ros_TransformStamped,
     bd_SE3Pose_to_sophus_SE3,
 )
+from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pixel_to_3d_conversion_utils import project_3d_to_pixel_uv
 from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.utils import (
@@ -178,6 +179,8 @@ SpotCamIdToFrameNameMap = {
     SpotCamIds.RIGHT_DEPTH: "right",
     SpotCamIds.RIGHT_DEPTH_IN_VISUAL_FRAME: "right_fisheye",
     SpotCamIds.RIGHT_FISHEYE: "right_fisheye",
+    SpotCamIds.INTEL_REALSENSE_COLOR: "hand_color_image_sensor",
+    SpotCamIds.INTEL_REALSENSE_DEPTH: "hand_color_image_sensor",
 }  # type: Dict[SpotCamIds, str]
 
 
@@ -225,8 +228,10 @@ class Spot:
         self.ik_client = robot.ensure_client(
             InverseKinematicsClient.default_service_name
         )
-        # Logging srcs init
-        self.source_list = []  # type: List[str]
+
+        # TODO: Add safety net
+        self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
+        print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
 
         # Used to re-center origin of global frame
         if osp.isfile(HOME_TXT):
@@ -500,99 +505,6 @@ class Spot:
 
         return image_responses.result() if await_the_resp else image_responses
 
-    def setup_logging_sources(self, camera_sources: List[str]):
-        """
-        Order .. RGB & then DEPTH_IN_RGB
-        DO NOT SUPPORT DEPTH and RGB_IN_DEPTH.
-        """
-        # By default, always log for hand camera data
-        source_list = [
-            SpotCamIds.HAND_COLOR,
-            SpotCamIds.HAND_COLOR_IN_HAND_DEPTH_FRAME,
-        ]  # type: List[str]
-
-        if not camera_sources:
-            print(
-                f"Empty list passed in logger camera sources, will initiate logger for : {source_list}"
-            )
-        else:
-            for camera_source in camera_sources:
-                if camera_source not in source_list:
-                    source_list.append(camera_source)
-
-        self.source_list = source_list
-        print(f"Initialized logging for sources : {self.source_list}")
-
-    def update_logging_data(
-        self,
-        include_image_data: bool = True,
-        visualize: bool = False,
-        verbose: bool = False,
-    ):
-        """Log robot data and camera info"""
-        log_packet = {
-            "timestamp": time.time(),
-            "datetime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
-            "camera_data": [],
-            "vision_T_base": None,
-            "base_pose_xyt": None,
-            "arm_pose": None,
-            "is_gripper_holding_item": None,
-            "gripper_open_percentage": None,
-            "gripper_force_in_hand": None,
-        }  # type: Dict[str, Any]
-
-        if include_image_data:
-            img_responses = self.get_image_responses(self.source_list)
-            frame_tree_snapshot = img_responses[0].shot.transforms_snapshot
-
-            for i, camera_source in enumerate(self.source_list):
-                log_packet["camera_data"].append(
-                    {
-                        "src_info": camera_source,
-                        "raw_image": image_response_to_cv2(
-                            img_responses[i], reorient=True
-                        ),  # np.ndarray
-                        "camera_intrinsics": self.get_camera_intrinsics_as_3x3(
-                            img_responses[i].source.pinhole.intrinsics
-                        ),  # np.ndarray
-                        "base_T_camera": self.get_sophus_SE3_spot_a_T_b(
-                            img_responses[i].shot.transforms_snapshot,
-                            a="body",
-                            b=SpotCamIdToFrameNameMap[camera_source],
-                        ).matrix(),  # np.ndarray
-                    }
-                )
-                if visualize:
-                    cv2.imshow(camera_source, log_packet["camera_data"][i]["raw_image"])
-            if visualize:
-                cv2.waitKey(1)
-
-        log_packet["vision_T_base"] = self.get_sophus_SE3_spot_a_T_b(
-            frame_tree_snapshot=frame_tree_snapshot, a="vision", b="body"
-        ).matrix()  # np.ndarray
-        log_packet["base_pose_xyt"] = np.asarray(
-            self.get_xy_yaw()
-        )  # robot's x,y,yaw w.r.t "home" frame provided spot_wrapper/home.txt exists
-        log_packet["arm_pose"] = self.get_arm_joint_positions()
-        log_packet["is_gripper_holding_item"] = bool(
-            self.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
-        )
-        log_packet[
-            "gripper_open_percentage"
-        ] = (
-            self.robot_state_client.get_robot_state().manipulator_state.gripper_open_percentage
-        )
-        log_packet[
-            "gripper_force_in_hand"
-        ] = (
-            self.robot_state_client.get_robot_state().manipulator_state.estimated_end_effector_force_in_hand
-        )
-
-        if verbose:
-            print(log_packet)
-        return log_packet
-
     def query_IK_reachability_of_gripper(self, se3querypose: SE3Pose) -> bool:
         """Check the reachability of a given pose of the gripper in the body frame"""
 
@@ -823,7 +735,6 @@ class Spot:
         data_edge_timeout=2,
         top_down_grasp=False,
         horizontal_grasp=False,
-        add_threshold_on_grasp=True,
     ):
         # If pixel location not provided, select the center pixel
         if pixel_xy is None:
@@ -873,8 +784,7 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            if add_threshold_on_grasp:
-                constraint.vector_alignment_with_tolerance.threshold_radians = 1.0 * 2
+            constraint.vector_alignment_with_tolerance.threshold_radians = 0.17
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(
@@ -1035,7 +945,6 @@ class Spot:
         )
 
         if blocking:
-            time.sleep(end_time)
             cmd_status = None
             while cmd_status != 1:
                 time.sleep(0.1)
@@ -1239,9 +1148,6 @@ class Spot:
             self.home_robot(write_to_file=True)
 
     def undock(self):
-        # Before undocking from dock, update the global_T_home transform
-        # member variable but not don't persist the changes in home.txt
-        self.home_robot(write_to_file=False)
         blocking_undock(self.robot)
 
     def power_robot(self):

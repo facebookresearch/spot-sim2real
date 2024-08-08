@@ -12,6 +12,9 @@ if __name__ == "__main__":
     object_name = "penguin plush toy"
     while contnue:
         spotskillmanager.spot.stand()
+        spotskillmanager.current_receptacle_name = (
+            "white_table"  # To test the grasping config
+        )
         spotskillmanager.pick(
             object_name,
             enable_pose_correction=True,

@@ -111,6 +111,12 @@ SEG_PORT: 21001 # port for segmentation service
 POSE_PORT: 2100 # port for pose estimation
 OBJECT_MESHES: ["bottle", "penguin", "cup", "cereal box", "hint can", "toy cup", "frosted flakes cup", "bowl", "oat creamer bottle"]
 
+# Grasp Parameters: any (default, let BD decides grasping), topdown, side
+RECEPTACLES:
+  dining_table : "any"
+  kitchen_island: "topdown"
+  white_table: "any"
+
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
@@ -121,6 +127,8 @@ MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
 MAX_JOINT_MOVEMENT_OPEN_CLOSE_DRAWER: 0.06
 STOW_ARM_JOINT_ANGLES: [0, -180, 180, 90, 0, -90]
 INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
+INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER: [0, -91, 33, 0, 100, 0]
+INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER: [0, -100, 33, 0, 89, 0]
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping (gripper is in object's right hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # The initial orientation of the arm for side grasping (gripper is in object's left hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
