@@ -950,7 +950,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             mn.Vector3(self.x, self.y, 0.5),
         )
 
-    def get_place_sensor(self, use_base_rot=False, semantic_place=True):
+    def get_place_sensor(self, use_base_rot=False):
         """Get the placing target x,y,z.
         param: use_base_rot: if we use base rotation as the ee rotation
         """
@@ -959,7 +959,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # use_base_rot=True is needed for computing the correct place target for the semantic
         # place skills. The normal place skill does not need this
-        use_base_rot = False
         if use_base_rot:
             if self.place_target_is_local:
                 # Get the transformationss
@@ -1004,10 +1003,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                         "hand", "body"
                     ).transform_point(mn.Vector3(*self.place_target))
                 )
-            elif semantic_place:
-                base_frame_place_target = self.get_base_frame_place_target_spot()
-                gripper_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("hand", "body")
-                gripper_pos = gripper_T_base.transform_point(base_frame_place_target)
             else:
                 gripper_T_base = self.get_in_gripper_tf()
                 base_T_gripper = gripper_T_base.inverted()
