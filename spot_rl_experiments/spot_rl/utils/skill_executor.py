@@ -46,7 +46,11 @@ class SpotRosSkillExecutor:
             nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
             # Call the skill
             if "None" not in nav_target_xyz:
-                nav_target_xyz = nav_target_xyz.split("|")[0:-1]
+                nav_target_xyz = (
+                    nav_target_xyz.split("|")[0:-1]
+                    if ("|" in nav_target_xyz)
+                    else nav_target_xyz
+                )
                 for nav_i, nav_target in enumerate(nav_target_xyz):
                     _nav_target = nav_target.split(",")
                     # This z and y are flipped due to hab convention
