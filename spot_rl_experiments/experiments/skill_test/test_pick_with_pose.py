@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
     contnue = True
-    object_name = "toy"
+    object_name = "pen_box"
     mesh_name = "black toy car"
     while contnue:
         spotskillmanager.spot.stand()
@@ -20,7 +20,7 @@ if __name__ == "__main__":
             object_name,
             mesh_name=mesh_name,
             enable_pose_correction=False,
-            enable_pose_estimation=True,
+            enable_pose_estimation=False,
             enable_force_control=False,
         )
         spotskillmanager.spot.open_gripper()
