@@ -1,6 +1,6 @@
 episode14:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:
@@ -13,7 +13,7 @@ episode14:
       - null
 episode15:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:
@@ -26,7 +26,7 @@ episode15:
       - null
 episode16:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:
@@ -39,7 +39,7 @@ episode16:
       - null
 episode17:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:
@@ -52,7 +52,7 @@ episode17:
       - null
 episode18:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:
@@ -65,7 +65,7 @@ episode18:
       - null
 episode19:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:
@@ -78,7 +78,7 @@ episode19:
       - null
 episode20:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: False
   actions:
     - nav:

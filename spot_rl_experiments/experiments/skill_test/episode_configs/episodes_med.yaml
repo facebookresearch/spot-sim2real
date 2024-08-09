@@ -1,55 +1,55 @@
-episode9:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "kitchen_island"
-    - pick:
-      - "pen box"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "study_room_table"
-    - place:
-      - null
-episode10:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "kitchen_island"
-    - pick:
-      - "can"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "coffee_table"
-    - place:
-      - null
-episode11:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "kitchen_left"
-    - pick:
-      - "bottle"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "dining_table"
-    - place:
-      - null
+# episode9:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_island"
+#     - pick:
+#       - "pen box"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "study_room_table"
+#     - place:
+#       - null
+# episode10:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_island"
+#     - pick:
+#       - "can"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "coffee_table"
+#     - place:
+#       - null
+# episode11:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_left"
+#     - pick:
+#       - "bottle"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "dining_table"
+#     - place:
+#       - null
 episode12:
   spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
+    use_mobile_pick: True
+    use_semantic_place: False
   actions:
     - nav:
       - "kitchen_counter"
@@ -64,7 +64,7 @@ episode12:
       - null
 episode13:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: True
   actions:
     - nav:
