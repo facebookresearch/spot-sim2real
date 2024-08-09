@@ -115,7 +115,7 @@ OBJECT_MESHES: ["blender bottle", "penguin", "cup", "cereal box", "hint can", "t
 RECEPTACLES:
   coffee_table: "topdown"
   sofa: "topdown"
-  dining_table: "topdown"
+  dining_table: "any"
   study_room_table: "topdown"
 
 # Base action params

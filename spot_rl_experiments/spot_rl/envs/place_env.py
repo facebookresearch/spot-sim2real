@@ -66,7 +66,7 @@ class SpotPlaceEnv(SpotBaseEnv):
     def get_observations(self):
         observations = {
             "joint": self.get_arm_joints(),
-            "obj_start_sensor": self.get_place_sensor(),
+            "obj_start_sensor": self.get_place_sensor(False, False),
         }
 
         return observations
@@ -167,7 +167,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         place = action_dict.get("grip_action", None) <= 0.0
 
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
-        cur_place_sensor_xyz = self.get_place_sensor(True)
+        cur_place_sensor_xyz = self.get_place_sensor(False)
         if (
             abs(cur_place_sensor_xyz[2]) < 0.05
             and np.linalg.norm(
@@ -201,7 +201,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         assert self.target_object_pose is not None
 
         # Get the gaol sensor
-        obj_goal_sensor = self.get_place_sensor(True)
+        obj_goal_sensor = self.get_place_sensor(False)
 
         # Get the delta ee orientation
         current_gripper_orientation = self.spot.get_ee_quaternion_in_body_frame()

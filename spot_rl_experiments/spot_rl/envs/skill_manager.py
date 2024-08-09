@@ -509,6 +509,12 @@ class SpotSkillManager:
                 return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
+        # if not is_local:
+        #     home_T_body = self.place_controller.env.curr_transform
+        #     place_target_location = home_T_body.inverted().transform_point(mn.Vector3(place_x, place_y, place_z))
+        #     place_x, place_y, place_z = np.array(place_target_location).astype(np.float64).tolist()
+        #     is_local = True
+
         status, message = self.place(
             place_x,
             place_y,

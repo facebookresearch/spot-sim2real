@@ -748,7 +748,7 @@ class Spot:
             transforms_snapshot_for_camera=image_response.shot.transforms_snapshot,
             frame_name_image_sensor=image_response.shot.frame_name_image_sensor,
             camera_model=image_response.source.pinhole,
-            walk_gaze_mode=3,
+            walk_gaze_mode=2,
         )
 
         if top_down_grasp or horizontal_grasp:
@@ -841,7 +841,7 @@ class Spot:
             (0.5, 0.7),
             (0.4, 0.5),
             (0.3, 0.6),
-            (0.2, 0.5),
+            (0.0, 1.0),
         ]
         n: int = len(claw_gripper_control_parameters)
         claw_gripper_command = None
