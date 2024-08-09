@@ -17,6 +17,7 @@ import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from spot_rl.utils.depth_map_utils import filter_depth
+from spot_rl.utils.tracking_service import tracking_with_socket
 from spot_wrapper.spot import Spot
 from spot_wrapper.spot import SpotCamIds as Cam
 from spot_wrapper.spot import image_response_to_cv2, scale_depth_img
@@ -316,6 +317,8 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        self._tracking_images = []
+        self._tracking_bbox = None
 
     def preprocess_image(self, img):
         if self.image_scale != 1.0:
@@ -344,10 +347,55 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         hand_rgb = self.msg_to_cv2(self.img_msg)
 
         # Internal model
+        # hand_rgb: (480, 640, 3)
+        # hand_rgb_preprocessed: (336, 448, 3)
         hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
+
+        _hand_rgb = hand_rgb_preprocessed.copy().astype("uint8")
+
+        enable_tracking = (
+            True if rospy.get_param("enable_tracking", "disable") == "enable" else False
+        )
+
         bbox_data, viz_img = self.model.inference(
             hand_rgb_preprocessed, timestamp, stopwatch
         )
+
+        time_stamp, detection_str = bbox_data.split("|")
+
+        # Reset everything
+        if not enable_tracking:
+            self._tracking_images = []
+            self._tracking_bbox = None
+
+        if detection_str != "None" and enable_tracking:
+            images = np.expand_dims(_hand_rgb, axis=0)
+            self._tracking_images.append(images)
+            if len(self._tracking_images) > 2:
+                self._tracking_images.pop(0)
+                input_images = np.concatenate(self._tracking_images, axis=0)
+                bbox_str = detection_str.split(",")[2:]
+                bbox = [int(v) for v in bbox_str]
+                if self._tracking_bbox is None:
+                    bbox = tracking_with_socket(input_images, bbox)
+                else:
+                    bbox = tracking_with_socket(input_images, self._tracking_bbox)
+                # change the order
+                bbox = [bbox[1], bbox[0], bbox[3], bbox[2]]
+                self._tracking_bbox = bbox
+
+                viz_img = cv2.rectangle(viz_img, bbox[:2], bbox[2:], (0, 0, 255), 5)
+                if bbox is not None:
+                    bbox_str = ",".join([str(v) for v in bbox])
+                    detection_str = (
+                        time_stamp
+                        + "|"
+                        + ",".join(detection_str.split(",")[0:2])
+                        + ","
+                        + bbox_str
+                    )
+                else:
+                    detection_str = time_stamp + "|None"
 
         # publish data
         self.publish_bbox_data(bbox_data)
@@ -455,6 +503,7 @@ if __name__ == "__main__":
     elif owlvit:
         # TODO dynamic label
         rospy.set_param("object_target", "ball")
+        rospy.set_param("enable_tracking", "disable")
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
     elif decompress:

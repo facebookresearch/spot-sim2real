@@ -4,6 +4,7 @@
 
 
 import numpy as np
+import rospy
 from spot_rl.envs.skill_manager import SpotSkillManager
 
 if __name__ == "__main__":
@@ -15,6 +16,7 @@ if __name__ == "__main__":
     # Using while loop
     contnue = True
     while contnue:
+        rospy.set_param("enable_tracking", "disable")
         spotskillmanager.opendrawer()
         close_drawer = map_user_input_to_boolean(
             "Do you want to close the drawer ? Y/N "

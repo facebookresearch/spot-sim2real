@@ -7,8 +7,11 @@ import numpy as np
 import torch
 import zmq
 from PIL import Image
-from sam2.build_sam import build_sam2_video_predictor
 
+try:
+    from sam2.build_sam import build_sam2_video_predictor
+except Exception:
+    print("no import of sam2")
 # use bfloat16 for the entire notebook
 torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
 
@@ -43,8 +46,8 @@ class Track:
         _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(
             inference_state=self.inference_state,
             frame_idx=0,
-            obj_id=0,
-            box=bbox,
+            obj_id=1,
+            box=np.array(bbox, dtype=np.float32),
         )
 
     def track(self):
@@ -62,10 +65,11 @@ class Track:
                 for i, out_obj_id in enumerate(out_obj_ids)
             }
         final_masks = None
-        for out_obj_id, out_mask in self.video_segments[out_frame_idx].items():
-            print("size of mask", out_mask.shape)
-            xmax, ymax = np.max(np.where(out_mask == 1), 1)
-            xmin, ymin = np.min(np.where(out_mask == 1), 1)
+        for _, out_mask in self.video_segments[out_frame_idx].items():
+            if np.sum(out_mask) == 0:
+                continue
+            xmax, ymax = np.max(np.where(out_mask[0] == 1), 1)
+            xmin, ymin = np.min(np.where(out_mask[0] == 1), 1)
             final_masks = [xmin, ymin, xmax, ymax]
         return final_masks
 
@@ -81,6 +85,7 @@ class Track:
             plt.imshow(self.cur_imgs[out_frame_idx])
             for out_obj_id, out_mask in self.video_segments[out_frame_idx].items():
                 show_mask(out_mask, plt.gca(), obj_id=out_obj_id)
+            plt.show()
 
 
 def connect_socket(port):
@@ -91,9 +96,11 @@ def connect_socket(port):
     return socket
 
 
-def tracking_with_socket(rgb_image, bbox, port=21001):
+def tracking_with_socket(images, bbox, port=21002):
+    # images with the size of [2, H, W, 3]
+    # bbox with the format of [x_min, y_min, x_max, y_max]
     socket = connect_socket(port)
-    socket.send_pyobj((rgb_image, bbox))
+    socket.send_pyobj((images, bbox))
     return socket.recv_pyobj()
 
 
@@ -110,64 +117,59 @@ def show_mask(mask, ax, obj_id=None, random_color=False):
 
 
 if __name__ == "__main__":
-    device = "cuda"
+    # sam2 = Track()
 
-    sam2 = Track()
+    # # Load the images
+    # from sam2.utils.misc import load_video_frames_light
 
-    # Load the images
-    from sam2.utils.misc import load_video_frames_light
+    # images, video_height, video_width = load_video_frames_light(
+    #     video_path="/home/jmmy/research/segment-anything-2/notebooks/videos/handle",
+    #     image_size=sam2.predictor.image_size,
+    #     offload_video_to_cpu=False,
+    #     async_loading_frames=False,
+    # )
+    # images = (images.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
+    # images = images[80:, :, :, :]
 
-    images, video_height, video_width = load_video_frames_light(
-        video_path="/home/jmmy/research/segment-anything-2/notebooks/videos/handle",
-        image_size=sam2.predictor.image_size,
-        offload_video_to_cpu=False,
-        async_loading_frames=False,
-    )
-    images = (images.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
-    images = images[80:, :, :, :]
+    # cur_bbox = [200, 340, 300, 350]  # (x_min, y_min, x_max, y_max)
+    # # Loop over images
+    # for i in range(len(images) - 1):
+    #     # images with the shape of torch.Size([# of frames, 1024, 1024, 3])
+    #     # Init the predictor
+    #     start_time = time.time()
+    #     sam2.init_state(images[i : i + 2])
+    #     # Add the bbox for the first frame
+    #     sam2.add_bbox(cur_bbox)
+    #     # Track the object
+    #     try:
+    #         raw_cur_bbox = sam2.track()
+    #         print("time taken to track one frame:", time.time() - start_time, "sec")
+    #         sam2.vis()
+    #     except Exception as e:
+    #         # Visualize the results
+    #         sam2.vis()
+    #     # For img coordinate
+    #     cur_bbox = [raw_cur_bbox[1], raw_cur_bbox[0], raw_cur_bbox[3], raw_cur_bbox[2]]
 
-    cur_bbox = [300, 0, 500, 400]  # (x_min, y_min, x_max, y_max)
+    # breakpoint()
 
-    # Loop over images
-    for i in range(len(images) - 1):
-        # images with the shape of torch.Size([# of frames, 1024, 1024, 3])
-        # Init the predictor
-        start_time = time.time()
-        sam2.init_state(images[i : i + 2])
-        # Add the bbox for the first frame
-        sam2.add_bbox(cur_bbox)
-        # Track the object
-        raw_cur_bbox = sam2.track()
-        cur_bbox = [raw_cur_bbox[1], raw_cur_bbox[0], raw_cur_bbox[3], raw_cur_bbox[2]]
-        print("time taken to track one frame:", time.time() - start_time, "sec")
-        # Visualize the results
-        sam2.vis()
-        breakpoint()
-
-    breakpoint()
-
-    port = "21001"
+    port = "21002"
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.bind(f"tcp://*:{port}")
-    print(f"Segmentation Server Listening on port {port}")
+    print(f"Tracking Server Listening on port {port}")
 
+    sam2 = Track()
     while True:
-        """A service for running segmentation service, send request using zmq socket"""
-        img, bbox = socket.recv_pyobj()
-        print("Recieved img for Segmentation")
-        masks = sam2.track()
-        mask = masks[0, 0].cpu().numpy()  # hxw, bool
-        socket.send_pyobj(mask)
-
-# If you want to use detection service, then use the following code to listen to socket
-# def detect_with_socket(img, object_name, thresh=0.01, device="cuda"):
-#     """Fetch the detection result"""
-#     subprocess.Popen("spot_rl_detection_service", shell=True)
-#     port = 21001
-#     context = zmq.Context()
-#     socket = context.socket(zmq.REQ)
-#     socket.connect(f"tcp://localhost:{port}")
-#     print(f"Socket Connected at {port}")
-#     socket.send_pyobj((img, object_name, thresh, device))
-#     return socket.recv_pyobj()
+        """A service for running tracking service, send request using zmq socket"""
+        images, bbox = socket.recv_pyobj()
+        print(f"Recieved images for tracking with {bbox}")
+        start_time = time.time()
+        sam2.init_state(images)
+        cur_bbox = bbox
+        print(f"img box: {cur_bbox}")
+        sam2.add_bbox(cur_bbox)
+        new_bbox = sam2.track()
+        print(f"time taken: {time.time()-start_time}")
+        # sam2.vis()
+        socket.send_pyobj(new_bbox)
