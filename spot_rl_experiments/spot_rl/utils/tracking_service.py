@@ -92,7 +92,6 @@ def connect_socket(port):
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.connect(f"tcp://localhost:{port}")
-    print(f"Socket Connected at {port}")
     return socket
 
 
@@ -163,13 +162,10 @@ if __name__ == "__main__":
     while True:
         """A service for running tracking service, send request using zmq socket"""
         images, bbox = socket.recv_pyobj()
-        print(f"Recieved images for tracking with {bbox}")
         start_time = time.time()
         sam2.init_state(images)
         cur_bbox = bbox
-        print(f"img box: {cur_bbox}")
         sam2.add_bbox(cur_bbox)
         new_bbox = sam2.track()
-        print(f"time taken: {time.time()-start_time}")
         # sam2.vis()
         socket.send_pyobj(new_bbox)

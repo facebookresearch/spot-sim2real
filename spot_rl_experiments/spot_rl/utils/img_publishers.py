@@ -318,7 +318,8 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
         self._tracking_images = []
-        self._tracking_bbox = None
+        self._tracking_bboxs = []
+        self._tracking_first_time = True
 
     def preprocess_image(self, img):
         if self.image_scale != 1.0:
@@ -357,45 +358,73 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             True if rospy.get_param("enable_tracking", "disable") == "enable" else False
         )
 
-        bbox_data, viz_img = self.model.inference(
-            hand_rgb_preprocessed, timestamp, stopwatch
-        )
-
-        time_stamp, detection_str = bbox_data.split("|")
-
-        # Reset everything
+        viz_img = hand_rgb_preprocessed
         if not enable_tracking:
+            # Normal detection
+            bbox_data, viz_img = self.model.inference(
+                hand_rgb_preprocessed, timestamp, stopwatch
+            )
+            time_stamp, detection_str = bbox_data.split("|")
             self._tracking_images = []
+            self._tracking_bboxs = []
             self._tracking_bbox = None
-
-        if detection_str != "None" and enable_tracking:
+            self._tracking_first_time = True
+        else:
+            # Start tracking
             images = np.expand_dims(_hand_rgb, axis=0)
             self._tracking_images.append(images)
-            if len(self._tracking_images) > 2:
-                self._tracking_images.pop(0)
-                input_images = np.concatenate(self._tracking_images, axis=0)
-                bbox_str = detection_str.split(",")[2:]
-                bbox = [int(v) for v in bbox_str]
-                if self._tracking_bbox is None:
-                    bbox = tracking_with_socket(input_images, bbox)
-                else:
-                    bbox = tracking_with_socket(input_images, self._tracking_bbox)
-                # change the order
-                bbox = [bbox[1], bbox[0], bbox[3], bbox[2]]
-                self._tracking_bbox = bbox
 
-                viz_img = cv2.rectangle(viz_img, bbox[:2], bbox[2:], (0, 0, 255), 5)
-                if bbox is not None:
-                    bbox_str = ",".join([str(v) for v in bbox])
-                    detection_str = (
-                        time_stamp
-                        + "|"
-                        + ",".join(detection_str.split(",")[0:2])
-                        + ","
-                        + bbox_str
-                    )
+            if len(self._tracking_images) == 1 and self._tracking_first_time:
+                self._tracking_first_time = False
+                # Get the first detection
+                bbox_data, viz_img = self.model.inference(
+                    hand_rgb_preprocessed, timestamp, stopwatch
+                )
+                _, detection_str = bbox_data.split("|")
+                if detection_str == "None":
+                    # Do not see the object yet, so restart
+                    self._tracking_images = []
+                    self._tracking_bboxs = []
+                    self._tracking_bbox = None
+                    self._tracking_first_time = True
                 else:
-                    detection_str = time_stamp + "|None"
+                    # See the object already
+                    cur_bbox_str = detection_str.split(",")[2:]
+                    cur_bbox = [int(v) for v in cur_bbox_str]
+                    self._tracking_bboxs.append(cur_bbox)
+            elif len(self._tracking_images) >= 2:
+                # This means that there is one object being detected in the last frame (first frame)
+                input_images = np.concatenate(self._tracking_images, axis=0)
+                # Get the last anchor
+                bbox = self._tracking_bboxs[-1]
+                cur_bbox = tracking_with_socket(input_images, bbox)
+                if cur_bbox is None:
+                    self._tracking_bboxs.append(None)
+                    bbox_data = f"{str(timestamp)}|None"
+                else:
+                    cur_bbox = [cur_bbox[1], cur_bbox[0], cur_bbox[3], cur_bbox[2]]
+                    self._tracking_bboxs.append(cur_bbox)
+                    object_label = rospy.get_param("object_target")
+                    bbox_data = f"{str(timestamp)}|{object_label},{1.0}," + ",".join(
+                        [str(v) for v in cur_bbox]
+                    )
+                    viz_img = cv2.rectangle(
+                        viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                    )
+
+            if len(self._tracking_images) >= 2:
+                # Try shrink the the buffer
+                cur_size = len(self._tracking_bboxs)
+
+                # Find the frame that has tracking
+                suc_frame = []
+                for i in range(cur_size):
+                    if self._tracking_bboxs[i] is not None:
+                        suc_frame.append(i)
+
+                # Only preseve the latest frame that has tracking
+                self._tracking_images = [self._tracking_images[suc_frame[-1]]]
+                self._tracking_bboxs = [self._tracking_bboxs[suc_frame[-1]]]
 
         # publish data
         self.publish_bbox_data(bbox_data)
