@@ -19,8 +19,14 @@ if torch.cuda.get_device_properties(0).major >= 8:
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-SAM2_CKPT = "/home/jmmy/research/segment-anything-2/checkpoints/sam2_hiera_large.pt"
-if not os.path.exists(SAM2_CKPT):
+# SAM2_CKPT = "segment-anything-2/checkpoints/sam2_hiera_large.pt"
+SAM2_CKPT = None
+for root, dirs, files in os.walk("/home/"):
+    if "sam2_hiera_large.pt" in files:
+        SAM2_CKPT = os.path.join(root, "sam2_hiera_large.pt")
+        break
+
+if SAM2_CKPT is None:
     print("Cannot import sam2. Please provide sam2 checkpoint")
     raise Exception("Cannot import sam2. Please provide sam2 checkpoint")
 MODEL_CFG = "sam2_hiera_l.yaml"
