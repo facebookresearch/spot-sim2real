@@ -100,7 +100,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Update target object name as provided in config
         observations = super().reset(target_obj_name="drawer handle", *args, **kwargs)
         rospy.set_param("object_target", self.target_obj_name)
-        rospy.set_param("enable_tracking", "enable")
+        rospy.set_param("enable_tracking", True)
 
         # Flag for done
         self._success = False

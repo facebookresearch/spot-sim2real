@@ -1,7 +1,6 @@
 import os
 import time
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -11,25 +10,25 @@ from PIL import Image
 try:
     from sam2.build_sam import build_sam2_video_predictor
 except Exception:
-    print("no import of sam2")
+    print("Do not import sam2 in the main loop. sam2 needs sam2 conda env")
+
 # use bfloat16 for the entire notebook
 torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
 
 if torch.cuda.get_device_properties(0).major >= 8:
-    # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
-
-sam2_checkpoint = (
-    "/home/jmmy/research/segment-anything-2/checkpoints/sam2_hiera_large.pt"
-)
-model_cfg = "sam2_hiera_l.yaml"
+SAM2_CKPT = "/home/jmmy/research/segment-anything-2/checkpoints/sam2_hiera_large.pt"
+if not os.path.exists(SAM2_CKPT):
+    print("Cannot import sam2. Please provide sam2 checkpoint")
+    raise Exception("Cannot import sam2. Please provide sam2 checkpoint")
+MODEL_CFG = "sam2_hiera_l.yaml"
 
 
 class Track:
     def __init__(self):
-        self.predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint)
+        self.predictor = build_sam2_video_predictor(MODEL_CFG, SAM2_CKPT)
         self.cur_imgs = None
         self.video_segments = {}
 
@@ -65,9 +64,10 @@ class Track:
                 for i, out_obj_id in enumerate(out_obj_ids)
             }
         final_masks = None
-        for _, out_mask in self.video_segments[out_frame_idx].items():
-            if np.sum(out_mask) == 0:
-                continue
+
+        # Get the final mask
+        _, out_mask = list(self.video_segments[out_frame_idx])[-1]
+        if np.sum(out_mask) != 0:
             xmax, ymax = np.max(np.where(out_mask[0] == 1), 1)
             xmin, ymin = np.min(np.where(out_mask[0] == 1), 1)
             final_masks = [xmin, ymin, xmax, ymax]
@@ -116,42 +116,6 @@ def show_mask(mask, ax, obj_id=None, random_color=False):
 
 
 if __name__ == "__main__":
-    # sam2 = Track()
-
-    # # Load the images
-    # from sam2.utils.misc import load_video_frames_light
-
-    # images, video_height, video_width = load_video_frames_light(
-    #     video_path="/home/jmmy/research/segment-anything-2/notebooks/videos/handle",
-    #     image_size=sam2.predictor.image_size,
-    #     offload_video_to_cpu=False,
-    #     async_loading_frames=False,
-    # )
-    # images = (images.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
-    # images = images[80:, :, :, :]
-
-    # cur_bbox = [200, 340, 300, 350]  # (x_min, y_min, x_max, y_max)
-    # # Loop over images
-    # for i in range(len(images) - 1):
-    #     # images with the shape of torch.Size([# of frames, 1024, 1024, 3])
-    #     # Init the predictor
-    #     start_time = time.time()
-    #     sam2.init_state(images[i : i + 2])
-    #     # Add the bbox for the first frame
-    #     sam2.add_bbox(cur_bbox)
-    #     # Track the object
-    #     try:
-    #         raw_cur_bbox = sam2.track()
-    #         print("time taken to track one frame:", time.time() - start_time, "sec")
-    #         sam2.vis()
-    #     except Exception as e:
-    #         # Visualize the results
-    #         sam2.vis()
-    #     # For img coordinate
-    #     cur_bbox = [raw_cur_bbox[1], raw_cur_bbox[0], raw_cur_bbox[3], raw_cur_bbox[2]]
-
-    # breakpoint()
-
     port = "21002"
     context = zmq.Context()
     socket = context.socket(zmq.REP)
@@ -167,5 +131,40 @@ if __name__ == "__main__":
         cur_bbox = bbox
         sam2.add_bbox(cur_bbox)
         new_bbox = sam2.track()
-        # sam2.vis()
+        # sam2.vis() # debug
         socket.send_pyobj(new_bbox)
+
+# Debug code
+# sam2 = Track()
+
+# # Load the images
+# from sam2.utils.misc import load_video_frames_light
+
+# images, video_height, video_width = load_video_frames_light(
+#     video_path="/home/jmmy/research/segment-anything-2/notebooks/videos/handle",
+#     image_size=sam2.predictor.image_size,
+#     offload_video_to_cpu=False,
+#     async_loading_frames=False,
+# )
+# images = (images.permute(0, 2, 3, 1).cpu().numpy() * 255).astype("uint8")
+# images = images[80:, :, :, :]
+
+# cur_bbox = [200, 340, 300, 350]  # (x_min, y_min, x_max, y_max)
+# # Loop over images
+# for i in range(len(images) - 1):
+#     # images with the shape of torch.Size([# of frames, 1024, 1024, 3])
+#     # Init the predictor
+#     start_time = time.time()
+#     sam2.init_state(images[i : i + 2])
+#     # Add the bbox for the first frame
+#     sam2.add_bbox(cur_bbox)
+#     # Track the object
+#     try:
+#         raw_cur_bbox = sam2.track()
+#         print("time taken to track one frame:", time.time() - start_time, "sec")
+#         sam2.vis()
+#     except Exception as e:
+#         # Visualize the results
+#         sam2.vis()
+#     # For img coordinate
+#     cur_bbox = [raw_cur_bbox[1], raw_cur_bbox[0], raw_cur_bbox[3], raw_cur_bbox[2]]

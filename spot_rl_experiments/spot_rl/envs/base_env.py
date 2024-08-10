@@ -173,6 +173,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self._max_lin_dist_scale = self.config[max_lin_dist_key]
         self._max_ang_dist_scale = self.config[max_ang_dist_key]
 
+        # Tracking paramters reset
+        rospy.set_param("enable_tracking", False)
+
         # Text-to-speech
         self.tts_pub = rospy.Publisher(rt.TEXT_TO_SPEECH, String, queue_size=1)
 

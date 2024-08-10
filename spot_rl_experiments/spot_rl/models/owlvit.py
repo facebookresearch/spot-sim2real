@@ -318,9 +318,6 @@ class OwlVit:
             )
             idx += 1
 
-            if idx == 1:
-                break
-
         return img
 
     def create_img_with_bounding_box_no_ranking(self, img, results):
