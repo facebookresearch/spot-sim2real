@@ -105,6 +105,7 @@ class robot_simulation:
             self.robot_new_xyyaw(xyyaw)
             self._goal_heading_list.append(self.compute_angle())
 
+        plt.close("all")
         fig = plt.figure()
         self.ax = fig.add_subplot(1, 1, 1)
 
@@ -123,7 +124,7 @@ class robot_simulation:
         self.ax.set_ylim([-axis_size, axis_size])
         plt.gca().invert_xaxis()
 
-        # make arrows and x,y labels
+        # Make arrows and x,y labels
         self.ax.plot(
             (0),
             (0),
@@ -147,16 +148,32 @@ class robot_simulation:
         self.ax.set_xlabel("$Y$", size=14, labelpad=-24, x=-0.02)
         self.ax.set_ylabel("$X$", size=14, labelpad=-21, y=1.02, rotation=0)
 
+        # Animation
         ani = animation.FuncAnimation(
             fig=fig,
             func=self.animation_update,
             frames=len(self._goal_heading_list) + 1,
             interval=1,
         )
+
+        # Add legend
+        self.ax.scatter([], [], marker="*", s=25, c="red", label="target goal")
+        marker, scale = gen_arrow_head_marker(np.pi / 2)
+        self.ax.scatter(
+            [],
+            [],
+            marker=marker,
+            s=(25 * scale) ** 1.5,
+            c="b",
+            label="robot pose (x, y, yaw)",
+        )
+        plt.legend(loc=1)
+
         ani.save(filename=save_name, writer="pillow")
 
     def animation_update(self, frame):
         # for each frame, update the data stored on each artist.
+        print(frame, len(self._goal_heading_list))
         if frame == 0:
             return
         goal_headings = self._goal_heading_list[:frame]
@@ -165,6 +182,7 @@ class robot_simulation:
         x_data = [v[1] for v in xyyaws]
         y_data = [v[0] for v in xyyaws]
         yaw_data = [v[2] for v in xyyaws]
+        # Plot the point
         for i in range(len(x_data)):
             marker, scale = gen_arrow_head_marker(
                 yaw_data[i] + np.pi / 2
@@ -181,7 +199,7 @@ class robot_simulation:
                 str(int(np.rad2deg(goal_headings[i]))), (x_data[i] - 0.35, y_data[i])
             )
 
-        # Plot target
+        # Plot target goal
         self.ax.scatter(
             self._goal_xy[1],
             self._goal_xy[0],
@@ -190,7 +208,6 @@ class robot_simulation:
             c="red",
             label="target goal",
         )
-        self.ax.legend(loc="upper right")
 
 
 if __name__ == "__main__":
@@ -212,8 +229,8 @@ if __name__ == "__main__":
     for i, goal_xy in enumerate([[1, -1], [-1, 1], [-1, -1], [1, 1]]):
         robot_sim = robot_simulation(goal_xy)
         animation_list = []
-        for x in range(-4, 4, 2):
-            for y in range(-4, 4, 2):
+        for x in range(-2, 4, 2):
+            for y in range(-2, 4, 2):
                 for yaw in range(-180, 180, 45):
                     animation_list.append([x, y, np.deg2rad(yaw)])
         robot_sim.animate(animation_list, f"debug_{i}.gif")
