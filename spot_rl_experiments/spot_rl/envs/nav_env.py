@@ -130,3 +130,17 @@ class SpotNavEnv(SpotBaseEnv):
             self.goal_heading = wrap_heading(self.yaw + rotation_delta)
 
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
+
+    def step(self):
+        observations, reward, done, info = super().step()
+
+        # Slow the base down if we are close to the nav target to slow down the the heading changes
+        dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
+        abs_good_heading = abs(observations["goal_heading"][0])
+
+        if dist_to_goal < 1.5 and abs_good_heading < np.rad2deg(45):
+            self.slowdown_base = 0.5
+        else:
+            self.slowdown_base = -1
+
+        return observations, reward, done, info

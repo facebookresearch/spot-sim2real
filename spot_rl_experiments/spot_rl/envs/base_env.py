@@ -393,10 +393,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         if not (grasp or place):
             if self.slowdown_base > -1 and base_action is not None:
-                # self.ctrl_hz = self.slowdown_base
-                base_action = (
-                    np.array(base_action) * self.slowdown_base
-                )  # / self.ctrl_hz
+                base_action = np.array(base_action) * self.slowdown_base
                 print("Slow down...")
             if base_action is not None and arm_action is not None:
                 print("input base_action velocity:", arr2str(base_action))
@@ -519,13 +516,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Is the agent at the goal?
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
         at_goal = dist_to_goal < success_distance
-        good_heading = abs(observations["goal_heading"][0]) < success_angle
+        abs_good_heading = abs(observations["goal_heading"][0])
+        good_heading = abs_good_heading < success_angle
+
         # Debug msg
-        goal_str = "goal_heading"
         print(f"nav stats: dis: {round(success_distance,2)} {round(dist_to_goal,2)}")
         print(
-            f"absolute delta heading: {round(success_angle,2)} {round(abs(observations[goal_str][0]),2)}"
+            f"absolute delta heading: {round(success_angle,2)} {round(abs_good_heading,2)}"
         )
+
         return at_goal and good_heading
 
     def print_nav_stats(self, observations):
