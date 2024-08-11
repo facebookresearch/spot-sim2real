@@ -268,6 +268,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.prev_base_moved = False
         self.should_end = False
         rospy.set_param("is_whiten_black", True)
+        rospy.set_param("enable_tracking", False)
         observations = self.get_observations()
         return observations
 

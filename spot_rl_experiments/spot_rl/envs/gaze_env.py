@@ -63,6 +63,7 @@ class SpotGazeEnv(SpotBaseEnv):
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
         rospy.set_param("is_gripper_blocked", 0)
+        rospy.set_param("enable_tracking", True)
         return observations
 
     def step(self, action_dict: Dict[str, Any]):
@@ -151,6 +152,7 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
         rospy.set_param("is_gripper_blocked", 0)
+        rospy.set_param("enable_tracking", True)
         self.grasping_type = grasping_type
         return observations
 
