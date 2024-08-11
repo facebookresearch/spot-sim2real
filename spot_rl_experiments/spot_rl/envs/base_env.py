@@ -520,6 +520,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
         at_goal = dist_to_goal < success_distance
         good_heading = abs(observations["goal_heading"][0]) < success_angle
+        # Debug msg
+        goal_str = "goal_heading"
+        print(f"nav stats: dis: {round(success_distance,2)} {round(dist_to_goal,2)}")
+        print(
+            f"absolute delta heading: {round(success_angle,2)} {round(abs(observations[goal_str][0]),2)}"
+        )
         return at_goal and good_heading
 
     def print_nav_stats(self, observations):

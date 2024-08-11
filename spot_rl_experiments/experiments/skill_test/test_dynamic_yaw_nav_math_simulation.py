@@ -7,7 +7,7 @@ import numpy as np
 from svgpath2mpl import parse_path
 from svgpathtools import svg2paths
 
-axis_size = 10
+axis_size = 14
 
 
 def wrap_heading(heading):
@@ -59,6 +59,10 @@ def gen_arrow_head_marker(rot):
     return arrow_head_marker, scale
 
 
+def point_in_circle(h, k, r, theta):
+    return h + np.cos(theta) * r, k + np.sin(theta) * r
+
+
 class robot_simulation:
     def __init__(self, goal_xy):
         self.x, self.y, self.yaw = [0, 0, 0]  # x, y, theta
@@ -98,12 +102,20 @@ class robot_simulation:
         goal_heading = wrap_heading(self.yaw + rotation_delta)
         return goal_heading
 
+    def goal_heading_delta(self, goal_heading):
+        goal_heading_delta = -wrap_heading(goal_heading - self.yaw)
+        return goal_heading_delta
+
     def animate(self, xyyaw_list, save_name):
         self._goal_heading_list = []
+        self._goal_heading_delta_list = []
         self._xyyaw_list = xyyaw_list
         for xyyaw in xyyaw_list:
             self.robot_new_xyyaw(xyyaw)
             self._goal_heading_list.append(self.compute_angle())
+            self._goal_heading_delta_list.append(
+                self.goal_heading_delta(self._goal_heading_list[-1])
+            )
 
         plt.close("all")
         fig = plt.figure()
@@ -165,7 +177,7 @@ class robot_simulation:
             marker=marker,
             s=(25 * scale) ** 1.5,
             c="b",
-            label="robot pose (x, y, yaw)",
+            label="robot pose (x, y, yaw) w/ goal_heading; delta_heading",
         )
         plt.legend(loc=1)
 
@@ -178,6 +190,7 @@ class robot_simulation:
             return
         goal_headings = self._goal_heading_list[:frame]
         xyyaws = self._xyyaw_list[:frame]
+        goal_headings_delta = self._goal_heading_delta_list[:frame]
         # update the scatter plot:
         x_data = [v[1] for v in xyyaws]
         y_data = [v[0] for v in xyyaws]
@@ -195,8 +208,19 @@ class robot_simulation:
                 c="b",
                 label="robot pose",
             )
+            # Add the goal heading text
             self.ax.annotate(
-                str(int(np.rad2deg(goal_headings[i]))), (x_data[i] - 0.35, y_data[i])
+                str(int(np.rad2deg(goal_headings[i]))) + ";",
+                (x_data[i] - 0.1, y_data[i]),
+                fontsize=6,
+                color="black",
+            )
+            # Add the delta heading text
+            self.ax.annotate(
+                str(round(np.rad2deg(goal_headings_delta[i]), 1)),
+                (x_data[i] - 0.8, y_data[i]),
+                fontsize=6,
+                color="green",
             )
 
         # Plot target goal
@@ -229,8 +253,10 @@ if __name__ == "__main__":
     for i, goal_xy in enumerate([[1, -1], [-1, 1], [-1, -1], [1, 1]]):
         robot_sim = robot_simulation(goal_xy)
         animation_list = []
-        for x in range(-2, 4, 2):
-            for y in range(-2, 4, 2):
+        for x in range(-8, 12, 8):
+            for y in range(-8, 12, 8):
                 for yaw in range(-180, 180, 45):
-                    animation_list.append([x, y, np.deg2rad(yaw)])
+                    _x, _y = point_in_circle(x, y, 1.5, np.deg2rad(yaw))
+                    animation_list.append([_x, _y, np.deg2rad(yaw)])
+
         robot_sim.animate(animation_list, f"debug_{i}.gif")
