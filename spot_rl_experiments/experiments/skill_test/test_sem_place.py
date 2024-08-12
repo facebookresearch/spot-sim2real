@@ -7,14 +7,14 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 
 if __name__ == "__main__":
     # Know which location we are doing experiments
-    in_fre_lab = map_user_input_to_boolean("Are you Tushar in FRE? Y/N ")
-    enable_estimation_before_place = map_user_input_to_boolean(
-        "Enable estimation before place? Y/N "
-    )
+    in_fre_lab = True  # map_user_input_to_boolean("Are you Tushar in FRE? Y/N ")
+    enable_estimation_before_place = False  # map_user_input_to_boolean(
+    #  "Enable estimation before place? Y/N "
+    # )
 
     if in_fre_lab:
         # at FRE
-        place_target = "kitchen_counter"
+        place_target = "bedroom_dresser"
     else:
         # at NYC
         place_target = "test_desk"
@@ -31,11 +31,11 @@ if __name__ == "__main__":
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
         # spotskillmanager.pick("bottle")
-        # spotskillmanager.nav(place_target)
+        spotskillmanager.nav(place_target)
         spotskillmanager.place(
             None if enable_estimation_before_place else place_target,
             is_local=is_local,
-            visualize=True,
+            visualize=False,
         )
         # spotskillmanager.contrainedplace("bowl", is_local=is_local, proposition="left")
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")

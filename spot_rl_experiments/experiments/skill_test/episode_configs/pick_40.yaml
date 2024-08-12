@@ -1,27 +1,27 @@
-# episode6:
-#   spotskillmanagerargs:
-#     use_mobile_pick: False
-#   actions:
-#     - nav:
-#       - "lab_desk"
-#     - pick:
-#       - "bowl"
-# episode7:
-#   spotskillmanagerargs:
-#     use_mobile_pick: False
-#   actions:
-#     # - nav:
-#     #   - "lab_desk"
-#     - pick:
-#       - "hint can"
-# episode8:
-#   spotskillmanagerargs:
-#     use_mobile_pick: False
-#   actions:
-#     # - nav:
-#     #   - "lab_desk"
-#     - pick:
-#       - "coffee cup"
+episode6:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    - nav:
+      - "lab_desk"
+    - pick:
+      - "bowl"
+episode7:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_desk"
+    - pick:
+      - "hint can"
+episode8:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+  actions:
+    # - nav:
+    #   - "lab_desk"
+    - pick:
+      - "coffee cup"
 episode9:
   spotskillmanagerargs:
     use_mobile_pick: False

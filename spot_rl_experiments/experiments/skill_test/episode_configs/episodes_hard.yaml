@@ -46,54 +46,54 @@
 #       - "study_room_table"
 #     - place:
 #       - null
-episode4:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "coffee_table"
-    - pick:
-      - "cup"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "dishwasher"
-    - place:
-      - "dishwasher"
-episode5:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "kitchen_left"
-    - pick:
-      - "yogurt"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "kitchen_shelf"
-    - place:
-      - "kitchen_shelf"
-episode6:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "study_room_table"
-    - pick:
-      - "hint can"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "fridge"
-    - place:
-      - "fridge"
+# episode4:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "coffee_table"
+#     - pick:
+#       - "cup"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "dishwasher"
+#     - place:
+#       - "dishwasher"
+# episode5:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_left"
+#     - pick:
+#       - "yogurt"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "kitchen_shelf"
+#     - place:
+#       - "kitchen_shelf"
+# episode6:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "study_room_table"
+#     - pick:
+#       - "hint can"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "fridge"
+#     - place:
+#       - "fridge"
 episode7:
   spotskillmanagerargs:
     use_mobile_pick: False
@@ -102,27 +102,27 @@ episode7:
     - nav:
       - "dining_table"
     - pick:
-      - "bowl"
+      - "cup"
       # - True
       # - False
       # - True
     - nav:
-      - "sink"
+      - "sink_v2"
     - place:
-      - "sink"
-episode8:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-    use_semantic_place: True
-  actions:
-    - nav:
-      - "kitchen_counter"
-    - pick:
-      - "blender bottle"
-      # - True
-      # - False
-      # - True
-    - nav:
-      - "sink"
-    - place:
-      - "sink"
+      - "sink_v2"
+# episode8:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "kitchen_counter"
+#     - pick:
+#       - "blender bottle"
+#       # - True
+#       # - False
+#       # - True
+#     - nav:
+#       - "sink"
+#     - place:
+#       - "sink"

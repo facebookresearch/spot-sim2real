@@ -12,8 +12,8 @@ if __name__ == "__main__":
     spotskillmanager = SpotSkillManager(use_mobile_pick=False)
     contnue = True
     while contnue:
-        spotskillmanager.nav("dining_table_demo")
-        spotskillmanager.pick("bottle")
+        spotskillmanager.nav("white_desk_lab")
+        spotskillmanager.pick("bowl")
         # spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
