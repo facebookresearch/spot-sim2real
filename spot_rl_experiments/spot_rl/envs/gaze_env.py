@@ -43,6 +43,9 @@ class SpotGazeEnv(SpotBaseEnv):
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
 
     def reset(self, target_obj_name, *args, **kwargs):
+        # Reset tracking
+        rospy.set_param("enable_tracking", False)
+
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
