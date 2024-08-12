@@ -72,7 +72,8 @@ class Track:
         final_masks = None
 
         # Get the final mask
-        _, out_mask = list(self.video_segments[out_frame_idx])[-1]
+        result = [(k, v) for k, v in self.video_segments[out_frame_idx].items()]
+        out_mask = result[-1][1]
         if np.sum(out_mask) != 0:
             xmax, ymax = np.max(np.where(out_mask[0] == 1), 1)
             xmin, ymin = np.min(np.where(out_mask[0] == 1), 1)
