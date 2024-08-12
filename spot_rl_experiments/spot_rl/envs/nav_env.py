@@ -131,8 +131,8 @@ class SpotNavEnv(SpotBaseEnv):
 
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
-    def step(self):
-        observations, reward, done, info = super().step()
+    def step(self, *args, **kwargs):
+        observations, reward, done, info = super().step(*args, **kwargs)
 
         # Slow the base down if we are close to the nav target to slow down the the heading changes
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
