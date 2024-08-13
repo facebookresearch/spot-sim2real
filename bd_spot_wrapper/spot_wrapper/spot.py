@@ -404,6 +404,7 @@ class Spot:
             )
         cmd_id = self.command_client.robot_command(command)
         success_status = self.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+        self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return success_status
 
     def move_gripper_to_point(
@@ -635,8 +636,10 @@ class Spot:
         # Send the request
         move_command_id = self.command_client.robot_command(command)
         self.robot.logger.info("Moving arm to position.")
-
-        return self.block_until_arm_arrives(move_command_id, seconds + 1)
+        msg = self.block_until_arm_arrives(move_command_id, seconds + 1)
+        # Set the robot base velocity to reset the base motion
+        self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
+        return msg
 
     def grasp_point_in_image_with_IK(
         self,

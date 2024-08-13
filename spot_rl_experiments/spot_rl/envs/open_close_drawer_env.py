@@ -178,8 +178,6 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             f"self.get_gripper_position_in_base_frame_spot() {self.get_gripper_position_in_base_frame_spot()}"
         )
         print(f"move_target {move_target}")
-        # Set the robot base velocity to reset the base motion
-        self.spot.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         self.spot.move_gripper_to_point(
             move_target,
             [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
@@ -243,11 +241,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         ########################################################
         ### Step 1: Get the location of handle in hand frame ###
         ########################################################
-        # Always get the latest detection, gripper moves a lot and loses sight
-        _, pixel_x, pixel_y = self.compute_distance_to_handle()
         imgs = self.spot.get_hand_image()
 
-        image_rgb = image_response_to_cv2(imgs[0])
         depth_raw = image_response_to_cv2(imgs[1])
 
         # Always get the latest detection, gripper moves a lot and loses sight, maybe comment later
@@ -283,13 +278,15 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         )
 
         # Debug -- verify point in image, comment later
-        image_rgb = cv2.circle(
-            image_rgb, (int(pixel_x), int(pixel_y)), radius=4, color=(0, 0, 255)
-        )
-        cv2.namedWindow("Handle", cv2.WINDOW_NORMAL)
-        cv2.imshow("Handle", image_rgb)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # image_rgb = image_response_to_cv2(imgs[0])
+        # image_rgb = cv2.circle(
+        #     image_rgb, (int(pixel_x), int(pixel_y)), radius=4, color=(0, 0, 255)
+        # )
+        # cv2.namedWindow("Handle", cv2.WINDOW_NORMAL)
+        # cv2.imshow("Handle", image_rgb)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
+
         point_in_base_3d = mn.Vector3(*point_in_base_3d)
 
         # Make it to be numpy
@@ -310,12 +307,12 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             # Fixed quaternion for better pose
             ee_rotation = quaternion.quaternion(
                 0.71277446, 0.70131284, 0.00662719, 0.00830902
-            )  # self.spot.get_ee_quaternion_in_body_frame()
+            )
         elif self._rep_type == "drawer":
             # Fixed quaternion for better pose
             ee_rotation = quaternion.quaternion(
                 0.99998224, 0.00505713, 0.00285832, 0.00132725
-            )  # self.spot.get_ee_quaternion_in_body_frame()
+            )
             # Move the gripper to target using current gripper pose in the body frame
             # while maintaining the gripper orientation
 
