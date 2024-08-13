@@ -404,6 +404,8 @@ class Spot:
             )
         cmd_id = self.command_client.robot_command(command)
         success_status = self.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+
+        # Set the robot base velocity to reset the base motion after calling body movement
         self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return success_status
 
@@ -600,7 +602,7 @@ class Spot:
         gripper_pose_quats: List[List[float]],
         seconds: int = 5,
         allow_body_follow: bool = True,
-        arm_offset: List[float] = [0.55, 0, 0.25],
+        body_offset_from_hand: List[float] = [0.55, 0, 0.25],
     ) -> bool:
         """Move the arm to the given point in the body frame and the given gripper poses, and allow
         the body to follow the arm."""
@@ -616,7 +618,9 @@ class Spot:
             mobility_command = mobility_command_pb2.MobilityCommand.Request(
                 follow_arm_request=basic_command_pb2.FollowArmCommand.Request(
                     body_offset_from_hand=Vec3(
-                        x=arm_offset[0], y=arm_offset[1], z=arm_offset[2]
+                        x=body_offset_from_hand[0],
+                        y=body_offset_from_hand[1],
+                        z=body_offset_from_hand[2],
                     )
                 )
             )
@@ -637,7 +641,8 @@ class Spot:
         move_command_id = self.command_client.robot_command(command)
         self.robot.logger.info("Moving arm to position.")
         msg = self.block_until_arm_arrives(move_command_id, seconds + 1)
-        # Set the robot base velocity to reset the base motion
+
+        # Set the robot base velocity to reset the base motion after calling body movement
         self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return msg
 

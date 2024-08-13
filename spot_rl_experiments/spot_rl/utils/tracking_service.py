@@ -7,16 +7,16 @@ import torch
 import zmq
 from PIL import Image
 
-move_ahead = False
+LOAD_SAM2 = False
 try:
     from sam2.build_sam import build_sam2_video_predictor
 
-    move_ahead = True
+    LOAD_SAM2 = True
 except Exception:
-    print("Do not import sam2 in the main loop. sam2 needs sam2 conda env")
-    move_ahead = False
+    print("Cannot import SAM2. SAM2 needs SAM2 conda env. Skipping...")
+    LOAD_SAM2 = False
 
-if move_ahead:
+if LOAD_SAM2:
     # use bfloat16 for the entire notebook
     torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
 

@@ -679,26 +679,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if self.parallel_inference_mode:
             self.detection_timestamp = None
             # Use .copy() to prevent mutations during iteration
-            try:
-                for i in reversed(self.detections_buffer["detections"].copy()):
-                    if (
-                        i in self.detections_buffer["detections"]
-                        and i in self.detections_buffer["filtered_depth"]
-                    ):
-                        self.detection_timestamp = i
-                        setattr(self, "retrials", 0)
-                        break
-                if self.detection_timestamp is None:
-                    raise RuntimeError(
-                        "Could not correctly synchronize gaze observations"
-                    )
-            except RuntimeError:
-                self.retrials = getattr(self, "retrials", 0) + 1
-                raise RuntimeError(
-                    "Could not correctly synchronize gaze observations"
-                ) if self.retrials > 50 else self.get_gripper_images(
-                    save_image=save_image
-                )
+            for i in reversed(self.detections_buffer["detections"].copy()):
+                if (
+                    i in self.detections_buffer["detections"]
+                    and i in self.detections_buffer["filtered_depth"]
+                ):
+                    self.detection_timestamp = i
+                    break
+            if self.detection_timestamp is None:
+                raise RuntimeError("Could not correctly synchronize gaze observations")
 
             self.detections_str_synced, filtered_hand_depth = (
                 self.detections_buffer["detections"][self.detection_timestamp],
