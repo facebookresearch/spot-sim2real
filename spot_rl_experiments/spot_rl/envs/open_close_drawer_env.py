@@ -7,12 +7,21 @@ import sys
 import time
 from typing import Any, Dict
 
+import cv2
 import magnum as mn
 import numpy as np
 import quaternion
 import rospy
+import sophuspy as sp
+from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
+from bosdyn.client.math_helpers import Quat, SE3Pose
 from spot_rl.envs.base_env import SpotBaseEnv
-from spot_rl.utils.heuristic_nav import get_3d_point
+from spot_rl.utils.pixel_to_3d_conversion_utils import (
+    get_3d_point,
+    project_3d_to_pixel_uv,
+    sample_patch_around_point,
+)
+from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
 from spot_wrapper.utils import angle_between_quat
 
@@ -159,6 +168,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         move_target = vision_T_base.inverted().transform_point(move_target)
 
         # Retract the arm based on the current gripper location
+        # This doesn't stop coming back because of arm follow command, check with BD ?
         self.spot.move_gripper_to_point(
             move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
         )
@@ -214,48 +224,60 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             vel_time=0.8,
         )
 
-    def approach_handle_and_grasp(self, z, pixel_x, pixel_y):
+    def approach_handle_and_grasp(self):
         """This method does IK to approach the handle and close the gripper to grasp the handle."""
 
         ########################################################
         ### Step 1: Get the location of handle in hand frame ###
         ########################################################
+        # always get the latest detection, gripper moves a lot & loses sight
+        _, pixel_x, pixel_y = self.compute_distance_to_handle()
 
         imgs = self.spot.get_hand_image()
 
+        image_rgb = image_response_to_cv2(imgs[0])
+        depth_raw = image_response_to_cv2(imgs[1])
+
+        # always get the latest detection, gripper moves a lot & loses sight, maybe comment later
+        x1, y1, x2, y2 = detect_with_rospy_subscriber(
+            rospy.get_param("/object_target", "drawer handle"), self.config.IMAGE_SCALE
+        )
+        pixel_x, pixel_y = (x1 + x2) // 2, (y1 + y2) // 2
+
+        z = sample_patch_around_point(pixel_x, pixel_y, depth_raw) * 1e-3
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
 
-        # Get the transformation
-        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-
-        # Get the 3D point in the hand RGB frame
+        # z -= 0.05 #offset to do pinch grasping
         point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
 
-        # Get the vision to hand
-        vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-            "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            GRAV_ALIGNED_BODY_FRAME_NAME,
+            "link_wr1",
         )
-        point_in_global_3d = vision_T_hand_image.transform_point(
+        hand_T_gripper: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+            "arm0.link_wr1",
+            "hand_color_image_sensor",
+            imgs[0].shot.transforms_snapshot,
+        )
+        body_T_gripper: mn.Matrix4 = body_T_hand @ hand_T_gripper
+        point_in_base_3d = body_T_gripper.transform_point(
             mn.Vector3(*point_in_hand_image_3d)
         )
 
-        # Get the transformation of the gripper
-        vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
-        # Get the location relative to the gripper
-        point_in_hand_3d = vision_T_hand.inverted().transform_point(point_in_global_3d)
-        # Offset the x and z direction in hand frame
-        ee_offset_x = 0.05 if self._rep_type == "drawer" else 0.05
-        ee_offset_y = 0.0 if self._rep_type == "drawer" else 0.01
-        ee_offset_z = -0.05 if self._rep_type == "drawer" else 0.02
-        point_in_hand_3d[0] += ee_offset_x
-        point_in_hand_3d[1] += ee_offset_y
-        point_in_hand_3d[2] += ee_offset_z
-        # Make it back to global frame
-        point_in_global_3d = vision_T_hand.transform_point(point_in_hand_3d)
+        print(
+            f"Drawer point in gripper 3D {point_in_hand_image_3d}, point in body {point_in_base_3d}"
+        )
 
-        # Get the point in the base frame
-        point_in_base_3d = vision_T_base.inverted().transform_point(point_in_global_3d)
+        # verify point in image, comment later
+        image_rgb = cv2.circle(
+            image_rgb, (int(pixel_x), int(pixel_y)), radius=4, color=(0, 0, 255)
+        )
+        cv2.namedWindow("Handle", cv2.WINDOW_NORMAL)
+        cv2.imshow("Handle", image_rgb)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        point_in_base_3d = mn.Vector3(*point_in_base_3d)
 
         # Make it to be numpy
         point_in_base_3d = np.array(
@@ -271,7 +293,10 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         ###############################################
 
         # Get the current ee rotation in body frame
-        ee_rotation = self.spot.get_ee_quaternion_in_body_frame()
+        # Fixed quaternion for better pose
+        ee_rotation = quaternion.quaternion(
+            0.99998224, 0.00505713, 0.00285832, 0.00132725
+        )  # #self.spot.get_ee_quaternion_in_body_frame()
 
         # For the cabnet part: rotation the gripper by 90 degree
         if self._rep_type == "cabinet":
@@ -282,16 +307,26 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         elif self._rep_type == "drawer":
             # Move the gripper to target using current gripper pose in the body frame
             # while maintaining the gripper orientation
-            self.spot.move_gripper_to_point(
-                point_in_base_3d,
-                [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+            is_point_reachable_without_mobility = (
+                self.spot.query_IK_reachability_of_gripper(
+                    SE3Pose(
+                        *point_in_base_3d,
+                        Quat(
+                            ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z
+                        ),
+                    )
+                )
+            )
+            self.spot.move_arm_to_point_with_body_follow(
+                [point_in_base_3d],
+                [[ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]],
+                seconds=10,
+                allow_body_follow=not is_point_reachable_without_mobility,
             )
 
         #################################
         ### Step 3: Close the gripper ###
         #################################
-
-        # Close the gripper
         self.spot.close_gripper()
         # Pause a bit to ensure the gripper grapes the handle
         time.sleep(2)
@@ -347,7 +382,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # We close gripper here
         if z != 0 and z < self._dis_threshold_ee_to_handle:
             # Do IK to approach the target
-            self.approach_handle_and_grasp(z, pixel_x, pixel_y)
+            self.approach_handle_and_grasp()
             # If we can do IK, then we call it successful
             done = self._success
 
