@@ -3,6 +3,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import json
+import time
 from functools import partial
 
 import numpy as np
@@ -10,7 +12,6 @@ import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from spot_rl.utils.utils import ros_topics as rt
-from spot_wrapper.spot import Spot
 from std_msgs.msg import Float32MultiArray
 
 IMG_TOPICS = [
@@ -96,3 +97,30 @@ class SpotRobotSubscriberMixin:
 
     def msg_to_cv2(self, *args, **kwargs) -> np.array:
         return self.cv_bridge.imgmsg_to_cv2(*args, **kwargs)
+
+
+if __name__ == "__main__":
+    from spot_wrapper.spot import Spot
+
+    spot = Spot("get_data")
+    sub = SpotRobotSubscriberMixin(spot)
+
+    data = []
+    print("start")
+    while True:
+        time.sleep(0.1)
+        data.append(sub.link_wr1_position)
+        if len(data) == 500:
+            break
+        print(len(data))
+
+    # Convert the list of tuples to a list of lists
+    data_as_lists = [list(item) for item in data]
+
+    # Dump the list of lists to a JSON string
+    json_data = json.dumps(data_as_lists)
+
+    file_name = "/home/jmmy/research/Nexus_data/ee_pose.json"
+    # Write the JSON string to a file
+    with open(file_name, "w") as file:
+        file.write(json_data)
