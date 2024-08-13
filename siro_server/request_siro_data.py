@@ -1,5 +1,6 @@
 import argparse
 import json
+import time
 
 import numpy as np
 from siro_robot_connection.siro_pub_sub import siro_publisher, siro_subscriber
@@ -10,6 +11,12 @@ class EEPosePublisher(siro_publisher):
         super().__init__(*args, **kwargs)
 
         # Open the file and load its contents as a Python object
+        # The ee pose data is a list of list: List[List].
+        # The element being robot gripper's x, y, z, relative to
+        # the robot base (body).
+        # +x is the robot's front;
+        # +y is the robot's left;
+        # +z is the robot's top
         with open(file_name, "r") as file:
             self.data = json.load(file)
 
@@ -21,6 +28,7 @@ class EEPosePublisher(siro_publisher):
         self.counter += 1
         if self.counter == len(self.data):
             self.counter = 0
+        time.sleep(0.1)  # in the real robot. this is 10Hz
         return msg
 
 
