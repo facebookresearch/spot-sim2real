@@ -305,39 +305,36 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         ### Step 2: Move the gripper to that handle ###
         ###############################################
 
-        # Get the current ee rotation in body frame
-        # Fixed quaternion for better pose
-        ee_rotation = quaternion.quaternion(
-            0.99998224, 0.00505713, 0.00285832, 0.00132725
-        )  # self.spot.get_ee_quaternion_in_body_frame()
-
         # For the cabnet part: rotation the gripper by 90 degree
         if self._rep_type == "cabinet":
-            self.spot.move_gripper_to_point(
-                point_in_base_3d,
-                [np.pi / 2, 0, 0],
-            )
+            # Fixed quaternion for better pose
+            ee_rotation = quaternion.quaternion(
+                0.71277446, 0.70131284, 0.00662719, 0.00830902
+            )  # self.spot.get_ee_quaternion_in_body_frame()
         elif self._rep_type == "drawer":
+            # Fixed quaternion for better pose
+            ee_rotation = quaternion.quaternion(
+                0.99998224, 0.00505713, 0.00285832, 0.00132725
+            )  # self.spot.get_ee_quaternion_in_body_frame()
             # Move the gripper to target using current gripper pose in the body frame
             # while maintaining the gripper orientation
-            is_point_reachable_without_mobility = (
-                self.spot.query_IK_reachability_of_gripper(
-                    SE3Pose(
-                        *point_in_base_3d,
-                        Quat(
-                            ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z
-                        ),
-                    )
+
+        is_point_reachable_without_mobility = (
+            self.spot.query_IK_reachability_of_gripper(
+                SE3Pose(
+                    *point_in_base_3d,
+                    Quat(ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z),
                 )
             )
+        )
 
-            self.spot.move_arm_to_point_with_body_follow(
-                [point_in_base_3d],
-                [[ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]],
-                seconds=5,
-                allow_body_follow=not is_point_reachable_without_mobility,
-                arm_offset=[0.9, 0, 0.35],
-            )
+        self.spot.move_arm_to_point_with_body_follow(
+            [point_in_base_3d],
+            [[ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]],
+            seconds=5,
+            allow_body_follow=not is_point_reachable_without_mobility,
+            arm_offset=[0.9, 0, 0.35],
+        )
 
         #################################
         ### Step 3: Close the gripper ###
