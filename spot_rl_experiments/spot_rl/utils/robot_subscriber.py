@@ -7,6 +7,7 @@ import json
 import time
 from functools import partial
 
+import magnum as mn
 import numpy as np
 import rospy
 from cv_bridge import CvBridge
@@ -86,13 +87,24 @@ class SpotRobotSubscriberMixin:
         self.msgs[topic] = msg
         self.updated[topic] = True
 
+    def curr_transform(self):
+        # Assume body is at default height of 0.5 m
+        # This is local_T_global.
+        return mn.Matrix4.from_(
+            mn.Matrix4.rotation_z(mn.Rad(self.yaw)).rotation(),
+            mn.Vector3(self.x, self.y, 0.5),
+        )
+
     def robot_state_callback(self, msg):
         x, y, yaw = msg.data[:3]
         self.x, self.y, self.yaw = self.spot.xy_yaw_global_to_home(x, y, yaw)
         self.current_arm_pose = msg.data[3:-7]
-        self.link_wr1_position, self.link_wr1_rotation = (
+        link_wr1_position, self.link_wr1_rotation = (
             msg.data[-7:][:3],
             msg.data[-7:][3:],
+        )
+        self.link_wr1_position = np.array(
+            self.curr_transform().transform_point(mn.Vector3(link_wr1_position))
         )
 
     def msg_to_cv2(self, *args, **kwargs) -> np.array:
