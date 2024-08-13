@@ -249,3 +249,50 @@ To install sophuspy in the existing spot_ros venv, please remove `sophus` and in
 pip uninstall sophus
 pip install sophuspy==0.0.8
 ```
+## Issues with Pose Estimation Module
+If faced cuDNN error while running Pose Estimation module, The version of cuDNN or CUDA installed on your system might not be compatible with the version of PyTorch or the GPU drivers you're using.
+```bash
+Loading DeblurGANv2 with: /home/Desktop/spot-sim2real/spot_rl_experiments/weights/fpn_inception.h5
+Traceback (most recent call last):
+  File "/home/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/img_publishers.py", line 500, in <module>
+    node.publish()
+  File "/home/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/img_publishers.py", line 212, in publish
+    super().publish()
+  File "/home/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/img_publishers.py", line 71, in publish
+    self._publish()
+  File "/home/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/img_publishers.py", line 347, in _publish
+    hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
+  File "/home/Desktop/spot-sim2real/spot_rl_experiments/spot_rl/utils/img_publishers.py", line 331, in preprocess_image
+    img = self.deblur_gan(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+  File "/home/Desktop/spot-sim2real/third_party/DeblurGANv2/deblur_gan/predictor.py", line 70, in __call__
+    pred = self.model(*inputs)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/Desktop/spot-sim2real/third_party/DeblurGANv2/deblur_gan/models/fpn_inception.py", line 66, in forward
+    map0, map1, map2, map3, map4 = self.fpn(x)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/Desktop/spot-sim2real/third_party/DeblurGANv2/deblur_gan/models/fpn_inception.py", line 142, in forward
+    enc0 = self.enc0(x)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/pretrainedmodels/models/inceptionresnetv2.py", line 49, in forward
+    x = self.conv(x)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 457, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/miniconda3/envs/spot_ros/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 453, in _conv_forward
+    return F.conv2d(input, weight, bias, self.stride,
+RuntimeError: Unable to find a valid cuDNN algorithm to run convolution
+
+```
+To fix this wjile just running mobile gaze and pick module and not the semantic pick module, make sure to comment out the following lines in local_only.sh
+```bash
+tmux new -s segmentation_service -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.segmentation_service'
+tmux new -s pose_estimation_service -d 'cd third_party/FoundationPoseForSpotSim2Real/ && sh run_pose_estimation_service.sh'
+tmux new -s ros_bridge_server -d 'roslaunch rosbridge_server rosbridge_tcp.launch'
+
+# This for running mask rcnn in img_publishers, which needs input images to be in grayscale
+tmux new -s img_pub -d '$CONDA_PREFIX/bin/python -m spot_rl.utils.img_publishers --local --bounding_box_detector mrcnn'
+```
