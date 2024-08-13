@@ -121,18 +121,22 @@ if __name__ == "__main__":
     print("start")
     while True:
         time.sleep(0.1)
-        data.append(sub.link_wr1_position)
+        data_dict = {
+            "timestamp": str(time.time()),
+            "pos_x": str(sub.link_wr1_position[0]),
+            "pos_y": str(sub.link_wr1_position[1]),
+            "pos_z": str(sub.link_wr1_position[2]),
+            "rot_x": str(sub.link_wr1_rotation[0]),
+            "rot_y": str(sub.link_wr1_rotation[1]),
+            "rot_z": str(sub.link_wr1_rotation[2]),
+            "rot_w": str(sub.link_wr1_rotation[3]),
+        }
+        data.append(data_dict)
         if len(data) == 500:
             break
         print(len(data))
 
-    # Convert the list of tuples to a list of lists
-    data_as_lists = [list(item) for item in data]
-
-    # Dump the list of lists to a JSON string
-    json_data = json.dumps(data_as_lists)
-
     file_name = "/home/jmmy/research/Nexus_data/ee_pose.json"
     # Write the JSON string to a file
-    with open(file_name, "w") as file:
-        file.write(json_data)
+    with open(file_name, "w") as outfile:
+        json.dump(data, outfile)
