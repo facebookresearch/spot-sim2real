@@ -446,7 +446,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.45, show_img=False):
+    def __init__(self, score_threshold=0.1, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
