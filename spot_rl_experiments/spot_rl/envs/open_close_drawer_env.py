@@ -12,7 +12,12 @@ import magnum as mn
 import numpy as np
 import quaternion
 import rospy
-import sophuspy as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
 from bosdyn.client.math_helpers import Quat, SE3Pose
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -160,7 +165,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the transformation of the gripper
         vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
         # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        pull_push_distance = -0.2 if self._mode == "open" else 0.25
+        pull_push_distance = -0.2 if self._mode == "open" else 0.30
         move_target = vision_T_hand.transform_point(
             mn.Vector3([pull_push_distance, 0, 0])
         )
@@ -169,6 +174,12 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Retract the arm based on the current gripper location
         # This doesn't stop coming back because of arm follow command, check with BD ?
+        print(
+            f"self.get_gripper_position_in_base_frame_spot() {self.get_gripper_position_in_base_frame_spot()}"
+        )
+        print(f"move_target {move_target}")
+        # Set the robot base velocity to reset the base motion
+        self.spot.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         self.spot.move_gripper_to_point(
             move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
         )
@@ -230,25 +241,25 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         ########################################################
         ### Step 1: Get the location of handle in hand frame ###
         ########################################################
-        # always get the latest detection, gripper moves a lot & loses sight
+        # Always get the latest detection, gripper moves a lot and loses sight
         _, pixel_x, pixel_y = self.compute_distance_to_handle()
-
         imgs = self.spot.get_hand_image()
 
         image_rgb = image_response_to_cv2(imgs[0])
         depth_raw = image_response_to_cv2(imgs[1])
 
-        # always get the latest detection, gripper moves a lot & loses sight, maybe comment later
+        # Always get the latest detection, gripper moves a lot and loses sight, maybe comment later
         x1, y1, x2, y2 = detect_with_rospy_subscriber(
             rospy.get_param("/object_target", "drawer handle"), self.config.IMAGE_SCALE
         )
         pixel_x, pixel_y = (x1 + x2) // 2, (y1 + y2) // 2
 
         z = sample_patch_around_point(pixel_x, pixel_y, depth_raw) * 1e-3
+
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
 
-        # z -= 0.05 #offset to do pinch grasping
+        # z -= 0.05 offset to do pinch grasping
         point_in_hand_image_3d = get_3d_point(cam_intrinsics, (pixel_x, pixel_y), z)
 
         body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
@@ -269,7 +280,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             f"Drawer point in gripper 3D {point_in_hand_image_3d}, point in body {point_in_base_3d}"
         )
 
-        # verify point in image, comment later
+        # Debug -- verify point in image, comment later
         image_rgb = cv2.circle(
             image_rgb, (int(pixel_x), int(pixel_y)), radius=4, color=(0, 0, 255)
         )
@@ -296,7 +307,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Fixed quaternion for better pose
         ee_rotation = quaternion.quaternion(
             0.99998224, 0.00505713, 0.00285832, 0.00132725
-        )  # #self.spot.get_ee_quaternion_in_body_frame()
+        )  # self.spot.get_ee_quaternion_in_body_frame()
 
         # For the cabnet part: rotation the gripper by 90 degree
         if self._rep_type == "cabinet":
@@ -317,11 +328,13 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
                     )
                 )
             )
+
             self.spot.move_arm_to_point_with_body_follow(
                 [point_in_base_3d],
                 [[ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]],
-                seconds=10,
+                seconds=5,
                 allow_body_follow=not is_point_reachable_without_mobility,
+                arm_offset=[1.0, 0, 0.35],
             )
 
         #################################

@@ -599,6 +599,7 @@ class Spot:
         gripper_pose_quats: List[List[float]],
         seconds: int = 5,
         allow_body_follow: bool = True,
+        arm_offset: List[float] = [0.55, 0, 0.25],
     ) -> bool:
         """Move the arm to the given point in the body frame and the given gripper poses, and allow
         the body to follow the arm."""
@@ -613,7 +614,9 @@ class Spot:
             # Tell the robot's body to follow the arm
             mobility_command = mobility_command_pb2.MobilityCommand.Request(
                 follow_arm_request=basic_command_pb2.FollowArmCommand.Request(
-                    body_offset_from_hand=Vec3(x=0.5, y=0, z=0)
+                    body_offset_from_hand=Vec3(
+                        x=arm_offset[0], y=arm_offset[1], z=arm_offset[2]
+                    )
                 )
             )
             synchronized_command = synchronized_command_pb2.SynchronizedCommand.Request(
