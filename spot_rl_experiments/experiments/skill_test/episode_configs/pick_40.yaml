@@ -3,23 +3,23 @@ episode6:
     use_mobile_pick: False
   actions:
     - nav:
-      - "lab_desk"
+      - "white_desk_lab"
     - pick:
       - "bowl"
 episode7:
   spotskillmanagerargs:
     use_mobile_pick: False
   actions:
-    # - nav:
-    #   - "lab_desk"
+    - nav:
+      - "white_desk_lab"
     - pick:
       - "hint can"
 episode8:
   spotskillmanagerargs:
     use_mobile_pick: False
   actions:
-    # - nav:
-    #   - "lab_desk"
+    - nav:
+      - "white_desk_lab"
     - pick:
       - "coffee cup"
 episode9:
@@ -27,14 +27,14 @@ episode9:
     use_mobile_pick: False
   actions:
     - nav:
-      - "lab_desk"
+      - "white_desk_lab"
     - pick:
       - "blender bottle"
 episode10:
   spotskillmanagerargs:
     use_mobile_pick: False
   actions:
-  #   - nav:
-  #     - "lab_desk"
+    - nav:
+      - "white_desk_lab"
     - pick:
       - "yogurt cup"
