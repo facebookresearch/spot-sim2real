@@ -165,7 +165,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Get the transformation of the gripper
         vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
         # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        pull_push_distance = -0.2 if self._mode == "open" else 0.30
+        pull_push_distance = -0.2 if self._mode == "open" else 0.4
         move_target = vision_T_hand.transform_point(
             mn.Vector3([pull_push_distance, 0, 0])
         )
@@ -181,7 +181,9 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Set the robot base velocity to reset the base motion
         self.spot.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         self.spot.move_gripper_to_point(
-            move_target, [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]
+            move_target,
+            [ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z],
+            seconds_to_goal=7,
         )
 
     def open_cabinet(self):
@@ -334,7 +336,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
                 [[ee_rotation.w, ee_rotation.x, ee_rotation.y, ee_rotation.z]],
                 seconds=5,
                 allow_body_follow=not is_point_reachable_without_mobility,
-                arm_offset=[1.0, 0, 0.35],
+                arm_offset=[0.9, 0, 0.35],
             )
 
         #################################
