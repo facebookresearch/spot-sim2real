@@ -24,7 +24,10 @@ class EEPosePublisher(siro_publisher):
 
     def load_data(self):
         """load data into python object"""
-        msg = ",".join([str(v) for v in self.data[self.counter]])
+        msg = []
+        for k in self.data[self.counter]:
+            msg += [self.data[self.counter][k]]
+        msg = ",".join(msg)
         self.counter += 1
         if self.counter == len(self.data):
             self.counter = 0
