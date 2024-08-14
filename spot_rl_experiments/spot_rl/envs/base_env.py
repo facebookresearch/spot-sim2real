@@ -427,12 +427,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             arm_ee_action = rescale_arm_ee_actions(arm_ee_action)
             if np.count_nonzero(arm_ee_action) > 0:
                 # TODO: semantic place ee: move this to config
-                arm_ee_action *= 0.1
+                arm_ee_action[0:3] *= 0.015
+                arm_ee_action[3:6] *= 0.0125
                 xyz, rpy = self.spot.get_ee_pos_in_body_frame()
                 cur_ee_pose = np.concatenate((xyz, rpy), axis=0)
+                # Wrap the heading
                 arm_ee_action += cur_ee_pose
-                # TODO: semantic place ee: move this to config
-                arm_ee_action = np.clip(arm_ee_action, 0.5, 0.5)
+                arm_ee_action[3:] = wrap_heading(arm_ee_action[3:])
             else:
                 arm_ee_action = None
 
