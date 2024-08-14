@@ -119,7 +119,6 @@ class PolicyConverter:
     ):
         print("Loading policy...")
         self.device = torch.device(device)
-
         # Load the checkpoint
         checkpoint = torch.load(checkpoint_path, map_location="cpu")
 
