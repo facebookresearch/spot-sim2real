@@ -405,7 +405,8 @@ class Spot:
         cmd_id = self.command_client.robot_command(command)
         success_status = self.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
 
-        # Set the robot base velocity to reset the base motion after calling body movement
+        # Set the robot base velocity to reset the base motion after calling body movement.
+        # Without this, calling the move gripper function casues the base to move.
         self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return success_status
 
@@ -642,7 +643,8 @@ class Spot:
         self.robot.logger.info("Moving arm to position.")
         msg = self.block_until_arm_arrives(move_command_id, seconds + 1)
 
-        # Set the robot base velocity to reset the base motion after calling body movement
+        # Set the robot base velocity to reset the base motion after calling body movement.
+        # Without this, calling the move gripper function casues the base to move.
         self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return msg
 

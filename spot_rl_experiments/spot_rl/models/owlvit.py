@@ -322,7 +322,8 @@ class OwlVit:
 
     def create_img_with_bounding_box_no_ranking(self, img, results):
         """
-        Returns an image with all bounding boxes avove the threshold overlaid
+        Returns an image with all bounding boxes above the threshold overlaid.
+        Each class has only one bounding box.
         """
 
         results = self.get_most_confident_bounding_box_per_label(results)

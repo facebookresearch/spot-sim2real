@@ -43,9 +43,6 @@ class SpotGazeEnv(SpotBaseEnv):
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
 
     def reset(self, target_obj_name, *args, **kwargs):
-        # Reset tracking
-        rospy.set_param("enable_tracking", False)
-
         # Move arm to initial configuration
         cmd_id = self.spot.set_arm_joint_positions(
             positions=self.initial_arm_joint_angles, travel_time=1
@@ -66,7 +63,6 @@ class SpotGazeEnv(SpotBaseEnv):
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
         rospy.set_param("is_gripper_blocked", 0)
-        rospy.set_param("enable_tracking", True)
         return observations
 
     def step(self, action_dict: Dict[str, Any]):
@@ -155,7 +151,6 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         rospy.set_param("object_target", target_obj_name)
         rospy.set_param("is_gripper_blocked", 0)
-        rospy.set_param("enable_tracking", True)
         self.grasping_type = grasping_type
         return observations
 

@@ -195,7 +195,7 @@ git checkout main
 
 
 #### Step7. [Optional] Object detection with tracking (uses Meta's SAM2 Model)
-- Follow the instruction to setup SAM2 in [SAM2 github page](https://github.com/facebookresearch/segment-anything-2). You can create a new conda environment, different from spot conda environment. The reason for not merging these two environments is that spot-sim2real currently use a lower python version.
+- Follow the instruction to setup SAM2 [here](https://github.com/jimmytyyang/sam2_skills.git). You can create a new conda environment, different from spot conda environment. The reason for not merging these two environments is that spot-sim2real currently use a lower python version. In addition, we motify the orginal sam2 so that now it can take raw RGB images, rather than a video path.
 - Once finishing the installation, run tracking service on its own conda environment by
 ```bash
 python spot_rl_experiments/spot_rl/utils/tracking_service.py
@@ -246,7 +246,7 @@ This will record data in a while loop, press `Ctrl+c` to spot the logger. That w
 Warning : This logger will cause motion blur as camera data is logged while the robot moves. Currently we do not support Spot-Record-Go protocol to log
 
 #### Log replay
-It is also possible to replay the logged data (essentially the camera streams that have been logged) using the following command :
+It is also possible to replay the logged data (essentially the camera streams that have been logged) using the following command:
 ```bash
 python -m spot_wrapper.data_logger --replay="<name_of_log_file>.pkl"
 ```

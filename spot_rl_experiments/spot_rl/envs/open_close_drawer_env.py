@@ -301,7 +301,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Move the gripper to target using current gripper pose in the body frame
         # while maintaining the gripper orientation
-        # For the cabnet part: rotation the gripper by 90 degree
+        # For the cabinet part: rotation the gripper by 90 degree
         if self._rep_type == "cabinet":
             # Rotate the gripper by 90 degree
             ee_rotation = quaternion.quaternion(
