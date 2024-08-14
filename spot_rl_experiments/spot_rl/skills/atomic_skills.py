@@ -985,6 +985,7 @@ class SemanticPlaceEE(SemanticPlace):
         """Refer to class Skill for documentation"""
         # action size is 10
         # TODO: semantic place ee: check the order
+        # TODO: semantic place ee: check roll pitch yaw
         action_dict = {
             "arm_ee_action": action[:6],
             "base_action": action[6:8],
