@@ -13,7 +13,7 @@ import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from spot_rl.utils.utils import ros_topics as rt
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, String
 
 IMG_TOPICS = [
     rt.MASK_RCNN_VIZ_TOPIC,
@@ -77,6 +77,10 @@ class SpotRobotSubscriberMixin:
         else:
             self.spot = None
 
+        # Subscribe the target object detection
+        self.target_object_detection = []
+        rospy.Subscriber("/open_voc_object_detector", String, self.detections_callback)
+
         self.pick_target = "None"
         self.pick_object = "None"
         self.place_target = "None"
@@ -108,6 +112,10 @@ class SpotRobotSubscriberMixin:
             self.curr_transform().transform_point(mn.Vector3(link_wr1_position))
         )
 
+    def detections_callback(self, msg):
+        _, x, y, z = msg.data.split(",")
+        self.target_object_detection = [float(x), float(y), float(z)]
+
     def msg_to_cv2(self, *args, **kwargs) -> np.array:
         return self.cv_bridge.imgmsg_to_cv2(*args, **kwargs)
 
@@ -127,9 +135,10 @@ if __name__ == "__main__":
     print("start")
     while True:
         time.sleep(0.1)
+        cur_time = time.time()
         # To store the ee location in the home frame
         data_dict = {
-            "timestamp": str(time.time()),
+            "timestamp": str(cur_time),
             "pos_x": str(sub.link_wr1_position[0]),
             "pos_y": str(sub.link_wr1_position[1]),
             "pos_z": str(sub.link_wr1_position[2]),
@@ -140,8 +149,19 @@ if __name__ == "__main__":
         }
         data["ee_pose"].append(data_dict.copy())
 
-        if len(data["ee_pose"]) == 500:
+        # To store the object detection in the home frame
+        if sub.target_object_detection != []:
+            data_dict = {
+                "timestamp": str(cur_time),
+                "pos_x": str(sub.target_object_detection[0]),
+                "pos_y": str(sub.target_object_detection[1]),
+                "pos_z": str(sub.target_object_detection[2]),
+            }
+            data["target_object_detection"].append(data_dict.copy())
+
+        if len(data["ee_pose"]) == 500 or len(data["target_object_detection"]) == 500:
             break
+
         print(len(data["ee_pose"]))
 
     for kk in data_of_interest:
