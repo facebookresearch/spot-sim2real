@@ -113,8 +113,11 @@ class SpotRobotSubscriberMixin:
         )
 
     def detections_callback(self, msg):
-        _, x, y, z = msg.data.split(",")
-        self.target_object_detection = [float(x), float(y), float(z)]
+        try:
+            name, x, y, z = msg.data.split(",")
+            self.target_object_detection = [name, float(x), float(y), float(z)]
+        except Exception:
+            print("No detection")
 
     def msg_to_cv2(self, *args, **kwargs) -> np.array:
         return self.cv_bridge.imgmsg_to_cv2(*args, **kwargs)
@@ -153,9 +156,10 @@ if __name__ == "__main__":
         if sub.target_object_detection != []:
             data_dict = {
                 "timestamp": str(cur_time),
-                "pos_x": str(sub.target_object_detection[0]),
-                "pos_y": str(sub.target_object_detection[1]),
-                "pos_z": str(sub.target_object_detection[2]),
+                "label": str(sub.target_object_detection[0]),
+                "pos_x": str(sub.target_object_detection[1]),
+                "pos_y": str(sub.target_object_detection[2]),
+                "pos_z": str(sub.target_object_detection[3]),
             }
             data["target_object_detection"].append(data_dict.copy())
 
