@@ -986,10 +986,11 @@ class SemanticPlaceEE(SemanticPlace):
         # action size is 10
         # TODO: semantic place ee: check the order
         # TODO: semantic place ee: check roll pitch yaw
+        print(f"action: {action}")
         action_dict = {
             "arm_ee_action": action[:6],
-            "base_action": action[6:8],
-            "grip_action": action[8],
+            "base_action": action[7:9],
+            "grip_action": action[6],
         }
 
         return action_dict

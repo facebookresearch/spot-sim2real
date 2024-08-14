@@ -313,6 +313,7 @@ class SpotSemanticPlaceEEEnv(SpotBaseEnv):
         place = False
 
         # Place command is issued if the place action is smaller than zero
+        # TODO: semantic place ee: check how grip_action behaves!
         place = action_dict.get("grip_action", None) <= 0.0
 
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
