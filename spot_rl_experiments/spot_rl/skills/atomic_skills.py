@@ -343,9 +343,10 @@ class Navigation(Skill):
 
         # Reset the env and policy
         (goal_x, goal_y, goal_heading) = nav_target
-        observations = self.env.reset((goal_x, goal_y), goal_heading)
+        dynamic_yaw = goal_dict.get("dynamic_yaw")
+        dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
+        observations = self.env.reset((goal_x, goal_y), goal_heading, dynamic_yaw)
         self.policy.reset()
-
         # Logging and Debug
         self.env.say(f"Navigating to {goal_dict['nav_target']}")
 
@@ -358,23 +359,28 @@ class Navigation(Skill):
         """Refer to class Skill for documentation"""
         self.env.say("Navigation Skill finished .. checking status")
 
-        # nav_target = goal_dict["nav_target"]  # safe to access as sanity check passed
-        # Make the angle from rad to deg
-        # _nav_target_pose_deg = (
-        #     nav_target[0],
-        #     nav_target[1],
-        #     np.rad2deg(nav_target[2]),
-        # )
-        # TODO: since we are using concept graph, the yaw is dynamically changed
-        # We cannot use this function to check
-        # check_navigation_success = is_pose_within_bounds(
-        #     self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
-        #     _nav_target_pose_deg,
-        #     self.config.SUCCESS_DISTANCE,
-        #     self.config.SUCCESS_ANGLE_DIST,
-        # )
-        obs = self.env.get_observations()
-        check_navigation_success = self.env.get_success(obs, False)
+        dynamic_yaw = goal_dict.get("dynamic_yaw")
+        dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
+
+        if dynamic_yaw:
+            obs = self.env.get_observations()
+            check_navigation_success = self.env.get_success(obs, False)
+        else:
+            nav_target = goal_dict[
+                "nav_target"
+            ]  # safe to access as sanity check passed
+            # Make the angle from rad to deg
+            _nav_target_pose_deg = (
+                nav_target[0],
+                nav_target[1],
+                np.rad2deg(nav_target[2]),
+            )
+            check_navigation_success = is_pose_within_bounds(
+                self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
+                _nav_target_pose_deg,
+                self.config.SUCCESS_DISTANCE,
+                self.config.SUCCESS_ANGLE_DIST,
+            )
 
         # Update result log
         self.skill_result_log["time_taken"] = time.time() - self.start_time
@@ -460,20 +466,8 @@ class Pick(Skill):
         self.enable_pose_estimation: bool = False
         self.enable_pose_correction: bool = False
         self.enable_force_control: bool = False
-        self.enable_pose_estimation: bool = False
-        self.enable_pose_correction: bool = False
-        self.enable_force_control: bool = False
 
         self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
-
-    def set_pose_estimation_flags(
-        self, enable_pose_estimation: bool = False, enable_pose_correction: bool = False
-    ) -> None:
-        self.enable_pose_estimation = enable_pose_estimation
-        self.enable_pose_correction = enable_pose_correction
-
-    def set_force_control(self, enable_force_control: bool = False):
-        self.enable_force_control = enable_force_control
 
     def set_pose_estimation_flags(
         self, enable_pose_estimation: bool = False, enable_pose_correction: bool = False

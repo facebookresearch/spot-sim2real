@@ -16,6 +16,7 @@ class SpotNavEnv(SpotBaseEnv):
         super().__init__(config, spot)
         self._goal_xy = None
         self._enable_nav_by_hand = False
+        self._enable_dynamic_yaw = False
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
@@ -41,33 +42,25 @@ class SpotNavEnv(SpotBaseEnv):
                 f"{self.node_name} Disabling nav goal change get_nav_observation by base fn restored"
             )
 
-    def reset(self, goal_xy, goal_heading):
+    def reset(self, goal_xy, goal_heading, dynamic_yaw=False):
         self._goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading
         observations = super().reset()
+        self._enable_dynamic_yaw = dynamic_yaw
         assert len(self._goal_xy) == 2
+
+        if self._enable_dynamic_yaw:
+            self.succ_distance = self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
+            self.succ_angle = np.deg2rad(
+                self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
+            )
+        else:
+            self.succ_distance = self.config.SUCCESS_DISTANCE
+            self.succ_angle = np.deg2rad(self.config.SUCCESS_ANGLE_DIST)
 
         return observations
 
     def get_success(self, observations, succ_set_base=True):
-        gps = observations["target_point_goal_gps_and_compass_sensor"]
-        goal_heading = observations["goal_heading"]
-
-        # Compute angle_facing_target
-        vector_robot_to_target = self._goal_xy - np.array([self.x, self.y])
-        vector_robot_to_target = vector_robot_to_target / np.linalg.norm(
-            vector_robot_to_target
-        )
-        vector_forward_robot = np.array(
-            self.curr_transform.transform_vector(mn.Vector3(1, 0, 0))
-        )[[0, 1]]
-        vector_forward_robot = vector_forward_robot / np.linalg.norm(
-            vector_forward_robot
-        )
-        angle_facing_target = np.dot(vector_robot_to_target, vector_forward_robot)
-        print(
-            f"Nav info: gps: {gps}; goal_heading of obs: {goal_heading}; facing_goal: {angle_facing_target}"
-        )
         succ = self.get_nav_success(observations, self.succ_distance, self.succ_angle)
         if succ and succ_set_base:
             self.spot.set_base_velocity(0.0, 0.0, 0.0, 1 / self.ctrl_hz)
@@ -113,8 +106,7 @@ class SpotNavEnv(SpotBaseEnv):
 
         return observations
 
-    def get_observations(self):
-        # Modify the goal_heading here based on the current robot orientation
+    def get_current_angle_for_target_facing(self):
         vector_robot_to_target = self._goal_xy - np.array([self.x, self.y])
         vector_robot_to_target = vector_robot_to_target / np.linalg.norm(
             vector_robot_to_target
@@ -126,18 +118,39 @@ class SpotNavEnv(SpotBaseEnv):
             vector_forward_robot
         )
 
-        x1 = (
-            vector_robot_to_target[1] * vector_forward_robot[0]
-            - vector_robot_to_target[0] * vector_forward_robot[1]
-        )
-        x2 = (
-            vector_robot_to_target[0] * vector_forward_robot[0]
-            + vector_robot_to_target[1] * vector_forward_robot[1]
-        )
-        rotation_delta = np.arctan2(x1, x2)
-        # breakpoint()
-        self.goal_heading = wrap_heading(self.yaw + rotation_delta)
-        print(
-            f"goal_heading: {self.goal_heading}; self.yaw {self.yaw}; rotation_delta: {rotation_delta}"
-        )
+        return vector_robot_to_target, vector_forward_robot
+
+    def get_observations(self):
+        if self._enable_dynamic_yaw:
+            # Modify the goal_heading here based on the current robot orientation
+            (
+                vector_robot_to_target,
+                vector_forward_robot,
+            ) = self.get_current_angle_for_target_facing()
+            x1 = (
+                vector_robot_to_target[1] * vector_forward_robot[0]
+                - vector_robot_to_target[0] * vector_forward_robot[1]
+            )
+            x2 = (
+                vector_robot_to_target[0] * vector_forward_robot[0]
+                + vector_robot_to_target[1] * vector_forward_robot[1]
+            )
+            rotation_delta = np.arctan2(x1, x2)
+            self.goal_heading = wrap_heading(self.yaw + rotation_delta)
+
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
+
+    def step(self, *args, **kwargs):
+        observations, reward, done, info = super().step(*args, **kwargs)
+
+        # Slow the base down if we are close to the nav target to slow down the the heading changes
+        dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
+        abs_good_heading = abs(observations["goal_heading"][0])
+
+        if self._enable_dynamic_yaw:
+            if dist_to_goal < 1.5 and abs_good_heading < np.rad2deg(45):
+                self.slowdown_base = 0.5
+            else:
+                self.slowdown_base = -1
+
+        return observations, reward, done, info

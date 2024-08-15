@@ -8,7 +8,6 @@ import numpy as np
 import open3d as o3d
 import rospy
 from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
-from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.heuristic_nav import get_3d_point, get_best_uvz_from_detection
@@ -247,7 +246,7 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     place_point_generation_src: int = 1
     # Garther gripper image response -> snapshot tree
     gripper_resps = spot.get_hand_image()
-    rospy.set_param("is_gripper_blocked", 0)
+
     intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
     snapshot_tree = gripper_resps[0].shot.transforms_snapshot
     # Switch to intel/gripper depending on place_point_generation_src
@@ -292,15 +291,11 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     cosine_thresh: float = 0.25,
     body_T_hand: np.ndarray = np.eye(4),
     gripper_T_intel: np.ndarray = np.eye(4),
-    body_T_hand: np.ndarray = np.eye(4),
-    gripper_T_intel: np.ndarray = np.eye(4),
     visualize: bool = False,
 ):
     """Filter point clouds based on the normal"""
     direction_vector = direction_vector.reshape(3)
     normals = np.asarray(pcd_with_normals.normals).reshape(-1, 3)
-    body_T_intel = np.array(body_T_hand @ gripper_T_intel)
-    normals_in_body = np.dot(body_T_intel[:3, :3], normals.T).T.reshape(-1, 3)
     body_T_intel = np.array(body_T_hand @ gripper_T_intel)
     normals_in_body = np.dot(body_T_intel[:3, :3], normals.T).T.reshape(-1, 3)
     # Compute the dot product to get the cosines
@@ -310,7 +305,6 @@ def filter_pointcloud_by_normals_in_the_given_direction(
         np.where(cosines > cosine_thresh)[0]
     )
     if visualize:
-        # o3d.visualization.draw_geometries([pcd_with_normals])
         o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 
@@ -368,12 +362,6 @@ def detect_place_point_by_pcd_method(
         body_T_hand,
         gripper_T_intel,
         visualize=visualize,
-        pcd,
-        np.array([0.0, 0.0, 1.0]),
-        0.5,
-        body_T_hand,
-        gripper_T_intel,
-        visualize=visualize,
     )
 
     # Down-sample by using voxel
@@ -416,11 +404,7 @@ def detect_place_point_by_pcd_method(
         camera_intrinsics_intel, selected_xy, depth_at_selected_xy
     )
 
-
     selected_point_in_gripper = np.array(
-        gripper_T_intel.transform_point(mn.Vector3(*selected_point))
-    )
-    print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
         gripper_T_intel.transform_point(mn.Vector3(*selected_point))
     )
     print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
@@ -435,10 +419,6 @@ def detect_place_point_by_pcd_method(
         img_with_bbox = cv2.circle(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
-        # cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
-        # cv2.imshow("table_detection", img_with_bbox)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
         # For debug
         # cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
         # cv2.imshow("table_detection", img_with_bbox)
@@ -500,7 +480,6 @@ def contrained_place_point_estimation(
         body_T_hand,
         gripper_T_intel,
     ) = get_arguments(spot, gripper_T_intel)
-    time.sleep(1.5)
     time.sleep(1.5)
     print(f"Lookign for {object_target}")
 

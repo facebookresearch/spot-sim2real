@@ -3,12 +3,10 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import magnum as mn
-import magnum as mn
 import numpy as np
-import rospy
 import rospy
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
@@ -31,7 +29,6 @@ from spot_rl.utils.heuristic_nav import (
     ImageSearch,
     heurisitic_object_search_and_navigation,
 )
-from spot_rl.utils.pose_estimation import OrientationSolver
 from spot_rl.utils.pose_estimation import OrientationSolver
 from spot_rl.utils.search_table_location import (
     contrained_place_point_estimation,
@@ -234,8 +231,8 @@ class SpotSkillManager:
         # Reset the policies and environments via the controllers
         raise NotImplementedError
 
-    @multimethod  # type: ignore
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    @multimethod
+    def nav(self, nav_target: str = None) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a known string
 
@@ -278,7 +275,7 @@ class SpotSkillManager:
         self,
         x: float,
         y: float,
-        theta=float,
+        theta: float,
         reset_current_receptacle_name: bool = True,
     ) -> Tuple[bool, str]:
         """
@@ -300,6 +297,26 @@ class SpotSkillManager:
             None if reset_current_receptacle_name else self.current_receptacle_name
         )
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the navigation target with yaw specified as a metric location
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        theta = 0.0
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "dynamic_yaw": True,
+        }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -355,13 +372,6 @@ class SpotSkillManager:
         enable_pose_correction: bool = False,
         enable_force_control: bool = False,
     ) -> Tuple[bool, str]:
-    def pick(
-        self,
-        target_obj_name: str = None,
-        enable_pose_estimation: bool = False,
-        enable_pose_correction: bool = False,
-        enable_force_control: bool = False,
-    ) -> Tuple[bool, str]:
         """
         Perform the pick action on the pick target specified as string
 
@@ -409,25 +419,6 @@ class SpotSkillManager:
             enable_pose_estimation, enable_pose_correction
         )
         self.gaze_controller.set_force_control(enable_force_control)
-        if enable_pose_correction or enable_force_control:
-            assert (
-                enable_pose_estimation
-            ), "Pose estimation must be enabled if you want to perform pose correction or force control"
-
-        if enable_pose_estimation:
-            object_meshes = self.pick_config.get("OBJECT_MESHES", [])
-            found = False
-            for object_mesh_name in object_meshes:
-                if object_mesh_name in target_obj_name:
-                    found = True
-            assert (
-                found
-            ), f"{target_obj_name} not found in meshes that we have {object_meshes}"
-
-        self.gaze_controller.set_pose_estimation_flags(
-            enable_pose_estimation, enable_pose_correction
-        )
-        self.gaze_controller.set_force_control(enable_force_control)
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)
         if status and enable_pose_correction:
             spinal_axis = rospy.get_param("spinal_axis")
@@ -437,37 +428,13 @@ class SpotSkillManager:
                 correction_status,
                 put_back_object_status,
             ) = self.orientation_solver.perform_orientation_correction(
-                self.spot, spinal_axis, gamma, target_obj_name
+                self.spot,
+                spinal_axis,
+                self.gaze_controller.ee_point_before_starting_the_skill,
+                gamma,
+                target_obj_name,
             )
             status = status and correction_status and put_back_object_status
-        conditional_print(message=message, verbose=self.verbose)
-        return status, message
-
-    def semanticpick(
-        self, target_obj_name: str = None, grasping_type: str = "topdown"
-    ) -> Tuple[bool, str]:
-        """
-        Perform the semantic pick action on the pick target specified as string
-
-        Args:
-            target_obj_name (str): Descriptive name of the pick target (eg: ball_plush)
-            grasping_type (str): The grasping type
-
-        Returns:
-            bool: True if pick was successful, False otherwise
-            str: Message indicating the status of the pick
-        """
-        assert grasping_type in [
-            "topdown",
-            "side",
-        ], f"Do not support {grasping_type} grasping"
-
-        goal_dict = {
-            "target_object": target_obj_name,
-            "take_user_input": False,
-            "grasping_type": grasping_type,
-        }  # type: Dict[str, Any]
-        status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -549,8 +516,8 @@ class SpotSkillManager:
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
-                    self.pick_config.GAZE_ARM_JOINT_ANGLES,
-                    percentile=0,
+                    self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
+                    percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
@@ -611,7 +578,7 @@ class SpotSkillManager:
             object_target,
             proposition,
             self.spot,
-            self.pick_config.GAZE_ARM_JOINT_ANGLES,
+            self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
             percentile=70,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
