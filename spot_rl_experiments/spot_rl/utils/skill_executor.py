@@ -77,12 +77,13 @@ class SpotRosSkillExecutor:
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
-            # Use the following for the hardcode waypoint place
-            # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, True)
-            # Call semantic place skills
-            succeded, msg = self.spotskillmanager.place(
-                None, is_local=True, visualize=False
-            )
+            # Call static place skill with local waypoint
+            succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, True)
+
+            # Call semantic place skills with SpotCore/NUC and IntelRealsense
+            # succeded, msg = self.spotskillmanager.place(
+            #     None, is_local=True, visualize=False
+            # )
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
