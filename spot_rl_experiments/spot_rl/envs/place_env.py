@@ -219,6 +219,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             "joint": self.get_arm_joints(self.config.SEMANTIC_PLACE_JOINT_BLACKLIST),
             "is_holding": np.ones((1,)),
         }
+        print("---")
         return observations
 
 
