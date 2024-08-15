@@ -280,7 +280,7 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
         observations = {
             "joint": self.get_arm_joints(),
             "arm_depth": arm_depth,
-            "arm_depth_bbox": arm_depth_bbox,
+            "arm_depth_bbox22": arm_depth_bbox,
         }
         # Remap observation keys for mobile gaze as it was trained with Habitat version3
         observations = self.remap_observation_keys_for_hab3(observations)
