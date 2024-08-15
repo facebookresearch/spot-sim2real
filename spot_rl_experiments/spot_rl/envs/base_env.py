@@ -319,7 +319,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
-        target_yaw = None
+        # target_yaw = None
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
         grasp = grasp or self.config.GRASP_EVERY_STEP
@@ -395,13 +395,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 lin_dist *= self._max_lin_dist_scale
                 ang_dist *= np.deg2rad(self._max_ang_dist_scale)
 
-                target_yaw = wrap_heading(self.yaw + ang_dist)
+                # target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity
                 ctrl_period = 1 / self.ctrl_hz
                 # Don't even bother moving if it's just for a bit of distance
                 if abs(lin_dist) < 0.05 and abs(ang_dist) < np.deg2rad(3):
                     base_action = None
-                    target_yaw = None
+                    # target_yaw = None
                 else:
                     base_action = [lin_dist / ctrl_period, 0, ang_dist / ctrl_period]
                     self.prev_base_moved = True
@@ -476,22 +476,24 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         print(f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}")
 
         # Spin until enough time has passed during this step
-        start_time = time.time()
-        if base_action is not None or arm_action is not None:
-            while time.time() < start_time + 1 / self.ctrl_hz:
-                if target_yaw is not None and abs(
-                    wrap_heading(self.yaw - target_yaw)
-                ) < np.deg2rad(3):
-                    # Prevent overshooting of angular velocity
-                    self.spot.set_base_velocity(base_action[0], 0, 0, MAX_CMD_DURATION)
-                    target_yaw = None
-        elif not (grasp or place):
-            self.say("!!!! NO ACTIONS CALLED: moving to next step !!!!")
-            self.num_steps -= 1
+        # TODO: semantic place ee: temp hack to command this out
+        # for not using base velocity
+        # start_time = time.time()
+        # if base_action is not None or arm_action is not None:
+        #     while time.time() < start_time + 1 / self.ctrl_hz:
+        #         if target_yaw is not None and abs(
+        #             wrap_heading(self.yaw - target_yaw)
+        #         ) < np.deg2rad(3):
+        #             # Prevent overshooting of angular velocity
+        #             self.spot.set_base_velocity(base_action[0], 0, 0, MAX_CMD_DURATION)
+        #             target_yaw = None
+        # elif not (grasp or place):
+        #     self.say("!!!! NO ACTIONS CALLED: moving to next step !!!!")
+        #     self.num_steps -= 1
 
-        self.stopwatch.record("run_actions")
-        if base_action is not None:
-            self.spot.set_base_velocity(0, 0, 0, 0.5)
+        # self.stopwatch.record("run_actions")
+        # if base_action is not None:
+        #     self.spot.set_base_velocity(0, 0, 0, 0.5)
 
         observations = self.get_observations()
         self.stopwatch.record("get_observations")
