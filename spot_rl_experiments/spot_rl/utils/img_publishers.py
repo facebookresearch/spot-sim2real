@@ -17,6 +17,7 @@ import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from spot_rl.utils.depth_map_utils import filter_depth
+from spot_rl.utils.tracking_service import tracking_with_socket
 from spot_wrapper.spot import Spot
 from spot_wrapper.spot import SpotCamIds as Cam
 from spot_wrapper.spot import image_response_to_cv2, scale_depth_img
@@ -316,6 +317,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        self._reset_tracking_params()
 
     def preprocess_image(self, img):
         if self.image_scale != 1.0:
@@ -337,17 +339,96 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         return img
 
+    def _reset_tracking_params(self):
+        self._tracking_first_time = (
+            True  # flag to indicate if it is the first time tracking
+        )
+        self._tracking_images = []  # cache the tracking images
+        self._tracking_bboxs = []  # cache the tracking bboxs
+
     def _publish(self):
         stopwatch = Stopwatch()
         header = self.img_msg.header
         timestamp = header.stamp
-        hand_rgb = self.msg_to_cv2(self.img_msg)
 
-        # Internal model
+        # size of hand_rgb: (480, 640, 3)
+        # size of hand_rgb_preprocessed: (336, 448, 3)
+
+        hand_rgb = self.msg_to_cv2(self.img_msg)
         hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
-        bbox_data, viz_img = self.model.inference(
-            hand_rgb_preprocessed, timestamp, stopwatch
-        )
+
+        # Copy the hand_rgb_preprocessed
+        tracking_rgb = hand_rgb_preprocessed.copy().astype("uint8")
+
+        # Fetch the tracking flag
+        enable_tracking = rospy.get_param("enable_tracking", False)
+
+        # Cache the vis image
+        viz_img = hand_rgb_preprocessed
+
+        if enable_tracking:
+            # Start tracking using video segmentation model
+            images = np.expand_dims(
+                tracking_rgb, axis=0
+            )  # The size should (1, H, W, C)
+            self._tracking_images.append(images)
+
+            if len(self._tracking_images) == 1 and self._tracking_first_time:
+                # To see if there is a bounding box in the first frame
+                self._tracking_first_time = False
+                # Get the first detection
+                bbox_data, viz_img = self.model.inference(
+                    hand_rgb_preprocessed, timestamp, stopwatch
+                )
+                _, detection_str = bbox_data.split("|")
+                if detection_str == "None":
+                    # Do not see the object yet, so restart the detection
+                    self._reset_tracking_params()
+                else:
+                    # See the object at the first frame
+                    cur_bbox_str = detection_str.split(",")[2:]
+                    cur_bbox = [int(v) for v in cur_bbox_str]
+                    self._tracking_bboxs.append(cur_bbox)
+            elif len(self._tracking_images) >= 2:
+                # This means that there is one object being detected in the previous frame (first frame)
+                input_images = np.concatenate(self._tracking_images, axis=0)
+                # Get the previous anchor
+                bbox = self._tracking_bboxs[-1]
+                cur_bbox = tracking_with_socket(input_images, bbox)
+                if cur_bbox is None:
+                    self._tracking_bboxs.append(None)
+                    bbox_data = f"{str(timestamp)}|None"
+                else:
+                    cur_bbox = [cur_bbox[1], cur_bbox[0], cur_bbox[3], cur_bbox[2]]
+                    self._tracking_bboxs.append(cur_bbox)
+                    object_label = rospy.get_param("object_target")
+                    bbox_data = f"{str(timestamp)}|{object_label},{1.0}," + ",".join(
+                        [str(v) for v in cur_bbox]
+                    )
+                    # Apply the red bounding box to showcase tracking on the image
+                    viz_img = cv2.rectangle(
+                        viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                    )
+
+            if len(self._tracking_images) >= 2:
+                # Prune the data
+                # Find the frame that has tracking
+                suc_frame = []
+                for i, v in enumerate(self._tracking_bboxs):
+                    if v is not None:
+                        suc_frame.append(i)
+
+                # Only keep the latest frame that has tracking to keep
+                # buffer size 2
+                self._tracking_images = [self._tracking_images[suc_frame[-1]]]
+                self._tracking_bboxs = [self._tracking_bboxs[suc_frame[-1]]]
+        else:
+            # Normal detection mode using detection model
+            bbox_data, viz_img = self.model.inference(
+                hand_rgb_preprocessed, timestamp, stopwatch
+            )
+            time_stamp, detection_str = bbox_data.split("|")
+            self._reset_tracking_params()
 
         # publish data
         self.publish_bbox_data(bbox_data)
@@ -365,7 +446,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.05, show_img=False):
+    def __init__(self, score_threshold=0.1, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -455,6 +536,7 @@ if __name__ == "__main__":
     elif owlvit:
         # TODO dynamic label
         rospy.set_param("object_target", "ball")
+        rospy.set_param("enable_tracking", False)
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
     elif decompress:
