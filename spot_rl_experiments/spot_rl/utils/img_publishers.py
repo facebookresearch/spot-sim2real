@@ -274,6 +274,7 @@ class SpotFilteredDepthImagesPublisher(SpotProcessedImagesPublisher):
     filtered_depth_topic = ""
 
     def _publish(self):
+        print("PUBLISHING FILTERED DEPTH")
         depth = self.msg_to_cv2(self.img_msg)
         filtered_depth = filter_depth(depth, max_depth=self.max_depth)
         img_msg = self.cv_bridge.cv2_to_imgmsg(filtered_depth, "mono8")

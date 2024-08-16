@@ -1,11 +1,14 @@
 episode1:
   spotskillmanagerargs:
     use_mobile_pick: False
+    use_semantic_place: True
   actions:
     - nav:
-      - "lab_desk"
+      - "fremont_lab_white_desk"
     - pick:
       - "frosted flakes cup"
+    - place:
+      - "fremont_lab_white_desk"
 episode2:
   spotskillmanagerargs:
     use_mobile_pick: False
@@ -21,11 +24,14 @@ episode3:
 episode4:
   spotskillmanagerargs:
     use_mobile_pick: False
+    use_semantic_place: True
   actions:
     # - nav:
     #   - "lab_desk"
     - pick:
       - "bottle"
+    - place:
+      -
 episode5:
   spotskillmanagerargs:
     use_mobile_pick: False
