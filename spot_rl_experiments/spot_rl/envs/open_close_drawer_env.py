@@ -166,7 +166,8 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         vision_T_hand = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "hand")
 
         # Get the location that we want to move to for retracting/moving forward the arm. Pull/push the drawer by 20 cm
-        pull_push_distance = -0.2 if self._mode == "open" else 0.4
+        pull_push_distance = -0.8 if self._mode == "open" else 0.4
+        print(f"pull_push_distance {pull_push_distance}")
         move_target = vision_T_hand.transform_point(
             mn.Vector3([pull_push_distance, 0, 0])
         )
