@@ -178,7 +178,7 @@ def pose_estimation(
     pose_socket.send_pyobj(pose_args)
 
     pose, ob_in_cam_pose, to_origin, visualization = pose_socket.recv_pyobj()
-    pose_magnum = mn.Matrix4(ob_in_cam_pose)
+    pose_magnum = mn.Matrix4.from_(ob_in_cam_pose[:3, :3], ob_in_cam_pose[:3, 3])
     (
         classification_text,
         spinal_axis,
@@ -330,32 +330,32 @@ class OrientationSolver:
         self.object_orientations = {
             "object_orientation_1": (
                 mn.Vector3(0, 1.0, 0.0),
-                mn.Vector3(0, 0, -1.0),
+                mn.Vector3(0, 0, 1.0),
                 "vertical",
             ),  # object in normal vertical position
             "object_orientation_2": (
                 mn.Vector3(1, 0.0, 0.0),
-                mn.Vector3(0, -1.0, 0.0),
+                mn.Vector3(0, 1.0, 0.0),
                 "horizontal",
             ),  # object head to the left of spot; object in horizontal position
             "object_orientation_3": (
                 mn.Vector3(-1, 0.0, 0.0),
-                mn.Vector3(0.0, 1.0, 0.0),
+                mn.Vector3(0.0, -1.0, 0.0),
                 "horizontal",
             ),  # object head to the right of spot; object in horizontal position
             "object_orientation_4": (
                 mn.Vector3(0, 0, -1),
-                mn.Vector3(-1, 0, 0),
+                mn.Vector3(1, 0, 0),
                 "horizontal",
             ),  # object base towards the spot; object in horizontal position
             "object_orientation_5": (
                 mn.Vector3(0, 0, 1),
-                mn.Vector3(1, 0, 0),
+                mn.Vector3(-1, 0, 0),
                 "horizontal",
             ),  # object head towards the spot; object in horizontal position
             "object_orientation_6": (
                 mn.Vector3(0, -1.0, 0.0),
-                mn.Vector3(0.0, 0.0, 1.0),
+                mn.Vector3(0.0, 0.0, -1.0),
                 "vertical",
             ),  # object in upside down vertical position
         }

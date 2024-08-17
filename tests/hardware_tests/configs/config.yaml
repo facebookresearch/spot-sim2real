@@ -86,7 +86,7 @@ JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"
 ACTUALLY_MOVE_ARM: True
 GRASP_EVERY_STEP: False
 TERMINATE_ON_GRASP: False
-
+MAX_GRASP_ATTEMPTS: 5
 # Mask RCNN
 GRAYSCALE_MASK_RCNN: False
 USE_MRCNN: True

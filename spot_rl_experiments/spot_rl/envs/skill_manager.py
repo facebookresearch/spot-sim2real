@@ -348,6 +348,7 @@ class SpotSkillManager:
     def pick(
         self,
         target_obj_name: str = None,
+        mesh_name: str = "",
         enable_pose_estimation: bool = False,
         enable_pose_correction: bool = False,
         enable_force_control: bool = False,
@@ -376,6 +377,9 @@ class SpotSkillManager:
                     break
 
         self.gaze_controller.set_grasp_type(grasp_mode)
+        print("enable_pose_estimation: ", enable_pose_estimation)
+        print("enable_pose_correction: ", enable_pose_correction)
+        print("enable_force_control: ", enable_force_control)
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
@@ -389,14 +393,15 @@ class SpotSkillManager:
             object_meshes = self.pick_config.get("OBJECT_MESHES", [])
             found = False
             for object_mesh_name in object_meshes:
-                if object_mesh_name in target_obj_name:
+                if object_mesh_name == mesh_name:
                     found = True
             assert (
                 found
-            ), f"{target_obj_name} not found in meshes that we have {object_meshes}"
+            ), f"{mesh_name} not found in meshes that we have {object_meshes}"
 
+        mesh_name = target_obj_name if mesh_name == "" else mesh_name
         self.gaze_controller.set_pose_estimation_flags(
-            enable_pose_estimation, enable_pose_correction
+            enable_pose_estimation, enable_pose_correction, mesh_name
         )
         self.gaze_controller.set_force_control(enable_force_control)
         status, message = self.gaze_controller.execute(goal_dict=goal_dict)

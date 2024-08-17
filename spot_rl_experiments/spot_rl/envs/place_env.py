@@ -25,6 +25,8 @@ class SpotPlaceEnv(SpotBaseEnv):
 
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
         self.placed = False
+        self.max_episode_steps = 75
+        self._time_step = 0
 
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
         assert place_target is not None
@@ -47,6 +49,11 @@ class SpotPlaceEnv(SpotBaseEnv):
             self.config.SUCC_Z_DIST,
             convention="habitat",
         )
+        # If the time steps have been passed for 75 steps, we will just place the object
+        if self._time_step >= self.max_episode_steps:
+            place = True
+
+        self._time_step += 1
 
         # Update the action_dict with place flag
         action_dict["place"] = place

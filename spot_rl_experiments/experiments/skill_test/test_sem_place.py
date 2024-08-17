@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     if in_fre_lab:
         # at FRE
-        place_target = "coffee_table"
+        place_target = "nav_desk_32_in"
     else:
         # at NYC
         place_target = "test_desk"
@@ -30,6 +30,7 @@ if __name__ == "__main__":
     contnue = True
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
+        spotskillmanager.nav(place_target)
         spotskillmanager.place(place_target, is_local=is_local, visualize=True)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
