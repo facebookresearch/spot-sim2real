@@ -362,9 +362,10 @@ class Navigation(Skill):
 
         # Reset the env and policy
         (goal_x, goal_y, goal_heading) = nav_target
-        observations = self.env.reset((goal_x, goal_y), goal_heading)
+        dynamic_yaw = goal_dict.get("dynamic_yaw")
+        dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
+        observations = self.env.reset((goal_x, goal_y), goal_heading, dynamic_yaw)
         self.policy.reset()
-
         # Logging and Debug
         self.env.say(f"Navigating to {goal_dict['nav_target']}")
 
@@ -384,9 +385,8 @@ class Navigation(Skill):
             nav_target[1],
             np.rad2deg(nav_target[2]),
         )
-        current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
         check_navigation_success = is_pose_within_bounds(
-            current_pose,
+            self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
             _nav_target_pose_deg,
             self.config.SUCCESS_DISTANCE,
             self.config.SUCCESS_ANGLE_DIST,

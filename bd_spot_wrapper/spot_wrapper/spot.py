@@ -1273,19 +1273,21 @@ class Spot:
         )
         return img_resp
 
-    def get_hand_image(self, is_rgb=True):
+    def get_hand_image(self, is_rgb=True, force_get_gripper=False):
         """
         Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
         If is_gripper_blocked is True then returns intel realsense images
         If hand_image_sources are passed then above condition is ignored & will send image & depth for each source
-        Thus if you send hand_image_sources=["gripper", "intelrealsense"] then 4 image resps should be returned
+        Thus if you send hand_image_sources=["gripper", "intelrealsense"] then 4 image resps should be returned.
+        In addition, the flag force_get_gripper allows you to get gripper images even if is_gripper_blocked is True.
+        This is useful when you want to get gripper camera transformation when the gripper is blocked.
         """
         realsense_img_srcs: List[str] = [
             SpotCamIds.INTEL_REALSENSE_COLOR,
             SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
 
-        if self.is_gripper_blocked:  # return intelrealsense
+        if self.is_gripper_blocked and not force_get_gripper:
             return self.select_hand_image(img_src=realsense_img_srcs)
         else:
             return self.select_hand_image(is_rgb=is_rgb)
