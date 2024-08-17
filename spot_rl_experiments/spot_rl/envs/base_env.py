@@ -599,8 +599,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Is the agent at the goal?
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
         at_goal = dist_to_goal < success_distance
-        good_heading = abs(observations["goal_heading"][0]) < success_angle
-        return at_goal and good_heading
+        goal_heading = abs(observations["goal_heading"][0])
+        good_heading_suc = goal_heading < success_angle
+        print(
+            f"nav dis.: {success_distance} {dist_to_goal}; nav delta heading: {success_angle} {goal_heading}"
+        )
+        return at_goal and good_heading_suc
 
     def print_nav_stats(self, observations):
         rho, theta = observations["target_point_goal_gps_and_compass_sensor"]

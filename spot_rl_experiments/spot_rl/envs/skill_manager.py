@@ -3,7 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import magnum as mn
 import numpy as np
@@ -231,8 +231,8 @@ class SpotSkillManager:
         # Reset the policies and environments via the controllers
         raise NotImplementedError
 
-    @multimethod  # type: ignore
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    @multimethod
+    def nav(self, nav_target: str = None) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a known string
 
@@ -275,7 +275,7 @@ class SpotSkillManager:
         self,
         x: float,
         y: float,
-        theta=float,
+        theta: float,
         reset_current_receptacle_name: bool = True,
     ) -> Tuple[bool, str]:
         """
@@ -297,6 +297,26 @@ class SpotSkillManager:
             None if reset_current_receptacle_name else self.current_receptacle_name
         )
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the navigation target with yaw specified as a metric location
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        theta = 0.0
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "dynamic_yaw": True,
+        }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -496,7 +516,7 @@ class SpotSkillManager:
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
-                    self.pick_config.GAZE_ARM_JOINT_ANGLES,
+                    self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
                     percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
@@ -558,7 +578,7 @@ class SpotSkillManager:
             object_target,
             proposition,
             self.spot,
-            self.pick_config.GAZE_ARM_JOINT_ANGLES,
+            self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
             percentile=70,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
