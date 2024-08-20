@@ -5,6 +5,7 @@
 import argparse
 import os
 import os.path as osp
+import threading
 import time
 
 import rospy
@@ -19,6 +20,11 @@ class SpotRosSkillExecutor:
     def __init__(self, spotskillmanager):
         self.spotskillmanager = spotskillmanager
         self._cur_skill_name_input = None
+        self.end = False
+
+        # Listen to estop
+        thread = threading.Thread(target=self.read_emergency_stop)
+        thread.start()
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -30,6 +36,18 @@ class SpotRosSkillExecutor:
         """Reset skill name and input, and publish the message"""
         rospy.set_param("/skill_name_input", "None,None")
         rospy.set_param("/skill_name_suc_msg", f"{skill_name},{succeded},{msg}")
+
+    def read_emergency_stop(self):
+        while True:
+            estop = rospy.get_param("estop", False)
+            if estop:
+                print("Emergency Stop!!! Robot returns to dock")
+                spotskillmanager = SpotSkillManager(
+                    use_mobile_pick=True, use_semantic_place=True
+                )
+                spotskillmanager.dock()
+                self.end = True
+                raise SystemExit
 
     def execute_skills(self):
         """Execute skills."""
@@ -104,6 +122,7 @@ def main():
     # Clean up the ros parameters
     rospy.set_param("/skill_name_input", "None,None")
     rospy.set_param("/skill_name_suc_msg", "None,None,None")
+    rospy.set_param("/estop", False)
 
     # Call the skill manager
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
@@ -111,10 +130,12 @@ def main():
     try:
         executor = SpotRosSkillExecutor(spotskillmanager)
         # While loop to run in the background
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and not executor.end:
             executor.execute_skills()
     except Exception as e:
         print(f"Ending script: {e}")
+
+    print("End of the skill executor")
 
 
 if __name__ == "__main__":
