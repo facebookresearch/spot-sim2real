@@ -1,0 +1,69 @@
+# episode21:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place_ee: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "frosted flakes cup"
+#     # - nav:
+#     #   - "fremont_lab_white_desk"
+#     - place:
+#       - null
+# episode22:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place_ee: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "ball"
+#     # - nav:
+#     #   - "fremont_lab_white_desk"
+#     - place:
+#       - null
+episode33:
+  spotskillmanagerargs:
+    use_mobile_pick: False
+    use_semantic_place_ee: True
+  actions:
+    - nav:
+      - "fremont_lab_white_desk"
+    - pick:
+      - "cereal box"
+    # - nav:
+    #   - "nav_desk_32_in"
+    - place:
+      - null
+# episode24:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place_ee: True
+#   actions:
+#     # - nav:Semantic Place with waypoint estimator 
+#     #   - "lab_desk"
+    
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "bottle"
+#     # - nav:
+#     #   - "nav_desk_32_in"
+#     - place:
+#       - null
+
+# episode25:
+#   spotskillmanagerargs:
+#     use_mobile_pick: False
+#     use_semantic_place_ee: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "water can"
+#     # - nav:
+#     #   - "nav_desk_32_in"
+#     - place:
+#       - null

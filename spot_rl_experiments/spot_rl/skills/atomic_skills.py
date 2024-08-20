@@ -46,10 +46,12 @@ from spot_rl.utils.construct_configs import (
 
 # Import Utils
 from spot_rl.utils.geometry_utils import (
+    euclidean,
     generate_intermediate_point,
     get_RPY_from_vector,
     is_pose_within_bounds,
     is_position_within_bounds,
+    wrap_angle_deg,
 )
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 
@@ -161,8 +163,15 @@ class Skill:
         while not done:
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
-            observations, _, done, _ = self.env.step(action_dict=action_dict)  # type: ignore
-
+            prev_pose = [
+                self.env.x,  # type: ignore
+                self.env.y,  # type: ignore
+            ]
+            observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
+            curr_pose = [
+                self.env.x,  # type: ignore
+                self.env.y,  # type: ignore
+            ]
             # Record trajectories at every step
             self.skill_result_log["robot_trajectory"].append(
                 {
@@ -173,6 +182,12 @@ class Skill:
                         np.rad2deg(self.env.yaw),  # type: ignore
                     ],
                 }
+            )
+            self.skill_result_log["num_steps"] = info["num_steps"]
+            if "distance_travelled" not in self.skill_result_log:
+                self.skill_result_log["distance_travelled"] = 0
+            self.skill_result_log["distance_travelled"] += euclidean(
+                curr_pose, prev_pose
             )
 
             # Check if we still want to use the same skill
@@ -364,30 +379,30 @@ class Navigation(Skill):
         """Refer to class Skill for documentation"""
         self.env.say("Navigation Skill finished .. checking status")
 
-        dynamic_yaw = goal_dict.get("dynamic_yaw")
-        dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
-
-        if dynamic_yaw:
-            obs = self.env.get_observations()
-            check_navigation_success = self.env.get_success(obs, False)
-        else:
-            nav_target = goal_dict[
-                "nav_target"
-            ]  # safe to access as sanity check passed
-            # Make the angle from rad to deg
-            _nav_target_pose_deg = (
-                nav_target[0],
-                nav_target[1],
-                np.rad2deg(nav_target[2]),
-            )
-            check_navigation_success = is_pose_within_bounds(
-                self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
-                _nav_target_pose_deg,
-                self.config.SUCCESS_DISTANCE,
-                self.config.SUCCESS_ANGLE_DIST,
-            )
+        nav_target = goal_dict["nav_target"]  # safe to access as sanity check passed
+        # Make the angle from rad to deg
+        _nav_target_pose_deg = (
+            nav_target[0],
+            nav_target[1],
+            np.rad2deg(nav_target[2]),
+        )
+        current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
+        check_navigation_success = is_pose_within_bounds(
+            current_pose,
+            _nav_target_pose_deg,
+            self.config.SUCCESS_DISTANCE,
+            self.config.SUCCESS_ANGLE_DIST,
+        )
 
         # Update result log
+
+        self.skill_result_log["distance_to_goal"] = {
+            "linear": euclidean(current_pose[:2], _nav_target_pose_deg[:2]),
+            "angular": abs(
+                wrap_angle_deg(current_pose[2])
+                - wrap_angle_deg(_nav_target_pose_deg[2])
+            ),
+        }
         self.skill_result_log["time_taken"] = time.time() - self.start_time
         self.skill_result_log["success"] = check_navigation_success
 
@@ -475,10 +490,14 @@ class Pick(Skill):
         self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
 
     def set_pose_estimation_flags(
-        self, enable_pose_estimation: bool = False, enable_pose_correction: bool = False
+        self,
+        enable_pose_estimation: bool = False,
+        enable_pose_correction: bool = False,
+        mesh_name: str = "",
     ) -> None:
         self.enable_pose_estimation = enable_pose_estimation
         self.enable_pose_correction = enable_pose_correction
+        self.mesh_name = mesh_name
 
     def set_force_control(self, enable_force_control: bool = False):
         self.enable_force_control = enable_force_control
@@ -570,6 +589,7 @@ class Pick(Skill):
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
                 "grasp_mode": self.grasp_mode,
+                "mesh_name": self.mesh_name,
             }
         else:
             action_dict = {
@@ -579,6 +599,7 @@ class Pick(Skill):
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
                 "grasp_mode": self.grasp_mode,
+                "mesh_name": self.mesh_name,
             }
 
         return action_dict
