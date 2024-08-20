@@ -304,8 +304,8 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     pcd_dir_filtered = pcd_with_normals.select_by_index(
         np.where(cosines > cosine_thresh)[0]
     )
-    if visualize:
-        o3d.visualization.draw_geometries([pcd_dir_filtered])
+    # if visualize:
+    # o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 
 
@@ -410,7 +410,7 @@ def detect_place_point_by_pcd_method(
     print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
 
     img_with_bbox = None
-    if visualize:
+    if True:
         img_with_bbox = img.copy()
         for xy in corners_xys:
             img_with_bbox = cv2.circle(
