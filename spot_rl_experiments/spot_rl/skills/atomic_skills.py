@@ -378,19 +378,29 @@ class Navigation(Skill):
         """Refer to class Skill for documentation"""
         self.env.say("Navigation Skill finished .. checking status")
 
-        nav_target = goal_dict["nav_target"]  # safe to access as sanity check passed
-        # Make the angle from rad to deg
-        _nav_target_pose_deg = (
-            nav_target[0],
-            nav_target[1],
-            np.rad2deg(nav_target[2]),
-        )
-        check_navigation_success = is_pose_within_bounds(
-            self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
-            _nav_target_pose_deg,
-            self.config.SUCCESS_DISTANCE,
-            self.config.SUCCESS_ANGLE_DIST,
-        )
+        dynamic_yaw = goal_dict.get("dynamic_yaw")
+        dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
+
+        if dynamic_yaw:
+            obs = self.env.get_observations()
+            check_navigation_success = self.env.get_success(obs, False)
+        else:
+            nav_target = goal_dict[
+                "nav_target"
+            ]  # safe to access as sanity check passed
+            # Make the angle from rad to deg
+            _nav_target_pose_deg = (
+                nav_target[0],
+                nav_target[1],
+                np.rad2deg(nav_target[2]),
+            )
+            current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
+            check_navigation_success = is_pose_within_bounds(
+                current_pose,
+                _nav_target_pose_deg,
+                self.config.SUCCESS_DISTANCE,
+                self.config.SUCCESS_ANGLE_DIST,
+            )
 
         # Update result log
 
