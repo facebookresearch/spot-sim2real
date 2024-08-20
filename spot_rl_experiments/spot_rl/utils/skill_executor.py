@@ -7,10 +7,15 @@ import os
 import os.path as osp
 import time
 
+import numpy as np
 import rospy
 from spot_rl.envs.skill_manager import SpotSkillManager
+from spot_rl.utils.retrieve_robot_poses_from_cg import get_view_poses
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 from spot_rl.utils.utils import ros_topics as rt
+from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
+    get_navigation_points,
+)
 
 
 class SpotRosSkillExecutor:
@@ -64,6 +69,44 @@ class SpotRosSkillExecutor:
             self.reset_skill_name_input(skill_name, succeded, msg)
             # Reset the navigation target
             rospy.set_param("nav_target_xyz", "None,None,None|")
+        elif skill_name == "nav_path_planning_with_view_poses":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
+            # Get the bbox center and bbox extent
+            bbox_info = skill_input.split(";")  # in the format of x,y,z
+            assert (
+                len(bbox_info) >= 6
+            ), f"Wrong size of the bbox info, it should be 6, but got {len(bbox_info)}"
+            bbox_center = np.array([float(v) for v in bbox_info[0:3]])
+            bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
+            query_class_names = bbox_info[6:]
+            query_class_names[0] = query_class_names[0].replace("_", " ")
+            # Get the view poses
+            view_poses = get_view_poses(
+                bbox_center, bbox_extent, query_class_names, False
+            )
+            # Get the robot x, y, yaw
+            x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
+            # Get the navigation points
+            nav_pts = get_navigation_points(
+                view_poses, bbox_center, bbox_extent, [x, y], False, "pathplanning.png"
+            )
+
+            # Sequentially give the point
+            if len(nav_pts) > 0:
+                final_pt_i = len(nav_pts) - 1
+                for pt_i, pt in enumerate(nav_pts):
+                    x, y, yaw = pt
+                    if pt_i == final_pt_i:
+                        # Do normal point nav with yaw for the final location
+                        succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
+                    else:
+                        # Do dynamic point yaw here for the intermediate points
+                        succeded, msg = self.spotskillmanager.nav(x, y)
+            else:
+                succeded = False
+                msg = "Cannot navigate to the point"
+            # Reset skill name and input and publish message
+            self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "pick":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
@@ -75,8 +118,12 @@ class SpotRosSkillExecutor:
             # Use the following for the hardcode waypoint place
             # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, is_local=True)
             # Call semantic place skills
+            rospy.set_param("is_gripper_blocked", 0)
             succeded, msg = self.spotskillmanager.place(
-                None, is_local=True, visualize=False, enable_waypoint_estimation=True
+                None,
+                is_local=True,
+                visualize=False,
+                enable_waypoint_estimation=True,
             )
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":

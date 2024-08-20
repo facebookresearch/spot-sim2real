@@ -3,13 +3,17 @@
 # LICENSE file in the root directory of this source tree.
 # black: ignore-errors
 
+import time
 from typing import Any, Dict, Tuple
 
 import magnum as mn
 import numpy as np
 import rospy
 from multimethod import multimethod
-from perception_and_utils.utils.generic_utils import conditional_print
+from perception_and_utils.utils.generic_utils import (
+    conditional_print,
+    map_user_input_to_boolean,
+)
 from spot_rl.skills.atomic_skills import (
     MobilePickEE,
     Navigation,
@@ -316,9 +320,10 @@ class SpotSkillManager:
         """
         # Keep track of the current receptacle that the robot navigates to for later grasping
         # mode of gaze skill
-        self.current_receptacle_name = (
-            None if reset_current_receptacle_name else self.current_receptacle_name
-        )
+        if reset_current_receptacle_name:
+            receptacle_name = getattr(self, "current_receptacle_name", None)
+            setattr(self, "current_receptacle_name", receptacle_name)
+
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
@@ -490,7 +495,10 @@ class SpotSkillManager:
         return status, message
 
     def set_arm_joint_angles(self, place_target: str = None):
-        height = calculate_height(place_target)
+        try:
+            height = calculate_height(place_target)
+        except Exception:
+            height = 0.90
         if height < self.place_config.HEIGHT_THRESHOLD:
             return self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
         else:
@@ -554,11 +562,12 @@ class SpotSkillManager:
                 (
                     place_target_location,
                     place_target_in_gripper_camera,
+                    edge_point_in_base,
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.arm_joint_angles,
-                    percentile=percentile,
+                    percentile=70 if visualize else 30,
                     visualize=visualize,
                     height_adjustment_offset=height_adjustment_threshold,
                 )
@@ -572,6 +581,25 @@ class SpotSkillManager:
                 conditional_print(message=message, verbose=self.verbose)
                 print(message)
                 return False, message
+
+        edge_x = float(edge_point_in_base[0])
+        offset_kept = 0.7
+        travel_time = 2
+        if edge_x > offset_kept:
+            walk_distance = edge_x - offset_kept
+            (
+                before_walking_x,
+                before_walking_y,
+                before_walking_yaw,
+            ) = self.spot.get_xy_yaw()
+            self.spot.set_base_position(walk_distance, 0, 0, travel_time, True)
+            time.sleep(travel_time)
+            after_walking_x, after_walking_y, after_walking_yaw = self.spot.get_xy_yaw()
+            walk_distance = after_walking_x - before_walking_x
+            # print(f"place target before {place_target_location}")
+            place_target_location[0] -= walk_distance
+            # print(f"New place target {place_target_location}")
+            # breakpoint()
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
         status, message = self.place(

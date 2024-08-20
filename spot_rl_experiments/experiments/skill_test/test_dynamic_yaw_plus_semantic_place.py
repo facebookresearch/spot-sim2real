@@ -6,16 +6,18 @@ import argparse
 import os
 import os.path as osp
 import time
+from copy import deepcopy
 
 import magnum as mn
 import numpy as np
 import rospy
+from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 1
-WAYPOINT_TEST = [[1.4, 3.1, -90.0]] * NUM_REPEAT  # x, y
+NUM_REPEAT = 3
+WAYPOINT_TEST = [[3.6, -4.2]] * NUM_REPEAT  # x, y
 
 
 class SpotRosSkillExecutor:
@@ -63,10 +65,14 @@ class SpotRosSkillExecutor:
         for waypoint in WAYPOINT_TEST:
             # Call the skill manager
             self.spotskillmanager = SpotSkillManager(
-                use_mobile_pick=True, use_semantic_place=False
+                use_mobile_pick=True, use_semantic_place=True
             )
-            x, y, yaw = waypoint
-            suc, _ = self.spotskillmanager.nav(x, y, np.deg2rad(yaw))
+            # gaze_arm_angles = deepcopy(self.spotskillmanager.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES)
+
+            # self.spotskillmanager.spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
+            # breakpoint()
+            x, y = waypoint
+            suc, _ = self.spotskillmanager.nav(x, y)
             # Compute the metrics
             traj = (
                 self.spotskillmanager.nav_controller.get_most_recent_result_log().get(
@@ -74,9 +80,26 @@ class SpotRosSkillExecutor:
                 )
             )
             metrics = self.compute_metrics(traj, np.array([x, y]))
-            metrics["suc"] = suc
+            metrics["nav_suc"] = suc
+            if suc:  # iff nav succeeds
+                self.spotskillmanager.spot.open_gripper()
+                # time.sleep(30)
+                close_gripper = map_user_input_to_boolean("Close the Gripper ? Y/N")
+                if close_gripper:
+                    self.spotskillmanager.spot.close_gripper()
+                    time.sleep(1.5)
+                    rospy.set_param("is_gripper_blocked", 0)
+                    suc, _ = self.spotskillmanager.place(
+                        None, is_local=True, visualize=False
+                    )
+                    rospy.set_param("is_gripper_blocked", 0)
+            else:
+                suc = False
+            time.sleep(0.5)
+            self.spotskillmanager.spot.open_gripper()
+            time.sleep(0.5)
+            metrics["place_suc"] = suc
             metrics_list.append(metrics)
-            breakpoint()
             # Reset
             self.spotskillmanager.dock()
 
