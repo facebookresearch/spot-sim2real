@@ -158,7 +158,6 @@ class Skill:
         while not done:
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
-            observations, _, done, _ = self.env.step(action_dict=action_dict)  # type: ignore
             prev_pose = [
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
