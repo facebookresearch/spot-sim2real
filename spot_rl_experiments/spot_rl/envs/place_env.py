@@ -42,11 +42,26 @@ class SpotPlaceEnv(SpotBaseEnv):
         self.placed = False
         return observations
 
+    def attempt_place(self):
+        self.say("PLACE ACTION CALLED: Opening the gripper!")
+        self.spot.open_gripper()
+        time.sleep(0.3)
+        self.place_attempted = True
+
     def step(self, action_dict: Dict[str, Any], *args, **kwargs):
         place = self.get_heuristic_place()
 
         # Update the action_dict with place flag
         action_dict["place"] = place
+        action_dict["semantic_place"] = False
+
+        if place:
+            # We turn the wrist for place, but not for semantic place
+            if self.get_grasp_angle_to_xy() < np.deg2rad(30):
+                self.turn_wrist()
+                self.say("open gripper in place")
+            self.attempt_place()
+
 
         return super().step(action_dict=action_dict, *args, **kwargs)
 
@@ -158,6 +173,9 @@ class SpotSemanticPlaceEnv(SpotPlaceEnv):
         # Write into action dict
         action_dict["place"] = place
         action_dict["semantic_place"] = place
+
+        if place:
+            self.attempt_place()
 
         # Set the travel time scale so that the arm movement is smooth
         return super().step(
