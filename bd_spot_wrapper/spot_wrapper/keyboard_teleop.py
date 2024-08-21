@@ -27,7 +27,10 @@ INITIAL_POINT = np.array([0.5, 0.0, 0.35])
 INITIAL_RPY = np.deg2rad([0.0, 45.0, 0.0])
 
 INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER = np.deg2rad([0, -91, 33, 0, 100, 0])
-INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER = np.deg2rad([0, -100, 33, 0, 75, 0])
+STOW_ARM_JOINT_ANGLES = np.deg2rad([0, -180, 180, 90, 0, -90])
+
+# INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER = np.deg2rad([0, -100, 33, 0, 75, 0])
+INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER = np.deg2rad([0, -125, 60, 0, 85, 0])
 
 KEY2GRIPPERMOVEMENT = {
     "w": np.array([0.0, 0.0, MOVE_INCREMENT, 0.0, 0.0, 0.0]),  # move up
@@ -63,26 +66,32 @@ INSTRUCTIONS = (
 )
 
 
-def move_to_initial(spot, initial_arm_state=0):
+def move_to_initial(spot, initial_arm_state=3):
     point, rpy = INITIAL_POINT, INITIAL_RPY
-    if initial_arm_state == 0:
-        spot.move_gripper_to_point(point, rpy, timeout_sec=2)
-        cement_arm_joints(spot)
-    elif initial_arm_state == 1:
-        spot.set_arm_joint_positions(
-            positions=INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER,
-            travel_time=UPDATE_PERIOD * 5,
-        )
-    elif initial_arm_state == 2:
-        # IntelConfig is giving bad data
-        spot.set_arm_joint_positions(
-            positions=INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER,
-            travel_time=UPDATE_PERIOD * 5,
-        )
-    else:
-        raise KeyError(
-            f"Invalid initial arm state provided {initial_arm_state}. Provide a value between 0-2. 0 for default, 1 for gripperCam logger, 2 for intel realsense logger"
-        )
+    # if initial_arm_state == 0:
+    #     spot.move_gripper_to_point(point, rpy, timeout_sec=2)
+    #     cement_arm_joints(spot)
+    # elif initial_arm_state == 1:
+    #     spot.set_arm_joint_positions(
+    #         positions=INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER,
+    #         travel_time=UPDATE_PERIOD * 5,
+    #     )
+    # elif initial_arm_state == 2:
+    #     # IntelConfig is giving bad data
+    #     spot.set_arm_joint_positions(
+    #         positions=INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER,
+    #         travel_time=UPDATE_PERIOD * 5,
+    #     )
+    # elif initial_arm_state == 3:
+    #     spot.set_arm_joint_positions(
+    #         # positions=STOW_ARM_JOINT_ANGLES,
+    #          spot.move_gripper_to_point(point, rpy, timeout_sec=2)
+    #         # travel_time=UPDATE_PERIOD * 5,
+    #     )
+    # else:
+    #     raise KeyError(
+    #         f"Invalid initial arm state provided {initial_arm_state}. Provide a value between 0-2. 0 for default, 1 for gripperCam logger, 2 for intel realsense logger"
+    #     )
     return point, rpy
 
 
@@ -111,7 +120,7 @@ def rotate(datalogger: DataLogger, n_intervals: int = 16, n_captures: int = 2) -
         datalogger.log_data_finite(n_captures)
 
 
-def main(spot: Spot, initial_arm_state: int = 1):
+def main(spot: Spot, initial_arm_state: int = 0):
     """Uses IK to move the arm by setting hand poses"""
     spot.power_robot()
 
@@ -141,7 +150,9 @@ def main(spot: Spot, initial_arm_state: int = 1):
     curses.noecho()
     signal.signal(signal.SIGINT, raise_error)
     stdscr.addstr(INSTRUCTIONS)
+
     last_execution = time.time()
+
     try:
         while True:
             point_rpy = np.concatenate([point, rpy])
@@ -171,6 +182,8 @@ def main(spot: Spot, initial_arm_state: int = 1):
                     enable_logger_during_teleop = True
 
             elif pressed_key == "t":
+                print("Initial EE POSE", spot.get_ee_pos_in_body_frame())
+
                 # Toggle between controlling arm or base
                 control_arm = not control_arm
                 if not control_arm:
@@ -183,19 +196,22 @@ def main(spot: Spot, initial_arm_state: int = 1):
                 hand_image_response = image_responses[0]  # only expecting one image
                 spot.grasp_point_in_image(hand_image_response)
                 # Retract arm back to initial configuration
-                point, rpy = move_to_initial(spot, 0)
+                # point, rpy = move_to_initial(spot, 0)
             elif pressed_key == "o":
                 # Open gripper
                 spot.open_gripper()
+            elif pressed_key == ".":
+                spot.close_gripper()
             elif pressed_key == "n":
                 try:
                     spot.dock(DOCK_ID, home_robot=True)
                 except Exception:
                     print("Dock was not found!")
-            elif pressed_key == "i":
-                point, rpy = move_to_initial(spot, initial_arm_state)
+            # elif pressed_key == "i":
+            #     point, rpy = move_to_initial(spot, initial_arm_state)
             else:
-                # Tele-operate either the gripper pose or the base
+                print(np.rad2deg(spot.get_arm_joint_positions()))
+                # # Tele-operate either the gripper pose or the base
                 if control_arm:
                     if pressed_key in KEY2GRIPPERMOVEMENT:
                         # Move gripper
@@ -209,6 +225,7 @@ def main(spot: Spot, initial_arm_state: int = 1):
                             print(
                                 "Pose out of reach, please bring gripper within valid bounds"
                             )
+                        print("EE POSE", spot.get_ee_pos_in_body_frame())
                 elif pressed_key in KEY2BASEMOVEMENT:
                     # Move base
                     x_vel, y_vel, ang_vel = KEY2BASEMOVEMENT[pressed_key]

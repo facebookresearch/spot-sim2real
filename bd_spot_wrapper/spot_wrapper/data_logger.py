@@ -7,7 +7,12 @@ from typing import Any, Dict, List
 import click
 import cv2
 import numpy as np
-import sophuspy as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
 from tqdm import tqdm
 

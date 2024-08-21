@@ -1,4 +1,5 @@
 import argparse
+import csv
 import json
 
 
@@ -21,12 +22,24 @@ def format_value(key, value):
     return str(value)
 
 
+def export_to_csv(results_dict, output_file):
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        # Write header (keys of the dictionary)
+        writer.writerow(results_dict.keys())
+        # Write data (values of the dictionary)
+        writer.writerow(results_dict.values())
+
+
 def main():
     parser = argparse.ArgumentParser(description="Parse a JSON file")
     parser.add_argument("file", help="Path to the JSON file to parse")
+    parser.add_argument("output_csv", help="Path to the output CSV file")
     args = parser.parse_args()
 
     parsed_data = parse_json_file(args.file)
+    if parsed_data is None:
+        return
 
     results_dict = {
         "overall_success": " ",
@@ -73,11 +86,7 @@ def main():
                         success_ctr += 1
     results_dict["overall_success"] = success_ctr / 4
 
-    # Print keys
-    print("\t".join(results_dict.keys()))
-
-    # Print values
-    print("\t".join(format_value(key, value) for key, value in results_dict.items()))
+    export_to_csv(results_dict, args.output_csv)
 
 
 if __name__ == "__main__":

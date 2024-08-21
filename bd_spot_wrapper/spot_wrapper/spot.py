@@ -4,6 +4,7 @@
 
 
 # mypy: ignore-errors
+# black: ignore-errors
 # Copyright (c) 2021 Boston Dynamics, Inc.  All rights reserved.
 #
 # Downloading, reproducing, distributing or otherwise using the SDK Software
@@ -114,7 +115,6 @@ ARM_6DOF_NAMES = [
     rf.SPOT_ARM_WRIST_0,
     rf.SPOT_ARM_WRIST_1,
 ]
-
 HOME_TXT = osp.join(osp.dirname(osp.abspath(__file__)), "home.txt")
 
 # Get Spot DOCK ID
@@ -797,7 +797,9 @@ class Spot:
             )
 
             # Take anything within about 10 degrees for top-down or horizontal grasps.
-            constraint.vector_alignment_with_tolerance.threshold_radians = 0.17
+            constraint.vector_alignment_with_tolerance.threshold_radians = np.deg2rad(
+                30 * 2
+            )
 
         # Ask the robot to pick up the object
         grasp_request = manipulation_api_pb2.ManipulationApiRequest(

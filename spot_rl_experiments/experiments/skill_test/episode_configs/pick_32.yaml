@@ -1,40 +1,104 @@
-episode1:
+# episode32ffc:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "frosted flakes cup"
+#     - nav:
+#       - "nav_desk_32_in"
+#     - place:
+#       - "lab_table_fremont"
+# episode32ball:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "ball"
+#     - nav:
+#       - "lab_table_fremont"
+#     - place:
+#       - "lab_table_fremont"
+# episode32box:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "cereal box"
+#     - nav:
+#       - "lab_table_fremont"
+#     - place:
+#       - "lab_table_fremont"
+# episode32bottle:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "bottle"
+#     - nav:
+#       - "lab_table_fremont"
+#     - place:
+#       - "lab_table_fremont"
+# episode32can:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "water can"
+#     - nav:
+#       - "lab_table_fremont"
+#     - place:
+#       - "lab_table_fremont"
+# episode32Tpaper:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "Cleaning liquid bottle"
+#     - nav:
+#       - "lab_table_fremont"
+#     - place:
+#       - "lab_table_fremont"
+episode32Cube:
   spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: True
   actions:
     - nav:
-      - "fremont_lab_white_desk"
+      - "lab_table_fremont"
     - pick:
-      - "frosted flakes cup"
+      - "rubix cube"
+    - nav:
+      - "lab_table_fremont"
     - place:
-      - "fremont_lab_white_desk"
-episode2:
+      - null
+episode32Duck:
   spotskillmanagerargs:
-    use_mobile_pick: False
-  actions:
-    - pick:
-      - "ball"
-episode3:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-  actions:
-    - pick:
-      - "cereal box"
-episode4:
-  spotskillmanagerargs:
-    use_mobile_pick: False
+    use_mobile_pick: True
     use_semantic_place: True
   actions:
-    # - nav:
-    #   - "lab_desk"
+    - nav:
+      - "lab_table_fremont"
     - pick:
-      - "bottle"
+      - "rubber duck"
+    - nav:
+      - "lab_table_fremont"
     - place:
-      -
-episode5:
-  spotskillmanagerargs:
-    use_mobile_pick: False
-  actions:
-    - pick:
-      - "water can"
+      - null

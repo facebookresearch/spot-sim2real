@@ -311,7 +311,7 @@ def filter_pointcloud_by_normals_in_the_given_direction(
 
 def detect_place_point_by_pcd_method(
     spot,
-    GAZE_ARM_JOINT_ANGLES,
+    GAZE_ARM_JOINT_ANGLES2,
     percentile: float = 70,
     visualize=True,
     height_adjustment_offset: float = 0.10,
@@ -327,7 +327,7 @@ def detect_place_point_by_pcd_method(
     assert osp.exists(GRIPPER_T_INTEL_PATH), f"{GRIPPER_T_INTEL_PATH} not found"
     gripper_T_intel = np.load(GRIPPER_T_INTEL_PATH)
     spot.close_gripper()
-    gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
+    gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES2)
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
 
     # Wait for a bit to stabalized the gripper

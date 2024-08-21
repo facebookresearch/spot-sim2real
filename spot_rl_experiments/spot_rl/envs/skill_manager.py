@@ -494,6 +494,7 @@ class SpotSkillManager:
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
             # estimate waypoint
+            breakpoint()
             try:
                 (
                     place_target_location,
@@ -501,7 +502,7 @@ class SpotSkillManager:
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
-                    self.pick_config.GAZE_ARM_JOINT_ANGLES,
+                    self.pick_config.GAZE_ARM_JOINT_ANGLES2,
                     percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
@@ -563,7 +564,7 @@ class SpotSkillManager:
             object_target,
             proposition,
             self.spot,
-            self.pick_config.GAZE_ARM_JOINT_ANGLES,
+            self.pick_config.GAZE_ARM_JOINT_ANGLES2,
             percentile=70,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
