@@ -7,22 +7,10 @@
 import os
 import os.path as osp
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict
 
 import cv2
 import gym
-from bosdyn.client.frame_helpers import (
-    GRAV_ALIGNED_BODY_FRAME_NAME,
-    HAND_FRAME_NAME,
-    VISION_FRAME_NAME,
-    get_a_tform_b,
-    get_vision_tform_body,
-)
-from spot_rl.utils.grasp_affordance_prediction import (
-    affordance_prediction,
-    grasp_control_parmeters,
-)
 from spot_rl.utils.img_publishers import MAX_HAND_DEPTH
 from spot_rl.utils.mask_rcnn_utils import (
     generate_mrcnn_detections,
@@ -49,10 +37,6 @@ except Exception:
     pass
 
 from sensor_msgs.msg import Image
-from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
-from spot_rl.utils.pose_estimation import pose_estimation
-from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
-from spot_rl.utils.segmentation_service import segment_with_socket
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2, wrap_heading
@@ -112,9 +96,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         config,
         spot: Spot,
         stopwatch=None,
-        max_joint_movement_key="MAX_JOINT_MOVEMENT",
-        max_lin_dist_key="MAX_LIN_DIST",
-        max_ang_dist_key="MAX_ANG_DIST",
     ):
         """
         :param max_joint_movement_key: max allowable displacement of arm joints
@@ -137,6 +118,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # General environment parameters
         self.ctrl_hz = config.CTRL_HZ
+        self.ctrl_period = 1 / self.ctrl_hz
         self.max_episode_steps = config.MAX_EPISODE_STEPS
         self.num_steps = 0
         self.reset_ran = False
@@ -169,9 +151,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
 
         # Neural network action scale
-        self._max_joint_movement_scale = self.config[max_joint_movement_key]
-        self._max_lin_dist_scale = self.config[max_lin_dist_key]
-        self._max_ang_dist_scale = self.config[max_ang_dist_key]
+        self._max_joint_movement_scale = self.config["MAX_JOINT_MOVEMENT"]
+        self._max_lin_dist_scale = self.config["MAX_LIN_DIST"]
+        self._max_ang_dist_scale = self.config["MAX_ANG_DIST"]
+
+        self._max_arm_ee_disp_scale = self.config["MAX_EE_DISP"]
+        self._max_arm_ee_rot_scale = self.config["MAX_EE_ROT"]
 
         # Tracking paramters reset
         rospy.set_param("enable_tracking", False)
@@ -280,6 +265,51 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.spot.block_until_arm_arrives(cmd_id, timeout_sec=4)
         self.spot.close_gripper()
 
+    def scale_base_actions(self, base_action):
+        lin_dist, ang_dist = base_action
+
+        # Scale the linear and angular velocities
+        lin_dist *= self._max_lin_dist_scale
+        ang_dist *= np.deg2rad(self._max_ang_dist_scale)
+
+        target_yaw = wrap_heading(self.yaw + ang_dist)
+
+        # Don't even bother moving if it's just for a bit of distance
+        if abs(lin_dist) < 0.05 and abs(ang_dist) < np.deg2rad(3):
+            base_action = None
+            target_yaw = None
+        else:
+            base_action = [lin_dist / self.ctrl_period, 0, ang_dist / self.ctrl_period]
+
+        return base_action, target_yaw
+
+    def scale_arm_actions(self, arm_action):
+        arm_action = rescale_actions(arm_action)
+        if np.count_nonzero(arm_action) > 0:
+            arm_action *= self._max_joint_movement_scale
+            arm_action = self.current_arm_pose + pad_action(arm_action)
+            arm_action = np.clip(
+                arm_action, self.arm_lower_limits, self.arm_upper_limits
+            )
+        else:
+            arm_action = None
+        return arm_action
+
+    def scale_arm_ee_actions(self, arm_ee_action):
+        arm_ee_action = rescale_actions(arm_ee_action)
+        if np.count_nonzero(arm_ee_action) > 0:
+            # TODO: semantic place ee: move this to config
+            arm_ee_action[0:3] *= self._max_arm_ee_disp_scale
+            arm_ee_action[3:6] *= self._max_arm_ee_rot_scale
+            xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+            cur_ee_pose = np.concatenate((xyz, rpy), axis=0)
+            # Wrap the heading
+            arm_ee_action += cur_ee_pose
+            arm_ee_action[3:] = wrap_heading(arm_ee_action[3:])
+        else:
+            arm_ee_action = None
+        return arm_ee_action
+
     def step(  # noqa
         self,
         action_dict: Dict[str, Any],
@@ -300,8 +330,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # Get Base & Arm actions, grasp and place from action dictionary
         base_action = action_dict.get("base_action", None)
+        arm_ee_action = action_dict.get("arm_ee_action", None)
         arm_action = action_dict.get("arm_action", None)
-        semantic_place = action_dict.get("semantic_place", False)
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
@@ -314,60 +344,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
             )
 
-        if grasp:
-            # Briefly pause and get latest gripper image to ensure precise grasp
-            time.sleep(0.5)
-            self.get_gripper_images(save_image=True)
-
-            if self.curr_forget_steps == 0:
-                if self.config.VERBOSE:
-                    print(f"GRASP CALLED: Aiming at (x, y): {self.obj_center_pixel}!")
-                self.say("Grasping " + self.target_obj_name)
-
-                # The following cmd is blocking
-                success = self.attempt_grasp(
-                    action_dict.get("enable_pose_estimation", False),
-                    action_dict.get("enable_force_control", False),
-                    action_dict.get("grasp_mode", "any"),
-                )
-                if success:
-                    # Just leave the object on the receptacle if desired
-                    if self.config.DONT_PICK_UP:
-                        self.say("open_gripper in don't pick up")
-                        self.spot.open_gripper()
-                    self.grasp_attempted = True
-                    arm_positions = np.deg2rad(self.config.PLACE_ARM_JOINT_ANGLES)
-                else:
-                    self.say("BD grasp API failed.")
-                    self.spot.open_gripper()
-                    self.locked_on_object_count = 0
-                    arm_positions = np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES)
-                    time.sleep(2)
-
-                # Record the grasping pose (in roll pitch yaw) of the gripper
-                (
-                    _,
-                    self.ee_orientation_at_grasping,
-                ) = self.spot.get_ee_pos_in_body_frame()
-                if not action_dict.get("enable_pose_correction", False):
-                    self.spot.set_arm_joint_positions(
-                        positions=arm_positions, travel_time=1.0
-                    )
-
-                # Wait for arm to return to position
-                time.sleep(1.0)
-                if self.config.TERMINATE_ON_GRASP:
-                    self.should_end = True
-        elif place:
-            self.say("PLACE ACTION CALLED: Opening the gripper!")
-            # We only turning the wrist when calling place, but not doing this for semantic place
-            if self.get_grasp_angle_to_xy() < np.deg2rad(30) and not semantic_place:
-                self.turn_wrist()
-                self.say("open gripper in place")
-            self.spot.open_gripper()
-            time.sleep(0.3)
-            self.place_attempted = True
-
         if base_action is not None:
             if nav_silence_only:
                 base_action = rescale_actions(base_action, silence_only=True)
@@ -375,35 +351,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 base_action = np.clip(base_action, -1, 1)
             if np.count_nonzero(base_action) > 0:
                 # Command velocities using the input action
-                lin_dist, ang_dist = base_action
-
-                # Scale the linear and angular velocities
-                lin_dist *= self._max_lin_dist_scale
-                ang_dist *= np.deg2rad(self._max_ang_dist_scale)
-
-                target_yaw = wrap_heading(self.yaw + ang_dist)
-                # No horizontal velocity
-                ctrl_period = 1 / self.ctrl_hz
-                # Don't even bother moving if it's just for a bit of distance
-                if abs(lin_dist) < 0.05 and abs(ang_dist) < np.deg2rad(3):
-                    base_action = None
-                    target_yaw = None
-                else:
-                    base_action = [lin_dist / ctrl_period, 0, ang_dist / ctrl_period]
+                base_action, target_yaw = self.scale_base_actions(base_action)
+                if base_action is not None:
                     self.prev_base_moved = True
             else:
                 base_action = None
                 self.prev_base_moved = False
         if arm_action is not None:
-            arm_action = rescale_actions(arm_action)
-            if np.count_nonzero(arm_action) > 0:
-                arm_action *= self._max_joint_movement_scale
-                arm_action = self.current_arm_pose + pad_action(arm_action)
-                arm_action = np.clip(
-                    arm_action, self.arm_lower_limits, self.arm_upper_limits
-                )
-            else:
-                arm_action = None
+            arm_action = self.scale_arm_actions(arm_action)
+        if arm_ee_action is not None:
+            arm_ee_action = self.scale_arm_ee_actions(arm_action)
 
         if not (grasp or place):
             if self.slowdown_base > -1 and base_action is not None:
@@ -463,11 +420,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.say(
             f"****************************************************num_steps: {self.num_steps}"
         )
-        timeout = self.num_steps >= self.max_episode_steps
-        if timeout:
-            print(f"Execution exceeded {self.max_episode_steps} steps. Timing out...")
-        else:
-            self.say(f"Execution has not exceeded {self.max_episode_steps} steps.")
+        timeout = self.get_timeout()
         done = timeout or self.get_success(observations) or self.should_end
         self.ctrl_hz = self.config.CTRL_HZ  # revert ctrl_hz in case it slowed down
 
@@ -476,123 +429,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         info = {"num_steps": self.num_steps}
 
         return observations, reward, done, info
-
-    def attempt_grasp(
-        self,
-        enable_pose_estimation=False,
-        enable_force_control=False,
-        grasp_mode: str = "any",
-    ):
-        pre_grasp = time.time()
-        graspmode = grasp_mode
-        if enable_pose_estimation:
-            image_scale = self.config.IMAGE_SCALE
-            seg_port = self.config.SEG_PORT
-            pose_port = self.config.POSE_PORT
-            object_name = rospy.get_param("/object_target")
-            image_src = self.config.IMG_SRC
-
-            rospy.set_param(
-                "is_gripper_blocked", image_src
-            )  # can be removed if we do mesh rescaling for gripper camera
-            image_resps = self.spot.get_hand_image()  # IntelImages
-            intrinsics = image_resps[0].source.pinhole.intrinsics
-            transform_snapshot = image_resps[0].shot.transforms_snapshot
-            body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-                GRAV_ALIGNED_BODY_FRAME_NAME,
-                "link_wr1",
-            )
-            hand_T_gripper: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
-                "arm0.link_wr1",
-                "hand_color_image_sensor",
-                transform_snapshot,
-            )
-            gripper_T_intel = (
-                np.load(GRIPPER_T_INTEL_PATH) if image_src == 1 else np.eye(4)
-            )
-            gripper_T_intel = mn.Matrix4(gripper_T_intel)
-            body_T_cam: mn.Matrix4 = body_T_hand @ hand_T_gripper @ gripper_T_intel
-            image_responses = [
-                image_response_to_cv2(image_rep) for image_rep in image_resps
-            ]
-            obj_bbox = detect_with_rospy_subscriber(object_name, image_scale)
-            x1, y1, x2, y2 = obj_bbox
-            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-            self.obj_center_pixel = [cx, cy]
-            mask = segment_with_socket(image_responses[0], obj_bbox, port=seg_port)
-            t1 = time.time()
-            (
-                graspmode,
-                spinal_axis,
-                gamma,
-                gripper_pose_quat,
-                solution_angles,
-                t2,
-            ) = pose_estimation(
-                *image_responses,
-                object_name,
-                intrinsics,
-                body_T_cam,
-                image_src,
-                image_scale,
-                seg_port,
-                pose_port,
-                obj_bbox,
-                mask,
-            )
-            with ThreadPoolExecutor() as executor:
-                future_affordance = executor.submit(
-                    affordance_prediction,
-                    object_name,
-                    *image_responses,
-                    mask,
-                    intrinsics,
-                    self.obj_center_pixel,
-                )
-                future_grasp_controls = executor.submit(
-                    grasp_control_parmeters, object_name
-                )
-                for future in as_completed(
-                    [
-                        future_affordance,
-                        future_grasp_controls,
-                    ]
-                ):
-                    result = future.result()
-                    if future == future_affordance:
-                        point_in_gripper = result
-                    if future == future_grasp_controls:
-                        claw_gripper_control_parameters = result
-
-            print(f"Time taken for pose estimation {t2-t1} secs")
-
-            rospy.set_param(
-                "spinal_axis",
-                [float(spinal_axis.x), float(spinal_axis.y), float(spinal_axis.z)],
-            )
-            rospy.set_param("gamma", float(gamma))
-            rospy.set_param("is_gripper_blocked", 0)
-
-        if enable_force_control:
-            ret = self.spot.grasp_point_in_image_with_IK(
-                point_in_gripper,  # 3D point in gripper camera
-                body_T_cam,  # will convert 3D point in gripper to body
-                gripper_pose_quat,  # quat for gripper
-                solution_angles,
-                10,
-                claw_gripper_control_parameters,
-                visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
-            )
-        else:
-            ret = self.spot.grasp_hand_depth(
-                self.obj_center_pixel,
-                top_down_grasp=graspmode == "topdown",
-                horizontal_grasp=graspmode == "side",
-                timeout=10,
-            )
-        if self.config.USE_REMOTE_SPOT:
-            ret = time.time() - pre_grasp > 3  # TODO: Make this better...
-        return ret
 
     @staticmethod
     def get_nav_success(observations, success_distance, success_angle):
@@ -888,26 +724,17 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         return locked_on
 
-    def should_grasp(self, target_object_distance_treshold=1.5):
-        grasp = False
-        if self.locked_on_object_count >= self.config.OBJECT_LOCK_ON_NEEDED:
-            if self.target_object_distance < target_object_distance_treshold:
-                if self.config.ASSERT_CENTERING:
-                    x, y = self.obj_center_pixel
-                    if abs(x / 640 - 0.5) < 0.25 or abs(y / 480 - 0.5) < 0.25:
-                        grasp = True
-                    else:
-                        print("Too off center to grasp!:", x / 640, y / 480)
-            else:
-                print(f"Too far to grasp ({self.target_object_distance})!")
-
-        return grasp
-
     def get_observations(self):
         raise NotImplementedError
 
     def get_success(self, observations):
         raise NotImplementedError
+
+    def get_timeout(self):
+        timeout = self.num_steps >= self.max_episode_steps
+        if timeout:
+            print(f"Execution exceeded {self.max_episode_steps} steps. Timing out...")
+        return timeout
 
     @staticmethod
     def spot2habitat_transform(position, rotation):
