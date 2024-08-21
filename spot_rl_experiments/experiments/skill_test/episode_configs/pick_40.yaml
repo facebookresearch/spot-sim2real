@@ -1,0 +1,91 @@
+# episode40Bowl:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "bowl"
+#     - nav:
+#       - "40_in_fre_lab_desk"
+#     - place:
+#       - null
+episode40hintcan:
+  spotskillmanagerargs:
+    use_mobile_pick: True
+    use_semantic_place: True
+  actions:
+    - nav:
+      - "fremont_lab_white_desk"
+    - pick:
+      - "can"
+    - nav:
+      - "40_in_fre_lab_desk"
+    - place:
+      - null
+# episode40bottle:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "blender bottle"
+#     - nav:
+#       - "40_in_fre_lab_desk"
+#     - place:
+#       - null
+# episode40cup:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "cup"
+#     - nav:
+#       - "40_in_fre_lab_desk"
+#     - place:
+#       - null
+# episode40yogurt:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "yogurt cup"
+#     - nav:
+#       - "40_in_fre_lab_desk"
+#     - place:
+#       - null
+# episode40Tpaper:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "Cleaning liquid bottle"
+#     - nav:
+#       - "40_in_fre_lab_desk"
+#     - place:
+#       - null
+# episode40Clorox:
+#   spotskillmanagerargs:
+#     use_mobile_pick: True
+#     use_semantic_place: True
+#   actions:
+#     - nav:
+#       - "fremont_lab_white_desk"
+#     - pick:
+#       - "Cleaning wipe"
+#     - nav:
+#       - "40_in_fre_lab_desk"
+#     - place:
+#       - null
