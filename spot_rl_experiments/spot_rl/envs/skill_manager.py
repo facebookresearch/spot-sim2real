@@ -515,10 +515,8 @@ class SpotSkillManager:
                 return False, message
             if self.use_semantic_place:
                 # Convert HOME frame coordinates into body frame
-                place_target_location = (
-                    self.place_controller.env.get_target_in_base_frame(
-                        mn.Vector3(*place_target_location.astype(np.float64).tolist())
-                    )
+                place_target_location = self.place_controller.env.get_target_in_base_frame(
+                    mn.Vector3(*place_target_location.astype(np.float64).tolist())
                 )
                 is_local = True
         else:
