@@ -110,6 +110,56 @@ class SpotGazeEnv(SpotBaseEnv):
     def get_success(self, observations):
         return self.grasp_attempted
 
+class SpotGazeEEEnv(SpotGazeEnv):
+    def __init__(self, config, spot: Spot, use_mobile_pick: bool = False):
+        super().__init__(
+            config,
+            spot,
+            use_mobile_pick=use_mobile_pick,
+        )
+
+    def step(self, action_dict: Dict[str, Any]):
+        grasp = self.should_grasp()
+
+        # Update the action_dict with grasp and place flags
+        action_dict["grasp"] = grasp
+        action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
+
+        observations, reward, done, info = super().step(
+            action_dict=action_dict,
+        )
+        return observations, reward, done, info
+
+    def remap_observation_keys_for_hab3(self, observations):
+        """
+        Change observation keys as per hab3.
+
+        @INFO: Policies trained on older hab versions DON'T need remapping
+        """
+        semantic_gaze_observations = {}
+        semantic_gaze_observations["arm_depth_bbox_sensor"] = observations[
+            "arm_depth_bbox"
+        ]
+        semantic_gaze_observations["articulated_agent_arm_depth"] = observations[
+            "arm_depth"
+        ]
+        semantic_gaze_observations["ee_pose"] = observations["ee_pose"]
+        return semantic_gaze_observations
+
+    def get_observations(self):
+        arm_depth, arm_depth_bbox = self.get_gripper_images()
+        xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+        observations = {
+            "ee_pose": np.concatenate([xyz, rpy]),
+            "arm_depth": arm_depth,
+            "arm_depth_bbox": arm_depth_bbox,
+        }
+
+        # Remap observation keys for mobile gaze as it was trained with Habitat version3
+        if self._use_mobile_pick:
+            observations = self.remap_observation_keys_for_hab3(observations)
+
+        return observations
 
 class SpotSemanticGazeEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
