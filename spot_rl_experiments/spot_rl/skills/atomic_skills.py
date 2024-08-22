@@ -12,7 +12,7 @@ from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
 )
-from spot_rl.envs.gaze_env import SpotGazeEnv, SpotSemanticGazeEnv
+from spot_rl.envs.gaze_env import SpotGazeEnv, SpotSemanticGazeEnv, SpotGazeEEEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
@@ -27,6 +27,7 @@ from spot_rl.envs.place_env import (
 from spot_rl.real_policy import (
     GazePolicy,
     MobileGazePolicy,
+    MobileGazeEEPolicy,
     NavPolicy,
     OpenCloseDrawerPolicy,
     PlacePolicy,
@@ -703,6 +704,42 @@ class SemanticPick(Pick):
         }
         return action_dict
 
+class MobilePickEE(Pick):
+    """
+    Semantic place ee controller is used to execute place for given place targets
+    """
+
+    def __init__(self, spot: Spot, config, use_mobile_pick=True):
+        if not config:
+            config = construct_config_for_gaze()
+        super().__init__(spot, config, use_mobile_pick=True)
+
+        self.policy = MobileGazeEEPolicy(
+            self.config.WEIGHTS.MOBILE_GAZE,
+            device=self.config.DEVICE,
+            config=self.config,
+        )
+        self.policy.reset()
+
+        self.env = SpotGazeEEEnv(config, spot)
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        # action size is 9
+        # TODO: semantic place ee: check the order
+        # TODO: semantic place ee: check roll pitch yaw
+        print(f"action: {action}")
+        action_dict = {
+            "arm_ee_action": action[:6],
+            "base_action": action[7:9],
+            "enable_pose_estimation": self.enable_pose_estimation,
+            "enable_pose_correction": self.enable_pose_correction,
+            "enable_force_control": self.enable_force_control,
+            "grasp_mode": self.grasp_mode,
+            "mesh_name": self.mesh_name,
+        }
+
+        return action_dict
 
 class Place(Skill):
     """

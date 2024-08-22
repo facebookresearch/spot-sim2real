@@ -16,6 +16,7 @@ from spot_rl.skills.atomic_skills import (
     Pick,
     Place,
     SemanticPick,
+    MobilePickEE,
     SemanticPlace,
     SemanticPlaceEE,
 )
@@ -104,7 +105,7 @@ class SpotSkillManager:
         open_close_drawer_config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
-        use_semantic_place_ee: bool = False,
+        use_ee: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -117,7 +118,7 @@ class SpotSkillManager:
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
         self.use_semantic_place = use_semantic_place
-        self.use_semantic_place_ee = use_semantic_place_ee
+        self.use_ee = use_ee
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -181,7 +182,7 @@ class SpotSkillManager:
             # TODO: overwrite the config
             self.place_config = (
                 construct_config_for_semantic_place()
-                if self.use_semantic_place or self.use_semantic_place_ee
+                if self.use_semantic_place
                 else construct_config_for_place()
             )
         else:
@@ -208,13 +209,20 @@ class SpotSkillManager:
             spot=self.spot,
             config=self.nav_config,
         )
-        self.gaze_controller = Pick(
-            spot=self.spot,
-            config=self.pick_config,
-            use_mobile_pick=self._use_mobile_pick,
-        )
+        if self.use_ee:
+            self.gaze_controller = Pick(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
+            )
+        else:
+            self.gaze_controller = MobilePickEE(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
+            )
         if self.use_semantic_place:
-            if self.use_semantic_place_ee:
+            if self.use_ee:
                 self.place_controller = SemanticPlaceEE(
                     spot=self.spot, config=self.place_config
                 )
