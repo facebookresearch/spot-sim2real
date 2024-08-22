@@ -484,12 +484,12 @@ class SpotSkillManager:
                 message = f"Failed - place target {place_target} not found - use the exact name"
                 conditional_print(message=message, verbose=self.verbose)
                 return False, message
-        if self.use_semantic_place:
-            # Convert HOME frame coordinates into body frame
-            place_target_location = self.place_controller.env.get_target_in_base_frame(
-                mn.Vector3(*place_target_location.astype(np.float64).tolist())
-            )
-            is_local = True
+            if self.use_semantic_place:
+                # Convert HOME frame coordinates into body frame
+                place_target_location = self.place_controller.env.get_target_in_base_frame(
+                    mn.Vector3(*place_target_location.astype(np.float64).tolist())
+                )
+                is_local = True
         else:
             message = "No place target specified, estimating point through heuristic"
             conditional_print(message=message, verbose=self.verbose)
