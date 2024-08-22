@@ -730,6 +730,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     def get_success(self, observations):
         raise NotImplementedError
 
+    def before_step(self):
+        raise NotImplementedError
+
     def get_timeout(self):
         timeout = self.num_steps >= self.max_episode_steps
         if timeout:

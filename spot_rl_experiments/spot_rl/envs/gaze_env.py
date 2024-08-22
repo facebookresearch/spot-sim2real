@@ -65,15 +65,19 @@ class SpotGazeEnv(SpotBaseEnv):
         rospy.set_param("is_gripper_blocked", 0)
         return observations
 
-    def step(self, action_dict: Dict[str, Any]):
+    def before_step(self, action_dict: Dict[str, Any]):
         grasp = self.should_grasp()
 
         # Update the action_dict with grasp and place flags
-        action_dict["grasp"] = False if self.gaze_env == "semantic_gaze" else grasp
+        action_dict["grasp"] = grasp
         action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
 
         if grasp:
-            self.call_grasp(action_dict)
+            self.call_attempt_grasp(action_dict)
+        return action_dict
+
+    def step(self, action_dict: Dict[str, Any]):
+        action_dict = self.before_step(action_dict)
         observations, reward, done, info = super().step(
             action_dict=action_dict,
         )
@@ -94,7 +98,7 @@ class SpotGazeEnv(SpotBaseEnv):
 
         return grasp
 
-    def execute_grasp(self, action_dict):
+    def call_attempt_grasp(self, action_dict):
         # Briefly pause and get latest gripper image to ensure precise grasp
         time.sleep(0.5)
         self.get_gripper_images(save_image=True)
@@ -145,15 +149,12 @@ class SpotGazeEnv(SpotBaseEnv):
 
         @INFO: Policies trained on older hab versions DON'T need remapping
         """
-        mobile_gaze_observations = {}
-        mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
-            "arm_depth_bbox"
-        ]
-        mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
-            "arm_depth"
-        ]
-        mobile_gaze_observations["joint"] = observations["joint"]
-        return mobile_gaze_observations
+        remapped_obs = observations.copy()
+        if "arm_depth_bbox" in remapped_obs.keys():
+            remapped_obs["arm_depth_bbox_sensor"] = remapped_obs.pop("arm_depth_bbox")
+        if "arm_depth" in remapped_obs.keys():
+            remapped_obs["articulated_agent_arm_depth"] = remapped_obs.pop("arm_depth")
+        return remapped_obs
 
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
@@ -179,11 +180,10 @@ class SpotGazeEnv(SpotBaseEnv):
         grasp_mode: str = "any",
     ):
         pre_grasp = time.time()
-        graspmode = grasp_mode
         ret = self.spot.grasp_hand_depth(
             self.obj_center_pixel,
-            top_down_grasp=graspmode == "topdown",
-            horizontal_grasp=graspmode == "side",
+            top_down_grasp=grasp_mode == "topdown",
+            horizontal_grasp=grasp_mode == "side",
             timeout=10,
         )
         if self.config.USE_REMOTE_SPOT:
@@ -199,12 +199,26 @@ class SpotSemanticGazeEnv(SpotGazeEnv):
         self._max_lin_dist_scale = self.config["MAX_LIN_DIST_SEMANTIC_GAZE"]
         self._max_ang_dist_scale = self.config["MAX_ANG_DIST_SEMANTIC_GAZE"]
         self.grasping_type = "topdown"
-        self.gaze_env = "semantic_gaze"
+        self.gaze_env = "pick"
 
     def reset(self, target_obj_name, grasping_type, *args, **kwargs):
         observations = super().reset(target_obj_name=target_obj_name, *args, **kwargs)
         self.grasping_type = grasping_type
         return observations
+
+    def before_step(self, action_dict: Dict[str, Any]):
+        grasp = self.should_grasp()
+        if grasp:
+            self.heuristic_grasp()
+
+        # Update the action_dict with grasp and place flags
+        action_dict["grasp"] = False
+        action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
+
+        if grasp:
+            self.call_attempt_grasp(action_dict)
+
+        return action_dict
 
     def step(self, action_dict: Dict[str, Any]):
         observations, reward, done, info = super().step(action_dict=action_dict)
@@ -311,7 +325,7 @@ class SpotSemanticGazeEnv(SpotGazeEnv):
                 self.obj_center_pixel[1],
             )
 
-    def execute_grasp(self):
+    def heuristic_grasp(self):
         self.approach_object()
         self.get_gripper_images(save_image=True)
         self.spot.close_gripper()
