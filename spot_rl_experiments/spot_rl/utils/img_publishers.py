@@ -666,8 +666,9 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
         # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
-        multi_classes = [["glass bottle"]]
-        self.owlvit.update_label(multi_classes)
+        params = rospy.get_param("/object_targets").split(",")
+        print(params)
+        self.owlvit.update_label([params])
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
         # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
@@ -757,6 +758,7 @@ if __name__ == "__main__":
         node = SpotBoundingBoxPublisher(model)
     elif open_voc:
         # Add open voc object detector here
+        rospy.set_param("object_targets", "glass bottle")
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)

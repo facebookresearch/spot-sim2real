@@ -5,10 +5,30 @@
 
 import magnum as mn
 import numpy as np
+import rospy
 from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_rl.envs.base_env import SpotBaseEnv
+from spot_rl.utils.pixel_to_3d_conversion_utils import (
+    get_3d_point,
+    sample_patch_around_point,
+)
+from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot, wrap_heading
+from std_msgs.msg import Float32, String
+
+MAX_PUBLISH_FREQ = 20
+MAX_DEPTH = 3.5
+MAX_HAND_DEPTH = 1.7
+DETECTIONS_BUFFER_LEN = 30
+LEFT_CROP = 124
+RIGHT_CROP = 60
+NEW_WIDTH = 228
+NEW_HEIGHT = 240
+ORIG_WIDTH = 640
+ORIG_HEIGHT = 480
+WIDTH_SCALE = 0.5
+HEIGHT_SCALE = 0.5
 
 
 class SpotNavEnv(SpotBaseEnv):
@@ -17,9 +37,13 @@ class SpotNavEnv(SpotBaseEnv):
         self._goal_xy = None
         self._enable_nav_by_hand = False
         self._enable_dynamic_yaw = False
+        self._enable_dynamic_goal_xy = False
+        self.detections_location = []  # type: ignore
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
+
+        rospy.Subscriber(rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC, String, self.bbox_cb)
 
     def enable_nav_by_hand(self):
         if not self._enable_nav_by_hand:
@@ -32,6 +56,22 @@ class SpotNavEnv(SpotBaseEnv):
             )
             self.get_nav_observation = self.get_nav_observation_by_hand
 
+    def bbox_cb(self, msg):
+        # The example format of the msg: "cup,0,0,0;table,0,0,0"
+        objects_detected = msg.data.split(";")
+        self.objects_detected = []
+        for object_detected in objects_detected:
+            if object_detected == "":
+                continue
+            try:
+                class_label, x, y, z = object_detected.split(",")
+            except Exception as e:
+                print(
+                    f"Fail to split the object detected due to {e} with object_detected being {object_detected}."
+                )
+                continue
+            self.objects_detected.append((class_label, [float(x), float(y), float(z)]))
+
     def disable_nav_by_hand(self):
         if self._enable_nav_by_hand:
             self.get_nav_observation = (
@@ -42,14 +82,27 @@ class SpotNavEnv(SpotBaseEnv):
                 f"{self.node_name} Disabling nav goal change get_nav_observation by base fn restored"
             )
 
-    def reset(self, goal_xy, goal_heading, dynamic_yaw=False):
+    def reset(
+        self,
+        goal_xy,
+        goal_heading,
+        dynamic_yaw=False,
+        dynamic_goal_xy=False,
+        target_object=None,
+    ):
         self._goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading
         observations = super().reset()
+        self.detections_location = []
+
         self._enable_dynamic_yaw = dynamic_yaw
+        self._enable_dynamic_goal_xy = dynamic_goal_xy
+
         assert len(self._goal_xy) == 2
 
-        if self._enable_dynamic_yaw:
+        self._cur_arm_depth = None
+
+        if self._enable_dynamic_yaw or self._enable_dynamic_goal_xy:
             self.succ_distance = self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
             self.succ_angle = np.deg2rad(
                 self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
@@ -57,6 +110,11 @@ class SpotNavEnv(SpotBaseEnv):
         else:
             self.succ_distance = self.config.SUCCESS_DISTANCE
             self.succ_angle = np.deg2rad(self.config.SUCCESS_ANGLE_DIST)
+
+        if self._enable_dynamic_goal_xy:
+            rospy.set_param("enable_tracking", False)
+            rospy.set_param("object_targets", target_object)
+            rospy.set_param("object_target", target_object)
 
         return observations
 
@@ -120,6 +178,35 @@ class SpotNavEnv(SpotBaseEnv):
 
         return vector_robot_to_target, vector_forward_robot
 
+    def affordance_prediction(
+        self,
+        depth_raw: np.ndarray,
+        mask: np.ndarray,
+        camera_intrinsics,
+        center_pixel: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Accepts
+        depth_raw: np.array HXW, 0.-2000.
+        mask: HXW, bool mask
+        camera_intrinsics:spot camera intrinsic object
+        center_pixel: np.array of length 2
+        Returns: Suitable point on object to grasp
+        """
+
+        mask = np.where(mask > 0, 1, 0).astype(depth_raw.dtype)
+        depth_image_masked = depth_raw * mask[...].astype(depth_raw.dtype)
+
+        non_zero_indices = np.nonzero(depth_image_masked)
+        # Calculate the bounding box coordinates
+        y_min, y_max = non_zero_indices[0].min(), non_zero_indices[0].max()
+        x_min, x_max = non_zero_indices[1].min(), non_zero_indices[1].max()
+        cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
+        Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1.0)
+        point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
+
+        return point_in_gripper
+
     def get_observations(self):
         if self._enable_dynamic_yaw:
             # Modify the goal_heading here based on the current robot orientation
@@ -138,6 +225,13 @@ class SpotNavEnv(SpotBaseEnv):
             rotation_delta = np.arctan2(x1, x2)
             self.goal_heading = wrap_heading(self.yaw + rotation_delta)
 
+        if self._enable_dynamic_goal_xy:
+            if len(self.objects_detected) != 0:
+                self._goal_xy = np.array(
+                    [self.objects_detected[0][1][0], self.objects_detected[0][1][1]]
+                )
+
+        print(f"self._goal_xy: {self._goal_xy}")
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
     def step(self, *args, **kwargs):

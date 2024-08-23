@@ -345,7 +345,12 @@ class Navigation(Skill):
         (goal_x, goal_y, goal_heading) = nav_target
         dynamic_yaw = goal_dict.get("dynamic_yaw")
         dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
-        observations = self.env.reset((goal_x, goal_y), goal_heading, dynamic_yaw)
+        dynamic_goal_xy = goal_dict.get("dynamic_goal_xy")
+        dynamic_goal_xy = False if dynamic_goal_xy is None else dynamic_goal_xy
+        target_object = goal_dict.get("target_object")
+        observations = self.env.reset(
+            (goal_x, goal_y), goal_heading, dynamic_yaw, dynamic_goal_xy, target_object
+        )
         self.policy.reset()
         # Logging and Debug
         self.env.say(f"Navigating to {goal_dict['nav_target']}")

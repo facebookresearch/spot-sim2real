@@ -302,7 +302,7 @@ class SpotSkillManager:
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+    def nav(self, x: float, y: float, nav_target: str) -> Tuple[bool, str]:  # noqa
         """
         Perform the nav action on the navigation target with yaw specified as a metric location
         Args:
@@ -315,8 +315,11 @@ class SpotSkillManager:
         theta = 0.0
         goal_dict = {
             "nav_target": (x, y, theta),
+            "target_object": nav_target,
             "dynamic_yaw": True,
+            "dynamic_goal_xy": True,
         }  # type: Dict[str, Any]
+
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
