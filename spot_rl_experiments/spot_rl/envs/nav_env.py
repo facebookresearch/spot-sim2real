@@ -116,6 +116,9 @@ class SpotNavEnv(SpotBaseEnv):
             rospy.set_param("object_targets", target_object)
             rospy.set_param("object_target", target_object)
 
+        self.dist_to_goal = float("inf")
+        self.abs_goal_heading = float("inf")
+
         return observations
 
     def get_success(self, observations, succ_set_base=True):
@@ -225,10 +228,16 @@ class SpotNavEnv(SpotBaseEnv):
             rotation_delta = np.arctan2(x1, x2)
             self.goal_heading = wrap_heading(self.yaw + rotation_delta)
 
-        if self._enable_dynamic_goal_xy:
-            if len(self.objects_detected) != 0:
+        if (
+            self._enable_dynamic_goal_xy
+            and self.dist_to_goal < 1.5
+            and self.abs_goal_heading < np.deg2rad(75)
+        ):
+            objects_detected = self.objects_detected.copy()
+            if len(objects_detected) != 0:
+                print("change goal!!!!!!")
                 self._goal_xy = np.array(
-                    [self.objects_detected[0][1][0], self.objects_detected[0][1][1]]
+                    [objects_detected[0][1][0], objects_detected[0][1][1]]
                 )
 
         print(f"self._goal_xy: {self._goal_xy}")
@@ -238,11 +247,11 @@ class SpotNavEnv(SpotBaseEnv):
         observations, reward, done, info = super().step(*args, **kwargs)
 
         # Slow the base down if we are close to the nav target to slow down the the heading changes
-        dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
-        abs_good_heading = abs(observations["goal_heading"][0])
+        self.dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
+        self.abs_goal_heading = abs(observations["goal_heading"][0])
 
         if self._enable_dynamic_yaw:
-            if dist_to_goal < 1.5 and abs_good_heading < np.rad2deg(45):
+            if self.dist_to_goal < 1.5 and self.abs_goal_heading < np.rad2deg(45):
                 self.slowdown_base = 0.5
             else:
                 self.slowdown_base = -1
