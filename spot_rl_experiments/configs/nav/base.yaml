@@ -1,0 +1,16 @@
+WEIGHTS: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript"
+#WEIGHTS: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
+
+MAX_EPISODE_STEPS: 150
+
+# Base action params
+MAX_LIN_DIST: 0.25  # meters
+MAX_ANG_DIST: 15.0  # degrees
+
+SUCCESS_DISTANCE: 0.3
+SUCCESS_ANGLE_DIST: 5
+DISABLE_OBSTACLE_AVOIDANCE: False
+USE_OA_FOR_NAV: True
+USE_HEAD_CAMERA: True
+NAV_ACTION_SPACE_LENGTH: 2
+

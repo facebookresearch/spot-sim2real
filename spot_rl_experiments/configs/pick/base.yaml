@@ -1,0 +1,17 @@
+# Static gaze
+WEIGHTS: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+MAX_EPISODE_STEPS: 150
+
+# Gaze env
+CENTER_TOLERANCE: 0.3
+OBJECT_LOCK_ON_NEEDED: 3
+DONT_PICK_UP: False
+ASSERT_CENTERING: True
+GAZE_ACTION_SPACE_LENGTH: 4
+
+# The old gaze ready angle: [0, -170, 120, 0, 75, 0]
+ARM_JOINT_ANGLES: [0, -160, 100, 0, 75, 0] #[0, -160, 100, 0, 90, 0]
+
+# Grasp Parameters: any (default, let BD decides grasping), topdown, side
+GRASP_TYPE:
+  coffee_table: "topdown"

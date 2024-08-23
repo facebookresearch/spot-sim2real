@@ -60,7 +60,7 @@ class RealPolicy:
             checkpoint_path_ts = [
                 torchscript_checkpoint_path
                 for torchscript_checkpoint_path in list(
-                    config.WEIGHTS_TORCHSCRIPT.values()
+                    config.WEIGHTS.values()
                 )
                 if checkpoint_path_without_ext in torchscript_checkpoint_path
             ]

@@ -19,11 +19,7 @@ from spot_rl.skills.atomic_skills import (
     SemanticPlace,
 )
 from spot_rl.utils.construct_configs import (
-    construct_config_for_gaze,
-    construct_config_for_nav,
-    construct_config_for_open_close_drawer,
-    construct_config_for_place,
-    construct_config_for_semantic_place,
+    construct_config,
 )
 from spot_rl.utils.heuristic_nav import (
     ImageSearch,
@@ -164,6 +160,7 @@ class SpotSkillManager:
                 exit(1)
         else:
             self.spot = spot
+        self.config = construct_config()
 
         # Construct configs for nav, gaze, and place
         self.nav_config = construct_config_for_nav() if not nav_config else nav_config

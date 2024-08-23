@@ -1,0 +1,14 @@
+# Static place
+WEIGHTS: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
+#WEIGHTS: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
+
+MAX_EPISODE_STEPS: 75
+# Place env
+EE_GRIPPER_OFFSET: [0.2, 0.0, 0.05]
+SUCC_XY_DIST: 0.25
+SUCC_Z_DIST: 0.05
+PLACE_ACTION_SPACE_LENGTH: 4
+
+MAX_JOINT_MOVEMENT: 0.174533  # Place arm speed (10 deg)
+ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
+

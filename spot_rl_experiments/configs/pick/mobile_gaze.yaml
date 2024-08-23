@@ -1,0 +1,12 @@
+defaults:
+  - base
+
+# Mobile Gaze torchscript module files path
+WEIGHTS: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
+
+# Mobile Gaze env
+MAX_LIN_DIST: 0
+MAX_ANG_DIST: 5.73 # degrees
+MAX_JOINT_MOVEMENT: 0.08 # radian
+ACTION_SPACE_LENGTH: 7
+HEURISTIC_SEARCH_ANGLE_INTERVAL: 20

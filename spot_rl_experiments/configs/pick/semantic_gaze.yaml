@@ -1,0 +1,17 @@
+defaults:
+  - base
+
+# Semantic gaze
+WEIGHTS: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"
+
+# Semantic Gaze env
+MAX_LIN_DIST: 0
+MAX_ANG_DIST: 0 # degrees
+MAX_JOINT_MOVEMENT: 0.08 # radian
+ACTION_SPACE_LENGTH: 7
+
+# Semantic Pick
+IMG_SRC: 0 # 1 for intel & 0 for gripper
+SEG_PORT: 21001 # port for segmentation service
+POSE_PORT: 2100 # port for pose estimation
+OBJECT_MESHES: ["bottle", "penguin", "cup", "cereal box", "hint can", "toy cup", "frosted flakes cup", "bowl", "oat creamer bottle"]

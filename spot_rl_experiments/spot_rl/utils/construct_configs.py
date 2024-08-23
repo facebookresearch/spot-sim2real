@@ -5,34 +5,30 @@
 
 import os.path as osp
 
-from yacs.config import CfgNode as CN
+import hydra
+from omegaconf import DictConfig
+import re
 
-this_dir = osp.dirname(osp.abspath(__file__))
-spot_rl_dir = osp.join(osp.dirname(this_dir))
-spot_rl_experiments_dir = osp.join(osp.dirname(spot_rl_dir))
-configs_dir = osp.join(spot_rl_experiments_dir, "configs")
-DEFAULT_CONFIG = osp.join(configs_dir, "config.yaml")
+THIS_DIR = osp.dirname(osp.abspath(__file__))
+SPOT_RL_DIR = osp.join(osp.dirname(THIS_DIR))
+SPOT_RL_EXPERIMENTS_DIR = osp.join(osp.dirname(SPOT_RL_DIR))
+CONFIGS_DIR = osp.join(SPOT_RL_EXPERIMENTS_DIR, "configs")
+DEFAULT_CONFIG = osp.join(CONFIGS_DIR, "config.yaml")
 
-
-def construct_config(file_path=DEFAULT_CONFIG, opts=None):
-    if opts is None:
-        opts = []
-    config = CN()
-    config.set_new_allowed(True)
-    config.merge_from_file(file_path)
-    config.merge_from_list(opts)
-
-    new_weights = {}
-    for k, v in config.WEIGHTS.items():
-        if not osp.isfile(v):
-            new_v = osp.join(spot_rl_experiments_dir, v)
-            if not osp.isfile(new_v):
-                raise KeyError(f"Neither {v} nor {new_v} exist!")
-            new_weights[k] = new_v
-    config.WEIGHTS.update(new_weights)
-
-    return config
-
+def prepend_experiments(d):
+    for key, value in d.items():
+        if isinstance(value, DictConfig):
+            prepend_experiments(value)
+        elif isinstance(value, str) and (('.pth') in value or ('.torchscript') in value):
+            full_path = osp.join(SPOT_RL_EXPERIMENTS_DIR, value)
+            # if not osp.isfile(value):
+                # raise KeyError(f"Neither {value} nor {full_path} exist!")
+            d[key] = full_path
+@hydra.main(config_path=CONFIGS_DIR, config_name="config")
+def construct_config(cfg: DictConfig):
+    prepend_experiments(cfg)
+    print(cfg)
+    return cfg
 
 def construct_config_for_nav(file_path=None, opts=[]):
     """
