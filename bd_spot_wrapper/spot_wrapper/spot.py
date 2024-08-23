@@ -215,9 +215,14 @@ class Spot:
             self.intelrealsense_image_client = robot.ensure_client(
                 "intel-realsense-image-service"
             )
+            self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
+            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
+
         except Exception:
             print("There is no intel-realsense-image_service. Using gripper cameras")
             self.intelrealsense_image_client = None
+            self.gripper_T_intel = None
+            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
 
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
@@ -228,10 +233,6 @@ class Spot:
         self.ik_client = robot.ensure_client(
             InverseKinematicsClient.default_service_name
         )
-
-        # TODO: Add safety net
-        self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
-        print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
 
         # Used to re-center origin of global frame
         if osp.isfile(HOME_TXT):
