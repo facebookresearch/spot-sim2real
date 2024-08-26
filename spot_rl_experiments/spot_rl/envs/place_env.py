@@ -371,13 +371,14 @@ class SpotSemanticPlaceEEEnv(SpotBaseEnv):
         arm_depth, _ = self.get_gripper_images()
 
         # Get ee's pose -- x,y,z
-        xyz, _ = self.spot.get_ee_pos_in_body_frame()
+        xyz, rpy = self.spot.get_ee_pos_in_body_frame()
         observations = {
             "obj_goal_sensor": obj_goal_sensor,
             "relative_initial_ee_orientation": delta_ee,
             "relative_target_object_orientation": delta_obj,
             "articulated_agent_jaw_depth": arm_depth,
-            "ee_pos": xyz,
-            "is_holding": np.ones((1,)),
+            "ee_pose": np.concatenate([xyz, rpy]),
+            # "ee_pos":xyz,
+           "is_holding": np.ones((1,)),
         }
         return observations

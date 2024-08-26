@@ -9,10 +9,10 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 if __name__ == "__main__":
     from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_ee=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=False)
     contnue = True
     while contnue:
-        spotskillmanager.pick("cup")
+        spotskillmanager.pick("Frosted Flakes Cup")
         spotskillmanager.spot.open_gripper()
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
