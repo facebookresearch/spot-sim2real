@@ -21,6 +21,6 @@ if __name__ == "__main__":
             None,
             is_local=is_local,
             visualize=True,
-            ee_orientation_at_grasping="top_down",
+            ee_orientation_at_grasping="side_right",
         )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
