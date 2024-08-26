@@ -420,6 +420,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 cur_ee_pose = xyz
                 # Wrap the heading
                 arm_ee_action += cur_ee_pose
+                # Cap the value
+                arm_ee_action = np.clip(
+                    arm_ee_action,
+                    np.array([0.16, -0.70, -0.30]),
+                    np.array([1.20, 0.70, 0.90]),
+                )
             else:
                 arm_ee_action = None
 
@@ -445,6 +451,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.spot.set_base_vel_and_arm_ee_pos(
                     *base_action,
                     arm_ee_action,
+                    self.initial_ee_pose,
                     travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
                     disable_obstacle_avoidance=disable_oa,
                 )
@@ -469,7 +476,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         start_time = time.time()
         if arm_ee_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
-                print("wait for time to pass")
+                pass
         elif base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
                 if target_yaw is not None and abs(

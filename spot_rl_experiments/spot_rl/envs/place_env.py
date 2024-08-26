@@ -301,7 +301,9 @@ class SpotSemanticPlaceEENoWaypointEnv(SpotBaseEnv):
         place = False
 
         # Place command is issued if the place action is smaller than zero
-        place = action_dict.get("grip_action", None) <= 0.0
+        place = action_dict.get("grip_action", None) <= -0.7
+        grip_action = action_dict.get("grip_action", None)
+        print("grip_action", grip_action)
 
         if self._time_step >= 75:
             place = True

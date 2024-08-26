@@ -1095,6 +1095,7 @@ class Spot:
         y_vel,
         ang_vel,
         arm_ee_action,
+        ee_rotation,
         travel_time,
         disable_obstacle_avoidance=False,
     ):
@@ -1110,9 +1111,7 @@ class Spot:
         )
         arm_cmd = self.move_gripper_to_point(
             point=arm_ee_action,
-            rotation=quaternion.as_float_array(
-                self.get_ee_quaternion_in_body_frame()
-            ).tolist(),
+            rotation=quaternion.as_float_array(ee_rotation).tolist(),
             seconds_to_goal=travel_time,
             return_cmd=True,
         )

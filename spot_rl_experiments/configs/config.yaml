@@ -130,7 +130,7 @@ RECEPTACLES:
 
 # Base action params
 MAX_LIN_DIST: 0.06  # meters
-MAX_ANG_DIST: 4.0  # degrees
+MAX_ANG_DIST: 0.0  # degrees
 
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
@@ -173,7 +173,7 @@ FORGET_TARGET_OBJECT_STEPS: 15
 RETURN_TO_BASE: True
 
 # BD params
-ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
+ARM_TRAJECTORY_TIME_IN_SECONDS: 1.0
 
 # Prints
 VERBOSE: True
