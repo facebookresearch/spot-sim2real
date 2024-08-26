@@ -11,12 +11,12 @@ import rospy
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
 from spot_rl.skills.atomic_skills import (
+    MobilePickEE,
     Navigation,
     OpenCloseDrawer,
     Pick,
     Place,
     SemanticPick,
-    MobilePickEE,
     SemanticPlace,
     SemanticPlaceEE,
 )
@@ -105,7 +105,8 @@ class SpotSkillManager:
         open_close_drawer_config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
-        use_ee: bool = False,
+        use_pick_ee: bool = False,
+        use_place_ee: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -117,8 +118,10 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
+        print("USE MOBILE PICK VARIABLE IS SET TO :", self._use_mobile_pick)
         self.use_semantic_place = use_semantic_place
-        self.use_ee = use_ee
+        self.use_pick_ee = use_pick_ee
+        self.use_place_ee = use_place_ee
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -209,20 +212,23 @@ class SpotSkillManager:
             spot=self.spot,
             config=self.nav_config,
         )
-        if self.use_ee:
-            self.gaze_controller = Pick(
-                spot=self.spot,
-                config=self.pick_config,
-                use_mobile_pick=self._use_mobile_pick,
-            )
-        else:
+        if self.use_pick_ee:
+            # print("GOING INSIDE GAZE EE ENV")
             self.gaze_controller = MobilePickEE(
                 spot=self.spot,
                 config=self.pick_config,
                 use_mobile_pick=self._use_mobile_pick,
             )
+        else:
+            self.gaze_controller = Pick(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
+            )
         if self.use_semantic_place:
-            if self.use_ee:
+
+            if self.use_place_ee:
+                print("GOING INSIDE SEM EE ENV")
                 self.place_controller = SemanticPlaceEE(
                     spot=self.spot, config=self.place_config
                 )
@@ -523,8 +529,10 @@ class SpotSkillManager:
                 return False, message
             if self.use_semantic_place:
                 # Convert HOME frame coordinates into body frame
-                place_target_location = self.place_controller.env.get_target_in_base_frame(
-                    mn.Vector3(*place_target_location.astype(np.float64).tolist())
+                place_target_location = (
+                    self.place_controller.env.get_target_in_base_frame(
+                        mn.Vector3(*place_target_location.astype(np.float64).tolist())
+                    )
                 )
                 is_local = True
         else:

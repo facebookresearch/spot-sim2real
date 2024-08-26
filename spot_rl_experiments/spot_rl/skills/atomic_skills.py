@@ -721,7 +721,7 @@ class MobilePickEE(Pick):
         )
         self.policy.reset()
 
-        self.env = SpotGazeEEEnv(config, spot)
+        self.env = SpotGazeEEEnv(config, spot, use_mobile_pick)
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""
