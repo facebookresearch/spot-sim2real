@@ -17,5 +17,10 @@ if __name__ == "__main__":
     contnue = True
     while contnue:
         rospy.set_param("is_gripper_blocked", 0)
-        spotskillmanager.place(None, is_local=is_local, visualize=True)
+        spotskillmanager.place(
+            None,
+            is_local=is_local,
+            visualize=True,
+            ee_orientation_at_grasping="top_down",
+        )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")

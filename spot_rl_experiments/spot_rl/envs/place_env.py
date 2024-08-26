@@ -251,32 +251,20 @@ class SpotSemanticPlaceEENoWaypointEnv(SpotBaseEnv):
         # Place steps
         self._time_step = 0
 
-    def decide_init_arm_joint(self, ee_orientation_at_grasping):
+    def decide_init_arm_joint(self, ee_orientation_at_grasping="side_right"):
         """Decide the place location"""
-
-        # User does not set the gripper orientation
-        if ee_orientation_at_grasping is None:
+        if ee_orientation_at_grasping == "side_right":
             self.initial_arm_joint_angles = np.deg2rad(
                 self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
             )
+        elif ee_orientation_at_grasping == "side_left":
+            self.initial_arm_joint_angles = np.deg2rad(
+                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND
+            )
         else:
-            # Get the pitch and yaw
-            pitch = ee_orientation_at_grasping[1]
-            yaw = ee_orientation_at_grasping[2]
-            print("ee_orientation_at_grasping:", ee_orientation_at_grasping)
-            if abs(pitch) <= 1.309:  # 75 degree in pitch
-                if yaw > 0:  # gripper is in object's right hand side
-                    self.initial_arm_joint_angles = np.deg2rad(
-                        self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
-                    )
-                else:  # gripper is in object's left hand side
-                    self.initial_arm_joint_angles = np.deg2rad(
-                        self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND
-                    )
-            else:
-                self.initial_arm_joint_angles = np.deg2rad(
-                    self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN
-                )
+            self.initial_arm_joint_angles = np.deg2rad(
+                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN
+            )
 
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
         assert place_target is not None
