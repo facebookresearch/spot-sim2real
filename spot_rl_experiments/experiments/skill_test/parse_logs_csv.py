@@ -86,6 +86,7 @@ def process_json_file(input_file, output_file):
 
 
 def main():
+<<<<<<< HEAD
     parser = argparse.ArgumentParser(
         description="Convert JSON files in a folder to CSV"
     )
@@ -93,6 +94,11 @@ def main():
     parser.add_argument(
         "output_folder", help="Path to the folder where CSV files will be saved"
     )
+=======
+    parser = argparse.ArgumentParser(description="Convert JSON files in a folder to CSV")
+    parser.add_argument("input_folder", help="Path to the folder containing JSON files")
+    parser.add_argument("output_folder", help="Path to the folder where CSV files will be saved")
+>>>>>>> 69d9e3f (Minor chagnges for new policy weights)
     args = parser.parse_args()
 
     if not os.path.exists(args.input_folder):
@@ -105,9 +111,13 @@ def main():
     for filename in os.listdir(args.input_folder):
         if filename.endswith(".json"):
             input_file = os.path.join(args.input_folder, filename)
+<<<<<<< HEAD
             output_file = os.path.join(
                 args.output_folder, f"{os.path.splitext(filename)[0]}.csv"
             )
+=======
+            output_file = os.path.join(args.output_folder, f"{os.path.splitext(filename)[0]}.csv")
+>>>>>>> 69d9e3f (Minor chagnges for new policy weights)
             process_json_file(input_file, output_file)
             print(f"Processed {filename} into {output_file}")
 

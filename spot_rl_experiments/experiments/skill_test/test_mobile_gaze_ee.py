@@ -7,7 +7,11 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 if __name__ == "__main__":
     from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
 
+<<<<<<< HEAD
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_pick_ee=True)
+=======
+    spotskillmanager = SpotSkillManager(use_mobile_pick=False)
+>>>>>>> 69d9e3f (Minor chagnges for new policy weights)
     contnue = True
     while contnue:
         spotskillmanager.pick("Frosted Flakes Cup")
