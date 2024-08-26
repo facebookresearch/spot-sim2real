@@ -17,6 +17,7 @@ from spot_rl.skills.atomic_skills import (
     Place,
     SemanticPick,
     SemanticPlace,
+    SemanticPlaceEENoWaypoint,
 )
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
@@ -102,6 +103,7 @@ class SpotSkillManager:
         open_close_drawer_config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
+        use_semantic_place_ee_no_waypoint: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -114,6 +116,7 @@ class SpotSkillManager:
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
         self.use_semantic_place = use_semantic_place
+        self.use_semantic_place_ee_no_waypoint = use_semantic_place_ee_no_waypoint
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -176,7 +179,7 @@ class SpotSkillManager:
         if place_config is None:
             self.place_config = (
                 construct_config_for_semantic_place()
-                if self.use_semantic_place
+                if self.use_semantic_place or self.use_semantic_place_ee_no_waypoint
                 else construct_config_for_place()
             )
         else:
@@ -209,9 +212,14 @@ class SpotSkillManager:
             use_mobile_pick=self._use_mobile_pick,
         )
         if self.use_semantic_place:
-            self.place_controller = SemanticPlace(
-                spot=self.spot, config=self.place_config
-            )
+            if self.use_semantic_place_ee_no_waypoint:
+                self.place_controller = SemanticPlaceEENoWaypoint(
+                    spot=self.spot, config=self.place_config
+                )
+            else:
+                self.place_controller = SemanticPlace(
+                    spot=self.spot, config=self.place_config
+                )
         else:
             self.place_controller = Place(
                 spot=self.spot,

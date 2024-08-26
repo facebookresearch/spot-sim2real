@@ -17,7 +17,11 @@ from spot_rl.envs.gaze_env import SpotGazeEnv, SpotSemanticGazeEnv
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
 from spot_rl.envs.open_close_drawer_env import SpotOpenCloseDrawerEnv
-from spot_rl.envs.place_env import SpotPlaceEnv, SpotSemanticPlaceEnv
+from spot_rl.envs.place_env import (
+    SpotPlaceEnv,
+    SpotSemanticPlaceEENoWaypointEnv,
+    SpotSemanticPlaceEnv,
+)
 
 # Import policies
 from spot_rl.real_policy import (
@@ -27,6 +31,7 @@ from spot_rl.real_policy import (
     OpenCloseDrawerPolicy,
     PlacePolicy,
     SemanticGazePolicy,
+    SemanticPlaceEENoWaypointPolicy,
     SemanticPlacePolicy,
 )
 
@@ -967,6 +972,37 @@ class SemanticPlace(Place):
             message = "Successfully reached the target position"
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+
+
+class SemanticPlaceEENoWaypoint(SemanticPlace):
+    """
+    Semantic place controller without waypoints
+    """
+
+    def __init__(self, spot: Spot, config):
+        if not config:
+            config = construct_config_for_semantic_place()
+        super().__init__(spot, config)
+
+        self.policy = SemanticPlaceEENoWaypointPolicy(
+            config.WEIGHTS.SEMANTIC_PLACE_EE_NO_WAYPOINT,
+            device=config.DEVICE,
+            config=config,
+        )
+        self.policy.reset()
+
+        self.env = SpotSemanticPlaceEENoWaypointEnv(config, spot)
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        action_dict = {
+            "arm_ee_action": action[:3],
+            "base_action": action[4:6],
+            "grip_action": action[
+                3
+            ],  # >0 grasp close gripper; <=0 ungrasp/open gripper
+        }
+        return action_dict
 
 
 class OpenCloseDrawer(Skill):

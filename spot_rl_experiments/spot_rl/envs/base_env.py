@@ -102,6 +102,11 @@ def rescale_actions(actions, action_thresh=0.05, silence_only=False):
     return actions
 
 
+def rescale_arm_ee_actions(actions, action_thresh=0.05, silence_only=False):
+    actions = np.clip(actions, -1, 1)
+    return actions
+
+
 class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     node_name = "spot_reality_gym"
     no_raw = True
@@ -301,6 +306,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Get Base & Arm actions, grasp and place from action dictionary
         base_action = action_dict.get("base_action", None)
         arm_action = action_dict.get("arm_action", None)
+        arm_ee_action = action_dict.get("arm_ee_action", None)
         semantic_place = action_dict.get("semantic_place", False)
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
@@ -405,6 +411,18 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             else:
                 arm_action = None
 
+        if arm_ee_action is not None:
+            arm_ee_action = rescale_arm_ee_actions(arm_ee_action)
+            if np.count_nonzero(arm_ee_action) > 0:
+                # TODO: semantic place ee: move this to config
+                arm_ee_action[0:3] *= 0.1
+                xyz, _ = self.spot.get_ee_pos_in_body_frame()
+                cur_ee_pose = xyz
+                # Wrap the heading
+                arm_ee_action += cur_ee_pose
+            else:
+                arm_ee_action = None
+
         if not (grasp or place):
             if self.slowdown_base > -1 and base_action is not None:
                 # self.ctrl_hz = self.slowdown_base
@@ -418,6 +436,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,
+                    travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                    disable_obstacle_avoidance=disable_oa,
+                )
+            elif base_action is not None and arm_ee_action is not None:
+                print("input base_action velocity:", arr2str(base_action))
+                print("input arm_ee_action:", arr2str(arm_ee_action))
+                self.spot.set_base_vel_and_arm_ee_pos(
+                    *base_action,
+                    arm_ee_action,
                     travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
                     disable_obstacle_avoidance=disable_oa,
                 )
@@ -440,7 +467,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # Spin until enough time has passed during this step
         start_time = time.time()
-        if base_action is not None or arm_action is not None:
+        if arm_ee_action is not None:
+            while time.time() < start_time + 1 / self.ctrl_hz:
+                print("wait for time to pass")
+        elif base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
                 if target_yaw is not None and abs(
                     wrap_heading(self.yaw - target_yaw)
