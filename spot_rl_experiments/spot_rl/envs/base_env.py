@@ -376,7 +376,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         if base_action is not None:
             if nav_silence_only:
-                base_action = rescale_actions(base_action, silence_only=True)
+                # TODO: move action_thresh=0.0 to config
+                base_action = rescale_actions(
+                    base_action, action_thresh=0.0, silence_only=True
+                )
             else:
                 base_action = np.clip(base_action, -1, 1)
             if np.count_nonzero(base_action) > 0:
@@ -391,7 +394,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 # No horizontal velocity
                 ctrl_period = 1 / self.ctrl_hz
                 # Don't even bother moving if it's just for a bit of distance
-                if abs(lin_dist) < 0.05 and abs(ang_dist) < np.deg2rad(3):
+                # TODO: move 0.0 to config
+                if abs(lin_dist) < 0.0 and abs(ang_dist) < np.deg2rad(3):
                     base_action = None
                     target_yaw = None
                 else:

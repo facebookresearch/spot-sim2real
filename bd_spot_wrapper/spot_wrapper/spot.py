@@ -1099,7 +1099,9 @@ class Spot:
         travel_time,
         disable_obstacle_avoidance=False,
     ):
-        print(f"in set_base_vel_and_arm_ee_pos: {arm_ee_action} {travel_time}")
+        print(
+            f"in set_base_vel_and_arm_ee_pos: {arm_ee_action} {x_vel} {y_vel} {ang_vel}"
+        )
         # TODO: semantic place ee: temp hack to distance the base vel
         base_cmd = self.set_base_velocity(
             x_vel,

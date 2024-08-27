@@ -129,8 +129,8 @@ RECEPTACLES:
   white_table: "any"
 
 # Base action params
-MAX_LIN_DIST: 0.06  # meters
-MAX_ANG_DIST: 0.0  # degrees
+MAX_LIN_DIST: 0  # meters
+MAX_ANG_DIST: 0  # degrees
 
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
