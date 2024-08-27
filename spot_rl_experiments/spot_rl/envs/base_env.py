@@ -429,6 +429,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             else:
                 arm_ee_action = None
 
+        print("input base_action velocity:", arr2str(base_action))
+        print("input arm_ee_action:", arr2str(arm_ee_action))
         if not (grasp or place):
             if self.slowdown_base > -1 and base_action is not None:
                 # self.ctrl_hz = self.slowdown_base
@@ -446,8 +448,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif base_action is not None and arm_ee_action is not None:
-                print("input base_action velocity:", arr2str(base_action))
-                print("input arm_ee_action:", arr2str(arm_ee_action))
                 self.spot.set_base_vel_and_arm_ee_pos(
                     *base_action,
                     arm_ee_action,
@@ -465,6 +465,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.spot.set_arm_joint_positions(
                     positions=arm_action,
                     travel_time=1 / self.ctrl_hz * 0.9 * travel_time_scale,
+                )
+            elif arm_ee_action is not None:
+                self.spot.set_base_vel_and_arm_ee_pos(
+                    0,
+                    0,
+                    0,
+                    arm_ee_action,
+                    self.initial_ee_pose,
+                    travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                    disable_obstacle_avoidance=disable_oa,
                 )
 
         if self.prev_base_moved and base_action is None:
