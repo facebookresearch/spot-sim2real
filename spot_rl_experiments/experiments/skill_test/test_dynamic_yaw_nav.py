@@ -14,8 +14,8 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 5
-WAYPOINT_TEST = [[1.8, 1.1]] * NUM_REPEAT  # x, y
+NUM_REPEAT = 1
+WAYPOINT_TEST = [[4.2240941, -2.53240013]] * NUM_REPEAT  # x, y
 
 
 class SpotRosSkillExecutor:
@@ -76,6 +76,7 @@ class SpotRosSkillExecutor:
             metrics = self.compute_metrics(traj, np.array([x, y]))
             metrics["suc"] = suc
             metrics_list.append(metrics)
+            breakpoint()
             # Reset
             self.spotskillmanager.dock()
 
