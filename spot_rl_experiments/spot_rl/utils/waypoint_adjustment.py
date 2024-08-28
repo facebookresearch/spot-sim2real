@@ -56,13 +56,13 @@ def intersect_ray_with_aabb(ray_origin, ray_direction, box_min, box_max):
         return False, None, None
 
     STATIC_OFFSET = 0.0
-    print(t_min)
+    print("t_min", t_min)
     t_min -= STATIC_OFFSET if t_min > STATIC_OFFSET else 0.0
     # Return the intersection points (if needed)
     intersection_point_1 = ray_origin + t_min * ray_direction
     intersection_point_2 = ray_origin + t_max * ray_direction
 
-    return True, intersection_point_1, intersection_point_2
+    return True, intersection_point_1, intersection_point_2, t_min, t_max
 
 
 def midpoint(x1, x2):
