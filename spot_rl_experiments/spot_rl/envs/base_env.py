@@ -404,6 +404,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             else:
                 base_action = None
                 self.prev_base_moved = False
+            if self.num_steps % 2 != 0:
+                base_action = None
+
         if arm_action is not None:
             arm_action = rescale_actions(arm_action)
             if np.count_nonzero(arm_action) > 0:

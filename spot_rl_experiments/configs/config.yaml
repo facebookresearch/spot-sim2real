@@ -20,7 +20,7 @@ WEIGHTS_TORCHSCRIPT:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE no waypoints
-  SEMANTIC_PLACE_EE_NO_WAYPOINT: "weights/semantic_place_ee/pika_v3_r2_6.224.torchscript"
+  SEMANTIC_PLACE_EE_NO_WAYPOINT: "weights/semantic_place_ee/pika_v3_r5_4.121.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -45,7 +45,7 @@ WEIGHTS:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE no waypoints
-  SEMANTIC_PLACE_EE_NO_WAYPOINT: "weights/semantic_place_ee/pika_v3_r2_6.224.torchscript"
+  SEMANTIC_PLACE_EE_NO_WAYPOINT: "weights/semantic_place_ee/pika_v3_r5_4.121.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -129,8 +129,8 @@ RECEPTACLES:
   white_table: "any"
 
 # Base action params
-MAX_LIN_DIST: 0  # meters
-MAX_ANG_DIST: 0  # degrees
+MAX_LIN_DIST: 0.1  # meters
+MAX_ANG_DIST: 10  # degrees
 
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
