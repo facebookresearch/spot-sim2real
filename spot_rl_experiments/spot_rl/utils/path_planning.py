@@ -1,3 +1,4 @@
+import math
 import os.path as osp
 from math import floor
 
@@ -102,15 +103,41 @@ def binary_to_image(binary_array):
     return image_array.astype(np.uint8)
 
 
+def compute_rotation_angle(point1, point2):
+    # Calculate the vector between the two points
+    vector_x = point2[0] - point1[0]
+    vector_y = point2[1] - point1[1]
+
+    # Calculate the angle using atan2, which handles all quadrants
+    angle_radians = math.atan2(vector_y, vector_x)
+
+    return angle_radians
+
+
 def convert_path_to_real_waypoints(path, min_x, min_y):
     path_converted = []
     for waypoint in path:
         new_waypoint = [waypoint[0] / 10.0, waypoint[1] / 10.0]
-        new_waypoint[0] = min_x + new_waypoint[0]
-        new_waypoint[1] = min_y + new_waypoint[1]
+        new_waypoint[0] = np.round(min_x + new_waypoint[0], 1)
+        new_waypoint[1] = np.round(min_y + new_waypoint[1], 1)
         # print(new_waypoint)
         path_converted.append(new_waypoint)
-    return path_converted
+
+    assert len(path_converted) > 2
+
+    filter_path = []
+    for ii in range(len(path_converted) - 2):
+        cur_pt = np.array(path_converted[ii])
+        next_pt = np.array(path_converted[ii + 1])
+        next_next_pt = np.array(path_converted[ii + 2])
+
+        next_yaw = compute_rotation_angle(cur_pt, next_pt)
+        next_next_yaw = compute_rotation_angle(next_pt, next_next_pt)
+
+        if next_yaw != next_next_yaw:
+            filter_path.append(next_next_pt.tolist() + [next_next_yaw])
+
+    return filter_path
 
 
 def path_planning_using_a_star(
@@ -179,7 +206,7 @@ def path_planning_using_a_star(
         )
         if len(path) > 0:
             print("Paths", path, occupancy_grid_visualization.shape)
-            # breakpoint()
+
             occupancy_grid_visualization = cv2.circle(
                 occupancy_grid_visualization,
                 (start_in_grid[1], start_in_grid[0]),
@@ -220,32 +247,16 @@ def path_planning_using_a_star(
         center = np.array([midpoint(x1, x2), midpoint(y1, y2)])
         dirVector = (center - face) / np.linalg.norm(center - face)
         yaw_calc = angle_between_vectors(np.array([1, 0]), dirVector)[1]
-        return (
-            face,
-            yaw_calc,
-            convert_path_to_real_waypoints(bestpath, occupancy_min_x, occupancy_min_y),
-        )
+        final_point = face.tolist() + [np.deg2rad(yaw_calc)]
+        return convert_path_to_real_waypoints(
+            bestpath, occupancy_min_x, occupancy_min_y
+        ) + [final_point]
+    return []
 
 
 if __name__ == "__main__":
     bbox_extents = np.array([0.9, 0.7, 0.5])
     bbox_centers = np.array([4.0, -1.9, 0.5])
-
-    # occupancy_scale = 10.0
-    # path_to_pcd = "point_cloud_fre.pkl"
-    # occupancy_grid, occupancy_scale, max_x, max_y = buil_occupancy_grid(path_to_pcd, occupancy_scale)
-    # occupancy_grid_cache =
-
-    robot_poses = [
-        [2.907976231186483, -3.591043740910226],
-        [4.15923173166292, -3.693013768795655],
-        [4.651140979172928, -3.7375389203182516],
-    ]
-
-    for robot_pose in robot_poses:
-        robot_pose = [0.0, 0.0]
-        print(f"Current robot pose {robot_pose}")
-        print(
-            path_planning_using_a_star(np.array(robot_pose), bbox_centers, bbox_extents)
-        )
-        break
+    robot_pose = [0.0, 0.0]
+    print(f"Current robot pose {robot_pose}")
+    print(path_planning_using_a_star(np.array(robot_pose), bbox_centers, bbox_extents))
