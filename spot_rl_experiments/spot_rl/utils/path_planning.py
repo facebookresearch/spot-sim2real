@@ -5,6 +5,7 @@ from math import floor
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.ndimage import binary_dilation
 from spot_rl.utils.a_star import astar
 from spot_rl.utils.occupancy_grid import (
     buil_occupancy_grid,
@@ -18,6 +19,9 @@ from spot_rl.utils.waypoint_adjustment import (
     intersect_ray_with_aabb,
     midpoint,
 )
+
+# Define the structure element (the neighborhood for dilation)
+DILATION_MAT = np.ones((10, 10))
 
 CACHE_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "occupancy_grid_cache.pkl")
 
@@ -161,6 +165,9 @@ def path_planning_using_a_star(
             occupancy_min_x,
             occupancy_min_y,
         ) = list(occupancy_cache.values())
+        dilated_occupancy_grid = binary_dilation(
+            occupancy_grid, structure=DILATION_MAT
+        ).astype(int)
 
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
     STATIC_OFFSET = 0.7  # adjustment for base 0.5 + extra offset
@@ -200,7 +207,7 @@ def path_planning_using_a_star(
         goal_in_grid = np.array([X, Y])
         print(f"start pos {start_in_grid}, goal in grid {goal_in_grid}")
         path = astar(
-            occupancy_grid,
+            dilated_occupancy_grid,
             (start_in_grid[0], start_in_grid[1]),
             (goal_in_grid[0], goal_in_grid[1]),
         )
@@ -221,15 +228,25 @@ def path_planning_using_a_star(
                 (0, 0, 255),
                 1,
             )
-            for iter, waypoint in enumerate(path):
-                if iter % 2 == 0:
-                    occupancy_grid_visualization = cv2.circle(
-                        occupancy_grid_visualization,
-                        (waypoint[1], waypoint[0]),
-                        1,
-                        (0, 255, 0),
-                        1,
-                    )
+            filter_path = convert_path_to_real_waypoints(
+                path, occupancy_min_x, occupancy_min_y
+            )
+            for iter, waypoint in enumerate(filter_path):
+                x = floor(
+                    map_x_from_cg_to_grid(waypoint[0], occupancy_min_x, occupancy_max_x)
+                    * occupancy_scale
+                )
+                y = floor(
+                    map_y_from_cg_to_grid(waypoint[1], occupancy_min_y, occupancy_max_y)
+                    * occupancy_scale
+                )
+                occupancy_grid_visualization = cv2.circle(
+                    occupancy_grid_visualization,
+                    (y, x),
+                    0,
+                    (0, 255, 0),
+                    -1,
+                )
             min_steps = min(min_steps, len(path))
             bestpath = path
             min_idx = face_idx
