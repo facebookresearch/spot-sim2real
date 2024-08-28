@@ -332,7 +332,7 @@ def detect_place_point_by_pcd_method(
 
     # Wait for a bit to stabalized the gripper
     time.sleep(1.5)
-
+    print("Taking realsense image")
     (
         img,
         depth_raw,
@@ -341,7 +341,7 @@ def detect_place_point_by_pcd_method(
         body_T_hand,
         gripper_T_intel,
     ) = get_arguments(spot, gripper_T_intel)
-
+    cv2.imwrite("before_table_detection.png", img)
     h, w = img.shape[:2]
     mask = np.ones_like(depth_raw).astype(bool)
     fx = camera_intrinsics_intel.focal_length.x

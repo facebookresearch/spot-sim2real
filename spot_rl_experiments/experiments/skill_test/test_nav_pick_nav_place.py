@@ -19,8 +19,9 @@ from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 3
-WAYPOINT_TEST = [([5.4, 2.5], [3.6, -4.2])] * NUM_REPEAT  # x, y
+NUM_REPEAT = 1
+WAYPOINT_TEST = [([3.6, -4.2], [3.6, -4.2])] * NUM_REPEAT  # x, y
+OBJECT_TO_PICK = "tomato"
 
 metrics_list = None
 metrics = None
@@ -96,7 +97,7 @@ class SpotRosSkillExecutor:
 
             # iff nav succeeds then we do pick
             if suc:
-                suc, _ = self.spotskillmanager.pick("can")
+                suc, _ = self.spotskillmanager.pick(OBJECT_TO_PICK)
             else:
                 suc = False
                 self.spotskillmanager.spot.open_gripper()

@@ -517,7 +517,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
-                    percentile=0 if visualize else 70,
+                    percentile=0 if visualize else 60,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
