@@ -20,8 +20,8 @@ from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import get_angle_between_two_vectors
 
 NUM_REPEAT = 1
-WAYPOINT_TEST = [([3.6, -4.2], [3.6, -4.2])] * NUM_REPEAT  # x, y
-OBJECT_TO_PICK = "tomato"
+WAYPOINT_TEST = [([0.2, -2.0], [3.6, -4.2])] * NUM_REPEAT  # x, y
+OBJECT_TO_PICK = "ball"
 
 metrics_list = None
 metrics = None

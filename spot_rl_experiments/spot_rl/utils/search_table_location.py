@@ -373,6 +373,15 @@ def detect_place_point_by_pcd_method(
     plane_pcd.points = o3d.utility.Vector3dVector(
         farthest_point_sampling(np.array(plane_pcd.points), 1024)
     )
+
+    # filter out anything with very small points
+    #
+    #
+    # find normal for all remaining planes
+    #
+    #
+    # choose plane with normal closest to vertical
+
     color = np.zeros(np.array(plane_pcd.points).shape)
     color[:, 0] = 1
     color[:, 1] = 0
