@@ -13,13 +13,16 @@ from spot_wrapper.spot import Spot, wrap_heading
 
 class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
-        super().__init__(config, spot)
+        full_config = config
+        super().__init__(config.nav, spot)
+        self.config = full_config
+        self.nav_config = self.config.nav
         self._goal_xy = None
         self._enable_nav_by_hand = False
-        self._enable_dynamic_yaw = False
+        self._enable_dynamic_yaw = self.nav_config.USE_DYNAMIC_YAW
         self.goal_heading = None
-        self.succ_distance = config.SUCCESS_DISTANCE
-        self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
+        self.succ_distance = self.nav_config.SUCCESS_DISTANCE
+        self.succ_angle = np.deg2rad(self.nav_config.SUCCESS_ANGLE_DIST)
 
     def enable_nav_by_hand(self):
         if not self._enable_nav_by_hand:
@@ -42,21 +45,18 @@ class SpotNavEnv(SpotBaseEnv):
                 f"{self.node_name} Disabling nav goal change get_nav_observation by base fn restored"
             )
 
-    def reset(self, goal_xy, goal_heading, dynamic_yaw=False):
+    def reset(self, goal_xy, goal_heading):
         self._goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading
         observations = super().reset()
-        self._enable_dynamic_yaw = dynamic_yaw
         assert len(self._goal_xy) == 2
 
         if self._enable_dynamic_yaw:
-            self.succ_distance = self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
-            self.succ_angle = np.deg2rad(
-                self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
-            )
+            self.succ_distance = self.nav_config.DYNAMIC_YAW.SUCCESS_DISTANCE
+            self.succ_angle = np.deg2rad(self.nav_config.DYNAMIC_YAW.SUCCESS_ANGLE_DIST)
         else:
-            self.succ_distance = self.config.SUCCESS_DISTANCE
-            self.succ_angle = np.deg2rad(self.config.SUCCESS_ANGLE_DIST)
+            self.succ_distance = self.nav_config.SUCCESS_DISTANCE
+            self.succ_angle = np.deg2rad(self.nav_config.SUCCESS_ANGLE_DIST)
 
         return observations
 

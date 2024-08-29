@@ -3,6 +3,8 @@ defaults:
   - pick: base.yaml
   - place: base.yaml
   - open_close: base.yaml
+  - override hydra/hydra_logging: disabled
+  - override hydra/job_logging: disabled
 
 WEIGHTS:
   # ASC (weight of ASC will always remain in pytorch)

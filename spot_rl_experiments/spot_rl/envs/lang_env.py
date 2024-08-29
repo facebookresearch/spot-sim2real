@@ -279,7 +279,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
     def reset(self, waypoint=None, *args, **kwargs):
         # Move arm to initial configuration (w/ gripper open)
         self.spot.set_arm_joint_positions(
-            positions=np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES), travel_time=0.75
+            positions=np.deg2rad(self.config.pick.ARM_JOINT_ANGLES), travel_time=0.75
         )
         # Wait for arm to arrive to position
         # import pdb; pdb.set_trace()
@@ -309,8 +309,8 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
         place = is_position_within_bounds(
             gripper_pos_in_base_frame,
             place_target_in_base_frame,
-            self.config.SUCC_XY_DIST,
-            self.config.SUCC_Z_DIST,
+            self.config.place.SUCC_XY_DIST,
+            self.config.place.SUCC_Z_DIST,
             convention="habitat",
         )
         if place:
@@ -324,7 +324,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
         if self.grasp_attempted:
             self.max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT_2
         else:
-            self.max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT
+            self.max_joint_movement_scale = self.config.pick.MAX_JOINT_MOVEMENT
 
         # Update the  action_dict with grasp and place flags
         action_dict["grasp"] = grasp
@@ -340,7 +340,7 @@ class SpotMobileManipulationBaseEnv(SpotGazeEnv):
             print("!!!!!!Slow mode!!!!!!")
         else:
             self.slowdown_base = -1
-        disable_oa = False if self.rho > 0.3 and self.config.USE_OA_FOR_NAV else None
+        disable_oa = False if self.rho > 0.3 and self.config.nav.USE_OA_FOR_NAV else None
         observations, reward, done, info = SpotBaseEnv.step(
             self,
             action_dict=action_dict,

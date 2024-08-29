@@ -3,6 +3,7 @@ WEIGHTS:
   GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 MAX_EPISODE_STEPS: 150
 
+USE_MOBILE_PICK: False
 # Base action params
 MAX_LIN_DIST: 0.0 # meters
 MAX_ANG_DIST: 0.0 # degrees

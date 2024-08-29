@@ -19,11 +19,14 @@ from spot_wrapper.utils import angle_between_quat
 
 class SpotPlaceEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
-        super().__init__(config, spot)
+        full_config = config
+        super().__init__(config.place, spot)
+        self.config = full_config
+        self.place_config = self.config.place
         self.place_target = None
         self.place_target_is_local = False
 
-        self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)
+        self.ee_gripper_offset = mn.Vector3(self.place_config.EE_GRIPPER_OFFSET)
         self.placed = False
 
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
@@ -43,8 +46,8 @@ class SpotPlaceEnv(SpotBaseEnv):
         place = is_position_within_bounds(
             gripper_pos_in_base_frame,
             place_target_in_base_frame,
-            self.config.SUCC_XY_DIST,
-            self.config.SUCC_Z_DIST,
+            self.place_config.SUCC_XY_DIST,
+            self.place_config.SUCC_Z_DIST,
             convention="habitat",
         )
 
@@ -100,7 +103,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # User does not set the gripper orientation
         if ee_orientation_at_grasping is None:
             self.initial_arm_joint_angles = np.deg2rad(
-                self.config.place.INITIAL_ARM_JOINT_ANGLES
+                self.place_config.INITIAL_ARM_JOINT_ANGLES
             )
         else:
             # Get the pitch and yaw
@@ -110,15 +113,15 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             if abs(pitch) <= 1.309:  # 75 degree in pitch
                 if yaw > 0:  # gripper is in object's right hand side
                     self.initial_arm_joint_angles = np.deg2rad(
-                        self.config.place.INITIAL_ARM_JOINT_ANGLES
+                        self.place_config.INITIAL_ARM_JOINT_ANGLES
                     )
                 else:  # gripper is in object's left hand side
                     self.initial_arm_joint_angles = np.deg2rad(
-                        self.config.place.INITIAL_ARM_JOINT_ANGLES_LEFT_HAND
+                        self.place_config.INITIAL_ARM_JOINT_ANGLES_LEFT_HAND
                     )
             else:
                 self.initial_arm_joint_angles = np.deg2rad(
-                    self.config.place.INITIAL_ARM_JOINT_ANGLES_TOP_DOWN
+                    self.place_config.INITIAL_ARM_JOINT_ANGLES_TOP_DOWN
                 )
 
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
@@ -170,7 +173,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             place = True
 
         # If the time steps have been passed for 75 steps, we will just place the object
-        if self._time_step >= self.config.place.MAX_EPISODE_STEPS:
+        if self._time_step >= self.place_config.MAX_EPISODE_STEPS:
             place = True
 
         self._time_step += 1
@@ -215,7 +218,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             "relative_initial_ee_orientation": delta_ee,
             "relative_target_object_orientation": delta_obj,
             "articulated_agent_jaw_depth": arm_depth,
-            "joint": self.get_arm_joints(self.config.SEMANTIC_PLACE_JOINT_BLACKLIST),
+            "joint": self.get_arm_joints(self.config.place.JOINT_BLACKLIST),
             "is_holding": np.ones((1,)),
         }
         return observations
