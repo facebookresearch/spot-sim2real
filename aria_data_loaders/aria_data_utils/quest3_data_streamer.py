@@ -1,7 +1,12 @@
 from aria_data_utils.human_sensor_data_streamer_interface import CameraParams, DataFrame, HumanSensorDataStreamerInterface
 from aria_data_utils.aria_sdk_utils import update_iptables_quest3
 from perception_and_utils.utils.math_utils import get_running_avg_a_T_b
-from quest3_streamer.unified_quest_camera import UnifiedQuestCamera # From internal repo
+from perception_and_utils.utils.frame_rate_counter import FrameRateCounter # Local Frame rate counter
+try:
+    from quest3_streamer.unified_quest_camera import UnifiedQuestCamera # From internal repo
+except ImportError:
+    print("Could not import Quest3 camera wrapper")
+
 
 import rospy
 import numpy as np
@@ -29,6 +34,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
+
+        self.frame_rate_counter = FrameRateCounter()
 
         self.unified_quest3_camera = UnifiedQuestCamera()
         self.rgb_cam_params : CameraParams = None
@@ -115,11 +122,16 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         data_frame._frame_number = self._frame_number
         data_frame._timestamp_s = time.time()
 
-        data_frame._avg_rgb_fps = self.unified_quest3_camera.get_avg_fps_rgb()
-        data_frame._avg_depth_fps = self.unified_quest3_camera.get_avg_fps_depth()
 
         # Align depth frame with rgb frame
         data_frame._aligned_depth_frame = None # TODO: Add this logic
+
+        # Update frame rate counter
+        self.frame_rate_counter.update()
+        data_frame._avg_rgb_fps = self.unified_quest3_camera.get_avg_fps_rgb()
+        data_frame._avg_depth_fps = self.unified_quest3_camera.get_avg_fps_depth()
+        data_frame._avg_data_frame_fps = self.frame_rate_counter.avg_value()
+
         return data_frame
 
     def process_frame(
@@ -189,10 +201,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 )
 
         if detect_human_motion:
-            _, activity_str = self.human_motion_detector.process_frame(frame=data_frame)
-            viz_img, _ = self.human_motion_detector.get_outputs(viz_img, {"activity": activity_str})
-            print(f"Activity: {activity_str}")
-            rospy.set_param("human_activity", activity_str)
+            activity_str, avg_velocity = self.human_motion_detector.process_frame(frame=data_frame)
+            ops = {
+                "activity": activity_str,
+                "velocity": avg_velocity,
+                "data_frame_fps": data_frame._avg_data_frame_fps,
+            }
+            viz_img, _ = self.human_motion_detector.get_outputs(viz_img, ops)
+            self.publish_human_activity_history(self.human_motion_detector.get_human_motion_history())
 
         # if detect_objects:
         #     viz_img, object_scores = self.object_detector.process_frame(viz_img)

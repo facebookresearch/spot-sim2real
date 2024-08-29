@@ -26,6 +26,7 @@ from spot_rl.utils.utils import ros_frames as rf
 # ROS imports
 from geometry_msgs.msg import Pose, PoseStamped
 from nav_msgs.msg import Odometry
+from std_msgs.msg import String
 from tf2_ros import StaticTransformBroadcaster
 from visualization_msgs.msg import Marker
 
@@ -55,21 +56,8 @@ class HumanSensorDataStreamerInterface:
         # ROS publishers & broadcaster
         self.static_tf_broadcaster = StaticTransformBroadcaster()
 
-        # self.pose_of_interest_publisher = rospy.Publisher(
-        #     "/pose_of_interest", PoseStamped, queue_size=10
-        # ) # pose of device when object was detected from rgb image
-        # self.pose_of_interest_marker_publisher = rospy.Publisher(
-        #     "/pose_of_interest_marker", Marker, queue_size=10
-        # )
-        # self.odom_publisher = rospy.Publisher(
-        #     "/odom", Odometry, queue_size=10
-        # )
-        # self.human_pose_publisher = rospy.Publisher(
-        #     "/current_pose", PoseStamped, queue_size=10
-        # )
-        # self.human_handoff_pose_publisher = rospy.Publisher(
-        #     "/human_handoff_pose", PoseStamped, queue_size=10
-        # )
+        self.human_activity_history_pub = rospy.Publisher(
+            "/human_activity_history", String, queue_size=10)
 
         # TODO: Define DEVICE FRAME as a visual frame of reference i.e. front facing frame of reference
         self.device_T_camera: Optional[sp.SE3] = None # TODO: Should be initialized by implementations of this class
@@ -223,3 +211,23 @@ class HumanSensorDataStreamerInterface:
         marker.color.b = 0.2
 
         self.pose_of_interest_marker_publisher.publish(marker)
+
+    def publish_human_activity_history(self, human_history: List[Tuple[float,str]]):
+        """
+        Publishes human activity history as a string
+
+        Args:
+            data_frame (DataFrame): DataFrame object containing data packet with rgb, depth
+                                    and all necessary transformations
+
+        Publishes:
+            - /human_activity_history: ROS String message for human activity history
+        """
+
+        # Iterate over human history and create a string
+        human_history_str = ""
+        for timestamp, activity in human_history:
+            human_history_str += f"{timestamp},{activity}|"  # str = "time1,Standing|time2,Walking"
+
+        # Publish human activity history string
+        self.human_activity_history_pub.publish(human_history_str)
