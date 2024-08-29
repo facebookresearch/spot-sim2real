@@ -6,15 +6,39 @@ import cv2
 import magnum as mn
 import numpy as np
 import open3d as o3d
+import quaternion
 import rospy
 from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
-from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.heuristic_nav import get_3d_point, get_best_uvz_from_detection
 from spot_rl.utils.plane_detection import plane_detect
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot, image_response_to_cv2
 from std_msgs.msg import String
+
+
+def spot2habitat_transform(position, rotation):
+    x, y, z = position
+    qx, qy, qz, qw = rotation
+
+    quat = quaternion.quaternion(qw, qx, qy, qz)
+    rotation_matrix = mn.Quaternion(quat.imag, quat.real).to_matrix()
+    rotation_matrix_fixed = (
+        rotation_matrix
+        @ mn.Matrix4.rotation(
+            mn.Rad(-np.pi / 2.0), mn.Vector3(1.0, 0.0, 0.0)
+        ).rotation()
+    )
+    translation = mn.Vector3(x, z, -y)
+
+    quat_rotated = mn.Quaternion.from_matrix(rotation_matrix_fixed)
+    quat_rotated.vector = mn.Vector3(
+        quat_rotated.vector[0], quat_rotated.vector[2], -quat_rotated.vector[1]
+    )
+    rotation_matrix_fixed = quat_rotated.to_matrix()
+    sim_transform = mn.Matrix4.from_(rotation_matrix_fixed, translation)
+
+    return sim_transform
 
 
 class DetectionSubscriber:
@@ -55,7 +79,7 @@ def convert_point_in_body_to_place_waypoint(point_in_body: mn.Vector3, spot: Spo
     )  # body_T_linkwr1 center wr1 in body
     position = [point_in_body.x, point_in_body.y, point_in_body.z]
     rotation = [rotation.x, rotation.y, rotation.z, rotation.w]
-    wrist_T_base = SpotBaseEnv.spot2habitat_transform(position, rotation)
+    wrist_T_base = spot2habitat_transform(position, rotation)
 
     base_place_target_habitat = np.array(wrist_T_base.translation)
     base_place_target = base_place_target_habitat[[0, 2, 1]]
@@ -134,9 +158,9 @@ def generate_point_cloud(
 
     # Optional: Filter out points with a depth of 0 or below a certain threshold
     valid_depth_indices = depth_values > 0  # Example threshold
-    print(
-        f"Total vertices: {len(points_3D)}, Corrupt vertices: {len(points_3D) - len(valid_depth_indices)}"
-    )
+    # print(
+    #     f"Total vertices: {len(points_3D)}, Corrupt vertices: {len(points_3D) - len(valid_depth_indices)}"
+    # )
     points_3D = points_3D[valid_depth_indices]
 
     print(f"3D point cloud shape {points_3D.shape}")

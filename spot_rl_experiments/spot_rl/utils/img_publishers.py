@@ -464,13 +464,19 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             cx = camera_intrinsics_intel.principal_point.x
             cy = camera_intrinsics_intel.principal_point.y
             # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
+            t0 = time.time()
             pcd = search_table_location.generate_point_cloud(
                 img, depth_raw, mask, fx, fy, cx, cy
             )
+            print("Time generate_point_cloud:", time.time() - t0)
+            pcd = pcd.voxel_down_sample(voxel_size=0.05)
+            t0 = time.time()
             pcd.estimate_normals(
                 search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
             )
+            print("Time estimate_normals:", time.time() - t0)
             # 0.25 - 0 < angle < 75
+            t0 = time.time()
             pcd = search_table_location.filter_pointcloud_by_normals_in_the_given_direction(
                 pcd,
                 np.array([0.0, 0.0, 1.0]),
@@ -479,10 +485,15 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                 gripper_T_intel,
                 visualize=False,
             )
-            pcd = pcd.voxel_down_sample(voxel_size=0.01)
+            print(
+                "Time filter_pointcloud_by_normals_in_the_given_direction:",
+                time.time() - t0,
+            )
+
             try:
                 plane_pcd = plane_detect(pcd)
-                if np.array(plane_pcd.points).shape[0] > 1000:
+                print(f"first: { np.array(plane_pcd.points).shape[0]}")
+                if np.array(plane_pcd.points).shape[0] > 10:
                     # o3d.visualization.draw_geometries([plane_pcd])
                     # Down-sample
                     # plane_pcd.points = o3d.utility.Vector3dVector(
@@ -494,6 +505,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
                     filter_pixel_points = []
                     if len(pixel_points) != 0:
+                        t0 = time.time()
                         for pt in pixel_points:
                             depth_pt = (
                                 sample_patch_around_point(
@@ -514,7 +526,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                                 filter_pixel_points.append(pt)
 
                         filter_pixel_points = np.stack(filter_pixel_points)
-
+                        print("Time get 3d:", time.time() - t0)
                         print(
                             f"before/after filter out: {pixel_points.shape[0]} {filter_pixel_points.shape[0]}"
                         )
