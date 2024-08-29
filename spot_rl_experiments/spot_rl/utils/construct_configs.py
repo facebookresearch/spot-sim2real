@@ -24,24 +24,29 @@ def prepend_experiments(d):
             # if not osp.isfile(value):
                 # raise KeyError(f"Neither {value} nor {full_path} exist!")
             d[key] = full_path
+    return d
 
 def merge_dicts(config):
-    conf = OmegaConf.create(config)
-    skills = ['nav', 'pick', 'place']
-    # Merge the top-level keys into 'nav' and 'pick'
-    for key in conf.keys():
-        if key not in skills:
-            OmegaConf.update(conf.nav, key, conf[key], merge=True)
-            OmegaConf.update(conf.pick, key, conf[key], merge=True)
-            OmegaConf.update(conf.place, key, conf[key], merge=True)
+    config = OmegaConf.to_container(config)
+    config = OmegaConf.create(config)
+    skills = ['nav', 'pick', 'place', 'open_close']
 
-    # Remove the top-level keys that have been merged
-    for key in list(conf.keys()):
+    for key in config.keys():
         if key not in skills:
-            del conf[key]
+            config.nav = OmegaConf.merge(config.nav, {key: config[key]})
+            config.pick = OmegaConf.merge(config.pick, {key: config[key]})
+            config.place = OmegaConf.merge(config.place, {key: config[key]})
+            config.open_close = OmegaConf.merge(config.open_close, {key: config[key]})
 
     # Convert back to a regular dictionary if needed
-    return OmegaConf.to_container(conf)
+    return OmegaConf.to_container(config)
+
+def construct_config() -> DictConfig:
+    GlobalHydra.instance().clear()
+    rel_pth = os.path.relpath(CONFIGS_DIR, CONSTRUCT_CONFIG_DIR)
+    initialize(config_path=rel_pth)
+    cfg = compose(config_name="config")
+    return prepend_experiments(cfg)
 
 # @hydra.main(config_path=CONFIGS_DIR, config_name="config")
 def construct_config(cfg: DictConfig):
