@@ -38,6 +38,7 @@ class SpotGazeEnv(SpotBaseEnv):
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
         )
+        self.grasp_dist_threshold = 1.5
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
@@ -66,7 +67,7 @@ class SpotGazeEnv(SpotBaseEnv):
         return observations
 
     def step(self, action_dict: Dict[str, Any]):
-        grasp = self.should_grasp()
+        grasp = self.should_grasp(self.grasp_dist_threshold)
 
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp
@@ -83,15 +84,14 @@ class SpotGazeEnv(SpotBaseEnv):
 
         @INFO: Policies trained on older hab versions DON'T need remapping
         """
-        mobile_gaze_observations = {}
-        mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
+        new_observations = observations.copy()
+        new_observations["arm_depth_bbox_sensor"] = observations[
             "arm_depth_bbox"
         ]
-        mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
+        new_observations["articulated_agent_arm_depth"] = observations[
             "arm_depth"
         ]
-        mobile_gaze_observations["joint"] = observations["joint"]
-        return mobile_gaze_observations
+        return new_observations
 
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
@@ -117,48 +117,14 @@ class SpotGazeEEEnv(SpotGazeEnv):
             spot,
             use_mobile_pick=use_mobile_pick,
         )
-
-    def step(self, action_dict: Dict[str, Any]):
-        grasp = self.should_grasp()
-
-        # Update the action_dict with grasp and place flags
-        action_dict["grasp"] = grasp
-        action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
-
-        observations, reward, done, info = super().step(
-            action_dict=action_dict,
-        )
-        return observations, reward, done, info
-
-    def remap_observation_keys_for_hab3(self, observations):
-        """
-        Change observation keys as per hab3.
-
-        @INFO: Policies trained on older hab versions DON'T need remapping
-        """
-        semantic_gaze_observations = {}
-        semantic_gaze_observations["arm_depth_bbox_sensor"] = observations[
-            "arm_depth_bbox"
-        ]
-        semantic_gaze_observations["articulated_agent_arm_depth"] = observations[
-            "arm_depth"
-        ]
-        semantic_gaze_observations["ee_pose"] = observations["ee_pose"]
-        return semantic_gaze_observations
+        self.grasp_dist_threshold = 0.7
 
     def get_observations(self):
-        arm_depth, arm_depth_bbox = self.get_gripper_images()
+        observations = super().get_observations()
+        if "joint" in observations:
+            del observations["joint"]
         xyz, rpy = self.spot.get_ee_pos_in_body_frame()
-        observations = {
-            "ee_pose": np.concatenate([xyz, rpy]),
-            "arm_depth": arm_depth,
-            "arm_depth_bbox": arm_depth_bbox,
-        }
-
-        # Remap observation keys for mobile gaze as it was trained with Habitat version3
-        if self._use_mobile_pick:
-            observations = self.remap_observation_keys_for_hab3(observations)
-
+        observations["ee_pose"] = np.concatenate([xyz, rpy])
         return observations
 
 class SpotSemanticGazeEnv(SpotBaseEnv):
