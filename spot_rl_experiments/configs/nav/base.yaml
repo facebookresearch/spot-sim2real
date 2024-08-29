@@ -1,6 +1,5 @@
 WEIGHTS: "weights/torchscript/CUTOUT_WT_True_SD_200_ckpt.99.pvp_combined_net.torchscript"
 #WEIGHTS: "weights/CUTOUT_WT_True_SD_200_ckpt.99.pvp.pth"
-
 MAX_EPISODE_STEPS: 150
 
 # Base action params
@@ -14,3 +13,5 @@ USE_OA_FOR_NAV: True
 USE_HEAD_CAMERA: True
 NAV_ACTION_SPACE_LENGTH: 2
 
+# General env params
+USE_MRCNN: False

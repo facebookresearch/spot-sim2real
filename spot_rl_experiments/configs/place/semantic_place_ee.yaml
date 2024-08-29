@@ -5,5 +5,14 @@ defaults:
 # Semantic place
 WEIGHTS: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
-# Semantic Place EE
+# Base action params
+MAX_LIN_DIST: 0.1 # meters
+MAX_ANG_DIST: 5.73 # radians
+
+# Arm action params
+MAX_EE_DIST: 0.3 # meters
+MAX_EE_ROT: 0.3 # radians
 ACTION_SPACE_LENGTH: 100
+
+# General env params
+USE_MRCNN: True

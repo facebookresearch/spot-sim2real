@@ -50,8 +50,7 @@ class RealPolicy:
         self.is_torchscript_policy = False
 
         if (
-            "torchscript" in str(config.WEIGHTS_TYPE).lower()
-            and type(checkpoint_path) == str
+            type(checkpoint_path) == str and "torchscript" in checkpoint_path
         ):
             # map pytorch weight path to torchscript path based on basename
             checkpoint_path_without_ext = os.path.basename(checkpoint_path).split(".")[

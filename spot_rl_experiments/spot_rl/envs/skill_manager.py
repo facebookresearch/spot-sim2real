@@ -92,10 +92,7 @@ class SpotSkillManager:
     def __init__(
         self,
         spot: Spot = None,
-        nav_config=None,
-        pick_config=None,
-        place_config=None,
-        open_close_drawer_config=None,
+        config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
         verbose: bool = True,
@@ -114,10 +111,7 @@ class SpotSkillManager:
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
             spot=spot,
-            nav_config=nav_config,
-            pick_config=pick_config,
-            place_config=place_config,
-            open_close_drawer_config=open_close_drawer_config,
+            config=config,
         )
 
         # Initiate the controllers for nav, gaze, and place
@@ -138,10 +132,7 @@ class SpotSkillManager:
     def __init_spot(
         self,
         spot: Spot = None,
-        nav_config=None,
-        pick_config=None,
-        place_config=None,
-        open_close_drawer_config=None,
+        config=None,
     ):
         """
         Initialize the Spot object, acquire lease, and construct configs
@@ -160,36 +151,7 @@ class SpotSkillManager:
                 exit(1)
         else:
             self.spot = spot
-        self.config = construct_config()
-
-        # Construct configs for nav, gaze, and place
-        self.nav_config = construct_config_for_nav() if not nav_config else nav_config
-        self.pick_config = (
-            construct_config_for_gaze(max_episode_steps=350)
-            if not pick_config
-            else pick_config
-        )
-
-        if place_config is None:
-            self.place_config = (
-                construct_config_for_semantic_place()
-                if self.use_semantic_place
-                else construct_config_for_place()
-            )
-        else:
-            self.place_config = place_config
-
-        self.open_close_drawer_config = (
-            construct_config_for_open_close_drawer()
-            if not open_close_drawer_config
-            else open_close_drawer_config
-        )
-
-        self.open_close_drawer_config = (
-            construct_config_for_open_close_drawer()
-            if not open_close_drawer_config
-            else open_close_drawer_config
-        )
+        self.config = construct_config() if config is None else config
 
     def __initiate_controllers(self, use_policies: bool = True):
         """
@@ -198,30 +160,30 @@ class SpotSkillManager:
 
         self.nav_controller = Navigation(
             spot=self.spot,
-            config=self.nav_config,
+            config=self.config,
         )
         self.gaze_controller = Pick(
             spot=self.spot,
-            config=self.pick_config,
+            config=self.config,
             use_mobile_pick=self._use_mobile_pick,
         )
         if self.use_semantic_place:
             self.place_controller = SemanticPlace(
-                spot=self.spot, config=self.place_config
+                spot=self.spot, config=self.config
             )
         else:
             self.place_controller = Place(
                 spot=self.spot,
-                config=self.place_config,
+                config=self.config,
                 use_policies=use_policies,
             )
         self.open_close_drawer_controller = OpenCloseDrawer(
             spot=self.spot,
-            config=self.open_close_drawer_config,
+            config=self.config,
         )
         self.semantic_gaze_controller = SemanticPick(
             spot=self.spot,
-            config=self.pick_config,
+            config=self.config,
         )
 
     def reset(self):
@@ -359,7 +321,7 @@ class SpotSkillManager:
             save_cone_search_images,
             pull_back,
             self,
-            angle_interval=self.nav_config.get("HEURISTIC_SEARCH_ANGLE_INTERVAL", 20),
+            angle_interval=self.config.get("HEURISTIC_SEARCH_ANGLE_INTERVAL", 20),
         )
 
     def pick(

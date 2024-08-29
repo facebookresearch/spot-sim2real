@@ -1,9 +1,11 @@
 # Open close drawer
 WEIGHTS: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
-# Open Close Drawer env
+# Base action params
 MAX_LIN_DIST: 0.0
 MAX_ANG_DIST: 3.73 # degrees
+
+# Arm action params
 ACTION_SPACE_LENGTH: 8
 DISTANCE_BETWEEN_EE_HANDLE: 0.75
 
@@ -11,3 +13,6 @@ MAX_JOINT_MOVEMENT: 0.06
 ARM_LOWER_LIMITS: [-90, -180, 0, 0, -90, 0]
 ARM_UPPER_LIMITS: [90, 0, 180, 0, 90, 0]
 JOINT_BLACKLIST: [3]
+
+# General env params
+USE_HEAD_CAMERA: False

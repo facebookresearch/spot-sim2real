@@ -32,11 +32,7 @@ from spot_rl.real_policy import (
 
 # Import utils and helpers
 from spot_rl.utils.construct_configs import (
-    construct_config_for_gaze,
-    construct_config_for_nav,
-    construct_config_for_open_close_drawer,
-    construct_config_for_place,
-    construct_config_for_semantic_place,
+    construct_config,
 )
 
 # Import Utils
@@ -304,7 +300,7 @@ class Navigation(Skill):
 
     def __init__(self, spot: Spot, config=None) -> None:
         if not config:
-            config = construct_config_for_nav()
+            config = construct_config()
         super().__init__(spot, config)
 
         # Setup
@@ -445,7 +441,7 @@ class Pick(Skill):
 
     def __init__(self, spot, config=None, use_mobile_pick=False) -> None:
         if not config:
-            config = construct_config_for_gaze()
+            config = construct_config()
         super().__init__(spot, config)
 
         # Setup
@@ -618,7 +614,7 @@ class SemanticPick(Pick):
 
     def __init__(self, spot, config=None) -> None:
         if not config:
-            config = construct_config_for_gaze()
+            config = construct_config()
         super().__init__(spot, config)
 
         self.policy = SemanticGazePolicy(
@@ -718,7 +714,7 @@ class Place(Skill):
 
     def __init__(self, spot: Spot, config=None, use_policies=True) -> None:
         if not config:
-            config = construct_config_for_place()
+            config = construct_config()
         super().__init__(spot, config)
 
         # Setup
@@ -914,7 +910,7 @@ class SemanticPlace(Place):
 
     def __init__(self, spot: Spot, config):
         if not config:
-            config = construct_config_for_semantic_place()
+            config = construct_config()
         super().__init__(spot, config)
 
         self.policy = SemanticPlacePolicy(
@@ -976,7 +972,7 @@ class OpenCloseDrawer(Skill):
 
     def __init__(self, spot, config=None) -> None:
         if not config:
-            config = construct_config_for_open_close_drawer()
+            config = construct_config()
         super().__init__(spot, config)
 
         # Setup

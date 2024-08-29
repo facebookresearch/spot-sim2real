@@ -1,0 +1,15 @@
+defaults:
+  - base
+  - mobile_gaze
+
+# Mobile Gaze torchscript module files path
+WEIGHTS: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
+
+# Base action params
+MAX_LIN_DIST: 0.1
+MAX_ANG_DIST: 5.73 # degrees
+
+# Arm action params
+MAX_EE_DIST: 0.1 # meters
+MAX_EE_ROT: 0.0125 # radians
+ACTION_SPACE_LENGTH: 7
