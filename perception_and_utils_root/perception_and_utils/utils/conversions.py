@@ -205,6 +205,11 @@ def sophus_SE3_to_ros_TransformStamped(
     ros_trf_stamped.transform.translation.z = float(trans[2])
 
     quat = Rotation.from_matrix(sp_se3.rotationMatrix()).as_quat()
+    quat = quat / np.linalg.norm(quat)
+    # Ensure quaternion's w is always positive for effective averaging as multiple quaternions can represent the same rotation
+    if quat[3] > 0:
+        quat = -1.0 * quat
+
     ros_trf_stamped.transform.rotation.x = float(quat[0])
     ros_trf_stamped.transform.rotation.y = float(quat[1])
     ros_trf_stamped.transform.rotation.z = float(quat[2])

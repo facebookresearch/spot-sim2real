@@ -127,6 +127,35 @@ def decorate_img_with_text_for_qr(
     return img
 
 
+def decorate_img_with_fps(frame: np.ndarray, fps_value: float, pos=(50, 50)):
+    text = f"{fps_value: .2f} FPS"
+
+    font = cv2.FONT_HERSHEY_PLAIN
+    font_scale = 2
+    text_color = (0, 0, 225)
+    text_color_bg = (0, 0, 0)
+    font_thickness = 2
+    (text_w, text_h), baseline = cv2.getTextSize(text, font, font_scale, font_thickness)
+    cv2.rectangle(
+        frame,
+        pos,
+        (pos[0] + text_w, pos[1] - text_h - font_scale - 1),
+        text_color_bg,
+        -1,
+        cv2.LINE_8,
+    )
+    cv2.putText(
+        frame,
+        text,
+        pos,
+        font,
+        font_scale,
+        text_color,
+        font_thickness,
+        cv2.LINE_8,
+    )
+
+
 def label_img(
     img: np.ndarray,
     text: str,

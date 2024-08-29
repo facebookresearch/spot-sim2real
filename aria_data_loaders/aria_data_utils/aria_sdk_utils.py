@@ -15,19 +15,19 @@
 import subprocess
 
 
-def update_iptables() -> None:
+def update_iptables(protocol: str = "tcp", direction: str = "INPUT") -> None:
     """
-    Update firewall to permit incoming UDP connections for DDS
+    Update firewall to permit incoming tcp / udp connections for DDS
     """
     update_iptables_cmd = [
         "sudo",
         "iptables",
         "-A",
-        "INPUT",
+        direction,
         "-p",
-        "udp",
+        protocol,
         "-m",
-        "udp",
+        protocol,
         "--dport",
         "7000:8000",
         "-j",
@@ -36,3 +36,12 @@ def update_iptables() -> None:
     print("Running the following command to update iptables:")
     print(update_iptables_cmd)
     subprocess.run(update_iptables_cmd)
+
+
+def update_iptables_aria():
+    update_iptables(protocol="udp", direction="INPUT")
+
+
+def update_iptables_quest3():
+    update_iptables(protocol="tcp", direction="INPUT")
+    update_iptables(protocol="tcp", direction="OUTPUT")
