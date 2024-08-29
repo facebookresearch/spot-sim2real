@@ -13,12 +13,6 @@ from spot_rl.utils.occupancy_grid import (
     map_y_from_cg_to_grid,
     pkl,
 )
-from spot_rl.utils.waypoint_adjustment import (
-    angle_between_vectors,
-    get_xyzxyz,
-    intersect_ray_with_aabb,
-    midpoint,
-)
 
 # Define the structure element (the neighborhood for dilation)
 DILATION_MAT = np.ones((10, 10))
@@ -53,6 +47,49 @@ OCCUPANCY_SCALE = 10.0
 #             #breakpoint()
 #         print(accum, num_steps)
 #     return accum/num_steps #x,y,yaw
+
+
+def get_xyzxyz(centroid, extents):
+    x1 = centroid[0] - (extents[0] / 2.0)
+    y1 = centroid[1] - (extents[1] / 2.0)
+    z1 = centroid[2] - (extents[2] / 2.0)
+
+    x2 = centroid[0] + (extents[0] / 2.0)
+    y2 = centroid[1] + (extents[1] / 2.0)
+    z2 = centroid[2] + (extents[2] / 2.0)
+
+    return np.array([x1, y1, z1]), np.array([x2, y2, z2])
+
+
+def midpoint(x1, x2):
+    return (x1 + x2) / 2.0
+
+
+def angle_between_vectors(v1, v2):
+    # Ensure the vectors are numpy arrays
+    v1 = np.array(v1)
+    v2 = np.array(v2)
+
+    # Compute the dot product
+    dot_product = np.dot(v1, v2)
+
+    # Compute the magnitudes of the vectors
+    magnitude_v1 = np.linalg.norm(v1)
+    magnitude_v2 = np.linalg.norm(v2)
+
+    # Compute the cosine of the angle
+    cos_angle = dot_product / (magnitude_v1 * magnitude_v2)
+
+    # Clip the cosine value to the range [-1, 1] to avoid numerical issues
+    cos_angle = np.clip(cos_angle, -1.0, 1.0)
+
+    # Compute the angle in radians
+    angle_radians = np.arccos(cos_angle)
+
+    # Convert the angle to degrees (optional)
+    angle_degrees = np.degrees(angle_radians)
+
+    return angle_radians, angle_degrees
 
 
 def get_occupancy_grid():
@@ -146,8 +183,8 @@ def convert_path_to_real_waypoints(path, min_x, min_y):
 
 def path_planning_using_a_star(
     xy_position_robot_in_cg,
-    bbox_centers,
-    bbox_extents,
+    goal_xy,
+    other_view_poses=None,
     occupancy_grid=None,
     occupancy_max_x=None,
     occupancy_max_y=None,
@@ -169,14 +206,6 @@ def path_planning_using_a_star(
             occupancy_grid, structure=DILATION_MAT
         ).astype(int)
 
-    boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
-    STATIC_OFFSET = 0.7  # adjustment for base 0.5 + extra offset
-    (x1, y1), (x2, y2) = boxMin[:2], boxMax[:2]
-    face_1 = np.array([midpoint(x1, x2), y1 - STATIC_OFFSET])
-    face_2 = np.array([midpoint(x1, x2), y2 + STATIC_OFFSET])
-    face_3 = np.array([x1 - STATIC_OFFSET, midpoint(y1, y2)])
-    face_4 = np.array([x2 + STATIC_OFFSET, midpoint(y1, y2)])
-    faces = [face_1, face_2, face_3, face_4]
     X = floor(
         map_x_from_cg_to_grid(
             xy_position_robot_in_cg[0], occupancy_min_x, occupancy_max_x
@@ -190,84 +219,90 @@ def path_planning_using_a_star(
         * occupancy_scale
     )
     start_in_grid = np.array([X, Y])
-    min_steps = float("inf")
-    min_idx = -1
+
     occupancy_grid_visualization = binary_to_image(occupancy_grid.copy())
     bestpath = None
-    # occupancy_grid_visualization = occupancy_grid_visualization.transpose((1, 2, 0))
-    for face_idx, face in enumerate(faces):
-        X = floor(
-            map_x_from_cg_to_grid(face[0], occupancy_min_x, occupancy_max_x)
-            * occupancy_scale
-        )
-        Y = floor(
-            map_y_from_cg_to_grid(face[1], occupancy_min_y, occupancy_max_y)
-            * occupancy_scale
-        )
-        goal_in_grid = np.array([X, Y])
-        print(f"start pos {start_in_grid}, goal in grid {goal_in_grid}")
-        path = astar(
-            dilated_occupancy_grid,
-            (start_in_grid[0], start_in_grid[1]),
-            (goal_in_grid[0], goal_in_grid[1]),
-        )
-        if len(path) > 0:
-            print("Paths", path, occupancy_grid_visualization.shape)
+    X = floor(
+        map_x_from_cg_to_grid(goal_xy[0], occupancy_min_x, occupancy_max_x)
+        * occupancy_scale
+    )
+    Y = floor(
+        map_y_from_cg_to_grid(goal_xy[1], occupancy_min_y, occupancy_max_y)
+        * occupancy_scale
+    )
+    goal_in_grid = np.array([X, Y])
+    print(f"start pos {start_in_grid}, goal in grid {goal_in_grid}")
+    path = astar(
+        dilated_occupancy_grid,
+        (start_in_grid[0], start_in_grid[1]),
+        (goal_in_grid[0], goal_in_grid[1]),
+    )
+    if len(path) > 0:
+        print("Paths", path, occupancy_grid_visualization.shape)
 
-            occupancy_grid_visualization = cv2.circle(
-                occupancy_grid_visualization,
-                (start_in_grid[1], start_in_grid[0]),
-                1,
-                (255, 0, 0),
-                1,
+        occupancy_grid_visualization = cv2.circle(
+            occupancy_grid_visualization,
+            (start_in_grid[1], start_in_grid[0]),
+            1,
+            (255, 0, 0),
+            1,
+        )
+        occupancy_grid_visualization = cv2.circle(
+            occupancy_grid_visualization,
+            (goal_in_grid[1], goal_in_grid[0]),
+            1,
+            (0, 0, 255),
+            1,
+        )
+        filter_path = convert_path_to_real_waypoints(
+            path, occupancy_min_x, occupancy_min_y
+        )
+        for iter, waypoint in enumerate(filter_path):
+            x = floor(
+                map_x_from_cg_to_grid(waypoint[0], occupancy_min_x, occupancy_max_x)
+                * occupancy_scale
+            )
+            y = floor(
+                map_y_from_cg_to_grid(waypoint[1], occupancy_min_y, occupancy_max_y)
+                * occupancy_scale
             )
             occupancy_grid_visualization = cv2.circle(
                 occupancy_grid_visualization,
-                (goal_in_grid[1], goal_in_grid[0]),
-                1,
-                (0, 0, 255),
-                1,
+                (y, x),
+                0,
+                (0, 255, 0),
+                -1,
             )
-            filter_path = convert_path_to_real_waypoints(
-                path, occupancy_min_x, occupancy_min_y
-            )
-            for iter, waypoint in enumerate(filter_path):
+        if other_view_poses:
+            for view_pose in other_view_poses:
                 x = floor(
-                    map_x_from_cg_to_grid(waypoint[0], occupancy_min_x, occupancy_max_x)
+                    map_x_from_cg_to_grid(
+                        view_pose[0], occupancy_min_x, occupancy_max_x
+                    )
                     * occupancy_scale
                 )
                 y = floor(
-                    map_y_from_cg_to_grid(waypoint[1], occupancy_min_y, occupancy_max_y)
+                    map_y_from_cg_to_grid(
+                        view_pose[1], occupancy_min_y, occupancy_max_y
+                    )
                     * occupancy_scale
                 )
                 occupancy_grid_visualization = cv2.circle(
                     occupancy_grid_visualization,
                     (y, x),
                     0,
-                    (0, 255, 0),
+                    (0, 255, 255),
                     -1,
                 )
-            min_steps = min(min_steps, len(path))
-            bestpath = path
-            min_idx = face_idx
-        else:
-            print(f"No solution for Edge_{face_idx+1}")
-    assert min_idx > -1, "couldnt find solution for given path problem"
-    plt.imshow(occupancy_grid_visualization, cmap="gray")
-    plt.title("Path Planning")
-    plt.show()
-    # plt.savefig("occupancy_grid_fre.png")
-    # breakpoint()
-    if min_idx > -1:
-        print(f"Min steps required to reach {min_steps}, {min_idx}")
-        face = faces[min_idx]
-        center = np.array([midpoint(x1, x2), midpoint(y1, y2)])
-        dirVector = (center - face) / np.linalg.norm(center - face)
-        yaw_calc = angle_between_vectors(np.array([1, 0]), dirVector)[1]
-        final_point = face.tolist() + [np.deg2rad(yaw_calc)]
+        bestpath = path
+        plt.imshow(occupancy_grid_visualization, cmap="gray")
+        plt.title("Path Planning")
+        plt.show()
         return convert_path_to_real_waypoints(
             bestpath, occupancy_min_x, occupancy_min_y
-        ) + [final_point]
+        )
+    else:
+        print(f"No solution for start: {xy_position_robot_in_cg}, goal {goal_xy}")
     return []
 
 
