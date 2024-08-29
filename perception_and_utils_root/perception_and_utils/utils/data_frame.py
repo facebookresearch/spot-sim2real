@@ -11,6 +11,7 @@ class DataFrame:
         self._timestamp_s = -1
         self._avg_rgb_fps = None # type: Optional[float]
         self._avg_depth_fps = None # type: Optional[float]
+        self._avg_data_frame_fps = None # type: Optional[float]
         self._rgb_frame = None # type: Optional[np.ndarray]
         self._depth_frame = None # type: Optional[np.ndarray]
         self._aligned_depth_frame = None # type: Optional[np.ndarray]
