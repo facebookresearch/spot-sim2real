@@ -1,27 +1,39 @@
-from aria_data_utils.human_sensor_data_streamer_interface import CameraParams, DataFrame, HumanSensorDataStreamerInterface
 from aria_data_utils.aria_sdk_utils import update_iptables_quest3
+from aria_data_utils.human_sensor_data_streamer_interface import (
+    CameraParams,
+    DataFrame,
+    HumanSensorDataStreamerInterface,
+)
+from perception_and_utils.utils.frame_rate_counter import (  # Local Frame rate counter
+    FrameRateCounter,
+)
 from perception_and_utils.utils.math_utils import get_running_avg_a_T_b
-from perception_and_utils.utils.frame_rate_counter import FrameRateCounter # Local Frame rate counter
+
 try:
-    from quest3_streamer.unified_quest_camera import UnifiedQuestCamera # From internal repo
+    from quest3_streamer.unified_quest_camera import (  # From internal repo
+        UnifiedQuestCamera,
+    )
 except ImportError:
     print("Could not import Quest3 camera wrapper")
 
 
-import rospy
-import numpy as np
-import sophus as sp
-import cv2
-from typing import Any, Dict, Optional, Tuple, List
-import click
 import logging
 import time
+from typing import Any, Dict, List, Optional, Tuple
+
+import click
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import rospy
+import sophus as sp
 from perception_and_utils.utils.conversions import (
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
     xyt_to_sophus_SE3,
 )
 from spot_rl.utils.utils import ros_frames as rf
+
 
 class Quest3DataStreamer(HumanSensorDataStreamerInterface):
     def __init__(self, verbose: bool = False) -> None:
@@ -38,8 +50,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         self.frame_rate_counter = FrameRateCounter()
 
         self.unified_quest3_camera = UnifiedQuestCamera()
-        self.rgb_cam_params : CameraParams = None
-        self.depth_cam_params : CameraParams = None
+        self.rgb_cam_params: CameraParams = None
+        self.depth_cam_params: CameraParams = None
         self._frame_number = -1
         self._setup_device()
 
@@ -58,7 +70,9 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         self.logger("Quest3DataStreamer :: Disconnected")
 
     def is_connected(self) -> bool:
-        return self._is_connected # TODO: Return device connection status from Bruno's APIs
+        return (
+            self._is_connected
+        )  # TODO: Return device connection status from Bruno's APIs
 
     def _setup_device(self) -> Any:
         # Setup RGB camera params
@@ -67,13 +81,23 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             rgb_pp = self.unified_quest3_camera.get_rgb_principal_point()
 
             if rgb_fl is not None and rgb_pp is not None:
-                rospy.logwarn("RGB Camera Params: focal lengths = {}, principal point = {}".format(rgb_fl, rgb_pp))
-                self.rgb_cam_params = CameraParams(focal_lengths=rgb_fl, principal_point=rgb_pp)
+                rospy.logwarn(
+                    "RGB Camera Params: focal lengths = {}, principal point = {}".format(
+                        rgb_fl, rgb_pp
+                    )
+                )
+                self.rgb_cam_params = CameraParams(
+                    focal_lengths=rgb_fl, principal_point=rgb_pp
+                )
         else:
             self.logger.info("Waiting for RGB camera params to be set...")
             rospy.logwarn("Waiting for RGB camera params to be set...")
             time.sleep(0.1)
-        rospy.loginfo("RGB Camera Params: focal lengths = {}, principal point = {}".format(self.rgb_cam_params._focal_lengths, self.rgb_cam_params._principal_point))
+        rospy.loginfo(
+            "RGB Camera Params: focal lengths = {}, principal point = {}".format(
+                self.rgb_cam_params._focal_lengths, self.rgb_cam_params._principal_point
+            )
+        )
 
         # Setup Depth camera params
         while self.depth_cam_params is None:
@@ -81,13 +105,24 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             depth_pp = self.unified_quest3_camera.get_depth_principal_point()
 
             if depth_fl is not None and depth_pp is not None:
-                rospy.logwarn("Depth Camera Params: focal lengths = {}, principal point = {}".format(depth_fl, depth_pp))
-                self.depth_cam_params = CameraParams(focal_lengths=depth_fl, principal_point=depth_pp)
+                rospy.logwarn(
+                    "Depth Camera Params: focal lengths = {}, principal point = {}".format(
+                        depth_fl, depth_pp
+                    )
+                )
+                self.depth_cam_params = CameraParams(
+                    focal_lengths=depth_fl, principal_point=depth_pp
+                )
             else:
                 self.logger.info("Waiting for Depth camera params to be set...")
                 rospy.logwarn("Waiting for Depth camera params to be set...")
                 time.sleep(0.1)
-        print("Depth Camera Params: focal lengths = {}, principal point = {}".format(self.depth_cam_params._focal_lengths, self.depth_cam_params._principal_point))
+        print(
+            "Depth Camera Params: focal lengths = {}, principal point = {}".format(
+                self.depth_cam_params._focal_lengths,
+                self.depth_cam_params._principal_point,
+            )
+        )
 
     def get_latest_data_frame(self) -> Optional[DataFrame]:
         # Create DataFrame object
@@ -98,7 +133,9 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         deviceWorld_T_rgbCam = self.unified_quest3_camera.get_deviceWorld_T_rgbCamera()
         device_T_rgbCam = self.unified_quest3_camera.get_device_T_rgbCamera()
         if rgb_frame is None or deviceWorld_T_rgbCam is None or device_T_rgbCam is None:
-            rospy.logwarn("Returning None, as rgb_frame or deviceWorld_T_rgbCam or device_T_rgbCam is None.")
+            rospy.logwarn(
+                "Returning None, as rgb_frame or deviceWorld_T_rgbCam or device_T_rgbCam is None."
+            )
             return None
         else:
             data_frame._rgb_frame = rgb_frame
@@ -107,10 +144,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 
         # Populate depth frame data iff all the required data is available; else return None
         depth_frame = self.unified_quest3_camera.get_depth()
-        deviceWorld_T_depthCam = self.unified_quest3_camera.get_deviceWorld_T_depthCamera()
+        deviceWorld_T_depthCam = (
+            self.unified_quest3_camera.get_deviceWorld_T_depthCamera()
+        )
         device_T_depthCam = self.unified_quest3_camera.get_device_T_depthCamera()
         if depth_frame is None or deviceWorld_T_depthCam is None:
-            rospy.logwarn("Returning None as depth_frame or deviceWorld_T_depthCam or device_T_depthCam is None.")
+            rospy.logwarn(
+                "Returning None as depth_frame or deviceWorld_T_depthCam or device_T_depthCam is None."
+            )
             return None
         else:
             data_frame._depth_frame = depth_frame
@@ -122,9 +163,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         data_frame._frame_number = self._frame_number
         data_frame._timestamp_s = time.time()
 
-
         # Align depth frame with rgb frame
-        data_frame._aligned_depth_frame = None # TODO: Add this logic
+        data_frame._aligned_depth_frame = None  # TODO: Add this logic
 
         # Update frame rate counter
         self.frame_rate_counter.update()
@@ -201,21 +241,25 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 )
 
         if detect_human_motion:
-            activity_str, avg_velocity = self.human_motion_detector.process_frame(frame=data_frame)
+            activity_str, avg_velocity = self.human_motion_detector.process_frame(
+                frame=data_frame
+            )
             ops = {
                 "activity": activity_str,
                 "velocity": avg_velocity,
                 "data_frame_fps": data_frame._avg_data_frame_fps,
             }
             viz_img, _ = self.human_motion_detector.get_outputs(viz_img, ops)
-            self.publish_human_activity_history(self.human_motion_detector.get_human_motion_history())
+            self.publish_human_activity_history(
+                self.human_motion_detector.get_human_motion_history()
+            )
 
-        # if detect_objects:
-        #     viz_img, object_scores = self.object_detector.process_frame(viz_img)
-        #     if object_label in object_scores.keys():
-        #         if self.verbose:
-        #             plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
-        #         # self.publish_pose_of_interest(frame.get("ros_pose"))
+        if detect_objects:
+            viz_img, object_scores = self.object_detector.process_frame(viz_img)
+            if object_label in object_scores.keys():
+                if self.verbose:
+                    plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
+                # self.publish_pose_of_interest(frame.get("ros_pose"))
 
         return viz_img, outputs
 
@@ -292,7 +336,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 @click.option("--do-update-iptables", is_flag=True, type=bool, default=False)
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--hz", type=int, default=100)
-def main(do_update_iptables:bool, debug:bool, hz:int):
+def main(do_update_iptables: bool, debug: bool, hz: int):
     if debug:
         _log_level = rospy.DEBUG
     else:
@@ -306,7 +350,7 @@ def main(do_update_iptables:bool, debug:bool, hz:int):
     else:
         rospy.logwarn("Not updating iptables")
 
-    rate = rospy.Rate(hz)
+    # rate = rospy.Rate(hz)
     outputs: Dict[str, Any] = {}
     data_streamer = None
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
@@ -314,7 +358,9 @@ def main(do_update_iptables:bool, debug:bool, hz:int):
         data_streamer = Quest3DataStreamer()
 
         outputs = data_streamer.initialize_april_tag_detector(outputs=outputs)
-        outputs = data_streamer.initialize_object_detector(outputs=outputs, object_labels=["milk bottle"])
+        outputs = data_streamer.initialize_object_detector(
+            outputs=outputs, object_labels=["milk bottle"]
+        )
         data_streamer.initialize_human_motion_detector()
         # data_streamer.connect()
         while not rospy.is_shutdown():
