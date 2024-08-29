@@ -212,7 +212,7 @@ def plot_place_point_in_gripper_image(spot: Spot, point_in_gripper_camera: np.nd
     rospy.set_param("is_gripper_blocked", 0)
     spot.open_gripper()
     time.sleep(0.5)
-    gripper_resps = spot.get_hand_image(force_get_gripper=True)
+    gripper_resps = spot.get_hand_image()
     gripper_rgb = image_response_to_cv2(gripper_resps[0])
     intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
     pixel = project_3d_to_pixel_uv(
@@ -245,7 +245,7 @@ def get_arguments(spot: Spot, gripper_T_intel: np.ndarray):
     """
     place_point_generation_src: int = 1
     # Garther gripper image response -> snapshot tree
-    gripper_resps = spot.get_hand_image()
+    gripper_resps = spot.get_hand_image(force_get_gripper=True)
 
     intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
     snapshot_tree = gripper_resps[0].shot.transforms_snapshot
