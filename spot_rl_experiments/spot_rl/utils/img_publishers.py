@@ -491,25 +491,55 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                     pixel_points = search_table_location.project_3d_to_pixel_uv(
                         np.array(plane_pcd.points), fx, fy, cx, cy
                     )
+
+                    filter_pixel_points = []
                     if len(pixel_points) != 0:
-                        max_x = int(np.max(pixel_points[:, 1]))
-                        min_x = int(np.min(pixel_points[:, 1]))
-                        max_y = int(np.max(pixel_points[:, 0]))
-                        min_y = int(np.min(pixel_points[:, 0]))
-                        cur_bbox = [min_y, min_x, max_y, max_x]
-                        object_label = "plane"
-                        bbox_data = (
-                            f"{str(timestamp)}|{object_label},{1.0},"
-                            + ",".join([str(v) for v in cur_bbox])
-                        )
-                        # Apply the red bounding box to showcase tracking on the image
-                        viz_img = cv2.rectangle(
-                            viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
-                        )
-                        for xy in pixel_points:
-                            viz_img = cv2.circle(
-                                viz_img, (int(xy[0]), int(xy[1])), 1, (255, 0, 0)
+                        for pt in pixel_points:
+                            depth_pt = (
+                                sample_patch_around_point(
+                                    int(pt[0]), int(pt[1]), depth_raw
+                                )
+                                / 1000.0
                             )
+                            intel_pt = get_3d_point(
+                                camera_intrinsics_intel, pt, depth_pt
+                            )
+                            gripper_pt = np.array(
+                                gripper_T_intel.transform_point(mn.Vector3(*intel_pt))
+                            )
+                            body_pt = body_T_hand.transform_point(
+                                mn.Vector3(*gripper_pt)
+                            )
+                            if body_pt[2] > 0:
+                                filter_pixel_points.append(pt)
+
+                        filter_pixel_points = np.stack(filter_pixel_points)
+
+                        print(
+                            f"before/after filter out: {pixel_points.shape[0]} {filter_pixel_points.shape[0]}"
+                        )
+
+                        if len(filter_pixel_points) != 0:
+                            max_x = int(np.max(filter_pixel_points[:, 1]))
+                            min_x = int(np.min(filter_pixel_points[:, 1]))
+                            max_y = int(np.max(filter_pixel_points[:, 0]))
+                            min_y = int(np.min(filter_pixel_points[:, 0]))
+                            cur_bbox = [min_y, min_x, max_y, max_x]
+                            object_label = "plane"
+                            bbox_data = (
+                                f"{str(timestamp)}|{object_label},{1.0},"
+                                + ",".join([str(v) for v in cur_bbox])
+                            )
+                            # Apply the red bounding box to showcase tracking on the image
+                            viz_img = cv2.rectangle(
+                                viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                            )
+                            for xy in filter_pixel_points:
+                                viz_img = cv2.circle(
+                                    viz_img, (int(xy[0]), int(xy[1])), 1, (255, 0, 0)
+                                )
+                        else:
+                            bbox_data = f"{str(timestamp)}|None"
                     else:
                         bbox_data = f"{str(timestamp)}|None"
                 else:
