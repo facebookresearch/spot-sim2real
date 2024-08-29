@@ -21,6 +21,8 @@ class SpotNavEnv(SpotBaseEnv):
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
 
+        self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
+
     def enable_nav_by_hand(self):
         if not self._enable_nav_by_hand:
             self._enable_nav_by_hand = True
@@ -43,6 +45,20 @@ class SpotNavEnv(SpotBaseEnv):
             )
 
     def reset(self, goal_xy, goal_heading, dynamic_yaw=False):
+
+        # Move arm to initial configuration
+        cmd_id = self.spot.set_arm_joint_positions(
+            positions=self.initial_arm_joint_angles, travel_time=1
+        )
+
+        # Block until arm arrives with incremental timeout for 3 attempts
+        timeout_sec = 1.0
+        max_allowed_timeout_sec = 3.0
+        status = False
+        while status is False and timeout_sec <= max_allowed_timeout_sec:
+            status = self.spot.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+            timeout_sec += 1.0
+
         self._enable_dynamic_yaw = dynamic_yaw
         self._goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading

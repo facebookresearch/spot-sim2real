@@ -464,7 +464,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
     name = "spot_open_voc_object_detector_publisher"
     subscriber_topic = rt.HAND_RGB
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
-    publisher_topics = ["temp"]
+    publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
 
     def __init__(self, model, spot):
         super().__init__()
@@ -483,8 +483,11 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         # For the depth images
         self.img_msg_depth = None
-        rospy.Subscriber(rt.HAND_DEPTH, Image, self.depth_cb, queue_size=1)
+        rospy.Subscriber(rt.HAND_DEPTH_UNSCALED, Image, self.depth_cb, queue_size=1)
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
+
+        self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+
         while self.img_msg_depth is None:
             pass
         rospy.loginfo(f"[{self.name}]: has received images!")
@@ -530,15 +533,21 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         mask = np.where(mask > 0, 1, 0).astype(depth_raw.dtype)
         depth_image_masked = depth_raw * mask[...].astype(depth_raw.dtype)
-
         non_zero_indices = np.nonzero(depth_image_masked)
+
         # Calculate the bounding box coordinates
         y_min, y_max = non_zero_indices[0].min(), non_zero_indices[0].max()
         x_min, x_max = non_zero_indices[1].min(), non_zero_indices[1].max()
         cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
         Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1.0)
-        point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
+        if np.isnan(Z):
+            print(f"Affordance Prediction : Z is NaN = {Z}")
+            return None
+        elif Z > MAX_HAND_DEPTH:
+            print(f"Affordance Prediction : Z is out of bounds = {Z}")
+            return None
 
+        point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
         return point_in_gripper
 
     def _publish(self):
@@ -600,14 +609,18 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             depth_box = arm_depth[y1_distance:y2_distance, x1_distance:x2_distance]
             if depth_box.size == 0:
                 continue
-            z = np.median(depth_box) / 255.0 * MAX_HAND_DEPTH
+
             try:
                 point_in_gripper = self.affordance_prediction(
-                    depth_raw=arm_depth / 255.0 * MAX_HAND_DEPTH,
+                    depth_raw=arm_depth / 1000.0,
                     mask=arm_depth_bbox,
                     camera_intrinsics=cam_intrinsics,
                     center_pixel=np.array([pixel_x, pixel_y]),
                 )
+
+                if point_in_gripper is None:
+                    print(f"Affordance Point is NaN for {class_label}, skipping")
+                    continue
             except Exception as e:
                 print(f"Issue of predicting location: {e}")
                 continue
@@ -623,16 +636,22 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
                 f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score}"
             )
             print(
-                f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y} {z}"
+                f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
             )
 
         # publish data
         self.publish_new_detection(";".join(object_info))
+        self.publish_viz_img(viz_img, header)
 
         stopwatch.print_stats()
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
+
+    def publish_viz_img(self, viz_img, header):
+        viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
+        viz_img_msg.header = header
+        self.pubs[self.viz_topic].publish(viz_img_msg)
 
 
 class OWLVITModel:
@@ -643,6 +662,7 @@ class OWLVITModel:
         rospy.loginfo("[OWLVIT]: Models loaded.")
 
     def inference(self, hand_rgb, timestamp, stopwatch):
+        print("Running inference on Owlvit")
         params = rospy.get_param("/object_target").split(",")
         self.owlvit.update_label([params])
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
@@ -662,11 +682,12 @@ class OWLVITModel:
 
 class OWLVITModelMultiClasses(OWLVITModel):
     def inference(self, hand_rgb, timestamp, stopwatch):
+        print("Running inference on OWLVITModelMultiClasses")
         # Add new classes here to the model
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
-        # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
-        multi_classes = [["glass bottle"]]
+        # TODO: Update this with fixed set list of objects for demo
+        multi_classes = [["ball", "cup"]]
         self.owlvit.update_label(multi_classes)
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
@@ -789,6 +810,7 @@ if __name__ == "__main__":
             else:
                 raise RuntimeError("This should be impossible.")
         cmds = [f"python {osp.abspath(__file__)} {flag}" for flag in flags]
+
         processes = [subprocess.Popen(cmd, shell=True) for cmd in cmds]
         try:
             while all([p.poll() is None for p in processes]):
