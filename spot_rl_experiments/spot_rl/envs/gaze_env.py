@@ -18,17 +18,16 @@ from spot_wrapper.spot import Spot
 class SpotGazeEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot, use_mobile_pick: bool = False):
         # Select suitable keys
+        full_config = config
         super().__init__(
-            config,
+            config.pick,
             spot,
             stopwatch=None,
         )
+        self.config = full_config
+        self.pick_config = self.config.pick
         self.target_obj_name = None
-        self._use_mobile_pick = use_mobile_pick
-        self.initial_arm_joint_angles = np.deg2rad(config.pick.ARM_JOINT_ANGLES)
-        self._max_joint_movement_scale = self.config.pick.MAX_JOINT_MOVEMENT
-        self._max_lin_dist_scale = self.config.pick.MAX_LIN_DIST
-        self._max_ang_dist_scale = self.config.pick.MAX_ANG_DIST
+        self._use_mobile_pick = self.pick_config.USE_MOBILE_PICK
 
     def reset(self, target_obj_name, *args, **kwargs):
         # Move arm to initial configuration
@@ -108,11 +107,7 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
             stopwatch=None,
         )
         self.target_obj_name = None
-        self.initial_arm_joint_angles = np.deg2rad(config.ARM_JOINT_ANGLES)
         self.grasping_type = "topdown"
-        self._max_joint_movement_scale = self.config.pick.MAX_JOINT_MOVEMENT
-        self._max_lin_dist_scale = self.config.pick.MAX_LIN_DIST
-        self._max_ang_dist_scale = self.config.pick.MAX_ANG_DIST
 
     def reset(self, target_obj_name, grasping_type, *args, **kwargs):
         # Move arm to initial configuration
