@@ -25,7 +25,25 @@ def prepend_experiments(d):
                 # raise KeyError(f"Neither {value} nor {full_path} exist!")
             d[key] = full_path
 
-@hydra.main(config_path=CONFIGS_DIR, config_name="config")
+def merge_dicts(config):
+    conf = OmegaConf.create(config)
+    skills = ['nav', 'pick', 'place']
+    # Merge the top-level keys into 'nav' and 'pick'
+    for key in conf.keys():
+        if key not in skills:
+            OmegaConf.update(conf.nav, key, conf[key], merge=True)
+            OmegaConf.update(conf.pick, key, conf[key], merge=True)
+            OmegaConf.update(conf.place, key, conf[key], merge=True)
+
+    # Remove the top-level keys that have been merged
+    for key in list(conf.keys()):
+        if key not in skills:
+            del conf[key]
+
+    # Convert back to a regular dictionary if needed
+    return OmegaConf.to_container(conf)
+
+# @hydra.main(config_path=CONFIGS_DIR, config_name="config")
 def construct_config(cfg: DictConfig):
     prepend_experiments(cfg)
     print(cfg)
