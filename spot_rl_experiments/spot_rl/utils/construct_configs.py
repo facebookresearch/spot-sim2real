@@ -5,14 +5,16 @@
 
 import os.path as osp
 
-import hydra
 from omegaconf import OmegaConf, DictConfig
-import re
+from hydra import compose, initialize
+from hydra.core.global_hydra import GlobalHydra
+import os
 
 THIS_DIR = osp.dirname(osp.abspath(__file__))
 SPOT_RL_DIR = osp.join(osp.dirname(THIS_DIR))
 SPOT_RL_EXPERIMENTS_DIR = osp.join(osp.dirname(SPOT_RL_DIR))
 CONFIGS_DIR = osp.join(SPOT_RL_EXPERIMENTS_DIR, "configs")
+CONSTRUCT_CONFIG_DIR = osp.join(SPOT_RL_EXPERIMENTS_DIR, "spot_rl/utils")
 DEFAULT_CONFIG = osp.join(CONFIGS_DIR, "config.yaml")
 
 def prepend_experiments(d):
