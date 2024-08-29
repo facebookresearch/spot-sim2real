@@ -180,6 +180,113 @@ def from_ros_Float32MultiArray(msg):
     return np_array.reshape(shape) if shape else np_array
 
 
+def to_ros_Marker(data):
+    """
+    Convert messages from dict to ros visulization_msgs/Marker
+    More info - http://docs.ros.org/en/noetic/api/visualization_msgs/html/msg/Marker.html
+    """
+    # quaternion = quaternion_from_euler(0.0, 0.0, 0.0)
+    message = {
+        "header": {
+            "frame_id": "spotWorld",
+            "stamp": Time.now(),
+            "seq": int(0),
+        },
+        "ns": "",
+        "id": int(data.get("id")),
+        "type": int(data.get("type")),
+        "action": int(0),
+        "pose": {
+            "position": data.get("position"),
+            "orientation": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0,
+                "w": 1.0,
+            },
+        },
+        "scale": {
+            "x": float(0.1),
+            "y": float(0.1),
+            "z": float(0.1),
+        },
+        "color": data.get("color"),
+        "lifetime": float(0.0),
+        "frame_locked": bool(False),
+    }
+
+    if message.get("type") == 9:
+        message["text"] = data.get("text")
+
+    return message
+
+
+def from_ros_Marker(message: Dict[str, Any]):
+    """
+    Convert messages from ros visulization_msgs/Marker to dict
+    More info - http://docs.ros.org/en/noetic/api/visualization_msgs/html/msg/Marker.html
+    """
+    data = message["msg"]
+
+    if data["type"] == 2:
+        return {"pose": data["pose"]}
+    return data
+
+
+def to_ros_MarkerArray(data):
+    """
+    Convert messages from dict to ros visulization_msgs/MarkerArray
+    More info - http://docs.ros.org/en/noetic/api/visualization_msgs/html/msg/MarkerArray.html
+    """
+    message = []
+
+    for data_entity in data:
+        message_entity = {
+            "header": {
+                "frame_id": "spotWorld",
+                "stamp": Time.now(),
+                "seq": int(0),
+            },
+            "ns": "",
+            "id": int(data_entity.get("id")),
+            "type": int(data_entity.get("type")),
+            "action": int(0),
+            "pose": {
+                "position": data_entity.get("position"),
+                "orientation": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0,
+                    "w": 1.0,
+                },
+            },
+            "scale": {
+                "x": float(0.1),
+                "y": float(0.1),
+                "z": float(0.1),
+            },
+            "color": data_entity.get("color"),
+            "lifetime": float(0.0),
+            "frame_locked": bool(False),
+        }
+
+        if message_entity.get("type") == 9:
+            message_entity["text"] = data_entity.get("text")
+
+        message.append(message_entity)
+
+    return {"markers": message}
+
+
+def from_ros_MarkerArray(message: Dict[str, Any]):
+    """
+    Convert messages from ros visulization_msgs/MarkerArray to dict
+    More info - http://docs.ros.org/en/noetic/api/visualization_msgs/html/msg/MarkerArray.html
+    """
+    data = message["msg"]
+    return data
+
+
 factory = {
     "sensor_msgs/Image": {"to": to_ros_image, "from": from_ros_image},
     "tf2_msgs/TFMessage": {"to": to_ros_transforms, "from": from_ros_transforms},
@@ -187,5 +294,10 @@ factory = {
     "std_msgs/Float32MultiArray": {
         "to": to_ros_Float32MultiArray,
         "from": from_ros_Float32MultiArray,
+    },
+    "visualization_msgs/Marker": {"to": to_ros_Marker, "from": from_ros_Marker},
+    "visualization_msgs/MarkerArray": {
+        "to": to_ros_MarkerArray,
+        "from": from_ros_MarkerArray,
     },
 }
