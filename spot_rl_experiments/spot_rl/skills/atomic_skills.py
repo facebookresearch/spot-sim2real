@@ -374,8 +374,8 @@ class Navigation(Skill):
             check_navigation_success = is_pose_within_bounds(
                 self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
                 _nav_target_pose_deg,
-                self.config.SUCCESS_DISTANCE,
-                self.config.SUCCESS_ANGLE_DIST,
+                self.config.nav.SUCCESS_DISTANCE,
+                self.config.nav.SUCCESS_ANGLE_DIST,
             )
 
         # Update result log
@@ -838,7 +838,7 @@ class Place(Skill):
         self.spot.move_gripper_to_point(
             intr_ee_pos,
             dir_rpy_to_intr,
-            self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+            self.config.place.ARM_TRAJECTORY_TIME_IN_SECONDS,
             timeout_sec=10,
         )
 
@@ -849,7 +849,7 @@ class Place(Skill):
         self.spot.move_gripper_to_point(
             goal_ee_pos,
             dir_rpy_to_goal,
-            self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+            self.config.place.ARM_TRAJECTORY_TIME_IN_SECONDS,
             timeout_sec=10,
         )
 
@@ -866,8 +866,8 @@ class Place(Skill):
         check_place_success = is_position_within_bounds(
             local_place_target_spot,
             local_ee_pose_spot,
-            self.config.SUCC_XY_DIST,
-            self.config.SUCC_Z_DIST,
+            self.config.place.SUCC_XY_DIST,
+            self.config.place.SUCC_Z_DIST,
             convention="spot",
         )
 

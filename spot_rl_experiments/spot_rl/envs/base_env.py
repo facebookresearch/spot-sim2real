@@ -112,9 +112,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         config,
         spot: Spot,
         stopwatch=None,
-        max_joint_movement_key="MAX_JOINT_MOVEMENT",
-        max_lin_dist_key="MAX_LIN_DIST",
-        max_ang_dist_key="MAX_ANG_DIST",
     ):
         """
         :param max_joint_movement_key: max allowable displacement of arm joints
@@ -169,9 +166,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
 
         # Neural network action scale
-        self._max_joint_movement_scale = self.config[max_joint_movement_key]
-        self._max_lin_dist_scale = self.config[max_lin_dist_key]
-        self._max_ang_dist_scale = self.config[max_ang_dist_key]
+        self._max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT
+        self._max_lin_dist_scale = self.config.MAX_LIN_DIST
+        self._max_ang_dist_scale = self.config.MAX_ANG_DIST
 
         # Tracking paramters reset
         rospy.set_param("enable_tracking", False)

@@ -1,5 +1,6 @@
 # Open close drawer
-WEIGHTS: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
+WEIGHTS:
+  OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
 # Base action params
 MAX_LIN_DIST: 0.0

@@ -2,7 +2,8 @@ defaults:
   - base
 
 # Semantic place
-WEIGHTS: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
+WEIGHTS:
+  PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
 # Semantic Place
 ACTION_SPACE_LENGTH: 9

@@ -71,7 +71,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):
         # We set the initial arm joints
         config.INITIAL_ARM_JOINT_ANGLES = copy.deepcopy(
-            config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
+            config.place.INITIAL_ARM_JOINT_ANGLES
         )
         super().__init__(config, spot)
 
@@ -100,7 +100,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # User does not set the gripper orientation
         if ee_orientation_at_grasping is None:
             self.initial_arm_joint_angles = np.deg2rad(
-                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
+                self.config.place.INITIAL_ARM_JOINT_ANGLES
             )
         else:
             # Get the pitch and yaw
@@ -110,15 +110,15 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             if abs(pitch) <= 1.309:  # 75 degree in pitch
                 if yaw > 0:  # gripper is in object's right hand side
                     self.initial_arm_joint_angles = np.deg2rad(
-                        self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
+                        self.config.place.INITIAL_ARM_JOINT_ANGLES
                     )
                 else:  # gripper is in object's left hand side
                     self.initial_arm_joint_angles = np.deg2rad(
-                        self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND
+                        self.config.place.INITIAL_ARM_JOINT_ANGLES_LEFT_HAND
                     )
             else:
                 self.initial_arm_joint_angles = np.deg2rad(
-                    self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN
+                    self.config.place.INITIAL_ARM_JOINT_ANGLES_TOP_DOWN
                 )
 
     def reset(self, place_target, target_is_local=False, *args, **kwargs):
@@ -166,12 +166,11 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
                 np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
             )
             < 0.25
-            and self._time_step >= 50
         ):
             place = True
 
         # If the time steps have been passed for 75 steps, we will just place the object
-        if self._time_step >= 75:
+        if self._time_step >= self.config.place.MAX_EPISODE_STEPS:
             place = True
 
         self._time_step += 1

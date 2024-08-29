@@ -1,5 +1,6 @@
 # Static gaze
-WEIGHTS: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
+WEIGHTS:
+  GAZE: "weights/final_paper/gaze_normal_32_seed100_1649708902_ckpt.38.pth"
 MAX_EPISODE_STEPS: 150
 
 # Base action params
@@ -7,6 +8,7 @@ MAX_LIN_DIST: 0.0 # meters
 MAX_ANG_DIST: 0.0 # degrees
 
 # Arm action params
+MAX_JOINT_MOVEMENT: 0.0872665 # Gaze arm speed (5 deg)
 CENTER_TOLERANCE: 0.3
 OBJECT_LOCK_ON_NEEDED: 3
 DONT_PICK_UP: False

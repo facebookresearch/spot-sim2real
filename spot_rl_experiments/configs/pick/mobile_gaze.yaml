@@ -2,7 +2,8 @@ defaults:
   - base
 
 # Mobile Gaze torchscript module files path
-WEIGHTS: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
+WEIGHTS:
+  GAZE: "weights/torchscript/mg97_2_latest_combined_net.torchscript"
 
 # Mobile Gaze env
 MAX_LIN_DIST: 0

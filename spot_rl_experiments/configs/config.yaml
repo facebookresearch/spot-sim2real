@@ -2,8 +2,8 @@ defaults:
   - nav: base.yaml
   - pick: base.yaml
   - place: base.yaml
+  - open_close: base.yaml
 
-WEIGHTS_TYPE: WEIGHTS_TORCHSCRIPT
 WEIGHTS:
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"

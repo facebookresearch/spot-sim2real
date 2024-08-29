@@ -2,7 +2,8 @@ defaults:
   - base
 
 # Semantic gaze
-WEIGHTS: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"
+WEIGHTS:
+  GAZE: "weights/mobile_gaze_v2/mg97h103_6_ckpt.64.torchscript"
 
 # Semantic Gaze env
 MAX_LIN_DIST: 0

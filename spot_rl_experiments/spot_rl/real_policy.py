@@ -364,7 +364,7 @@ class NavPolicy(RealPolicy):
         )
         # Linear, angular, and horizontal velocity (in that order)
         action_space = spaces.Box(
-            -1.0, 1.0, (config.get("NAV_ACTION_SPACE_LENGTH", 2),)
+            -1.0, 1.0, (config.nav.ACTION_SPACE_LENGTH,)
         )
         super().__init__(
             checkpoint_path, observation_space, action_space, device, config=config
@@ -408,7 +408,7 @@ class OpenCloseDrawerPolicy(RealPolicy):
             }
         )
         action_space = spaces.Box(
-            -1.0, 1.0, (config.get("OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH", 8),)
+            -1.0, 1.0, (config.open_close.ACTION_SPACE_LENGTH,)
         )
         super().__init__(
             checkpoint_path, observation_space, action_space, device, config=config

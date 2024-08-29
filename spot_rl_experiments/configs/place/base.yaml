@@ -1,5 +1,6 @@
 # Static place
-WEIGHTS: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
+WEIGHTS:
+  PLACE: "weights/torchscript/place_10deg_32_seed300_1649709235_ckpt.75_combined_net.torchscript"
 #WEIGHTS: "weights/final_paper/place_10deg_32_seed300_1649709235_ckpt.75.pth"
 MAX_EPISODE_STEPS: 75
 
@@ -15,6 +16,8 @@ PLACE_ACTION_SPACE_LENGTH: 4
 
 MAX_JOINT_MOVEMENT: 0.174533  # Place arm speed (10 deg)
 ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
+
+ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
 
 # General env params
 USE_HEAD_CAMERA: False

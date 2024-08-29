@@ -6,7 +6,7 @@
 import os.path as osp
 
 import hydra
-from omegaconf import DictConfig
+from omegaconf import OmegaConf, DictConfig
 import re
 
 THIS_DIR = osp.dirname(osp.abspath(__file__))
