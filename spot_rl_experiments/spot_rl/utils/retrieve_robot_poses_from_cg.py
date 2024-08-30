@@ -110,7 +110,7 @@ def draw_bbox_with_confidence(image, bbox, confidence):
     return image
 
 
-def get_view_poses(anchor_object_center):
+def get_view_poses(anchor_object_center, query_class_names=[]):
     data_list = []
     previously_seen_data = {}
     raw_data = None
@@ -143,7 +143,12 @@ def get_view_poses(anchor_object_center):
                         center - anchor_object_center
                     )
 
-                    if dist_to_anchor_center < 0.1:
+                    class_condition = (
+                        True
+                        if len(query_class_names) == 0
+                        else class_name in query_class_names
+                    )
+                    if dist_to_anchor_center < 0.3 and class_condition:
                         print(set(class_names))
                         # if class_name in query_class_names
                         rgb_path = object_item["color_path"][class_i]
@@ -216,4 +221,4 @@ def get_view_poses(anchor_object_center):
 
 
 if __name__ == "__main__":
-    get_view_poses(ANCHOR_OBJECT_CENTER)
+    get_view_poses(ANCHOR_OBJECT_CENTER, [])

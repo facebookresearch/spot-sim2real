@@ -74,12 +74,13 @@ class SpotRosSkillExecutor:
             # Get the bbox center and bbox extent
             bbox_info = skill_input.split(";")  # in the format of x,y,z
             assert (
-                len(bbox_info) == 6
+                len(bbox_info) >= 6
             ), f"Wrong size of the bbox info, it should be 6, but got {len(bbox_info)}"
             bbox_center = np.array([float(v) for v in bbox_info[0:3]])
-            bbox_extent = np.array([float(v) for v in bbox_info[3:]])
+            bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
+            query_class_names = bbox_info[6:]
             # Get the view poses
-            view_poses = get_view_poses(bbox_center)
+            view_poses = get_view_poses(bbox_center, query_class_names)
             # Get the robot x, y, yaw
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points

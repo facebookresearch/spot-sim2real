@@ -5,9 +5,13 @@ import rospy
 
 if __name__ == "__main__":
     # Put the bbox center/extent info here
-    bbox_center = [8.2, 6.0, 0.1]
-    bbox_extent = [1.3, 1.0, 0.8]
-    bbox_info = [str(v) for v in bbox_center] + [str(v) for v in bbox_extent]
+    bbox_extent = [1.8, 0.7, 0.4]
+    bbox_center = [2.1, 1.5, 0.2]
+    bbox_info = (
+        [str(v) for v in bbox_center]
+        + [str(v) for v in bbox_extent]
+        + ["pillow", "couch", "sofa"]
+    )
     skill_input = ";".join(bbox_info)
     rospy.set_param(
         "/skill_name_input", f"nav_path_planning_with_view_poses,{skill_input}"

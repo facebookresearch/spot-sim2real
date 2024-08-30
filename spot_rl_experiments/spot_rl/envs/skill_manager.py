@@ -293,9 +293,10 @@ class SpotSkillManager:
         """
         # Keep track of the current receptacle that the robot navigates to for later grasping
         # mode of gaze skill
-        self.current_receptacle_name = (
-            None if reset_current_receptacle_name else self.current_receptacle_name
-        )
+        if reset_current_receptacle_name:
+            receptacle_name = getattr(self, "current_receptacle_name", None)
+            setattr(self, "current_receptacle_name", receptacle_name)
+
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)

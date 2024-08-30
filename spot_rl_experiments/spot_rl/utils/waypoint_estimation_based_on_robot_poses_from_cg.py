@@ -11,6 +11,42 @@ from spot_rl.utils.path_planning import (
 )
 
 
+def angle_and_sign_between_vectors(a, b):
+    """
+    Calculate the angle and sign of the angle between two 2D vectors.
+
+    Parameters:
+    a (tuple): The first vector as (a_x, a_y).
+    b (tuple): The second vector as (b_x, b_y).
+
+    Returns:
+    float: The angle between the vectors in radians.
+    int: The sign of the angle (+1 for counterclockwise, -1 for clockwise).
+    """
+    # Convert the input tuples to numpy arrays
+    a = np.array(a)
+    b = np.array(b)
+
+    # Calculate the dot product and magnitudes
+    dot_product = np.dot(a, b)
+    magnitude_a = np.linalg.norm(a)
+    magnitude_b = np.linalg.norm(b)
+
+    # Calculate the angle using the dot product formula
+    angle = np.arccos(dot_product / (magnitude_a * magnitude_b))
+
+    # Calculate the cross product (in 2D, this is a scalar)
+    cross_product = a[0] * b[1] - a[1] * b[0]
+
+    # Determine the sign of the angle
+    sign = 1 if cross_product > 0 else -1
+
+    # Apply the sign to the angle
+    signed_angle = sign * np.rad2deg(angle)
+
+    return signed_angle
+
+
 # don't remove this keep it incase new logic fails
 def intersect_ray_with_aabb(ray_origin, ray_direction, box_min, box_max):
     t_min = (box_min[0] - ray_origin[0]) / ray_direction[0]
@@ -101,7 +137,9 @@ def determin_nearest_edge(robot_xy, bbox_centers, boxMin, boxMax):
     min_idx = np.argmin(angles_betwn_approach_vector_and_faces)
     _ = angles_betwn_approach_vector_and_faces[min_idx]
     nearestfacevector, nearestface = faces[min_idx]
-    yaw_calc = angle_between_vectors(np.array([1, 0]), nearestfacevector)[1]
+
+    yaw_calc = angle_and_sign_between_vectors(np.array([1, 0]), nearestfacevector)
+
     return nearestface, nearestfacevector, yaw_calc
 
 
@@ -205,4 +243,7 @@ def get_navigation_points(
 
 
 if __name__ == "__main__":
-    get_navigation_points()
+    vector_x = np.array([1, 0])
+    vector_y = np.array([1, -1])
+    # breakpoint()
+    print(angle_and_sign_between_vectors(vector_x, vector_y))

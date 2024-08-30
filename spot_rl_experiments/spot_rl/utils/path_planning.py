@@ -248,21 +248,23 @@ def path_planning_using_a_star(
         (start_in_grid[0], start_in_grid[1]),
         (goal_in_grid[0], goal_in_grid[1]),
     )
+
+    occupancy_grid_visualization = cv2.circle(
+        occupancy_grid_visualization,
+        (start_in_grid[1], start_in_grid[0]),
+        1,
+        (255, 0, 0),
+        1,
+    )
+    occupancy_grid_visualization = cv2.circle(
+        occupancy_grid_visualization,
+        (goal_in_grid[1], goal_in_grid[0]),
+        1,
+        (0, 0, 255),
+        1,
+    )
+
     if len(path) > 0:
-        occupancy_grid_visualization = cv2.circle(
-            occupancy_grid_visualization,
-            (start_in_grid[1], start_in_grid[0]),
-            1,
-            (255, 0, 0),
-            1,
-        )
-        occupancy_grid_visualization = cv2.circle(
-            occupancy_grid_visualization,
-            (goal_in_grid[1], goal_in_grid[0]),
-            1,
-            (0, 0, 255),
-            1,
-        )
         filter_path = convert_path_to_real_waypoints(
             path, occupancy_min_x, occupancy_min_y
         )
@@ -282,36 +284,34 @@ def path_planning_using_a_star(
                 (0, 255, 0),
                 -1,
             )
-        if other_view_poses:
-            for view_pose in other_view_poses:
-                x = floor(
-                    map_x_from_cg_to_grid(
-                        view_pose[0], occupancy_min_x, occupancy_max_x
-                    )
-                    * occupancy_scale
-                )
-                y = floor(
-                    map_y_from_cg_to_grid(
-                        view_pose[1], occupancy_min_y, occupancy_max_y
-                    )
-                    * occupancy_scale
-                )
-                occupancy_grid_visualization = cv2.circle(
-                    occupancy_grid_visualization,
-                    (y, x),
-                    0,
-                    (0, 255, 255),
-                    -1,
-                )
-        bestpath = path
-        plt.imshow(occupancy_grid_visualization, cmap="gray")
-        plt.title("Path Planning")
-        plt.show()
+            bestpath = path
+    if other_view_poses:
+        for view_pose in other_view_poses:
+            x = floor(
+                map_x_from_cg_to_grid(view_pose[0], occupancy_min_x, occupancy_max_x)
+                * occupancy_scale
+            )
+            y = floor(
+                map_y_from_cg_to_grid(view_pose[1], occupancy_min_y, occupancy_max_y)
+                * occupancy_scale
+            )
+            occupancy_grid_visualization = cv2.circle(
+                occupancy_grid_visualization,
+                (y, x),
+                0,
+                (0, 255, 255),
+                -1,
+            )
+
+    plt.imshow(occupancy_grid_visualization, cmap="gray")
+    plt.title("Path Planning")
+    plt.show()
+
+    if bestpath is not None:
         return convert_path_to_real_waypoints(
             bestpath, occupancy_min_x, occupancy_min_y
         )
-    else:
-        print(f"No solution for start: {xy_position_robot_in_cg}, goal {goal_xy}")
+    print(f"No solution for start: {xy_position_robot_in_cg}, goal {goal_xy}")
     return []
 
 
