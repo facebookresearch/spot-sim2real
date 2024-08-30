@@ -303,6 +303,26 @@ class SpotSkillManager:
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+        
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the navigation target with yaw specified as a metric location
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        theta = 0.0
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "dynamic_yaw": True,
+        }  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
 
     def heuristic_mobile_gaze(
         self,
@@ -490,16 +510,13 @@ class SpotSkillManager:
             message = "No place target specified, estimating point through heuristic"
             height = calculate_height(height_target)
             if height < self.place_config.HEIGHT_THRESHOLD:
-                print("lower than 20 in")
-                self.angle = self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
+                self.arm_joint_angles = self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
             else:
-                print("higher than 20 inc")
-                self.angle = self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
+                self.arm_joint_angles = self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
 
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
             # estimate waypoint
-            visualize = True
             try:
                 (
                     place_target_location,
