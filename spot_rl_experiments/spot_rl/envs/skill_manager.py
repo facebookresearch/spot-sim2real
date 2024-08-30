@@ -489,12 +489,12 @@ class SpotSkillManager:
         else:
             message = "No place target specified, estimating point through heuristic"
             height = calculate_height(height_target)
-            if height < 0.8128:
+            if height < self.place_config.HEIGHT_THRESHOLD:
                 print("lower than 20 in")
-                self.angle = self.pick_config.GAZE_ARM_JOINT_ANGLES
+                self.angle = self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
             else:
                 print("higher than 20 inc")
-                self.angle = self.pick_config.GAZE_ARM_JOINT_ANGLES2
+                self.angle = self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
 
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
