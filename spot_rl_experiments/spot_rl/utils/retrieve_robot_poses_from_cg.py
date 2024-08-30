@@ -110,7 +110,7 @@ def draw_bbox_with_confidence(image, bbox, confidence):
     return image
 
 
-if __name__ == "__main__":
+def get_view_poses(anchor_object_center):
     data_list = []
     previously_seen_data = {}
     raw_data = None
@@ -140,7 +140,7 @@ if __name__ == "__main__":
                     )
                     center = (boxMin + boxMax) / 2.0
                     dist_to_anchor_center = np.linalg.norm(
-                        center - ANCHOR_OBJECT_CENTER
+                        center - anchor_object_center
                     )
 
                     if dist_to_anchor_center < 0.1:
@@ -211,3 +211,9 @@ if __name__ == "__main__":
             pickle.dump(data_list, file)
     else:
         print("No such class was found")
+
+    return data_list
+
+
+if __name__ == "__main__":
+    get_view_poses(ANCHOR_OBJECT_CENTER)

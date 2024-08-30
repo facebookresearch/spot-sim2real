@@ -155,24 +155,21 @@ def get_waypoint_from_robot_view_poses(
     return waypoint, best_robot_view_pos
 
 
-if __name__ == "__main__":
-    # receptacle details from CG
-    bbox_extents = np.array([1.3, 1.0, 0.8])
-    bbox_centers = np.array([8.2, 6.0, 0.1])
+def get_navigation_points(
+    robot_view_pose_data=None,
+    bbox_centers=np.array([8.2, 6.0, 0.1]),
+    bbox_extents=np.array([1.3, 1.0, 0.8]),
+    cur_robot_xy=[0, 0],
+):
 
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
     print("boxMin", boxMin, "boxMax", boxMax)
 
-    # PASTE your waypoint in robot_xy; only x,y, keep z as it is
-    # obtain xy,yaw from Concept graph based on detection confs & area. Rank top 5 etc.
-    robot_xy = np.array(
-        [4.651140979172928, -3.7375389203182516, bbox_centers[-1] + 0.1]
-    )
-    yaw_cg = 88.59926264693141
+    if robot_view_pose_data is None:
+        robot_view_pose_data = pkl.load(
+            open("robot_view_poses_for_bedroom_dresser.pkl", "rb")
+        )
 
-    robot_view_pose_data = pkl.load(
-        open("robot_view_poses_for_bedroom_dresser.pkl", "rb")
-    )
     robot_view_poses = []
     for robot_view_pose in robot_view_pose_data:
         robot_view_poses.append(
@@ -203,3 +200,9 @@ if __name__ == "__main__":
     print(f"Final path x y yaw: {path}")
     with open("path.pkl", "wb") as file:
         pkl.dump(path, file)
+
+    return path
+
+
+if __name__ == "__main__":
+    get_navigation_points()
