@@ -423,8 +423,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             arm_ee_action = rescale_arm_ee_actions(arm_ee_action)
             if np.count_nonzero(arm_ee_action) > 0:
                 # TODO: semantic place ee: move this to config
-                arm_ee_action[0:3] *= 0.2  # 0.015
-                arm_ee_action[3:6] *= 0.2  # 0.0125
+                if place is not None:
+                    arm_ee_action[0:3] *= self.arm_ee_dist_scale  # 0.015
+                    arm_ee_action[3:6] *= self.arm_ee_rot_scale  # 0.0125
+                else:
+                    arm_ee_action[0:3] *= self.config.EE_DIST_SCALE_MOBILE_GAZE  # 0.015
+                    arm_ee_action[3:6] *= self.config.EE_ROT_SCALE_MOBILE_GAZE  # 0.0125
+
                 xyz, rpy = self.spot.get_ee_pos_in_body_frame()
                 cur_ee_pose = np.concatenate((xyz, rpy), axis=0)
                 # Wrap the heading
@@ -479,9 +484,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # TODO: semantic place ee: temp hack to command this out
         # for not using base velocity
         start_time = time.time()
-        if arm_ee_action is not None:
-            print("do not move the base")
-        elif base_action is not None or arm_action is not None:
+        # if arm_ee_action is not None:
+        #     print("do not move the base")
+        if base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
                 if target_yaw is not None and abs(
                     wrap_heading(self.yaw - target_yaw)
