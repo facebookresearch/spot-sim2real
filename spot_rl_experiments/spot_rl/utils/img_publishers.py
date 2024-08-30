@@ -530,8 +530,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                         print(
                             f"before/after filter out: {pixel_points.shape[0]} {filter_pixel_points.shape[0]}"
                         )
-
-                        if len(filter_pixel_points) != 0:
+                        if len(filter_pixel_points) >= 40:
                             max_x = int(np.max(filter_pixel_points[:, 1]))
                             min_x = int(np.min(filter_pixel_points[:, 1]))
                             max_y = int(np.max(filter_pixel_points[:, 0]))
