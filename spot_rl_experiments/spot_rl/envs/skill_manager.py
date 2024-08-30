@@ -513,7 +513,6 @@ class SpotSkillManager:
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
                 print(f"Estimate Place xyz: {place_target_location}")
-                breakpoint()
                 if visualize:
                     plot_place_point_in_gripper_image(
                         self.spot, place_target_in_gripper_camera

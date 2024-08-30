@@ -1,3 +1,7 @@
+# Copyright (c) Meta Platforms, Inc. and its affiliates.
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+# black: ignore-errors
 import json
 import os
 
@@ -23,7 +27,5 @@ def calculate_height(object_tag):
                     height = bbox_center[2] + bbox_extent[2]
                     return height
                 else:
-                    raise ValueError(
-                        f"Object with tag '{object_tag}' is missing required properties"
-                    )
+                    raise ValueError(f"Object with tag '{object_tag}' is missing")
     raise ValueError(f"Object with tag '{object_tag}' not found in world_graph")
