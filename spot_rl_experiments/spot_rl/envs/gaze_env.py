@@ -85,12 +85,8 @@ class SpotGazeEnv(SpotBaseEnv):
         @INFO: Policies trained on older hab versions DON'T need remapping
         """
         new_observations = observations.copy()
-        new_observations["arm_depth_bbox_sensor"] = observations[
-            "arm_depth_bbox"
-        ]
-        new_observations["articulated_agent_arm_depth"] = observations[
-            "arm_depth"
-        ]
+        new_observations["arm_depth_bbox_sensor"] = observations["arm_depth_bbox"]
+        new_observations["articulated_agent_arm_depth"] = observations["arm_depth"]
         return new_observations
 
     def get_observations(self):
@@ -110,6 +106,7 @@ class SpotGazeEnv(SpotBaseEnv):
     def get_success(self, observations):
         return self.grasp_attempted
 
+
 class SpotGazeEEEnv(SpotGazeEnv):
     def __init__(self, config, spot: Spot, use_mobile_pick: bool = False):
         super().__init__(
@@ -117,6 +114,8 @@ class SpotGazeEEEnv(SpotGazeEnv):
             spot,
             use_mobile_pick=use_mobile_pick,
         )
+        self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_MOBILE_GAZE
+        self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_MOBILE_GAZE
         self.grasp_dist_threshold = 0.7
 
     def get_observations(self):
@@ -126,6 +125,7 @@ class SpotGazeEEEnv(SpotGazeEnv):
         xyz, rpy = self.spot.get_ee_pos_in_body_frame()
         observations["ee_pose"] = np.concatenate([xyz, rpy])
         return observations
+
 
 class SpotSemanticGazeEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot):

@@ -1,7 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
+# black : ignore-errors
 
 import time
 from typing import Any, Dict, List, Tuple
@@ -12,7 +12,7 @@ from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
 )
-from spot_rl.envs.gaze_env import SpotGazeEnv, SpotSemanticGazeEnv, SpotGazeEEEnv
+from spot_rl.envs.gaze_env import SpotGazeEEEnv, SpotGazeEnv, SpotSemanticGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
@@ -26,8 +26,8 @@ from spot_rl.envs.place_env import (
 # Import policies
 from spot_rl.real_policy import (
     GazePolicy,
-    MobileGazePolicy,
     MobileGazeEEPolicy,
+    MobileGazePolicy,
     NavPolicy,
     OpenCloseDrawerPolicy,
     PlacePolicy,
@@ -704,6 +704,7 @@ class SemanticPick(Pick):
         }
         return action_dict
 
+
 class MobilePickEE(Pick):
     """
     Semantic place ee controller is used to execute place for given place targets
@@ -740,6 +741,7 @@ class MobilePickEE(Pick):
         }
 
         return action_dict
+
 
 class Place(Skill):
     """
@@ -975,17 +977,17 @@ class SemanticPlace(Place):
     Semantic place controller is used to execute place for given place targets
     """
 
-    def __init__(self, spot: Spot, config):
+    def __init__(self, spot: Spot, config, use_semantic_place=False):
         if not config:
             config = construct_config_for_semantic_place()
         super().__init__(spot, config)
-
-        self.policy = SemanticPlacePolicy(
-            config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
-        )
+        if use_semantic_place:
+            self.policy = SemanticPlacePolicy(
+                config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
+            )
         self.policy.reset()
 
-        self.env = SpotSemanticPlaceEnv(config, spot)
+        self.env = SpotSemanticPlaceEnv(config, spot, use_semantic_place)
 
     def execute_rl_loop(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
         # Set the robot inital pose
