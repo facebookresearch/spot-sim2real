@@ -430,10 +430,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 if place is not None:
                     arm_ee_action[0:3] *= self.arm_ee_dist_scale  # 0.015
                     arm_ee_action[3:6] *= self.arm_ee_rot_scale  # 0.0125
-                else:
-                    arm_ee_action[0:3] *= self.config.EE_DIST_SCALE_MOBILE_GAZE  # 0.015
-                    arm_ee_action[3:6] *= self.config.EE_ROT_SCALE_MOBILE_GAZE  # 0.0125
-
                 xyz, rpy = self.spot.get_ee_pos_in_body_frame()
                 cur_ee_pose = np.concatenate((xyz, rpy), axis=0)
                 # Wrap the heading
