@@ -351,8 +351,9 @@ def detect_place_point_by_pcd_method(
     assert osp.exists(GRIPPER_T_INTEL_PATH), f"{GRIPPER_T_INTEL_PATH} not found"
     gripper_T_intel = np.load(GRIPPER_T_INTEL_PATH)
     spot.close_gripper()
-    gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
-    spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
+    # gaze_arm_angles = copy.deepcopy(GAZE_ARM_JOINT_ANGLES)
+    # TODO: no arm movement
+    # spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
 
     # Wait for a bit to stabalized the gripper
     time.sleep(1.5)

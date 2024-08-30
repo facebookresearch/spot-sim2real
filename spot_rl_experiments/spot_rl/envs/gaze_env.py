@@ -68,6 +68,11 @@ class SpotGazeEnv(SpotBaseEnv):
     def step(self, action_dict: Dict[str, Any]):
         grasp = self.should_grasp()
 
+        has_grasp = False
+        if grasp:
+            has_grasp = True
+            grasp = False
+
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp
         action_dict["place"] = False  # TODO: Why is gaze getting flag for place?
@@ -75,6 +80,10 @@ class SpotGazeEnv(SpotBaseEnv):
         observations, reward, done, info = super().step(
             action_dict=action_dict,
         )
+
+        if has_grasp:
+            done = True
+
         return observations, reward, done, info
 
     def remap_observation_keys_for_hab3(self, observations):
