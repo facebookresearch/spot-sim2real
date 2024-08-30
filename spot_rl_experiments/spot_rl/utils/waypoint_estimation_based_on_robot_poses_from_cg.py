@@ -99,7 +99,7 @@ def determin_nearest_edge(robot_xy, bbox_centers, boxMin, boxMax):
         angle_between_vectors(raydir[:2], face[0])[1] for face in faces
     ]
     min_idx = np.argmin(angles_betwn_approach_vector_and_faces)
-    min_angle = angles_betwn_approach_vector_and_faces[min_idx]
+    _ = angles_betwn_approach_vector_and_faces[min_idx]
     nearestfacevector, nearestface = faces[min_idx]
     yaw_calc = angle_between_vectors(np.array([1, 0]), nearestfacevector)[1]
     return nearestface, nearestfacevector, yaw_calc
@@ -132,9 +132,9 @@ def sort_robot_view_poses_from_cg(
             + beta * detectionconf
             + gamma * (pixel_area / max_pixel_area)
         )
-        rank_array[i] = (rank, i)
-    rank_array = sorted(rank_array, reverse=True, key=lambda x: x[0])
-    robot_view_poses_sorted = [robot_view_poses[rank[1]] for rank in rank_array]
+        rank_array[i] = (rank, i)  # type: ignore
+    rank_array = sorted(rank_array, reverse=True, key=lambda x: x[0])  # type: ignore
+    robot_view_poses_sorted = [robot_view_poses[rank[1]] for rank in rank_array]  # type: ignore
     return robot_view_poses_sorted
 
 
@@ -196,9 +196,10 @@ if __name__ == "__main__":
     path = path_planning_using_a_star(
         [0, 0],  # best_robot_view_pos[0][:2]
         waypoint[:2],
-        other_view_poses=[view_pose[0][:2] for view_pose in robot_view_poses],
+        other_view_poses=[view_pose[0][:2] for view_pose in robot_view_poses],  # type: ignore
     )
     waypoint[-1] = np.deg2rad(waypoint[-1])
     path.append(waypoint)
+    print(f"Final path x y yaw: {path}")
     with open("path.pkl", "wb") as file:
         pkl.dump(path, file)

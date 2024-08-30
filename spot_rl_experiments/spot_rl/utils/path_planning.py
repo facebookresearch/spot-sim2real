@@ -23,6 +23,8 @@ PCD_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "point_cloud_fre.pkl")
 
 OCCUPANCY_SCALE = 10.0
 
+DISTANCE_THRESHOLD_TO_ADD_POINT = 1.0
+
 # def path_planning_based_on_raymarching(occupancy_grid, occupancy_max_x, occupancy_max_y, occupancy_scale, xy_position_robot_in_cg, bbox_centers, bbox_extents):
 
 #     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
@@ -175,8 +177,17 @@ def convert_path_to_real_waypoints(path, min_x, min_y):
         next_yaw = compute_rotation_angle(cur_pt, next_pt)
         next_next_yaw = compute_rotation_angle(next_pt, next_next_pt)
 
+        # We add waypoint only if the direction of the robot changes
         if next_yaw != next_next_yaw:
-            filter_path.append(next_next_pt.tolist() + [next_next_yaw])
+            # We check the distance
+            if filter_path != []:
+                if (
+                    np.linalg.norm(next_next_pt - np.array(filter_path[-1][0:2]))
+                    >= DISTANCE_THRESHOLD_TO_ADD_POINT
+                ):
+                    filter_path.append(next_next_pt.tolist() + [next_next_yaw])
+            else:
+                filter_path.append(next_next_pt.tolist() + [next_next_yaw])
 
     return filter_path
 
@@ -238,8 +249,6 @@ def path_planning_using_a_star(
         (goal_in_grid[0], goal_in_grid[1]),
     )
     if len(path) > 0:
-        print("Paths", path, occupancy_grid_visualization.shape)
-
         occupancy_grid_visualization = cv2.circle(
             occupancy_grid_visualization,
             (start_in_grid[1], start_in_grid[0]),
