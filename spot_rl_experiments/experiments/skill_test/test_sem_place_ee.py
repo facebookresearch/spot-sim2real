@@ -31,6 +31,8 @@ if __name__ == "__main__":
         input("Place an object in Spot's gripper and press Enter to continue...")
         rospy.set_param("is_gripper_blocked", 0)
         episode_log = {"actions": []}
+        spotskillmanager.spot.close_gripper()
+        input("waiting for user to get ready with camera")
 
         spotskillmanager.place(place_target, is_local=is_local, visualize=False)
         skill_log = spotskillmanager.place_controller.skill_result_log
