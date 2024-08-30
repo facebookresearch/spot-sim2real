@@ -500,7 +500,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                 img, depth_raw, mask, fx, fy, cx, cy
             )
             print("Time generate_point_cloud:", time.time() - t0)
-            pcd = pcd.voxel_down_sample(voxel_size=0.05)
+            pcd = pcd.voxel_down_sample(voxel_size=0.01)
             t0 = time.time()
             pcd.estimate_normals(
                 search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
@@ -535,8 +535,14 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                     # plane_pcd.points = o3d.utility.Vector3dVector(
                     #     search_table_location.farthest_point_sampling(np.array(plane_pcd.points), 1024)
                     # )
+                    (
+                        target_points,
+                        selected_point,
+                    ) = search_table_location.get_target_points_by_heuristic(
+                        np.array(plane_pcd.points)
+                    )
                     pixel_points = search_table_location.project_3d_to_pixel_uv(
-                        np.array(plane_pcd.points), fx, fy, cx, cy
+                        np.array(target_points), fx, fy, cx, cy
                     )
 
                     filter_pixel_points = []
