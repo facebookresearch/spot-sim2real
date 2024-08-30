@@ -191,7 +191,7 @@ def get_navigation_points(
         robot_view_poses, bbox_centers, bbox_extents
     )
     path = path_planning_using_a_star(
-        [0, 0],  # best_robot_view_pos[0][:2]
+        cur_robot_xy,  # best_robot_view_pos[0][:2]
         waypoint[:2],
         other_view_poses=[view_pose[0][:2] for view_pose in robot_view_poses],  # type: ignore
     )
