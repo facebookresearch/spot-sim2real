@@ -159,7 +159,7 @@ if __name__ == "__main__":
     # receptacle details from CG
     bbox_extents = np.array([1.3, 1.0, 0.8])
     bbox_centers = np.array([8.2, 6.0, 0.1])
-    
+
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
     print("boxMin", boxMin, "boxMax", boxMax)
 
@@ -170,7 +170,9 @@ if __name__ == "__main__":
     )
     yaw_cg = 88.59926264693141
 
-    robot_view_pose_data = pkl.load(open("robot_view_poses_for_bedroom_dresser.pkl", "rb"))
+    robot_view_pose_data = pkl.load(
+        open("robot_view_poses_for_bedroom_dresser.pkl", "rb")
+    )
     robot_view_poses = []
     for robot_view_pose in robot_view_pose_data:
         robot_view_poses.append(
@@ -192,7 +194,7 @@ if __name__ == "__main__":
         robot_view_poses, bbox_centers, bbox_extents
     )
     path = path_planning_using_a_star(
-        [0, 0], #best_robot_view_pos[0][:2]
+        [0, 0],  # best_robot_view_pos[0][:2]
         waypoint[:2],
         other_view_poses=[view_pose[0][:2] for view_pose in robot_view_poses],
     )
@@ -200,4 +202,3 @@ if __name__ == "__main__":
     path.append(waypoint)
     with open("path.pkl", "wb") as file:
         pkl.dump(path, file)
-isolate_image_fetures_of_objects_in_cg.py
