@@ -8,11 +8,13 @@ import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-query_class_names = ["sink"]  # keep all the class names as same as possible
+#new changes: Select view poses based on distance
+#query_class_names = ["furniture", "counter", "locker", "vanity", "wine glass"]  # keep all the class names as same as possible
 PATH_TO_CACHE_FILE = "scene_map_cfslam_pruned.pkl.gz"
 PATH_TO_RAW_DATA_PKL = "data.pkl"
 VISUALIZE = False
 VISUALIZATION_DIR = "image_vis"
+ANCHOR_OBJECT_CENTER = np.array([8.2, 6.0, 0.1])
 
 
 def resize_crop(masked_rgb_image, x1, y1, x2, y2):
@@ -120,20 +122,27 @@ if __name__ == "__main__":
         cache_file = pickle.load(f)
         for i, object_item in enumerate(cache_file):
             class_names = object_item["class_name"]
-            intersection_with_search_query = list(
-                set(query_class_names) & set(class_names)
-            )
-            if (
-                len(intersection_with_search_query) > 0
-            ):  # and len(set(class_names)) == 1:
+            
+            # intersection_with_search_query = list(
+            #     set(query_class_names) & set(class_names)
+            # )
+            if True: #len(intersection_with_search_query) > 0:  # and len(set(class_names)) == 1:
                 # breakpoint()
                 for class_i, class_name in enumerate(class_names):
-                    if class_name in query_class_names:
+                    bbox_np = object_item["bbox_np"]
+                    boxMin = np.array([bbox_np[:, 0].min(), bbox_np[:, 1].min(), bbox_np[:, -1].min()])
+                    boxMax = np.array([bbox_np[:, 0].max(), bbox_np[:, 1].max(), bbox_np[:, -1].max()])
+                    center = (boxMin + boxMax)/2.
+                    dist_to_anchor_center = np.linalg.norm(center - ANCHOR_OBJECT_CENTER)   
+                    
+                    if dist_to_anchor_center < 0.1: 
+                        print(set(class_names))
+                        # if class_name in query_class_names
                         rgb_path = object_item["color_path"][class_i]
                         conf = object_item["conf"][class_i]
                         index_in_raw_data = get_index_in_raw_data(rgb_path)
                         add_data_flag = True
-                        breakpoint()
+                        
                         if index_in_raw_data not in previously_seen_data:
                             previously_seen_data[index_in_raw_data] = {
                                 "max_conf": conf,
@@ -159,7 +168,7 @@ if __name__ == "__main__":
 
                             # vision_T_camera = R.from_matrix((vision_T_base@base_T_camera_from_raw)[:3, :3])
                             # yaw_gripper = vision_T_camera.as_euler("ZYX", True)[-1]
-                            print(type(raw_data[index_in_raw_data]["base_pose_xyt"]))
+                            #print(type(raw_data[index_in_raw_data]["base_pose_xyt"]))
                             data = {
                                 "conf": conf,
                                 "bbox": object_item["xyxy"][class_i],
@@ -189,8 +198,8 @@ if __name__ == "__main__":
                             data_list.append(data)
 
     if len(data_list) > 0:
-        print(f"Found {len(data_list)} instances for class {query_class_names}")
-        with open("cg_robot_view_poses_data.pkl", "wb") as file:
+        print(f"Found {len(data_list)} instances for given bbox centers")
+        with open("robot_view_poses_for_bedroom_dresser.pkl", "wb") as file:
             pickle.dump(data_list, file)
     else:
         print("No such class was found")
