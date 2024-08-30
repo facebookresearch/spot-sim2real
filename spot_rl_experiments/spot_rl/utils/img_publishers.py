@@ -363,6 +363,37 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         return img
 
+    def shrink_bounding_box(self, x_min, x_max, y_min, y_max, shrink_factor=0.1):
+        """
+        Shrinks the bounding box by a specified shrink factor.
+
+        Parameters:
+        x_min (float): Minimum x-coordinate of the bounding box.
+        x_max (float): Maximum x-coordinate of the bounding box.
+        y_min (float): Minimum y-coordinate of the bounding box.
+        y_max (float): Maximum y-coordinate of the bounding box.
+        shrink_factor (float): Factor by which to shrink the bounding box. Default is 0.1 (i.e., 10%).
+
+        Returns:
+        tuple: New coordinates (x_min_new, x_max_new, y_min_new, y_max_new).
+        """
+        height = x_max - x_min
+        width = y_max - y_min
+
+        # Calculate the amount to shrink by
+        shrink_width = width * shrink_factor / 2
+        shrink_height = height * shrink_factor / 2
+
+        x_center = (x_max + x_min) / 2
+        y_center = (y_max + y_min) / 2
+        # Adjust the bounding box coordinates
+        x_min_new = x_center - shrink_height
+        x_max_new = x_center + shrink_height
+        y_min_new = y_center - shrink_width
+        y_max_new = y_center + shrink_width
+
+        return int(x_min_new), int(x_max_new), int(y_min_new), int(y_max_new)
+
     def _reset_tracking_params(self):
         self._tracking_first_time = (
             True  # flag to indicate if it is the first time tracking
@@ -480,7 +511,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             pcd = search_table_location.filter_pointcloud_by_normals_in_the_given_direction(
                 pcd,
                 np.array([0.0, 0.0, 1.0]),
-                0.5,
+                0.99,
                 body_T_hand,
                 gripper_T_intel,
                 visualize=False,
@@ -492,6 +523,11 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
             try:
                 plane_pcd = plane_detect(pcd)
+                plane_pcd.points = o3d.utility.Vector3dVector(
+                    search_table_location.farthest_point_sampling(
+                        np.array(plane_pcd.points), 1024
+                    )
+                )
                 print(f"first: { np.array(plane_pcd.points).shape[0]}")
                 if np.array(plane_pcd.points).shape[0] > 10:
                     # o3d.visualization.draw_geometries([plane_pcd])
@@ -535,7 +571,16 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                             min_x = int(np.min(filter_pixel_points[:, 1]))
                             max_y = int(np.max(filter_pixel_points[:, 0]))
                             min_y = int(np.min(filter_pixel_points[:, 0]))
-                            cur_bbox = [min_y, min_x, max_y, max_x]
+                            (
+                                new_min_x,
+                                new_max_x,
+                                new_min_y,
+                                new_max_y,
+                            ) = self.shrink_bounding_box(
+                                min_x, max_x, min_y, max_y, 0.5
+                            )
+                            # cur_bbox = [min_y, min_x, max_y, max_x]
+                            cur_bbox = [new_min_y, new_min_x, new_max_y, new_max_x]
                             object_label = "plane"
                             bbox_data = (
                                 f"{str(timestamp)}|{object_label},{1.0},"
@@ -544,6 +589,13 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                             # Apply the red bounding box to showcase tracking on the image
                             viz_img = cv2.rectangle(
                                 viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                            )
+                            viz_img = cv2.rectangle(
+                                viz_img,
+                                [new_min_y, new_min_x],
+                                [new_max_y, new_max_x],
+                                (0, 255, 0),
+                                5,
                             )
                             for xy in filter_pixel_points:
                                 viz_img = cv2.circle(
