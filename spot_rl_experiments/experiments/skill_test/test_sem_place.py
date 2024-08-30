@@ -27,19 +27,6 @@ if __name__ == "__main__":
         place_target = "test_desk"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
-    spot_pos1 = spotskillmanager.spot.get_arm_joint_positions(as_array=True)
-
-    # is_local = False
-    # if enable_estimation_before_place:
-    #     place_target = None
-    #     is_local = True
-
-    # # Start testing
-    # contnue = True
-    # while contnue:
-    #     rospy.set_param("is_gripper_blocked", 0)
-    #     spotskillmanager.place(place_target, is_local=is_local, visualize=True)
-    #     contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
     is_local = False
     if enable_estimation_before_place:
         height_target = place_target
@@ -50,7 +37,7 @@ if __name__ == "__main__":
     contnue = True
     INITIAL_ARM_JOINT_ANGLES = [0, -180, 180, 90, 0, -90]
     episode_ctr = 0
-    # Get EE Pose Initial
+    # Get EE Pose Initial in rest position
     spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
     # Set Orientation as Zero
     spot_ort = np.zeros(3)
@@ -87,7 +74,6 @@ if __name__ == "__main__":
         episode_ctr += 1
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
         # Return the arm to the original position
-        spot_pos = spotskillmanager.spot.get_ee_pos_in_body_frame()[0]
         spotskillmanager.spot.move_gripper_to_point(spot_pos, spot_ort)
 # The following is a helpful tip to debug the arm
 # We get Spot class
