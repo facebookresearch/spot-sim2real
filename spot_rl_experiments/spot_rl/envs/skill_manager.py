@@ -229,13 +229,14 @@ class SpotSkillManager:
             if self.use_place_ee:
                 print("GOING INSIDE SEM EE ENV")
                 self.place_controller = SemanticPlaceEE(
-                    spot=self.spot, config=self.place_config
+                    spot=self.spot,
+                    config=self.place_config,
+                    use_semantic_place=self.use_semantic_place,
                 )
             else:
                 self.place_controller = SemanticPlace(
                     spot=self.spot,
                     config=self.place_config,
-                    use_semantic_place=self.use_semantic_place,
                 )
         else:
             self.place_controller = Place(

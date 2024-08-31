@@ -974,17 +974,17 @@ class SemanticPlace(Place):
     Semantic place controller is used to execute place for given place targets
     """
 
-    def __init__(self, spot: Spot, config, use_semantic_place=False):
+    def __init__(self, spot: Spot, config):
         if not config:
             config = construct_config_for_semantic_place()
         super().__init__(spot, config)
-        if use_semantic_place:
-            self.policy = SemanticPlacePolicy(
-                config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
-            )
+
+        self.policy = SemanticPlacePolicy(
+            config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
+        )
         self.policy.reset()
 
-        self.env = SpotSemanticPlaceEnv(config, spot, use_semantic_place)
+        self.env = SpotSemanticPlaceEnv(config, spot)
 
     def execute_rl_loop(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
         # Set the robot inital pose
@@ -1036,7 +1036,7 @@ class SemanticPlaceEE(SemanticPlace):
     Semantic place ee controller is used to execute place for given place targets
     """
 
-    def __init__(self, spot: Spot, config):
+    def __init__(self, spot: Spot, config, use_semantic_place=False):
         if not config:
             config = construct_config_for_semantic_place()
         super().__init__(spot, config)
@@ -1046,7 +1046,7 @@ class SemanticPlaceEE(SemanticPlace):
         )
         self.policy.reset()
 
-        self.env = SpotSemanticPlaceEEEnv(config, spot)
+        self.env = SpotSemanticPlaceEEEnv(config, spot, use_semantic_place)
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""
