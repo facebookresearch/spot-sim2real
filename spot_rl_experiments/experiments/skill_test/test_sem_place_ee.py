@@ -14,7 +14,7 @@ if __name__ == "__main__":
     enable_estimation_before_place = map_user_input_to_boolean(
         "Use waypoint estimator? Y/N "
     )
-    place_target = "new_place_waypoint"
+    place_target = "new_pl_pt"
     spotskillmanager = SpotSkillManager(
         use_mobile_pick=False, use_semantic_place=True, use_place_ee=True
     )
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Start testing
     contnue = True
-    episode_ctr = 0
+    episode_ctr = 1
     while contnue:
         spotskillmanager.spot.open_gripper()
         input("Place an object in Spot's gripper and press Enter to continue...")
@@ -40,7 +40,7 @@ if __name__ == "__main__":
             skill_log["num_steps"] = 0
         episode_log["actions"].append({"place": skill_log})
         curr_date = datetime.today().strftime("%m-%d-%y")
-        file_path = f"logs/semantic_place_ee/{curr_date}/episode_{episode_ctr}.json"
+        file_path = f"logs/semantic_place_ee/{curr_date}/0.5m_minus_20deg_episode_{episode_ctr}.json"
         with open(file_path, "w") as file:
             json.dump(episode_log, file, indent=4)
             print(f"Saved log: {file_path}")
