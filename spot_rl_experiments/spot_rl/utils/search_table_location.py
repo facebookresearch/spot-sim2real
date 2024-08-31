@@ -10,11 +10,11 @@ import rospy
 from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
-from spot_rl.utils.heuristic_nav import get_3d_point, get_best_uvz_from_detection
-from spot_rl.utils.plane_detection import plane_detect
+from spot_rl.utils.plane_detection import plane_detect, NumpyToPCD
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.spot import Spot, image_response_to_cv2
 from std_msgs.msg import String
+from spot_rl.utils.pixel_to_3d_conversion_utils import project_3d_to_pixel_uv, get_best_uvz_from_detection, get_3d_point
 
 
 class DetectionSubscriber:
@@ -86,19 +86,6 @@ def farthest_point_sampling(points, num_samples):
             distances, np.linalg.norm(points - farthest_pts[i], axis=1)
         )
     return farthest_pts
-
-
-def project_3d_to_pixel_uv(points_3d, fx, fy, cx, cy):
-    """
-    Back projects given xyz 3d point to pixel location u,v using camera intrinsics
-    """
-    Z = points_3d[:, -1]
-    X_Z = points_3d[:, 0] / Z
-    Y_Z = points_3d[:, 1] / Z
-    u = (fx * X_Z) + cx
-    v = (fy * Y_Z) + cy
-    return np.stack([u.flatten(), v.flatten()], axis=1).reshape(-1, 2)
-
 
 def generate_point_cloud(
     image, depth, mask, fx=383.883, fy=383.883, cx=324.092, cy=238.042
@@ -197,7 +184,7 @@ def plot_intel_point_in_gripper_image(
     cx = gripper_intrinsics.principal_point.x
     cy = gripper_intrinsics.principal_point.y
     point2d_in_gripper = project_3d_to_pixel_uv(
-        point3d_in_gripper.reshape(1, 3), fx, fy, cx, cy
+        point3d_in_gripper.reshape(1, 3), gripper_intrinsics
     )[0]
     img_with_point = cv2.circle(
         gripper_image.copy(),
@@ -217,10 +204,7 @@ def plot_place_point_in_gripper_image(spot: Spot, point_in_gripper_camera: np.nd
     intrinsics_gripper = gripper_resps[0].source.pinhole.intrinsics
     pixel = project_3d_to_pixel_uv(
         point_in_gripper_camera.reshape(1, 3),
-        intrinsics_gripper.focal_length.x,
-        intrinsics_gripper.focal_length.y,
-        intrinsics_gripper.principal_point.x,
-        intrinsics_gripper.principal_point.y,
+        intrinsics_gripper
     )[0]
     print(f"Pixel in gripper image {pixel}")
     gripper_rgb = cv2.circle(
@@ -304,10 +288,158 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     pcd_dir_filtered = pcd_with_normals.select_by_index(
         np.where(cosines > cosine_thresh)[0]
     )
-    if visualize:
-        o3d.visualization.draw_geometries([pcd_dir_filtered])
+    #if visualize:
+        #o3d.visualization.draw_geometries([pcd_dir_filtered])
     return pcd_dir_filtered
 
+def filter_planes_by_normals_in_the_given_direction(
+    planes:np.ndarray,
+    plane_normals:np.ndarray,
+    direction_vector: np.ndarray,
+    body_T_hand: np.ndarray = np.eye(4),
+    gripper_T_intel: np.ndarray = np.eye(4),
+):
+    """Filter point clouds based on the normal"""
+    direction_vector = direction_vector.reshape(3)
+    normals = plane_normals.reshape(-1, 3)
+    body_T_intel = np.array(body_T_hand @ gripper_T_intel)
+    normals_in_body = np.dot(body_T_intel[:3, :3], normals.T).T.reshape(-1, 3)
+    # Compute the dot product to get the cosines
+    # Calculate the angle using the dot product formula
+    cosines = (np.dot(normals_in_body, direction_vector) / (np.linalg.norm(normals_in_body) *  np.linalg.norm(direction_vector)))
+
+
+    euclidean_dist, height_of_plane, number_of_pts = [], [], []
+    for plane in planes:
+        center_point = plane.get_center().reshape(1, 3)
+        norm = np.linalg.norm(center_point[0])
+        euclidean_dist.append(norm)
+        center_point_in_body =  np.dot(body_T_intel[:3, :3], center_point.T).T.reshape(1, 3)[0]
+        height_of_plane.append(center_point_in_body[-1])
+        number_of_pts.append(np.array(plane.points).shape[0])
+    
+    euclidean_dist =  np.array(euclidean_dist) / np.max(euclidean_dist)
+    height_of_plane = np.array(height_of_plane)/ max(height_of_plane)
+    number_of_pts = np.array(number_of_pts)/max(number_of_pts)
+
+    #cost = -0.0*euclidean_dist + 0.05*height_of_plane + 0.05*number_of_pts + 0.9*cosines
+    cost = cosines + 0.3*height_of_plane
+    # Filter out the point clouds
+    argmax = int(np.argmax(cost))
+    
+    return argmax, normals_in_body
+
+# def is_collinear(p1, p2, p3):
+#     """
+#     Check if three points are collinear by computing the cross product.
+
+#     Parameters:
+#     p1, p2, p3 (numpy.ndarray): Three points in 3D space.
+
+#     Returns:
+#     bool: True if the points are collinear, False otherwise.
+#     """
+#     v1 = p2 - p1
+#     v2 = p3 - p1
+#     cross_product = np.cross(v1, v2)
+#     return np.linalg.norm(cross_product) < 1e-6
+
+# def compute_plane_normal_by_cross_product(points):
+#     n = points.shape[0]
+    
+#     if n < 3:
+#         raise ValueError("The point cloud must have at least 3 points.")
+    
+#     # Initial selection: first, middle, and last points
+#     p1 = points[0]
+#     p2 = points[n // 2]
+#     p3 = points[-1]
+    
+#     # Check if the initially selected points are collinear
+#     if not is_collinear(p1, p2, p3):
+#         return p1, p2, p3
+    
+#     # If collinear, randomly sample points until a non-collinear triplet is found
+#     t1 = time.time()
+#     while True:
+#         if time.time() - t1 > 30 :
+#             raise Exception(f"couldnt find non-colinear points in the given plane for calculating the plane normal, been more than 30 secs")
+#         p1, p2, p3 = points[np.random.choice(n, 3, replace=False)]
+#         if not is_collinear(p1, p2, p3):
+#             # Compute vectors v1 and v2
+#             v1 = p2 - p1
+#             v2 = p3 - p1
+            
+#             # Compute the cross product
+#             normal = np.cross(v1, v2)
+            
+#             # Normalize the normal vector
+#             normal_normalized = normal / np.linalg.norm(normal)
+            
+#             return normal_normalized, np.mean(points, axis=0)
+
+
+def compute_plane_normal_by_average(pcd):
+    #pcd = NumpyToPCD(points)
+    pcd.estimate_normals(
+         search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+    )
+    normals = np.array(pcd.normals)
+    return normals.mean(axis=0), pcd.get_center().reshape(-1)
+
+# def compute_plane_normal(points):
+#     """
+#     Compute the normal of a plane given a point cloud on the plane.
+    
+#     Parameters:
+#     points (numpy.ndarray): An array of shape (m, 3) representing points on the plane.
+    
+#     Returns:
+#     numpy.ndarray: The normal vector of the plane.
+#     """
+#     # Step 1: Center the points (subtract the mean)
+#     centroid = np.mean(points, axis=0)
+#     centered_points = points - centroid
+    
+#     # Step 2: Compute the covariance matrix
+#     cov_matrix = np.cov(centered_points, rowvar=False)
+    
+#     # Step 3: Perform eigenvalue decomposition
+#     eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+    
+#     # The normal vector is the eigenvector corresponding to the smallest eigenvalue
+#     normal_vector = eigenvectors[:, np.argmin(eigenvalues)]
+    
+#     return normal_vector, centroid
+
+def visualize_all_planes(planes, image_rgb_orig, camera_intrinsics, all_planes_normals=None, normal_in_body=None):
+    #project all 3D plane points back to image_rgb
+    #fx, fy, cx, cy = camera_intrinsics
+    np.random.seed(42)  # Optional: set a seed for reproducibility
+    image_rgb = image_rgb_orig.copy()
+    for p_i, plane in enumerate(planes):
+        if all_planes_normals is not None:
+            plane_normal =  all_planes_normals[p_i]
+            plane_origin = plane.get_center().reshape(-1) #np.mean(plane, axis=0)
+        else:
+            plane_normal, plane_origin = compute_plane_normal_by_average(plane)
+        plane_extend_origin = plane_origin + 0.1*plane_normal
+        plane_normals_2d = project_3d_to_pixel_uv(np.vstack((plane_origin, plane_extend_origin)), camera_intrinsics)
+        plane_normals_2d = plane_normals_2d.astype(int).tolist()
+        image_rgb = cv2.arrowedLine(image_rgb, plane_normals_2d[0], plane_normals_2d[1], (0, 0, 255), 2, tipLength=0.2)
+        print(f"Plane id {p_i} plane normal {plane_normal}")
+        plane_pts_2d = project_3d_to_pixel_uv(np.array(plane.points), camera_intrinsics)
+        color = tuple(np.random.randint(0, 256, size=3).astype(int).tolist())
+        for point in plane_pts_2d:
+            x, y = list(map(int, point))
+            image_rgb = cv2.circle(image_rgb, (x, y), 1, color, 1)
+    if len(planes) == 1:
+        cv2.putText(image_rgb, f"N:{np.round(normal_in_body, 2)}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
+    
+    cv2.namedWindow("plane detections", cv2.WINDOW_NORMAL)
+    cv2.imshow("plane detections", image_rgb)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 def detect_place_point_by_pcd_method(
     spot,
@@ -350,25 +482,37 @@ def detect_place_point_by_pcd_method(
     cy = camera_intrinsics_intel.principal_point.y
     # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
     pcd = generate_point_cloud(img, depth_raw, mask, fx, fy, cx, cy)
-
-    pcd.estimate_normals(
-        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
-    )
-    # 0.25 - 0 < angle < 75
-    pcd = filter_pointcloud_by_normals_in_the_given_direction(
-        pcd,
-        np.array([0.0, 0.0, 1.0]),
-        0.5,
-        body_T_hand,
-        gripper_T_intel,
-        visualize=visualize,
-    )
+    #pcd = pcd.uniform_down_sample(every_k_points=2)
+    # pcd.estimate_normals(
+    #     search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+    # )
+    # # 0.25 - 0 < angle < 75
+    # pcd = filter_pointcloud_by_normals_in_the_given_direction(
+    #     pcd,
+    #     np.array([0.0, 0.0, 1.0]),
+    #     0.25,
+    #     body_T_hand,
+    #     gripper_T_intel,
+    #     visualize=visualize,
+    # )
 
     # Down-sample by using voxel
     # pcd = pcd.voxel_down_sample(voxel_size=0.01)
     # print(f"After Downsampling {np.array(pcd.points).shape}")
 
-    plane_pcd = plane_detect(pcd)
+    all_planes = plane_detect(pcd)
+    
+    all_plane_normals = np.array([compute_plane_normal_by_average(plane)[0] for plane in all_planes], dtype=np.float32)
+    
+    plane_index, normals_in_body = filter_planes_by_normals_in_the_given_direction(all_planes, all_plane_normals.copy(), np.array([0.0, 0.0, 1.0]), body_T_hand, gripper_T_intel)
+    
+    plane_pcd = all_planes[plane_index]
+    
+    if visualize:
+        #for plane_index in range(len(all_planes)):
+        #visualize_all_planes(all_planes, img, camera_intrinsics_intel, all_plane_normals)
+        visualize_all_planes([all_planes[plane_index]], img, camera_intrinsics_intel, [all_plane_normals[plane_index]], normals_in_body[plane_index])
+    
     # Down-sample
     plane_pcd.points = o3d.utility.Vector3dVector(
         farthest_point_sampling(np.array(plane_pcd.points), 1024)
@@ -381,7 +525,7 @@ def detect_place_point_by_pcd_method(
     target_points, selected_point = get_target_points_by_heuristic(
         np.array(plane_pcd.points)
     )
-    corners_xys = project_3d_to_pixel_uv(target_points, fx, fy, cx, cy)
+    corners_xys = project_3d_to_pixel_uv(target_points, camera_intrinsics_intel)
 
     y_threshold = np.percentile(corners_xys[:, -1], percentile)
 
@@ -420,10 +564,10 @@ def detect_place_point_by_pcd_method(
             img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
         )
         # For debug
-        # cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
-        # cv2.imshow("table_detection", img_with_bbox)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
+        cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
+        cv2.imshow("table_detection", img_with_bbox)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
         cv2.imwrite("table_detection.png", img_with_bbox)
 
     point_in_body = body_T_hand.transform_point(mn.Vector3(*selected_point_in_gripper))
@@ -542,7 +686,7 @@ def contrained_place_point_estimation(
     target_points, selected_point = get_target_points_by_heuristic(
         np.array(plane_pcd.points)
     )
-    corners_xys = project_3d_to_pixel_uv(target_points, fx, fy, cx, cy)
+    corners_xys = project_3d_to_pixel_uv(target_points, camera_intrinsics_intel)
 
     y_threshold = np.percentile(corners_xys[:, -1], percentile)
 
@@ -584,7 +728,7 @@ def contrained_place_point_estimation(
     cx = camera_intrinsics_gripper.principal_point.x
     cy = camera_intrinsics_gripper.principal_point.y
     selected_xy_in_gripper = project_3d_to_pixel_uv(
-        selected_point_in_gripper.reshape(1, 3), fx, fy, cx, cy
+        selected_point_in_gripper.reshape(1, 3), camera_intrinsics_gripper
     )[0]
     depth_at_selected_xy_in_gripper = (
         depth_at_selected_xy + 0.02
