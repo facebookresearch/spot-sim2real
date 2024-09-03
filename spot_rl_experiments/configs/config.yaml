@@ -40,10 +40,7 @@ WEIGHTS:
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
-
-  # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_jt_ckpt.16.torchscript"
-
+  
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
