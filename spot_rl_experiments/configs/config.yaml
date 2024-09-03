@@ -40,7 +40,7 @@ WEIGHTS:
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
-  
+
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
@@ -104,7 +104,7 @@ SEMANTIC_PLACE_JOINT_BLACKLIST: [3]
 MAX_LIN_DIST_OPEN_CLOSE_DRAWER: 0.0
 MAX_ANG_DIST_OPEN_CLOSE_DRAWER: 3.73 # degrees
 OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
-OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
+OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.75
 
 # Semantic Pick
 IMG_SRC: 0 # 1 for intel & 0 for gripper
