@@ -28,11 +28,6 @@ if __name__ == "__main__":
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
     is_local = False
-    if enable_estimation_before_place:
-        height_target = place_target
-        place_target = None
-        is_local = True
-
     # Start testing
     contnue = True
     INITIAL_ARM_JOINT_ANGLES = [0, -180, 180, 90, 0, -90]
@@ -50,13 +45,20 @@ if __name__ == "__main__":
         episode_log = {"actions": []}  # mypy: ignore-errors
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
-        if place_target is None:
+        if enable_estimation_before_place:
+            is_local = True
             spotskillmanager.place(
-                place_target, height_target, is_local=is_local, visualize=True
+                place_target,
+                is_local=is_local,
+                visualize=True,
+                enable_waypoint_estimation=True,
             )
         else:
             spotskillmanager.place(
-                place_target, None, is_local=is_local, visualize=True
+                place_target,
+                is_local=is_local,
+                visualize=True,
+                enable_waypoint_estimation=False,
             )
 
         skill_log = spotskillmanager.place_controller.skill_result_log
