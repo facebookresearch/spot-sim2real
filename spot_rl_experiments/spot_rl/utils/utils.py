@@ -12,6 +12,7 @@ from collections import OrderedDict
 import numpy as np
 import rospy
 import yaml
+from spot_rl.utils.construct_configs import construct_config_for_semantic_place
 from yacs.config import CfgNode as CN
 
 this_dir = osp.dirname(osp.abspath(__file__))
@@ -167,6 +168,10 @@ def calculate_height(object_tag):
     with open(json_file_path) as f:
         world_graph = json.load(f)
     print("THE OBJECT I GOT IS", object_tag)
+    # getting default height as threshold height in config
+    default_config = construct_config_for_semantic_place()
+    default_height = default_config.HEIGHT_THRESHOLD
+
     for rel in world_graph:
         # Iterate through all keys in the dictionary
         for key, value in rel.items():
@@ -180,8 +185,13 @@ def calculate_height(object_tag):
                     height = bbox_center[2] + bbox_extent[2]
                     return height
                 else:
-                    raise ValueError(f"Object with tag '{object_tag}' is missing")
-    raise ValueError(f"Object with tag '{object_tag}' not found in world_graph")
+                    print(
+                        f"Object with tag '{object_tag}' missing bbox property!!! Returning Default Height"
+                    )
+                    return default_height
+    # If the object tag is empty, we return the threhold height
+    print(f"Object with tag '{object_tag}' not found in world_graph")
+    return default_height
 
 
 class FixSizeOrderedDict(OrderedDict):
