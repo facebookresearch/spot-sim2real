@@ -452,12 +452,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             elif base_action is not None and arm_ee_action is not None:
                 print("input base_action velocity:", arr2str(base_action))
                 print("input arm_ee_action:", arr2str(arm_ee_action))
-                self.spot.set_base_vel_and_arm_ee_pos(
-                    *base_action,
-                    arm_ee_action,
-                    travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
-                    disable_obstacle_avoidance=disable_oa,
-                )
+                if self._max_lin_dist_scale == 0.0:
+                    self.spot.set_arm_ee_pos()
+                else:
+                    self.spot.set_base_vel_and_arm_ee_pos(
+                        *base_action,
+                        arm_ee_action,
+                        travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                        disable_obstacle_avoidance=disable_oa,
+                    )
             elif base_action is not None:
                 self.spot.set_base_velocity(
                     *base_action,
@@ -479,9 +482,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # TODO: semantic place ee: temp hack to command this out
         # for not using base velocity
         start_time = time.time()
-        # if arm_ee_action is not None:
-        #     print("do not move the base")
-        if base_action is not None or arm_action is not None:
+        if arm_ee_action is not None:
+            print("do not move the base")
+        elif base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
                 if target_yaw is not None and abs(
                     wrap_heading(self.yaw - target_yaw)
