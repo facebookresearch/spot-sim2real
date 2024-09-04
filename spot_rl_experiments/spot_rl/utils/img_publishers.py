@@ -12,11 +12,13 @@ from typing import Any, List
 
 import blosc
 import cv2
+import magnum as mn
 import numpy as np
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from spot_rl.utils.depth_map_utils import filter_depth
+from spot_rl.utils.tracking_service import tracking_with_socket
 from spot_wrapper.spot import Spot
 from spot_wrapper.spot import SpotCamIds as Cam
 from spot_wrapper.spot import image_response_to_cv2, scale_depth_img
@@ -40,6 +42,10 @@ except ModuleNotFoundError:
 
 # owlvit
 from spot_rl.models import OwlVit
+from spot_rl.utils.pixel_to_3d_conversion_utils import (
+    get_3d_point,
+    sample_patch_around_point,
+)
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
@@ -47,6 +53,15 @@ from spot_rl.utils.utils import ros_topics as rt
 MAX_PUBLISH_FREQ = 20
 MAX_DEPTH = 3.5
 MAX_HAND_DEPTH = 1.7
+DETECTIONS_BUFFER_LEN = 30
+LEFT_CROP = 124
+RIGHT_CROP = 60
+NEW_WIDTH = 228
+NEW_HEIGHT = 240
+ORIG_WIDTH = 640
+ORIG_HEIGHT = 480
+WIDTH_SCALE = 0.5
+HEIGHT_SCALE = 0.5
 
 
 class SpotImagePublisher:
@@ -316,6 +331,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        self._reset_tracking_params()
 
     def preprocess_image(self, img):
         if self.image_scale != 1.0:
@@ -337,17 +353,96 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         return img
 
+    def _reset_tracking_params(self):
+        self._tracking_first_time = (
+            True  # flag to indicate if it is the first time tracking
+        )
+        self._tracking_images = []  # cache the tracking images
+        self._tracking_bboxs = []  # cache the tracking bboxs
+
     def _publish(self):
         stopwatch = Stopwatch()
         header = self.img_msg.header
         timestamp = header.stamp
-        hand_rgb = self.msg_to_cv2(self.img_msg)
 
-        # Internal model
+        # size of hand_rgb: (480, 640, 3)
+        # size of hand_rgb_preprocessed: (336, 448, 3)
+
+        hand_rgb = self.msg_to_cv2(self.img_msg)
         hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
-        bbox_data, viz_img = self.model.inference(
-            hand_rgb_preprocessed, timestamp, stopwatch
-        )
+
+        # Copy the hand_rgb_preprocessed
+        tracking_rgb = hand_rgb_preprocessed.copy().astype("uint8")
+
+        # Fetch the tracking flag
+        enable_tracking = rospy.get_param("enable_tracking", False)
+
+        # Cache the vis image
+        viz_img = hand_rgb_preprocessed
+
+        if enable_tracking:
+            # Start tracking using video segmentation model
+            images = np.expand_dims(
+                tracking_rgb, axis=0
+            )  # The size should (1, H, W, C)
+            self._tracking_images.append(images)
+
+            if len(self._tracking_images) == 1 and self._tracking_first_time:
+                # To see if there is a bounding box in the first frame
+                self._tracking_first_time = False
+                # Get the first detection
+                bbox_data, viz_img = self.model.inference(
+                    hand_rgb_preprocessed, timestamp, stopwatch
+                )
+                _, detection_str = bbox_data.split("|")
+                if detection_str == "None":
+                    # Do not see the object yet, so restart the detection
+                    self._reset_tracking_params()
+                else:
+                    # See the object at the first frame
+                    cur_bbox_str = detection_str.split(",")[2:]
+                    cur_bbox = [int(v) for v in cur_bbox_str]
+                    self._tracking_bboxs.append(cur_bbox)
+            elif len(self._tracking_images) >= 2:
+                # This means that there is one object being detected in the previous frame (first frame)
+                input_images = np.concatenate(self._tracking_images, axis=0)
+                # Get the previous anchor
+                bbox = self._tracking_bboxs[-1]
+                cur_bbox = tracking_with_socket(input_images, bbox)
+                if cur_bbox is None:
+                    self._tracking_bboxs.append(None)
+                    bbox_data = f"{str(timestamp)}|None"
+                else:
+                    cur_bbox = [cur_bbox[1], cur_bbox[0], cur_bbox[3], cur_bbox[2]]
+                    self._tracking_bboxs.append(cur_bbox)
+                    object_label = rospy.get_param("object_target")
+                    bbox_data = f"{str(timestamp)}|{object_label},{1.0}," + ",".join(
+                        [str(v) for v in cur_bbox]
+                    )
+                    # Apply the red bounding box to showcase tracking on the image
+                    viz_img = cv2.rectangle(
+                        viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                    )
+
+            if len(self._tracking_images) >= 2:
+                # Prune the data
+                # Find the frame that has tracking
+                suc_frame = []
+                for i, v in enumerate(self._tracking_bboxs):
+                    if v is not None:
+                        suc_frame.append(i)
+
+                # Only keep the latest frame that has tracking to keep
+                # buffer size 2
+                self._tracking_images = [self._tracking_images[suc_frame[-1]]]
+                self._tracking_bboxs = [self._tracking_bboxs[suc_frame[-1]]]
+        else:
+            # Normal detection mode using detection model
+            bbox_data, viz_img = self.model.inference(
+                hand_rgb_preprocessed, timestamp, stopwatch
+            )
+            time_stamp, detection_str = bbox_data.split("|")
+            self._reset_tracking_params()
 
         # publish data
         self.publish_bbox_data(bbox_data)
@@ -364,8 +459,184 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
 
+class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
+
+    name = "spot_open_voc_object_detector_publisher"
+    subscriber_topic = rt.HAND_RGB
+    # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
+    publisher_topics = ["temp"]
+
+    def __init__(self, model, spot):
+        super().__init__()
+        self.model = model
+        self.spot = spot
+        self.detection_topic = rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC
+
+        self.config = config = construct_config()
+        self.image_scale = config.IMAGE_SCALE
+        self.deblur_gan = get_deblurgan_model(config)
+        self.grayscale = self.config.GRAYSCALE_MASK_RCNN
+
+        self.pubs[self.detection_topic] = rospy.Publisher(
+            self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        )
+
+        # For the depth images
+        self.img_msg_depth = None
+        rospy.Subscriber(rt.HAND_DEPTH, Image, self.depth_cb, queue_size=1)
+        rospy.loginfo(f"[{self.name}]: is waiting for images...")
+        while self.img_msg_depth is None:
+            pass
+        rospy.loginfo(f"[{self.name}]: has received images!")
+
+    def depth_cb(self, msg: Image):
+        self.img_msg_depth = msg
+
+    def preprocess_image(self, img):
+        if self.image_scale != 1.0:
+            img = cv2.resize(
+                img,
+                (0, 0),
+                fx=self.image_scale,
+                fy=self.image_scale,
+                interpolation=cv2.INTER_AREA,
+            )
+
+        if self.deblur_gan is not None:
+            img = self.deblur_gan(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        if self.grayscale:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+        return img
+
+    def affordance_prediction(
+        self,
+        depth_raw: np.ndarray,
+        mask: np.ndarray,
+        camera_intrinsics,
+        center_pixel: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Accepts
+        depth_raw: np.array HXW, 0.-2000.
+        mask: HXW, bool mask
+        camera_intrinsics:spot camera intrinsic object
+        center_pixel: np.array of length 2
+        Returns: Suitable point on object to grasp
+        """
+
+        mask = np.where(mask > 0, 1, 0).astype(depth_raw.dtype)
+        depth_image_masked = depth_raw * mask[...].astype(depth_raw.dtype)
+
+        non_zero_indices = np.nonzero(depth_image_masked)
+        # Calculate the bounding box coordinates
+        y_min, y_max = non_zero_indices[0].min(), non_zero_indices[0].max()
+        x_min, x_max = non_zero_indices[1].min(), non_zero_indices[1].max()
+        cx, cy = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
+        Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1.0)
+        point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
+
+        return point_in_gripper
+
+    def _publish(self):
+        stopwatch = Stopwatch()
+        header = self.img_msg.header
+        timestamp = header.stamp
+        hand_rgb = self.msg_to_cv2(self.img_msg)
+        arm_depth = self.msg_to_cv2(self.img_msg_depth)
+        arm_depth = arm_depth[:, LEFT_CROP:-RIGHT_CROP]
+        arm_depth = cv2.resize(
+            arm_depth, (NEW_WIDTH, NEW_HEIGHT), interpolation=cv2.INTER_AREA
+        )
+
+        # Get camera pose of view and the location of the robot
+        # These two should be fast and limited delay
+        imgs = self.spot.get_hand_image(
+            force_get_gripper=True
+        )  # for getting gripper intrinsics
+        # Get the camera intrinsics
+        cam_intrinsics = imgs[0].source.pinhole.intrinsics
+
+        # Get the vision to hand
+        try:
+            vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+            )
+        except Exception as e:
+            print("ee:", imgs[0].shot.transforms_snapshot is None)
+            print(f"Cannot get Spot T due to {e}. Online detection might be off")
+            return
+
+        # Internal model
+        hand_rgb_preprocessed = self.preprocess_image(hand_rgb)
+        new_detection, viz_img = self.model.inference(
+            hand_rgb_preprocessed, timestamp, stopwatch
+        )
+        # Split the detection
+        timestamp, new_detections = new_detection.split("|")
+        new_detections = new_detections.split(";")
+        object_info = []
+        for detection_str in new_detections:
+            if detection_str == "None":
+                continue
+            class_label, score, x1, y1, x2, y2 = detection_str.split(",")
+            # Compute the center pixel
+            x1, y1, x2, y2 = [
+                int(float(i) / self.image_scale) for i in [x1, y1, x2, y2]
+            ]
+            pixel_x = int(np.mean([x1, x2]))
+            pixel_y = int(np.mean([y1, y2]))
+            # Get the distance between arm and the object
+            x1_distance = max(int(float(x1 - LEFT_CROP) * WIDTH_SCALE), 0)
+            x2_distance = max(int(float(x2 - LEFT_CROP) * WIDTH_SCALE), 0)
+            y1_distance = int(float(y1) * HEIGHT_SCALE)
+            y2_distance = int(float(y2) * HEIGHT_SCALE)
+            arm_depth_bbox = np.zeros_like(arm_depth, dtype=np.float32)
+            arm_depth_bbox[y1_distance:y2_distance, x1_distance:x2_distance] = 1.0
+            # Estimate distance from the gripper to the object
+            depth_box = arm_depth[y1_distance:y2_distance, x1_distance:x2_distance]
+            if depth_box.size == 0:
+                continue
+            z = np.median(depth_box) / 255.0 * MAX_HAND_DEPTH
+            try:
+                point_in_gripper = self.affordance_prediction(
+                    depth_raw=arm_depth / 255.0 * MAX_HAND_DEPTH,
+                    mask=arm_depth_bbox,
+                    camera_intrinsics=cam_intrinsics,
+                    center_pixel=np.array([pixel_x, pixel_y]),
+                )
+            except Exception as e:
+                print(f"Issue of predicting location: {e}")
+                continue
+
+            if np.isnan(point_in_gripper).any():
+                continue
+
+            point_in_global_3d = vision_T_hand_image.transform_point(
+                mn.Vector3(*point_in_gripper)
+            )
+
+            object_info.append(
+                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]}"
+            )
+            print(
+                f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y} {z}"
+            )
+
+        # publish data
+        self.publish_new_detection(";".join(object_info))
+
+        stopwatch.print_stats()
+
+    def publish_new_detection(self, new_object):
+        self.pubs[self.detection_topic].publish(new_object)
+
+
 class OWLVITModel:
-    def __init__(self, score_threshold=0.05, show_img=False):
+    def __init__(self, score_threshold=0.1, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -376,6 +647,30 @@ class OWLVITModel:
         self.owlvit.update_label([params])
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
 
+        if bbox_xy is not None and bbox_xy != []:
+            detections = []
+            for detection in bbox_xy:
+                str_det = f'{detection[0]},{detection[1]},{",".join([str(i) for i in detection[2]])}'
+                detections.append(str_det)
+            bbox_xy_string = ";".join(detections)
+        else:
+            bbox_xy_string = "None"
+        detections_str = f"{str(timestamp)}|{bbox_xy_string}"
+
+        return detections_str, viz_img
+
+
+class OWLVITModelMultiClasses(OWLVITModel):
+    def inference(self, hand_rgb, timestamp, stopwatch):
+        # Add new classes here to the model
+        # We decide to hardcode these classes first as this will be more robust
+        # and gives us the way to control the detection
+        # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
+        multi_classes = [["glass bottle"]]
+        self.owlvit.update_label(multi_classes)
+        # TODO: spot-sim2real: right now for each class, we only return the most confident detection
+        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
+        # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
         if bbox_xy is not None and bbox_xy != []:
             detections = []
             for detection in bbox_xy:
@@ -413,6 +708,7 @@ if __name__ == "__main__":
     parser.add_argument("--raw", action="store_true")
     parser.add_argument("--compress", action="store_true")
     parser.add_argument("--owlvit", action="store_true")
+    parser.add_argument("--open-voc", action="store_true")
     parser.add_argument("--mrcnn", action="store_true")
     parser.add_argument("--core", action="store_true", help="running on the Core")
     parser.add_argument("--listen", action="store_true", help="listening to Core")
@@ -442,6 +738,7 @@ if __name__ == "__main__":
     bounding_box_detector = args.bounding_box_detector
     mrcnn = args.mrcnn
     owlvit = args.owlvit
+    open_voc = args.open_voc
 
     node = None  # type: Any
     model = None  # type: Any
@@ -455,8 +752,14 @@ if __name__ == "__main__":
     elif owlvit:
         # TODO dynamic label
         rospy.set_param("object_target", "ball")
+        rospy.set_param("enable_tracking", False)
         model = OWLVITModel()
         node = SpotBoundingBoxPublisher(model)
+    elif open_voc:
+        # Add open voc object detector here
+        spot = Spot("SpotOpenVocObjectDetectorPublisher")
+        model = OWLVITModelMultiClasses()
+        node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()
     elif raw or compress:
@@ -482,6 +785,7 @@ if __name__ == "__main__":
                 flags.append("--decompress")
             elif local:
                 flags.append("--raw")
+                flags.append("--open-voc")
             else:
                 raise RuntimeError("This should be impossible.")
         cmds = [f"python {osp.abspath(__file__)} {flag}" for flag in flags]

@@ -20,7 +20,7 @@ WEIGHTS_TORCHSCRIPT:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_jt_ckpt.16.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_ckpt_50.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -45,7 +45,7 @@ WEIGHTS:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_jt_ckpt.16.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_ckpt_50.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -65,11 +65,13 @@ PARALLEL_INFERENCE_MODE: True
 
 # General env params
 CTRL_HZ: 2.0
-MAX_EPISODE_STEPS: 500
+MAX_EPISODE_STEPS: 100
 
 # Nav env
 SUCCESS_DISTANCE: 0.3
 SUCCESS_ANGLE_DIST: 5
+SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV: 1.10
+SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV: 20
 DISABLE_OBSTACLE_AVOIDANCE: False
 USE_OA_FOR_NAV: True
 USE_HEAD_CAMERA: True
@@ -112,7 +114,7 @@ SEMANTIC_PLACE_EE_ACTION_SPACE_LENGTH: 10
 MAX_LIN_DIST_OPEN_CLOSE_DRAWER: 0.0
 MAX_ANG_DIST_OPEN_CLOSE_DRAWER: 3.73 # degrees
 OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
-OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
+OPEN_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
 
 # Semantic Pick
 IMG_SRC: 0 # 1 for intel & 0 for gripper
@@ -130,6 +132,16 @@ RECEPTACLES:
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
 
+# Base action params for sem place EE 
+MAX_LIN_DIST_SEMANTIC_PLACE: 0.0  # meters
+MAX_ANG_DIST_SEMANTIC_PLACE: 5.73  # degrees
+
+# SEMANTIC EE POLICY SCALE PARAMETERS
+EE_DIST_SCALE_SEMANTIC_PLACE : 0.3
+EE_ROT_SCALE_SEMANTIC_PLACE : 0.3
+EE_DIST_SCALE_MOBILE_GAZE : 0.1
+EE_ROT_SCALE_MOBILE_GAZE : 0.0125
+
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)
 MAX_JOINT_MOVEMENT_2: 0.174533  # Place arm speed (10 deg)
@@ -143,6 +155,7 @@ INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # T
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 75, 0] #[0, -160, 100, 0, 90, 0]
+SEMANTIC_PLACE_ARM_JOINT_ANGLES: [0, -125, 80, 0, 85, 0]
 PLACE_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
 ARM_UPPER_LIMITS: [45, 0, 180, 0, 90, 0]

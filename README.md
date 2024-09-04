@@ -184,7 +184,7 @@ git checkout main
 #### Step6. [Optional] Pick with Pose estimation (uses NVIDIA's FoundationPose Model)
 - Ensure [FoundationPoseForSpotSim2real](https://github.com/tusharsangam/FoundationPoseForSpotSim2Real) is setup as submodule in third_party folder please follow instructions in [SETUP_INSTRUCTIONS.mds](./installation/SETUP_INSTRUCTIONS.md)
 - Currently we only support pose estimation for bottle, penguine plush toy & paper cup found in FB offices' microktichen
-- New Meshes can be added using 360 video of the object from any camera (iphone, android), entire process will be described in the above repo's README 
+- New Meshes can be added using 360 video of the object from any camera (iphone, android), entire process will be described in the above repo's README
 - Pose estimation model [FoundationPose](https://nvlabs.github.io/FoundationPose/) runs as a microservice & can be communicated through pyzmq socket
 - The [Step 1](#step1-run-the-local-launch-executable) should also start the pose estimation service & no other step is required to start this microservice
 - <b>How to use Pose Estimation ?</b>
@@ -192,6 +192,19 @@ git checkout main
     - If you enable pose correction, spot will first manually correct the object pose for eg. rotate horizontal object to be vertical etc & place the corrected the object at the same place.
     - Our `orientationsolver` can also correct the object to face the camera but it incurs additional pick attempt before place can be run thus is kept to be false by default
     - <b>Enabling pose estimation can help in two major way</b> - informs grasp api how to approach the object viz. topdown or side which increases the grasp success probability & correct object orientation before place is ran.
+
+
+#### Step7. [Optional] Object detection with tracking (uses Meta's SAM2 Model)
+- Follow the instruction to setup SAM2 [here](https://github.com/jimmytyyang/sam2_skills.git). You can create a new conda environment, different from spot conda environment. The reason for not merging these two environments is that spot-sim2real currently use a lower python version. In addition, we motify the orginal sam2 so that now it can take raw RGB images, rather than a video path.
+- Once finishing the installation, run tracking service on its own conda environment by
+```bash
+python spot_rl_experiments/spot_rl/utils/tracking_service.py
+```
+- We support open/close skills using SAM2's tracking. It is done by setting
+```python
+import rospy
+rospy.set_param("enable_tracking", True)
+```
 
 
 ### Using Spot Data-logger
@@ -233,7 +246,7 @@ This will record data in a while loop, press `Ctrl+c` to spot the logger. That w
 Warning : This logger will cause motion blur as camera data is logged while the robot moves. Currently we do not support Spot-Record-Go protocol to log
 
 #### Log replay
-It is also possible to replay the logged data (essentially the camera streams that have been logged) using the following command : 
+It is also possible to replay the logged data (essentially the camera streams that have been logged) using the following command:
 ```bash
 python -m spot_wrapper.data_logger --replay="<name_of_log_file>.pkl"
 ```
@@ -247,11 +260,11 @@ We provide an function that can call skills in seperate conda environment. And t
 #### Step1. Follow Running instructions section to setup image client in spot_ros conda environment
 #### Step2. Run ```skill_executor.py``` to listen to which skill to use. This will run on the background.
 ```bash
-python spot_rl_experiments/spot_rl/utils/skill_executor.py 
+python spot_rl_experiments/spot_rl/utils/skill_executor.py
 ```
 #### Step3. Use ROS to use skill in your application. Now you can call skills in non-blocking way.
 ```python
-# In your application, you import rospy for calling which skill to use 
+# In your application, you import rospy for calling which skill to use
 import rospy # This is the only package you need to install in your environment
 rospy.set_param("skill_name_input", "Navigate,desk") # Call navigation skills to navigate to the desk. This is a non-blocking call.
 ```

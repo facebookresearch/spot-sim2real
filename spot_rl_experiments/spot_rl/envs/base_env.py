@@ -189,6 +189,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self._max_lin_dist_scale = self.config[max_lin_dist_key]
         self._max_ang_dist_scale = self.config[max_ang_dist_key]
 
+        # Tracking paramters reset
+        rospy.set_param("enable_tracking", False)
+
         # Text-to-speech
         self.tts_pub = rospy.Publisher(rt.TEXT_TO_SPEECH, String, queue_size=1)
 
@@ -281,6 +284,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.prev_base_moved = False
         self.should_end = False
         rospy.set_param("is_whiten_black", True)
+        rospy.set_param("enable_tracking", False)
         observations = self.get_observations()
         return observations
 
@@ -423,8 +427,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             arm_ee_action = rescale_arm_ee_actions(arm_ee_action)
             if np.count_nonzero(arm_ee_action) > 0:
                 # TODO: semantic place ee: move this to config
-                arm_ee_action[0:3] *= 0.1  # 0.015
-                arm_ee_action[3:6] *= 0.1  # 0.0125
+                arm_ee_action[0:3] *= self.arm_ee_dist_scale  # 0.015
+                arm_ee_action[3:6] *= self.arm_ee_rot_scale  # 0.0125
                 xyz, rpy = self.spot.get_ee_pos_in_body_frame()
                 cur_ee_pose = np.concatenate((xyz, rpy), axis=0)
                 # Wrap the heading
@@ -452,12 +456,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             elif base_action is not None and arm_ee_action is not None:
                 print("input base_action velocity:", arr2str(base_action))
                 print("input arm_ee_action:", arr2str(arm_ee_action))
-                self.spot.set_base_vel_and_arm_ee_pos(
-                    *base_action,
-                    arm_ee_action,
-                    travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
-                    disable_obstacle_avoidance=disable_oa,
-                )
+                if self._max_lin_dist_scale == 0.0:
+                    self.spot.set_arm_ee_pos()
+                else:
+                    self.spot.set_base_vel_and_arm_ee_pos(
+                        *base_action,
+                        arm_ee_action,
+                        travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                        disable_obstacle_avoidance=disable_oa,
+                    )
             elif base_action is not None:
                 self.spot.set_base_velocity(
                     *base_action,
@@ -640,8 +647,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Is the agent at the goal?
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
         at_goal = dist_to_goal < success_distance
-        good_heading = abs(observations["goal_heading"][0]) < success_angle
-        return at_goal and good_heading
+        goal_heading = abs(observations["goal_heading"][0])
+        good_heading_suc = goal_heading < success_angle
+        print(
+            f"nav dis.: {success_distance} {dist_to_goal}; nav delta heading: {success_angle} {goal_heading}"
+        )
+        return at_goal and good_heading_suc
 
     def print_nav_stats(self, observations):
         rho, theta = observations["target_point_goal_gps_and_compass_sensor"]
@@ -729,6 +740,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     break
             if self.detection_timestamp is None:
                 raise RuntimeError("Could not correctly synchronize gaze observations")
+
             self.detections_str_synced, filtered_hand_depth = (
                 self.detections_buffer["detections"][self.detection_timestamp],
                 self.detections_buffer["filtered_depth"][self.detection_timestamp],

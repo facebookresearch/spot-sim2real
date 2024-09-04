@@ -130,13 +130,13 @@ class OwlVit:
 
         return (
             self.get_most_confident_bounding_box_per_label(results),
-            self.create_img_with_bounding_box(img, results)
+            self.create_img_with_bounding_box_no_ranking(img, results)
             if vis_img_required
             else None,
         )
 
     def show_img_with_overlaid_bounding_boxes(self, img, results):
-        img = self.create_img_with_bounding_box(img, results)
+        img = self.create_img_with_bounding_box_no_ranking(img, results)
         cv2.imshow("img", img)
         cv2.waitKey(1)
 
@@ -317,6 +317,27 @@ class OwlVit:
                 cv2.LINE_AA,
             )
             idx += 1
+
+        return img
+
+    def create_img_with_bounding_box_no_ranking(self, img, results):
+        """
+        Returns an image with all bounding boxes above the threshold overlaid.
+        Each class has only one bounding box.
+        """
+
+        results = self.get_most_confident_bounding_box_per_label(results)
+        font = cv2.FONT_HERSHEY_SIMPLEX
+
+        for label, score, box in results:
+            img = cv2.rectangle(img, box[:2], box[2:], (255, 0, 0), 5)
+            if box[3] + 25 > 768:
+                y = box[3] - 10
+            else:
+                y = box[3] + 25
+            img = cv2.putText(
+                img, label, (box[0], y), font, 1, (255, 0, 0), 2, cv2.LINE_AA
+            )
 
         return img
 

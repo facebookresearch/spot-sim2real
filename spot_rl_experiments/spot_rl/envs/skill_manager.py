@@ -3,7 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import magnum as mn
 import numpy as np
@@ -11,6 +11,7 @@ import rospy
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
 from spot_rl.skills.atomic_skills import (
+    MobilePickEE,
     Navigation,
     OpenCloseDrawer,
     Pick,
@@ -103,7 +104,8 @@ class SpotSkillManager:
         open_close_drawer_config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
-        use_semantic_place_ee: bool = False,
+        use_pick_ee: bool = False,
+        use_place_ee: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -115,8 +117,10 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
+        print("USE MOBILE PICK VARIABLE IS SET TO :", self._use_mobile_pick)
         self.use_semantic_place = use_semantic_place
-        self.use_semantic_place_ee = use_semantic_place_ee
+        self.use_pick_ee = use_pick_ee
+        self.use_place_ee = use_place_ee
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -180,7 +184,7 @@ class SpotSkillManager:
             # TODO: overwrite the config
             self.place_config = (
                 construct_config_for_semantic_place()
-                if self.use_semantic_place or self.use_semantic_place_ee
+                if self.use_semantic_place
                 else construct_config_for_place()
             )
         else:
@@ -207,19 +211,32 @@ class SpotSkillManager:
             spot=self.spot,
             config=self.nav_config,
         )
-        self.gaze_controller = Pick(
-            spot=self.spot,
-            config=self.pick_config,
-            use_mobile_pick=self._use_mobile_pick,
-        )
+        if self.use_pick_ee:
+            # print("GOING INSIDE GAZE EE ENV")
+            self.gaze_controller = MobilePickEE(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
+            )
+        else:
+            self.gaze_controller = Pick(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
+            )
         if self.use_semantic_place:
-            if self.use_semantic_place_ee:
+
+            if self.use_place_ee:
+                print("GOING INSIDE SEM EE ENV")
                 self.place_controller = SemanticPlaceEE(
-                    spot=self.spot, config=self.place_config
+                    spot=self.spot,
+                    config=self.place_config,
+                    use_semantic_place=self.use_semantic_place,
                 )
             else:
                 self.place_controller = SemanticPlace(
-                    spot=self.spot, config=self.place_config
+                    spot=self.spot,
+                    config=self.place_config,
                 )
         else:
             self.place_controller = Place(
@@ -240,8 +257,8 @@ class SpotSkillManager:
         # Reset the policies and environments via the controllers
         raise NotImplementedError
 
-    @multimethod  # type: ignore
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    @multimethod
+    def nav(self, nav_target: str = None) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a known string
 
@@ -284,7 +301,7 @@ class SpotSkillManager:
         self,
         x: float,
         y: float,
-        theta=float,
+        theta: float,
         reset_current_receptacle_name: bool = True,
     ) -> Tuple[bool, str]:
         """
@@ -306,6 +323,26 @@ class SpotSkillManager:
             None if reset_current_receptacle_name else self.current_receptacle_name
         )
         goal_dict = {"nav_target": (x, y, theta)}  # type: Dict[str, Any]
+        status, message = self.nav_controller.execute(goal_dict=goal_dict)
+        conditional_print(message=message, verbose=self.verbose)
+        return status, message
+
+    @multimethod  # type: ignore
+    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+        """
+        Perform the nav action on the navigation target with yaw specified as a metric location
+        Args:
+            x (float): x coordinate of the nav target (in meters) specified in the world frame
+            y (float): y coordinate of the nav target (in meters) specified in the world frame
+        Returns:
+            bool: True if navigation was successful, False otherwise
+            str: Message indicating the status of the navigation
+        """
+        theta = 0.0
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "dynamic_yaw": True,
+        }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -484,6 +521,14 @@ class SpotSkillManager:
                 message = f"Failed - place target {place_target} not found - use the exact name"
                 conditional_print(message=message, verbose=self.verbose)
                 return False, message
+            if self.use_semantic_place:
+                # Convert HOME frame coordinates into body frame
+                place_target_location = (
+                    self.place_controller.env.get_target_in_base_frame(
+                        mn.Vector3(*place_target_location.astype(np.float64).tolist())
+                    )
+                )
+                is_local = True
         else:
             message = "No place target specified, estimating point through heuristic"
             conditional_print(message=message, verbose=self.verbose)
@@ -496,7 +541,7 @@ class SpotSkillManager:
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
-                    self.pick_config.GAZE_ARM_JOINT_ANGLES,
+                    self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
                     percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
@@ -558,7 +603,7 @@ class SpotSkillManager:
             object_target,
             proposition,
             self.spot,
-            self.pick_config.GAZE_ARM_JOINT_ANGLES,
+            self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
             percentile=70,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,

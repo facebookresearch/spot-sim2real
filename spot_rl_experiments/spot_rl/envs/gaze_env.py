@@ -38,6 +38,7 @@ class SpotGazeEnv(SpotBaseEnv):
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
         )
+        self.grasp_dist_threshold = 1.5
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
@@ -66,7 +67,7 @@ class SpotGazeEnv(SpotBaseEnv):
         return observations
 
     def step(self, action_dict: Dict[str, Any]):
-        grasp = self.should_grasp()
+        grasp = self.should_grasp(self.grasp_dist_threshold)
 
         # Update the action_dict with grasp and place flags
         action_dict["grasp"] = grasp
@@ -83,15 +84,10 @@ class SpotGazeEnv(SpotBaseEnv):
 
         @INFO: Policies trained on older hab versions DON'T need remapping
         """
-        mobile_gaze_observations = {}
-        mobile_gaze_observations["arm_depth_bbox_sensor"] = observations[
-            "arm_depth_bbox"
-        ]
-        mobile_gaze_observations["articulated_agent_arm_depth"] = observations[
-            "arm_depth"
-        ]
-        mobile_gaze_observations["joint"] = observations["joint"]
-        return mobile_gaze_observations
+        new_observations = observations.copy()
+        new_observations["arm_depth_bbox_sensor"] = observations["arm_depth_bbox"]
+        new_observations["articulated_agent_arm_depth"] = observations["arm_depth"]
+        return new_observations
 
     def get_observations(self):
         arm_depth, arm_depth_bbox = self.get_gripper_images()
@@ -109,6 +105,26 @@ class SpotGazeEnv(SpotBaseEnv):
 
     def get_success(self, observations):
         return self.grasp_attempted
+
+
+class SpotGazeEEEnv(SpotGazeEnv):
+    def __init__(self, config, spot: Spot, use_mobile_pick: bool = False):
+        super().__init__(
+            config,
+            spot,
+            use_mobile_pick=use_mobile_pick,
+        )
+        self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_MOBILE_GAZE
+        self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_MOBILE_GAZE
+        self.grasp_dist_threshold = 0.7
+
+    def get_observations(self):
+        observations = super().get_observations()
+        if "joint" in observations:
+            del observations["joint"]
+        xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+        observations["ee_pose"] = np.concatenate([xyz, rpy])
+        return observations
 
 
 class SpotSemanticGazeEnv(SpotBaseEnv):
