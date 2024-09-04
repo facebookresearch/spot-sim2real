@@ -1,0 +1,19 @@
+# Define the model class name
+MODEL_CLASS_NAME : "habitat_baselines.rl.ddppo.policy.resnet_policy.PointNavResNetPolicy"
+# Define the observation dict
+OBSERVATIONS_DICT:
+  obj_goal_sensor: [[3,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
+  relative_initial_ee_orientation: [[1,],'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
+  relative_target_object_orientation: [[1,],'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
+  articulated_agent_jaw_depth: [[240, 228, 1], '0.0', '1.0', 'np.float32']
+  ee_pos: [[3,], 'np.finfo(np.float32).min', 'np.finfo(np.float32).max', 'np.float32']
+  is_holding: [[1,], '0', '1', 'np.float32']
+
+# Define the action space output length
+ACTION_SPACE_LENGTH: 10
+# The path to load and save the models
+TARGET_HAB3_POLICY_PATH: "/home/jmmy/research/spot-sim2real/spot_rl_experiments/weights/semantic_place_ee/sp_jt_ckpt.16_3.pth"
+OUTPUT_COMBINED_NET_SAVE_PATH: "/home/jmmy/research/spot-sim2real/spot_rl_experiments/weights/semantic_place_ee/sp_jt_ckpt.16.torchscript"
+# If we want to use stereo pair camera for mobile gaze
+USE_STEREO_PAIR_CAMERA: False
+NEW_HABITAT_LAB_POLICY_OR_OLD: 'new'

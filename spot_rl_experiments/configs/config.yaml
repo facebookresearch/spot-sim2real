@@ -19,6 +19,9 @@ WEIGHTS_TORCHSCRIPT:
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
+  # Semantic place EE
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_jt_ckpt.16.torchscript"
+
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
@@ -40,6 +43,9 @@ WEIGHTS:
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
+
+  # Semantic place EE
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_jt_ckpt.16.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -100,6 +106,9 @@ PLACE_ACTION_SPACE_LENGTH: 4
 # Semantic Place
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9
 SEMANTIC_PLACE_JOINT_BLACKLIST: [3]
+
+# Semantic Place EE
+SEMANTIC_PLACE_EE_ACTION_SPACE_LENGTH: 10
 
 # Open Close Drawer env
 MAX_LIN_DIST_OPEN_CLOSE_DRAWER: 0.0
