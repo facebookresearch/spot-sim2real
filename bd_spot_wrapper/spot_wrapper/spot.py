@@ -1115,6 +1115,28 @@ class Spot:
         )
         return cmd_id
 
+    def set_arm_ee_pos(
+        self,
+        x_vel,
+        y_vel,
+        ang_vel,
+        arm_ee_action,
+        travel_time,
+        disable_obstacle_avoidance=False,
+    ):
+        print(f"in set_arm_ee_pos: {arm_ee_action} {travel_time}")
+        arm_cmd = self.move_gripper_to_point(
+            point=arm_ee_action[0:3],
+            rotation=list(arm_ee_action[3:]),
+            seconds_to_goal=travel_time,
+            return_cmd=True,
+        )
+        synchro_command = RobotCommandBuilder.build_synchro_command(arm_cmd)
+        cmd_id = self.command_client.robot_command(
+            synchro_command, end_time_secs=time.time() + travel_time
+        )
+        return cmd_id
+
     def get_xy_yaw(self, use_boot_origin=False, robot_state=None):
         """
         Returns the relative x and y distance from start, as well as relative heading
