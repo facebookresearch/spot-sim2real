@@ -1086,22 +1086,22 @@ class Spot:
     ):
         print(f"in set_base_vel_and_arm_ee_pos: {arm_ee_action} {travel_time}")
         # TODO: semantic place ee: temp hack to distance the base vel
-        base_cmd = self.set_base_velocity(
-            x_vel,
-            y_vel,
-            ang_vel,
-            vel_time=travel_time,
-            disable_obstacle_avoidance=disable_obstacle_avoidance,
-            return_cmd=True,
-        )
+        # base_cmd = self.set_base_velocity(
+        #     x_vel,
+        #     y_vel,
+        #     ang_vel,
+        #     vel_time=travel_time,
+        #     disable_obstacle_avoidance=disable_obstacle_avoidance,
+        #     return_cmd=True,
+        # )
         arm_cmd = self.move_gripper_to_point(
             point=arm_ee_action[0:3],
             rotation=list(arm_ee_action[3:]),
             seconds_to_goal=travel_time,
             return_cmd=True,
         )
-        synchro_command = RobotCommandBuilder.build_synchro_command(base_cmd, arm_cmd)
-        # synchro_command = RobotCommandBuilder.build_synchro_command(arm_cmd)
+        # synchro_command = RobotCommandBuilder.build_synchro_command(base_cmd, arm_cmd)
+        synchro_command = RobotCommandBuilder.build_synchro_command(arm_cmd)
         cmd_id = self.command_client.robot_command(
             synchro_command, end_time_secs=time.time() + travel_time
         )
