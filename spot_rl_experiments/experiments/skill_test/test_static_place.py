@@ -39,16 +39,13 @@ if __name__ == "__main__":
 
         spotskillmanager.spot.open_gripper()
         input("Place an object in Spot's gripper and press Enter to continue...")
-=======
-    INITIAL_ARM_JOINT_ANGLES=[0, -180, 180, 90, 0, -90]
     episode_ctr = 1
-    spot_pos,spot_ort=spotskillmanager.spot.get_ee_pos_in_body_frame()
-    spot_ort=np.zeros(3)
+    spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
+    spot_ort = np.zeros(3)
     while contnue:
-        
+
         spotskillmanager.spot.open_gripper()
-        input('Place an object in Spot\'s gripper and press Enter to continue...')
->>>>>>> 69d9e3f (Minor chagnges for new policy weights)
+        input("Place an object in Spot's gripper and press Enter to continue...")
         rospy.set_param("is_gripper_blocked", 0)
         episode_log = {"actions": []}
         spotskillmanager.spot.close_gripper()
