@@ -241,9 +241,6 @@ class SpotSemanticPlaceEEEnv(SpotBaseEnv):
         max_ang_dist_sem_place = (
             "MAX_ANG_DIST_SEMANTIC_PLACE" if use_semantic_place else "MAX_ANG_DIST"
         )
-
-        print("THE VAR", use_semantic_place)
-
         super().__init__(
             config,
             spot,
