@@ -164,16 +164,14 @@ def plane_detect(pcd):
 
     # DrawPointCloud(points, color=(0.4, 0.4, 0.4))
     t0 = time.time()
-    results = DetectMultiPlanes(
-        points, min_ratio=0.05, threshold=0.005, iterations=2000
-    )
-    print("Time:", time.time() - t0)
+    results = DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=2000)
+    print("Time Plane detection:", time.time() - t0)
     planes = []
     colors = []
 
     highest_pts, high_i = -np.inf, 0
     # lowest_dist_to_camera, low_i = np.inf, 0
-    print(f"{len(results)} plane are detected")
+    # print(f"{len(results)} plane are detected")
     for i, (_, plane) in enumerate(results):
 
         r = 1

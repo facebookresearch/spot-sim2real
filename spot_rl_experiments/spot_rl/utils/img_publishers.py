@@ -40,12 +40,17 @@ try:
 except ModuleNotFoundError:
     pass
 
+import open3d as o3d
+
 # owlvit
 from spot_rl.models import OwlVit
+from spot_rl.utils import search_table_location
+from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     sample_patch_around_point,
 )
+from spot_rl.utils.plane_detection import plane_detect
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
@@ -317,7 +322,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
     subscriber_topic = rt.HAND_RGB
     publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
 
-    def __init__(self, model):
+    def __init__(self, model, spot):
         super().__init__()
         self.model = model
         self.detection_topic = rt.DETECTIONS_TOPIC
@@ -332,6 +337,11 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
         self._reset_tracking_params()
+
+        # Parameter for plane detection
+        assert osp.exists(GRIPPER_T_INTEL_PATH), f"{GRIPPER_T_INTEL_PATH} not found"
+        self.gripper_T_intel = np.load(GRIPPER_T_INTEL_PATH)
+        self.spot = spot
 
     def preprocess_image(self, img):
         if self.image_scale != 1.0:
@@ -352,6 +362,37 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         return img
+
+    def shrink_bounding_box(self, x_min, x_max, y_min, y_max, shrink_factor=0.1):
+        """
+        Shrinks the bounding box by a specified shrink factor.
+
+        Parameters:
+        x_min (float): Minimum x-coordinate of the bounding box.
+        x_max (float): Maximum x-coordinate of the bounding box.
+        y_min (float): Minimum y-coordinate of the bounding box.
+        y_max (float): Maximum y-coordinate of the bounding box.
+        shrink_factor (float): Factor by which to shrink the bounding box. Default is 0.1 (i.e., 10%).
+
+        Returns:
+        tuple: New coordinates (x_min_new, x_max_new, y_min_new, y_max_new).
+        """
+        height = x_max - x_min
+        width = y_max - y_min
+
+        # Calculate the amount to shrink by
+        shrink_width = width * shrink_factor / 2
+        shrink_height = height * shrink_factor / 2
+
+        x_center = (x_max + x_min) / 2
+        y_center = (y_max + y_min) / 2
+        # Adjust the bounding box coordinates
+        x_min_new = x_center - shrink_height
+        x_max_new = x_center + shrink_height
+        y_min_new = y_center - shrink_width
+        y_max_new = y_center + shrink_width
+
+        return int(x_min_new), int(x_max_new), int(y_min_new), int(y_max_new)
 
     def _reset_tracking_params(self):
         self._tracking_first_time = (
@@ -376,6 +417,8 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         # Fetch the tracking flag
         enable_tracking = rospy.get_param("enable_tracking", False)
+        enable_plane_detector = rospy.get_param("enable_plane_detector", False)
+        enable_plane_detector = True
 
         # Cache the vis image
         viz_img = hand_rgb_preprocessed
@@ -436,6 +479,142 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
                 # buffer size 2
                 self._tracking_images = [self._tracking_images[suc_frame[-1]]]
                 self._tracking_bboxs = [self._tracking_bboxs[suc_frame[-1]]]
+        elif enable_plane_detector:
+            (
+                img,
+                depth_raw,
+                camera_intrinsics_intel,
+                camera_intrinsics_gripper,
+                body_T_hand,
+                gripper_T_intel,
+            ) = search_table_location.get_arguments(self.spot, self.gripper_T_intel)
+            h, w = img.shape[:2]
+            mask = np.ones_like(depth_raw).astype(bool)
+            fx = camera_intrinsics_intel.focal_length.x
+            fy = camera_intrinsics_intel.focal_length.y
+            cx = camera_intrinsics_intel.principal_point.x
+            cy = camera_intrinsics_intel.principal_point.y
+            # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
+            t0 = time.time()
+            pcd = search_table_location.generate_point_cloud(
+                img, depth_raw, mask, fx, fy, cx, cy
+            )
+            print("Time generate_point_cloud:", time.time() - t0)
+            pcd = pcd.voxel_down_sample(voxel_size=0.01)
+            t0 = time.time()
+            pcd.estimate_normals(
+                search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
+            )
+            print("Time estimate_normals:", time.time() - t0)
+            # 0.25 - 0 < angle < 75
+            t0 = time.time()
+            pcd = search_table_location.filter_pointcloud_by_normals_in_the_given_direction(
+                pcd,
+                np.array([0.0, 0.0, 1.0]),
+                0.99,
+                body_T_hand,
+                gripper_T_intel,
+                visualize=False,
+            )
+            print(
+                "Time filter_pointcloud_by_normals_in_the_given_direction:",
+                time.time() - t0,
+            )
+
+            try:
+                plane_pcd = plane_detect(pcd)
+                plane_pcd.points = o3d.utility.Vector3dVector(
+                    search_table_location.farthest_point_sampling(
+                        np.array(plane_pcd.points), 1024
+                    )
+                )
+                print(f"first: { np.array(plane_pcd.points).shape[0]}")
+                if np.array(plane_pcd.points).shape[0] > 10:
+                    # o3d.visualization.draw_geometries([plane_pcd])
+                    # Down-sample
+                    # plane_pcd.points = o3d.utility.Vector3dVector(
+                    #     search_table_location.farthest_point_sampling(np.array(plane_pcd.points), 1024)
+                    # )
+                    (
+                        target_points,
+                        selected_point,
+                    ) = search_table_location.get_target_points_by_heuristic(
+                        np.array(plane_pcd.points)
+                    )
+                    pixel_points = search_table_location.project_3d_to_pixel_uv(
+                        np.array(target_points), fx, fy, cx, cy
+                    )
+
+                    filter_pixel_points = []
+                    if len(pixel_points) != 0:
+                        t0 = time.time()
+                        for pt in pixel_points:
+                            depth_pt = (
+                                sample_patch_around_point(
+                                    int(pt[0]), int(pt[1]), depth_raw
+                                )
+                                / 1000.0
+                            )
+                            intel_pt = get_3d_point(
+                                camera_intrinsics_intel, pt, depth_pt
+                            )
+                            gripper_pt = np.array(
+                                gripper_T_intel.transform_point(mn.Vector3(*intel_pt))
+                            )
+                            body_pt = body_T_hand.transform_point(
+                                mn.Vector3(*gripper_pt)
+                            )
+                            if body_pt[2] > 0:
+                                filter_pixel_points.append(pt)
+
+                        filter_pixel_points = np.stack(filter_pixel_points)
+                        print("Time get 3d:", time.time() - t0)
+                        print(
+                            f"before/after filter out: {pixel_points.shape[0]} {filter_pixel_points.shape[0]}"
+                        )
+                        if len(filter_pixel_points) >= 40:
+                            max_x = int(np.max(filter_pixel_points[:, 1]))
+                            min_x = int(np.min(filter_pixel_points[:, 1]))
+                            max_y = int(np.max(filter_pixel_points[:, 0]))
+                            min_y = int(np.min(filter_pixel_points[:, 0]))
+                            (
+                                new_min_x,
+                                new_max_x,
+                                new_min_y,
+                                new_max_y,
+                            ) = self.shrink_bounding_box(
+                                min_x, max_x, min_y, max_y, 0.5
+                            )
+                            # cur_bbox = [min_y, min_x, max_y, max_x]
+                            cur_bbox = [new_min_y, new_min_x, new_max_y, new_max_x]
+                            object_label = "plane"
+                            bbox_data = (
+                                f"{str(timestamp)}|{object_label},{1.0},"
+                                + ",".join([str(v) for v in cur_bbox])
+                            )
+                            # Apply the red bounding box to showcase tracking on the image
+                            viz_img = cv2.rectangle(
+                                viz_img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                            )
+                            viz_img = cv2.rectangle(
+                                viz_img,
+                                [new_min_y, new_min_x],
+                                [new_max_y, new_max_x],
+                                (0, 255, 0),
+                                5,
+                            )
+                            for xy in filter_pixel_points:
+                                viz_img = cv2.circle(
+                                    viz_img, (int(xy[0]), int(xy[1])), 1, (255, 0, 0)
+                                )
+                        else:
+                            bbox_data = f"{str(timestamp)}|None"
+                    else:
+                        bbox_data = f"{str(timestamp)}|None"
+                else:
+                    bbox_data = f"{str(timestamp)}|None"
+            except Exception:
+                bbox_data = f"{str(timestamp)}|None"
         else:
             # Normal detection mode using detection model
             bbox_data, viz_img = self.model.inference(
@@ -747,14 +926,17 @@ if __name__ == "__main__":
     elif filter_hand_depth:
         node = SpotFilteredHandDepthImagesPublisher()
     elif mrcnn:
+        spot = Spot("SpotBoundingBoxPublisher")
         model = MRCNNModel()
-        node = SpotBoundingBoxPublisher(model)
+        node = SpotBoundingBoxPublisher(model, spot)
     elif owlvit:
         # TODO dynamic label
         rospy.set_param("object_target", "ball")
         rospy.set_param("enable_tracking", False)
+        rospy.set_param("enable_plane_detector", False)
+        spot = Spot("SpotBoundingBoxPublisher")
         model = OWLVITModel()
-        node = SpotBoundingBoxPublisher(model)
+        node = SpotBoundingBoxPublisher(model, spot)
     elif open_voc:
         # Add open voc object detector here
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
@@ -785,7 +967,7 @@ if __name__ == "__main__":
                 flags.append("--decompress")
             elif local:
                 flags.append("--raw")
-                flags.append("--open-voc")
+                # flags.append("--open-voc")
             else:
                 raise RuntimeError("This should be impossible.")
         cmds = [f"python {osp.abspath(__file__)} {flag}" for flag in flags]

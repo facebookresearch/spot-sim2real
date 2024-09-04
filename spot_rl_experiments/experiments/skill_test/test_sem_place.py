@@ -19,7 +19,7 @@ if __name__ == "__main__":
         # at NYC
         place_target = "test_desk"
 
-    spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
+    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
 
     is_local = False
     if enable_estimation_before_place:
@@ -29,6 +29,7 @@ if __name__ == "__main__":
     # Start testing
     contnue = True
     while contnue:
+        spotskillmanager.pick("cup")
         rospy.set_param("is_gripper_blocked", 0)
         spotskillmanager.place(place_target, is_local=is_local, visualize=True)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
