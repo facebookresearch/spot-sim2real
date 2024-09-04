@@ -231,8 +231,10 @@ class MobileGazePolicy(RealPolicy):
             checkpoint_path, observation_space, action_space, device, config=config
         )
 
+
 class MobileGazeEEPolicy(RealPolicy):
     def __init__(self, checkpoint_path, device, config: CN = CN()):
+
         observation_space = SpaceDict(
             {
                 "arm_depth_bbox_sensor": spaces.Box(
@@ -252,12 +254,11 @@ class MobileGazeEEPolicy(RealPolicy):
                 ),
             }
         )
-        action_space = spaces.Box(
-            -1.0, 1.0, (9,)
-        )
+        action_space = spaces.Box(-1.0, 1.0, (9,))
         super().__init__(
             checkpoint_path, observation_space, action_space, device, config=config
         )
+
 
 class SemanticGazePolicy(RealPolicy):
     def __init__(self, checkpoint_path, device, config: CN = CN()):
