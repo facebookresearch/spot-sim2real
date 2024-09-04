@@ -1108,12 +1108,8 @@ class Spot:
 
     def set_arm_ee_pos(
         self,
-        x_vel,
-        y_vel,
-        ang_vel,
         arm_ee_action,
         travel_time,
-        disable_obstacle_avoidance=False,
     ):
         print(f"in set_arm_ee_pos: {arm_ee_action} {travel_time}")
         arm_cmd = self.move_gripper_to_point(
