@@ -14,7 +14,7 @@ if __name__ == "__main__":
     enable_estimation_before_place = map_user_input_to_boolean(
         "Use waypoint estimator? Y/N "
     )
-    place_target = "new_pl_pt"
+    place_target = "fre_lab_40in_sep"
     spotskillmanager = SpotSkillManager(
         use_mobile_pick=False, use_semantic_place=True, use_place_ee=True
     )
