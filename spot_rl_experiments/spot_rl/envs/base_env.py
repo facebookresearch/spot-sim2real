@@ -102,22 +102,6 @@ def rescale_actions(actions, action_thresh=0.05, silence_only=False):
     return actions
 
 
-def rescale_arm_ee_actions(actions, action_thresh=0.05, silence_only=False):
-    actions = np.clip(actions, -1, 1)
-    # Silence low actions
-    actions[np.abs(actions) < action_thresh] = 0.0
-    if silence_only:
-        return actions
-
-    # Remap action scaling to compensate for silenced values
-    action_offsets = np.ones_like(actions) * action_thresh
-    action_offsets[actions < 0] = -action_offsets[actions < 0]
-    action_offsets[actions == 0] = 0
-    actions = (actions - np.array(action_offsets)) / (1.0 - action_thresh)
-
-    return actions
-
-
 class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     node_name = "spot_reality_gym"
     no_raw = True
@@ -420,7 +404,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 arm_action = None
 
         if arm_ee_action is not None:
-            arm_ee_action = rescale_arm_ee_actions(arm_ee_action)
+            arm_ee_action = rescale_actions(arm_ee_action)
             if np.count_nonzero(arm_ee_action) > 0:
                 # TODO: semantic place ee: move this to config
                 arm_ee_action[0:3] *= self.arm_ee_dist_scale  # 0.015
@@ -441,8 +425,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 )  # / self.ctrl_hz
                 print("Slow down...")
             if base_action is not None and arm_action is not None:
-                print("input base_action velocity:", arr2str(base_action))
-                print("input arm_action:", arr2str(arm_action))
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,
@@ -450,8 +432,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif base_action is not None and arm_ee_action is not None:
-                print("input base_action velocity:", arr2str(base_action))
-                print("input arm_ee_action:", arr2str(arm_ee_action))
                 if self._max_lin_dist_scale == 0.0:
                     self.spot.set_arm_ee_pos()
                 else:

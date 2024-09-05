@@ -117,7 +117,6 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
-        print("USE MOBILE PICK VARIABLE IS SET TO :", self._use_mobile_pick)
         self.use_semantic_place = use_semantic_place
         self.use_pick_ee = use_pick_ee
         self.use_place_ee = use_place_ee
@@ -212,7 +211,6 @@ class SpotSkillManager:
             config=self.nav_config,
         )
         if self.use_pick_ee:
-            # print("GOING INSIDE GAZE EE ENV")
             self.gaze_controller = MobilePickEE(
                 spot=self.spot,
                 config=self.pick_config,
