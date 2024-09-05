@@ -2,10 +2,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 # mypy: ignore-errors
-<<<<<<< HEAD
 # black: ignore-errors
-=======
->>>>>>> abd65c7 ( Minor bug fixes in place_env)
 import json
 import time
 from datetime import datetime
@@ -24,21 +21,14 @@ if __name__ == "__main__":
 
     if in_fre_lab:
         # at FRE
-<<<<<<< HEAD
         place_target = "160_teddy bear"
-=======
-        place_target = "new_place_waypoint"
->>>>>>> abd65c7 ( Minor bug fixes in place_env)
     else:
         # at NYC
         place_target = "test_desk"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
-<<<<<<< HEAD
-=======
     spot_pos1 = spotskillmanager.spot.get_arm_joint_positions(as_array=True)
 
-<<<<<<< HEAD
     # is_local = False
     # if enable_estimation_before_place:
     #     place_target = None
@@ -50,50 +40,20 @@ if __name__ == "__main__":
     #     rospy.set_param("is_gripper_blocked", 0)
     #     spotskillmanager.place(place_target, is_local=is_local, visualize=True)
     #     contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
->>>>>>> 41ba97e (Minor chagnges for new policy weights)
-=======
->>>>>>> abd65c7 ( Minor bug fixes in place_env)
     is_local = False
     # Start testing
     contnue = True
-<<<<<<< HEAD
-    episode_ctr = 0
-    # Get EE Pose Initial in rest position
-    spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
-    # Set Orientation as Zero
-    spot_ort = np.zeros(3)
-    while contnue:
-        # Open Gripper
-        spotskillmanager.spot.open_gripper()
-        input("Place an object in Spot's gripper and press Enter to continue...")
-        # Place Object and Close Gripper
-        rospy.set_param("is_gripper_blocked", 0)
-        episode_log = {"actions": []}  # mypy: ignore-errors
-        spotskillmanager.spot.close_gripper()
-        input("waiting for user to get ready with camera")
-        spotskillmanager.place(
-            place_target,
-            is_local=enable_estimation_before_place,
-            visualize=False,
-            enable_waypoint_estimation=enable_estimation_before_place,
-        )
-        skill_log = spotskillmanager.place_controller.skill_result_log
-        if "num_steps" not in skill_log:
-
-            skill_log["num_steps"] = 0
-        episode_log["actions"].append({"place": skill_log})
-=======
     INITIAL_ARM_JOINT_ANGLES = [0, -180, 180, 90, 0, -90]
     episode_ctr = 0
-    # Get EE Pose Initial
+    #Get EE Pose Initial
     spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
-    # Set Orientation as Zero
+    #Set Orientation as Zero
     spot_ort = np.zeros(3)
     while contnue:
-        # Open Gripper
+        #Open Gripper
         spotskillmanager.spot.open_gripper()
         input("Place an object in Spot's gripper and press Enter to continue...")
-        # Place Object and Close Gripper
+        #Place Object and Close Gripper
         rospy.set_param("is_gripper_blocked", 0)
         episode_log = {"actions": []}
         spotskillmanager.spot.close_gripper()
@@ -103,12 +63,7 @@ if __name__ == "__main__":
         skill_log = spotskillmanager.place_controller.skill_result_log
         if "num_steps" not in skill_log:
             skill_log["num_steps"] = 0
-<<<<<<< HEAD
         episode_log["actions"].append({f"place": skill_log})
->>>>>>> 41ba97e (Minor chagnges for new policy weights)
-=======
-        episode_log["actions"].append({"place": skill_log})
->>>>>>> abd65c7 ( Minor bug fixes in place_env)
         curr_date = datetime.today().strftime("%m-%d-%y")
         file_path = (
             f"logs/semantic_place/{curr_date}/episode_sem_pl_run2_{episode_ctr}.json"
@@ -118,15 +73,7 @@ if __name__ == "__main__":
             print(f"Saved log: {file_path}")
         episode_ctr += 1
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
-<<<<<<< HEAD
-<<<<<<< HEAD
-        # Return the arm to the original position
-        spotskillmanager.spot.move_gripper_to_point(spot_pos, spot_ort)
-=======
         #Return the arm to the original position
-=======
-        # Return the arm to the original position
->>>>>>> abd65c7 ( Minor bug fixes in place_env)
         spot_pos = spotskillmanager.spot.get_ee_pos_in_body_frame()[0]
         spotskillmanager.spot.move_gripper_to_point(spot_pos, spot_ort)
 # The following is a helpful tip to debug the arm
@@ -145,4 +92,3 @@ if __name__ == "__main__":
 # ee_orientation_at_grasping = spotskillmanager.gaze_controller.env.ee_orientation_at_grasping
 # spotskillmanager.nav("test_desk")
 # spotskillmanager.place("test_desk", orientation_at_grasping) # This controls the arm initial orientation
->>>>>>> 41ba97e (Minor chagnges for new policy weights)
