@@ -215,9 +215,14 @@ class Spot:
             self.intelrealsense_image_client = robot.ensure_client(
                 "intel-realsense-image-service"
             )
+            self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
+            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
+
         except Exception:
             print("There is no intel-realsense-image_service. Using gripper cameras")
             self.intelrealsense_image_client = None
+            self.gripper_T_intel = None
+            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
 
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
@@ -228,10 +233,6 @@ class Spot:
         self.ik_client = robot.ensure_client(
             InverseKinematicsClient.default_service_name
         )
-
-        # TODO: Add safety net
-        self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
-        print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
 
         # Used to re-center origin of global frame
         if osp.isfile(HOME_TXT):
@@ -404,6 +405,10 @@ class Spot:
             )
         cmd_id = self.command_client.robot_command(command)
         success_status = self.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+
+        # Set the robot base velocity to reset the base motion after calling body movement.
+        # Without this, calling the move gripper function casues the base to move.
+        self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return success_status
 
     def move_gripper_to_point(
@@ -602,6 +607,7 @@ class Spot:
         gripper_pose_quats: List[List[float]],
         seconds: int = 5,
         allow_body_follow: bool = True,
+        body_offset_from_hand: List[float] = [0.55, 0, 0.25],
     ) -> bool:
         """Move the arm to the given point in the body frame and the given gripper poses, and allow
         the body to follow the arm."""
@@ -616,7 +622,11 @@ class Spot:
             # Tell the robot's body to follow the arm
             mobility_command = mobility_command_pb2.MobilityCommand.Request(
                 follow_arm_request=basic_command_pb2.FollowArmCommand.Request(
-                    body_offset_from_hand=Vec3(x=0.5, y=0, z=0)
+                    body_offset_from_hand=Vec3(
+                        x=body_offset_from_hand[0],
+                        y=body_offset_from_hand[1],
+                        z=body_offset_from_hand[2],
+                    )
                 )
             )
             synchronized_command = synchronized_command_pb2.SynchronizedCommand.Request(
@@ -635,8 +645,12 @@ class Spot:
         # Send the request
         move_command_id = self.command_client.robot_command(command)
         self.robot.logger.info("Moving arm to position.")
+        msg = self.block_until_arm_arrives(move_command_id, seconds + 1)
 
-        return self.block_until_arm_arrives(move_command_id, seconds + 1)
+        # Set the robot base velocity to reset the base motion after calling body movement.
+        # Without this, calling the move gripper function casues the base to move.
+        self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
+        return msg
 
     def grasp_point_in_image_with_IK(
         self,
@@ -1260,19 +1274,21 @@ class Spot:
         )
         return img_resp
 
-    def get_hand_image(self, is_rgb=True):
+    def get_hand_image(self, is_rgb=True, force_get_gripper=False):
         """
         Gets hand raw rgb & depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot & camera intrinsics along with pixel data
         If is_gripper_blocked is True then returns intel realsense images
         If hand_image_sources are passed then above condition is ignored & will send image & depth for each source
-        Thus if you send hand_image_sources=["gripper", "intelrealsense"] then 4 image resps should be returned
+        Thus if you send hand_image_sources=["gripper", "intelrealsense"] then 4 image resps should be returned.
+        In addition, the flag force_get_gripper allows you to get gripper images even if is_gripper_blocked is True.
+        This is useful when you want to get gripper camera transformation when the gripper is blocked.
         """
         realsense_img_srcs: List[str] = [
             SpotCamIds.INTEL_REALSENSE_COLOR,
             SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
 
-        if self.is_gripper_blocked:  # return intelrealsense
+        if self.is_gripper_blocked and not force_get_gripper:
             return self.select_hand_image(img_src=realsense_img_srcs)
         else:
             return self.select_hand_image(is_rgb=is_rgb)

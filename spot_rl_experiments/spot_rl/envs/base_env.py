@@ -173,6 +173,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self._max_lin_dist_scale = self.config[max_lin_dist_key]
         self._max_ang_dist_scale = self.config[max_ang_dist_key]
 
+        # Tracking paramters reset
+        rospy.set_param("enable_tracking", False)
+
         # Text-to-speech
         self.tts_pub = rospy.Publisher(rt.TEXT_TO_SPEECH, String, queue_size=1)
 
@@ -265,6 +268,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.prev_base_moved = False
         self.should_end = False
         rospy.set_param("is_whiten_black", True)
+        rospy.set_param("enable_tracking", False)
         observations = self.get_observations()
         return observations
 
@@ -623,8 +627,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Is the agent at the goal?
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
         at_goal = dist_to_goal < success_distance
-        good_heading = abs(observations["goal_heading"][0]) < success_angle
-        return at_goal and good_heading
+        goal_heading = abs(observations["goal_heading"][0])
+        good_heading_suc = goal_heading < success_angle
+        print(
+            f"nav dis.: {success_distance} {dist_to_goal}; nav delta heading: {success_angle} {goal_heading}"
+        )
+        return at_goal and good_heading_suc
 
     def print_nav_stats(self, observations):
         rho, theta = observations["target_point_goal_gps_and_compass_sensor"]
@@ -712,6 +720,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     break
             if self.detection_timestamp is None:
                 raise RuntimeError("Could not correctly synchronize gaze observations")
+
             self.detections_str_synced, filtered_hand_depth = (
                 self.detections_buffer["detections"][self.detection_timestamp],
                 self.detections_buffer["filtered_depth"][self.detection_timestamp],
