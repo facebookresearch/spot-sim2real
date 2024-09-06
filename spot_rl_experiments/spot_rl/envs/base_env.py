@@ -462,11 +462,8 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         print(f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}")
 
-        # Spin until enough time has passed during this step
-        # TODO: semantic place ee: temp hack to command this out
-        # for not using base velocity
         start_time = time.time()
-        if arm_ee_action is not None:
+        if arm_ee_action is not None and self._max_lin_dist_scale == 0.0:
             print("do not move the base")
         elif base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
