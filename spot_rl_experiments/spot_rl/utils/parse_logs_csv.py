@@ -95,21 +95,31 @@ def main():
     )
     args = parser.parse_args()
 
-    if not os.path.exists(args.input_folder):
-        print(f"Error: Input folder '{args.input_folder}' does not exist.")
-        return
-
-    if not os.path.exists(args.output_folder):
-        os.makedirs(args.output_folder)
-
-    for filename in os.listdir(args.input_folder):
+    if os.path.isfile(args.input_folder):
+        filename = args.input_folder
+        filename = os.path.basename(filename)
         if filename.endswith(".json"):
-            input_file = os.path.join(args.input_folder, filename)
             output_file = os.path.join(
                 args.output_folder, f"{os.path.splitext(filename)[0]}.csv"
             )
-            process_json_file(input_file, output_file)
-            print(f"Processed {filename} into {output_file}")
+            process_json_file(args.input_folder, output_file)
+
+    elif os.path.isdir(args.input_folder):
+        if not os.path.exists(args.input_folder):
+            print(f"Error: Input folder '{args.input_folder}' does not exist.")
+            return
+
+        if not os.path.exists(args.output_folder):
+            os.makedirs(args.output_folder)
+
+        for filename in os.listdir(args.input_folder):
+            if filename.endswith(".json"):
+                input_file = os.path.join(args.input_folder, filename)
+                output_file = os.path.join(
+                    args.output_folder, f"{os.path.splitext(filename)[0]}.csv"
+                )
+                process_json_file(input_file, output_file)
+                print(f"Processed {filename} into {output_file}")
 
 
 if __name__ == "__main__":
