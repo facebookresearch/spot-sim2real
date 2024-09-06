@@ -241,27 +241,6 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
 
     def get_observations(self):
-        assert self.initial_ee_pose is not None
-        assert self.target_object_pose is not None
-
-        # Get the delta ee orientation
-        current_gripper_orientation = self.spot.get_ee_quaternion_in_body_frame()
-        delta_ee = angle_between_quat(self.initial_ee_pose, current_gripper_orientation)
-        delta_ee = np.array([delta_ee], dtype=np.float32)
-
-        # Get the delta object orientation
-        delta_obj = angle_between_quat(
-            self.target_object_pose, current_gripper_orientation
-        )
-        # remove the offset from the base to object
-        delta_obj = np.array(
-            [delta_obj - abs(self.spot.get_cur_ee_pose_offset())], dtype=np.float32
-        )
-        # Get the jaw image
-        arm_depth, _ = self.get_gripper_images()
-
-        # Get ee's pose -- x,y,z
-        xyz, rpy = self.spot.get_ee_pos_in_body_frame()
         observations = super().get_observations()
         if "joint" in observations:
             del observations["joint"]
