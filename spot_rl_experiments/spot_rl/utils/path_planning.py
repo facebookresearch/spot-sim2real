@@ -95,7 +95,7 @@ def angle_between_vectors(v1, v2):
 
 
 def get_occupancy_grid():
-    if False:  # osp.exists(CACHE_PATH):
+    if osp.exists(CACHE_PATH):
         with open(CACHE_PATH, "rb") as file:
             return pkl.load(file)
     elif osp.exists(PCD_PATH):
@@ -195,6 +195,8 @@ def convert_path_to_real_waypoints(path, min_x, min_y):
 def path_planning_using_a_star(
     xy_position_robot_in_cg,
     goal_xy,
+    save_fig_name=None,
+    visualize=False,
     other_view_poses=None,
     occupancy_grid=None,
     occupancy_max_x=None,
@@ -303,9 +305,11 @@ def path_planning_using_a_star(
                 -1,
             )
 
-    plt.imshow(occupancy_grid_visualization, cmap="gray")
-    plt.title("Path Planning")
-    plt.show()
+    if visualize:
+        plt.imshow(occupancy_grid_visualization, cmap="gray")
+        plt.title("Path Planning")
+        plt.savefig(save_fig_name)
+        plt.show()
 
     if bestpath is not None:
         return convert_path_to_real_waypoints(

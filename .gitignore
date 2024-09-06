@@ -30,3 +30,4 @@ ros_tcp/ros_communication_client.egg-info/**
 *.json
 *.pkl
 *.gz
+*.pt

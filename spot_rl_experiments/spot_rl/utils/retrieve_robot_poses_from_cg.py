@@ -2,18 +2,23 @@ import gzip
 import os
 import os.path as osp
 import pickle
+import shutil
 from typing import List
 
 import cv2
 import numpy as np
+import zmq
 from scipy.spatial.transform import Rotation as R
+from spot_rl.utils.path_planning import get_xyzxyz, plt
 
 # new changes: Select view poses based on distance
 # query_class_names = ["furniture", "counter", "locker", "vanity", "wine glass"]  # keep all the class names as same as possible
-PATH_TO_CACHE_FILE = "scene_map_cfslam_pruned.pkl.gz"
-PATH_TO_RAW_DATA_PKL = "data.pkl"
-VISUALIZE = False
-VISUALIZATION_DIR = "image_vis"
+PATH_TO_CACHE_FILE = osp.join(
+    osp.dirname(osp.abspath(__file__)), "scene_map_cfslam_pruned.pkl.gz"
+)
+PATH_TO_RAW_DATA_PKL = osp.join(osp.dirname(osp.abspath(__file__)), "data.pkl")
+VISUALIZE = True
+VISUALIZATION_DIR = "image_vis_for_mined_rgb_from_cg"
 ANCHOR_OBJECT_CENTER = np.array([8.2, 6.0, 0.1])
 
 
@@ -110,115 +115,176 @@ def draw_bbox_with_confidence(image, bbox, confidence):
     return image
 
 
-def get_view_poses(anchor_object_center, query_class_names=[]):
+def get_max_diag(bbox_np):
+    p0 = bbox_np[0]
+    max_diag = -np.inf
+    correct_index_pair = -1
+    for i, bbox_coord in enumerate(bbox_np[1:]):
+        diag = np.linalg.norm(bbox_coord - p0)
+        if diag > max_diag:
+            max_diag = diag
+            correct_index_pair = i + 1
+    return max_diag, correct_index_pair
+
+
+def get_pixel_area(x1, y1, x2, y2):
+    w = x2 - x1 + 1
+    h = y2 - y1 + 1
+    return int(w * h)
+
+
+socket = None
+
+
+def connect_socket(port):
+    global socket
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.connect(f"tcp://localhost:{port}")
+    print(f"Socket Connected at {port}")
+
+
+def detect_with_yolo(rgb_image, object_classes, visualize=False, port=21001):
+    global socket
+    if socket is None:
+        connect_socket(port)
+    socket.send_pyobj((rgb_image, object_classes, visualize))
+    bboxes, probs, visualization_img = socket.recv_pyobj()
+    if visualize:
+        # Show visualization img
+        plt.imshow(visualization_img[:, :, ::-1])
+        plt.title("Yolo world Detection")
+        plt.show()
+    if len(bboxes) > 0:
+        argmax = int(np.argmax(probs))
+        pixel_area = get_pixel_area(*bboxes[argmax])
+        return bboxes[argmax], probs[argmax], pixel_area
+    return None, None, None
+
+
+def get_view_poses(
+    anchor_object_center,
+    anchor_object_extent,
+    object_tags,
+    query_class_names=[],
+    visulize=False,
+    visualize_dir=VISUALIZATION_DIR,
+):
     data_list = []
     previously_seen_data = {}
     raw_data = None
-
     with open(PATH_TO_RAW_DATA_PKL, "rb") as f:
         raw_data = pickle.load(f)
 
+    if visulize:
+        try:
+            shutil.rmtree(visualize_dir)
+        except Exception:
+            pass
+        os.makedirs(visualize_dir, exist_ok=True)
+
     with gzip.open(PATH_TO_CACHE_FILE, "rb") as f:
         cache_file = pickle.load(f)
+        anchorboxMin, anchorboxMax = get_xyzxyz(
+            anchor_object_center, anchor_object_extent
+        )
+        dist_thresh = (
+            2.0  # np.linalg.norm(anchorboxMax[:2] - anchorboxMin[:2]) / 2 + 0.5
+        )
+        print(f"Using Dist thresh {dist_thresh}")
         for i, object_item in enumerate(cache_file):
             class_names = object_item["class_name"]
 
             # intersection_with_search_query = list(
             #     set(query_class_names) & set(class_names)
             # )
+            min_dist = np.inf
+            # for class_i, class_name in enumerate(class_names):
+            # breakpoint()
+            bbox_np = object_item["bbox_np"]
+            max_diag, correct_pair_index = get_max_diag(bbox_np)
+            center = (bbox_np[0] + bbox_np[correct_pair_index]) / 2.0
+            dist_to_anchor_center = np.linalg.norm(center - anchor_object_center)
+
+            # bbox_center_from_caption_field = object_item["caption_dict"]["bbox_center"]
+            min_dist = min(min_dist, dist_to_anchor_center)
             if (
-                True
-            ):  # len(intersection_with_search_query) > 0:  # and len(set(class_names)) == 1:
-                # breakpoint()
-                for class_i, class_name in enumerate(class_names):
-                    bbox_np = object_item["bbox_np"]
-                    boxMin = np.array(
-                        [bbox_np[:, 0].min(), bbox_np[:, 1].min(), bbox_np[:, -1].min()]
-                    )
-                    boxMax = np.array(
-                        [bbox_np[:, 0].max(), bbox_np[:, 1].max(), bbox_np[:, -1].max()]
-                    )
-                    center = (boxMin + boxMax) / 2.0
-                    dist_to_anchor_center = np.linalg.norm(
-                        center - anchor_object_center
+                dist_to_anchor_center < dist_thresh
+            ):  # and object_item["caption_dict"]["response"]["object_tag"] == object_tags[0]:
+                print(f"Detected classes around given receptacle {set(class_names)}")
+                # if class_name in query_class_names
+                for class_i in range(len(object_item["color_path"])):
+                    rgb_path = object_item["color_path"][class_i]
+                    conf = object_item["conf"][class_i]
+                    index_in_raw_data = get_index_in_raw_data(rgb_path)
+                    add_data_flag = True
+                    bbox = object_item["xyxy"][class_i]
+                    pixel_area = object_item["pixel_area"][class_i]
+
+                    # yoloworld detection
+                    raw_image = raw_image_in_data = raw_data[index_in_raw_data][
+                        "camera_data"
+                    ][0]["raw_image"]
+                    bbox, conf, pixel_area = detect_with_yolo(
+                        raw_image, object_tags, visualize=False
                     )
 
-                    class_condition = (
-                        True
-                        if len(query_class_names) == 0
-                        else class_name in query_class_names
-                    )
-                    if dist_to_anchor_center < 0.3 and class_condition:
-                        print(set(class_names))
-                        # if class_name in query_class_names
-                        rgb_path = object_item["color_path"][class_i]
-                        conf = object_item["conf"][class_i]
-                        index_in_raw_data = get_index_in_raw_data(rgb_path)
-                        add_data_flag = True
+                    if bbox is None:
+                        continue
 
-                        if index_in_raw_data not in previously_seen_data:
+                    if index_in_raw_data not in previously_seen_data:
+                        previously_seen_data[index_in_raw_data] = {
+                            "max_conf": conf,
+                            "seen_at": len(data_list),
+                        }
+                    else:
+                        prev_conf = previously_seen_data[index_in_raw_data]["max_conf"]
+                        if conf > prev_conf:
                             previously_seen_data[index_in_raw_data] = {
                                 "max_conf": conf,
                                 "seen_at": len(data_list),
                             }
                         else:
-                            prev_conf = previously_seen_data[index_in_raw_data][
-                                "max_conf"
-                            ]
-                            if conf > prev_conf:
-                                previously_seen_data[index_in_raw_data] = {
-                                    "max_conf": conf,
-                                    "seen_at": len(data_list),
-                                }
-                            else:
-                                add_data_flag = False
+                            add_data_flag = False
 
-                        # print(f"Raw path {osp.basename(rgb_path)}, index in raw {index_in_raw_data}")
-                        if add_data_flag:
-                            # base_T_camera_from_raw = raw_data[index_in_raw_data]["camera_data"][0]["base_T_camera"]
-
-                            # vision_T_base = raw_data[index_in_raw_data]["vision_T_base"]
-
-                            # vision_T_camera = R.from_matrix((vision_T_base@base_T_camera_from_raw)[:3, :3])
-                            # yaw_gripper = vision_T_camera.as_euler("ZYX", True)[-1]
-                            # print(type(raw_data[index_in_raw_data]["base_pose_xyt"]))
-                            data = {
-                                "conf": conf,
-                                "bbox": object_item["xyxy"][class_i],
-                                "pixel_area": object_item["pixel_area"][class_i],
-                                "rgb_path": rgb_path,
-                                "index_in_raw_data": index_in_raw_data,
-                                "robot_xy_yaw": raw_data[index_in_raw_data][
-                                    "base_pose_xyt"
-                                ],
-                            }
-                            # print(f'Yaw Gripper {yaw_gripper}, Yaw BAse {np.rad2deg(raw_data[index_in_raw_data]["base_pose_xyt"][-1])}')
-                            if VISUALIZE:
-                                os.makedirs(VISUALIZATION_DIR, exist_ok=True)
-                                raw_image_in_data = raw_data[index_in_raw_data][
-                                    "camera_data"
-                                ][0]["raw_image"]
-                                image_vis = draw_bbox_with_confidence(
-                                    raw_image_in_data, data["bbox"], data["conf"]
-                                )
-                                cv2.imwrite(
-                                    osp.join(
-                                        VISUALIZATION_DIR,
-                                        f"comparison_{len(data_list)}.png",
-                                    ),
-                                    image_vis,
-                                )
-                            data_list.append(data)
+                    # print(f"Raw path {osp.basename(rgb_path)}, index in raw {index_in_raw_data}")
+                    if add_data_flag:
+                        data = {
+                            "conf": conf,
+                            "bbox": bbox,
+                            "pixel_area": pixel_area,
+                            "rgb_path": rgb_path,
+                            "index_in_raw_data": index_in_raw_data,
+                            "robot_xy_yaw": raw_data[index_in_raw_data][
+                                "base_pose_xyt"
+                            ],
+                        }
+                        # print(f'Yaw Gripper {yaw_gripper}, Yaw BAse {np.rad2deg(raw_data[index_in_raw_data]["base_pose_xyt"][-1])}')
+                        if visulize:
+                            raw_image_in_data = raw_data[index_in_raw_data][
+                                "camera_data"
+                            ][0]["raw_image"]
+                            image_vis = draw_bbox_with_confidence(
+                                raw_image_in_data, data["bbox"], data["conf"]
+                            )
+                            cv2.imwrite(
+                                osp.join(
+                                    VISUALIZATION_DIR,
+                                    f"comparison_{len(data_list)}.png",
+                                ),
+                                image_vis,
+                            )
+                        data_list.append(data)
 
     if len(data_list) > 0:
-        print(f"Found {len(data_list)} instances for given bbox centers")
-        with open("robot_view_poses_for_bedroom_dresser.pkl", "wb") as file:
-            pickle.dump(data_list, file)
+        print(f"Found {len(data_list)} instances for given bbox centers & object tag")
+        # with open("robot_view_poses_for_bedroom_dresser.pkl", "wb") as file:
+        #     pickle.dump(data_list, file)
     else:
-        print("No such class was found")
+        print(f"No such class was found, min distance to anchor object is {min_dist}")
 
     return data_list
 
 
 if __name__ == "__main__":
-    get_view_poses(ANCHOR_OBJECT_CENTER, [])
+    get_view_poses(ANCHOR_OBJECT_CENTER, [], [], [])

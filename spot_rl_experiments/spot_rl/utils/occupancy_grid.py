@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 
-path_to_PCD = "point_cloud_fre.pkl"
-
 
 def map_x_from_cg_to_grid(x_in_cg, min_x, max_x):
     # return (x_in_cg - min_x)* (max_x - min_x + 1)/(max_x - min_x)
@@ -73,6 +71,7 @@ def buil_occupancy_grid(path_to_PCD, scale=10.0):
 
 
 if __name__ == "__main__":
+    path_to_PCD = "point_cloud_fre.pkl"
     occupancy_grid, scale = buil_occupancy_grid(path_to_PCD, 10.0)
     plt.imshow(occupancy_grid, cmap="gray")
     plt.title("Top-Down View")

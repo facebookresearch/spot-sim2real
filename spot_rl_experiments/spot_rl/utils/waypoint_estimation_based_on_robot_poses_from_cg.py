@@ -99,11 +99,11 @@ def intersect_ray_with_aabb(ray_origin, ray_direction, box_min, box_max):
     return True, intersection_point_1, intersection_point_2, t_min, t_max
 
 
-def determin_nearest_edge(robot_xy, bbox_centers, boxMin, boxMax):
+def determin_nearest_edge(robot_xy, bbox_centers, boxMin, boxMax, static_offset=0.0):
     if len(bbox_centers) == 3:
         bbox_centers = bbox_centers[:2]
     raydir = (bbox_centers - robot_xy) / np.linalg.norm(bbox_centers - robot_xy)
-    STATIC_OFFSET = 0.7
+    STATIC_OFFSET = static_offset
     (x1, y1), (x2, y2) = boxMin[:2], boxMax[:2]
     face_1 = np.array([midpoint(x1, x2), y1 - 0.0])
     face_1_vector = bbox_centers - face_1  # x1,y1, x2,y1
@@ -180,13 +180,13 @@ def get_waypoint_from_robot_view_poses(
     robot_view_poses, bbox_centers: np.ndarray, bbox_extents: np.ndarray
 ):
     sorted_robot_view_poses = sort_robot_view_poses_from_cg(
-        robot_view_poses, bbox_centers, 0.6, 0.1, 0.3
+        robot_view_poses, bbox_centers, 0.33, 0.33, 0.33
     )
     best_robot_view_pos = sorted_robot_view_poses[0]
     print(f"Best robot view pose {best_robot_view_pos}")
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
     nearestedge, facevector, yaw_calc = determin_nearest_edge(
-        best_robot_view_pos[0][:2], bbox_centers, boxMin, boxMax
+        best_robot_view_pos[0][:2], bbox_centers, boxMin, boxMax, 0.5
     )
     waypoint = nearestedge.tolist()
     waypoint.append(yaw_calc)
@@ -198,10 +198,12 @@ def get_navigation_points(
     bbox_centers=np.array([8.2, 6.0, 0.1]),
     bbox_extents=np.array([1.3, 1.0, 0.8]),
     cur_robot_xy=[0, 0],
+    visualize=False,
+    savefigname=None,
 ):
 
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
-    print("boxMin", boxMin, "boxMax", boxMax)
+    # print("boxMin", boxMin, "boxMax", boxMax)
 
     if robot_view_pose_data is None:
         robot_view_pose_data = pkl.load(
@@ -218,26 +220,21 @@ def get_navigation_points(
             ]
         )
 
-    # waypoint_dock = [(2.8363019401919116, 0.18846130298868974, -39.047862044229156), 0.94, 50*50]
-    # waypoint_stairs = [( 6.7563028035139485, -1.1514989785168246, -131.4607976353374), 0.89, 100*100]
-    # waypoint_kitchen = [( 4.714151978378424, -3.413209498770333, 102.83945805400889), 0.93, 100*150]
-    # Target is sink
-    # near dock, 0.94, detection (50, 50)
-    # kitchen counter 0.93, detection (100, 150)
-    # from stairs 0.86, detection (100, 100)
     waypoint, best_robot_view_pos = get_waypoint_from_robot_view_poses(
         robot_view_poses, bbox_centers, bbox_extents
     )
     path = path_planning_using_a_star(
         cur_robot_xy,  # best_robot_view_pos[0][:2]
         waypoint[:2],
+        savefigname,
+        visualize=visualize,
         other_view_poses=[view_pose[0][:2] for view_pose in robot_view_poses],  # type: ignore
     )
     waypoint[-1] = np.deg2rad(waypoint[-1])
     path.append(waypoint)
     print(f"Final path x y yaw: {path}")
-    with open("path.pkl", "wb") as file:
-        pkl.dump(path, file)
+    # with open("path.pkl", "wb") as file:
+    #     pkl.dump(path, file)
 
     return path
 
