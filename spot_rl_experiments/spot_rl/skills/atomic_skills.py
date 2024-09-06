@@ -733,7 +733,6 @@ class MobilePickEE(Pick):
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""
-        print(f"action: {action}")
         action_dict = {
             "arm_ee_action": action[:6],
             "base_action": action[7:9],
@@ -1057,10 +1056,6 @@ class SemanticPlaceEE(SemanticPlace):
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""
-        # action size is 10
-        # TODO: semantic place ee: check the order
-        # TODO: semantic place ee: check roll pitch yaw
-        print(f"action: {action}")
         action_dict = {
             "arm_ee_action": action[:6],
             "base_action": action[7:9],

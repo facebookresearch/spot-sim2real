@@ -68,17 +68,13 @@ class SpotPlaceEnv(SpotBaseEnv):
 class SpotSemanticPlaceEnv(SpotBaseEnv):
     """This is Spot semantic place class"""
 
-    def __init__(self, config, spot: Spot, use_semantic_place: bool = False):
+    def __init__(self, config, spot: Spot):
         # We set the initial arm joints
         config.INITIAL_ARM_JOINT_ANGLES = copy.deepcopy(
             config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
         )
-        max_lin_dist_sem_place = (
-            "MAX_LIN_DIST_SEMANTIC_PLACE" if use_semantic_place else "MAX_LIN_DIST"
-        )
-        max_ang_dist_sem_place = (
-            "MAX_ANG_DIST_SEMANTIC_PLACE" if use_semantic_place else "MAX_ANG_DIST"
-        )
+        max_lin_dist_sem_place = "MAX_LIN_DIST_SEMANTIC_PLACE"
+        max_ang_dist_sem_place = "MAX_ANG_DIST_SEMANTIC_PLACE"
         super().__init__(
             config,
             spot,
@@ -237,28 +233,16 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
     """This is Spot semantic place class"""
 
     def __init__(self, config, spot: Spot, use_semantic_place: bool = False):
-        # We set the initial arm joints
-        config.INITIAL_ARM_JOINT_ANGLES = copy.deepcopy(
-            config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
-        )
+
         super().__init__(config, spot)
 
         # Define End Effector Policy Scale Values
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
 
-        # Place steps
-        self._time_step = 0
-
-    def get_success(self, observations):
-        return self.place_attempted
-
     def get_observations(self):
         assert self.initial_ee_pose is not None
         assert self.target_object_pose is not None
-
-        # Get the gaol sensor
-        obj_goal_sensor = self.get_place_sensor(True)
 
         # Get the delta ee orientation
         current_gripper_orientation = self.spot.get_ee_quaternion_in_body_frame()
@@ -278,13 +262,9 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
 
         # Get ee's pose -- x,y,z
         xyz, rpy = self.spot.get_ee_pos_in_body_frame()
-        observations = {
-            "obj_goal_sensor": obj_goal_sensor,
-            "relative_initial_ee_orientation": delta_ee,
-            "relative_target_object_orientation": delta_obj,
-            "articulated_agent_jaw_depth": arm_depth,
-            "ee_pose": np.concatenate([xyz, rpy]),
-            # "ee_pos":xyz,
-            "is_holding": np.ones((1,)),
-        }
+        observations = super().get_observations()
+        if "joint" in observations:
+            del observations["joint"]
+        xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+        observations["ee_pose"] = np.concatenate([xyz, rpy])
         return observations

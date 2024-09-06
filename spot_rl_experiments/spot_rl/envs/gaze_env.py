@@ -38,7 +38,7 @@ class SpotGazeEnv(SpotBaseEnv):
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
         )
-        self.grasp_dist_threshold = 1.5
+        self.grasp_dist_threshold = self.config.GRASP_DISTANCE_THRESHOLD
         self.target_obj_name = None
         self._use_mobile_pick = use_mobile_pick
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
@@ -116,7 +116,7 @@ class SpotGazeEEEnv(SpotGazeEnv):
         )
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_MOBILE_GAZE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_MOBILE_GAZE
-        self.grasp_dist_threshold = 0.7
+        self.grasp_dist_threshold = self.config.GRASP_DISTANCE_THRESHOLD_EE
 
     def get_observations(self):
         observations = super().get_observations()
