@@ -166,7 +166,6 @@ def get_view_poses(
     anchor_object_center,
     anchor_object_extent,
     object_tags,
-    query_class_names=[],
     visulize=False,
     visualize_dir=VISUALIZATION_DIR,
 ):

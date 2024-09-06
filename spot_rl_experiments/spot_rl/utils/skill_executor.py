@@ -80,13 +80,16 @@ class SpotRosSkillExecutor:
             bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
             query_class_names = bbox_info[6:]
             # Get the view poses
-            view_poses = get_view_poses(bbox_center, query_class_names)
+            view_poses = get_view_poses(
+                bbox_center, bbox_extent, query_class_names, True
+            )
             # Get the robot x, y, yaw
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points
             nav_pts = get_navigation_points(
-                view_poses, bbox_center, bbox_extent, [x, y]
+                view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
             )
+
             # Sequentially give the point
             if len(nav_pts) > 0:
                 final_pt_i = len(nav_pts) - 1
