@@ -97,6 +97,10 @@ class SpotRosSkillExecutor:
         elif skill_name == "dock":
             self.spotskillmanager.dock()
             self.reset_skill_name_input(skill_name, True, "Exit")
+            # Reinit
+            self.spotskillmanager = SpotSkillManager(
+                use_mobile_pick=True, use_semantic_place=True
+            )
 
 
 def main():
