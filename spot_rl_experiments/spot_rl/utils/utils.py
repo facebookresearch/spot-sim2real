@@ -167,30 +167,45 @@ def calculate_height(object_tag):
 
     with open(json_file_path) as f:
         world_graph = json.load(f)
-    print("THE OBJECT I GOT IS", object_tag)
+    # Get Object id from string object_tag
+    try:
+        object_id_str, object_tag = object_tag.split("_", 1)
+        object_id = int(object_id_str)  # Convert ID to integer
+    except ValueError:
+        print(f"Invalid object_tag format: '{object_tag}'")
+        # Return default height if the format is invalid
+        default_config = construct_config_for_semantic_place()
+        default_height = default_config.HEIGHT_THRESHOLD
+        return default_height
+
     # getting default height as threshold height in config
     default_config = construct_config_for_semantic_place()
     default_height = default_config.HEIGHT_THRESHOLD
-
     for rel in world_graph:
         # Iterate through all keys in the dictionary
         for key, value in rel.items():
-            if isinstance(value, dict) and value.get("object_tag") == object_tag:
-                object_node = value
-                # Extract the height
-                if "bbox_center" in object_node and "bbox_extent" in object_node:
-                    bbox_center = object_node["bbox_center"]
-                    bbox_extent = object_node["bbox_extent"]
-                    # Calculate the height
-                    height = bbox_center[2] + bbox_extent[2]
-                    return height
-                else:
-                    print(
-                        f"Object with tag '{object_tag}' missing bbox property!!! Returning Default Height"
-                    )
-                    return default_height
+            if isinstance(value, dict):
+                if (
+                    value.get("id") == object_id
+                    and value.get("object_tag") == object_tag
+                ):
+                    object_node = value
+                    # Extract the height
+                    if "bbox_center" in object_node and "bbox_extent" in object_node:
+                        bbox_center = object_node["bbox_center"]
+                        bbox_extent = object_node["bbox_extent"]
+                        # Calculate the height
+                        height = bbox_center[2] + bbox_extent[2]
+                        return height
+                    else:
+                        print(
+                            f"Object with ID '{object_id}' and tag '{object_tag}' missing bbox properties! Returning Default Height"
+                        )
+                        return default_height
     # If the object tag is empty, we return the threhold height
-    print(f"Object with tag '{object_tag}' not found in world_graph")
+    print(
+        f"Object with ID '{object_id}' and tag '{object_tag}' not found in world_graph"
+    )
     return default_height
 
 

@@ -511,7 +511,6 @@ class SpotSkillManager:
             message = "No place target specified, estimating point through heuristic"
             height = calculate_height(place_target)
             if height < self.place_config.HEIGHT_THRESHOLD:
-                print("HERE")
                 self.arm_joint_angles = (
                     self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
                 )

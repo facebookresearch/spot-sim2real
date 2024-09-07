@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if in_fre_lab:
         # at FRE
-        place_target = "office chair"
+        place_target = "160_teddy bear"
     else:
         # at NYC
         place_target = "test_desk"
@@ -50,7 +50,7 @@ if __name__ == "__main__":
             spotskillmanager.place(
                 place_target,
                 is_local=is_local,
-                visualize=True,
+                visualize=False,
                 enable_waypoint_estimation=True,
             )
         else:
