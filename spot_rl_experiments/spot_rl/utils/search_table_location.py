@@ -305,6 +305,7 @@ def rank_planes(
     body_T_hand: sp.SE3 = sp.SE3(np.eye(4)),
     gripper_T_intel: sp.SE3 = sp.SE3(np.eye(4)),
     max_number_of_points: float = 1e8,
+    percentile_thresh=30,
 ):
     """Filter point clouds based on the normal"""
     # breakpoint()
@@ -313,15 +314,16 @@ def rank_planes(
     # Compute the dot product to get the cosines
     # Calculate the angle using the dot product formula
     euclidean_dist, number_of_pts = [], []
-    indices_of_min_dist = []
+    # indices_of_min_dist = []
+    all_distances = []
     planes_points = [np.array(plane.points).reshape(-1, 3) for plane in planes]
 
     for plane_points in planes_points:
         plane_points_in_body = body_T_intel * plane_points
         norms_of_plane_points = np.linalg.norm(plane_points_in_body, axis=1)
         argmin_dist = int(np.argmin(norms_of_plane_points))
-
-        indices_of_min_dist.append(argmin_dist)
+        all_distances.append(np.linalg.norm(plane_points_in_body[:, :3], axis=1))
+        # indices_of_min_dist.append(argmin_dist)
         euclidean_dist.append(norms_of_plane_points[argmin_dist] / 0.5)
         number_of_pts.append(plane_points.shape[0] / max_number_of_points)
 
@@ -334,10 +336,24 @@ def rank_planes(
     # Filter out the point clouds
     # breakpoint()
     argmax = int(np.argmax(cost))
-
+    distances_of_points_for_selected_plane = all_distances[argmax]
+    sorted_distances_of_points = np.sort(distances_of_points_for_selected_plane.copy())
+    selected_distance_based_on_percentile = np.percentile(
+        sorted_distances_of_points, percentile_thresh
+    )
+    index_in_og_plane = int(
+        np.argmin(
+            np.abs(
+                distances_of_points_for_selected_plane
+                - selected_distance_based_on_percentile
+            )
+        )
+    )
     return (
         argmax,
-        planes_points[argmax][indices_of_min_dist[argmax]],
+        planes_points[argmax][
+            index_in_og_plane
+        ],  # if not visualize else planes_points[argmax][indices_of_max_dist[argmax]],
         sp.SO3(body_T_intel.rotationMatrix()) * all_plane_normals,
     )
 
@@ -434,7 +450,7 @@ def visualize_all_planes(
 def detect_place_point_by_pcd_method(
     spot,
     GAZE_ARM_JOINT_ANGLES,
-    percentile: float = 70,
+    percentile: float = 30,
     visualize=True,
     height_adjustment_offset: float = 0.10,
 ):
@@ -480,7 +496,7 @@ def detect_place_point_by_pcd_method(
     pcd = filter_pointcloud_by_normals_in_the_given_direction(
         pcd,
         np.array([0.0, 0.0, 1.0]),
-        0.86,
+        float(np.cos(np.deg2rad(45))),
         body_T_hand,
         gripper_T_intel,
         visualize=visualize,
@@ -503,6 +519,7 @@ def detect_place_point_by_pcd_method(
         body_T_hand,
         gripper_T_intel,
         max_number_of_points,
+        percentile,
     )
 
     plane_pcd = all_planes[plane_index]
@@ -538,12 +555,12 @@ def detect_place_point_by_pcd_method(
     img_with_bbox = cv2.circle(
         img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
     )
-    if visualize:
-        # For debug
-        cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
-        cv2.imshow("table_detection", img_with_bbox)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+    # if visualize:
+    #     # For debug
+    #     cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
+    #     cv2.imshow("table_detection", img_with_bbox)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
     cv2.imwrite("table_detection.png", img_with_bbox)
 
     point_in_body = body_T_hand * selected_point_in_gripper

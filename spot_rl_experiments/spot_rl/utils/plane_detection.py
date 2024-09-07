@@ -200,8 +200,8 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
 
 
 def plane_detect(pcd, visualize=False):
-    if visualize:
-        o3d.visualization.draw_geometries([pcd])
+    # if visualize:
+    # o3d.visualization.draw_geometries([pcd])
 
     points = PCDToNumpy(pcd)
     points = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)
@@ -233,7 +233,7 @@ def plane_detect(pcd, visualize=False):
         plane.colors = o3d.utility.Vector3dVector(color)
         planes.append(plane)
 
-    if visualize:
-        o3d.visualization.draw_geometries(planes)
+    # if visualize:
+    # o3d.visualization.draw_geometries(planes)
 
     return planes
