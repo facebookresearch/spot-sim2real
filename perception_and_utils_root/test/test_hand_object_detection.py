@@ -1,9 +1,10 @@
 import os
 
-os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/Cellar/ffmpeg/6.1.1_3/bin/ffmpeg"
+# os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/Cellar/ffmpeg/6.1.1_3/bin/ffmpeg"
 import sys  # noqa: E402
 
-sys.path.append("/Users/jimmytyyang/research/spot-sim2real/spot_rl_experiments")
+# TODO: remove this
+sys.path.append("/data/home/jimmytyyang/facebook/spot-sim2real/spot_rl_experiments")
 import time  # noqa: E402
 
 import cv2  # noqa: E402
@@ -28,8 +29,8 @@ class HandObjectDetection:
         self.hands = self.mpHands.Hands(
             static_image_mode=False,
             max_num_hands=2,
-            min_detection_confidence=0.15,
-            min_tracking_confidence=0.05,
+            min_detection_confidence=0.35,
+            min_tracking_confidence=0.35,
         )
         self.mpDraw = mp.solutions.drawing_utils
 
@@ -103,7 +104,6 @@ class HandObjectDetection:
             imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             start_time = time.time()
             results = self.hands.process(imgRGB)
-            end_time = time.time()
 
             hand_pixel_location = []
             # Draw the hand landmarks if detected
@@ -165,12 +165,7 @@ class HandObjectDetection:
                         self._hand_tracking_bboxs[suc_frame[-1]]
                     ]
 
-            # Put the FPS on the image
-            fps = 1 / (end_time - start_time)
-            cv2.putText(
-                img, str(int(fps)), (10, 70), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 3
-            )
-
+            xyxy_list = []
             # Object prediction
             num_of_times_that_hand_point_is_inside_bbox = False
             results = self.object_detection_model.predict(origin_img, stream=False)
@@ -183,16 +178,91 @@ class HandObjectDetection:
                         or self.hand_in_bbox(xyxy, hand_pixel_location)
                         >= THRESHOLD_HAND_IN_BBOX
                     )
+                    xyxy_list.append(xyxy)
+
+            # Check if two bounding boxes are overlap
+            overlap_bbox = False
+            if ENABLE_SAM2_TRACKING:
+                if (
+                    self._hand_tracking_bboxs != []
+                    and self._hand_tracking_bboxs[-1] is not None
+                    and xyxy_list != []
+                ):
+                    tracking_bbox = self._hand_tracking_bboxs[-1]
+                    object_bbox = xyxy_list[-1]  # only select the first one
+                    # Check if the bounding boxes overlap to each other
+                    x1min = tracking_bbox[0]
+                    x1max = tracking_bbox[2]
+                    y1min = tracking_bbox[1]
+                    y1max = tracking_bbox[3]
+                    x2min = object_bbox[0]
+                    x2max = object_bbox[2]
+                    y2min = object_bbox[1]
+                    y2max = object_bbox[3]
+                    overlap_bbox = (
+                        x1min < x2max
+                        and x2min < x1max
+                        and y1min < y2max
+                        and y2min < y1max
+                    )
+
+            # Put the FPS on the image
+            end_time = time.time()
+            fps = 1 / (end_time - start_time)
+            print(f"fps: {round(fps)}")
+            cv2.putText(
+                img,
+                "fps: " + str(int(fps)),
+                (10, 70),
+                cv2.FONT_HERSHEY_PLAIN,
+                2,
+                (255, 0, 0),
+                3,
+            )
 
             # Put the hand touches object flag on the image
             if num_of_times_that_hand_point_is_inside_bbox:
                 cv2.putText(
-                    img, "hold", (390, 70), cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3
+                    img,
+                    "point: hold",
+                    (250, 70),
+                    cv2.FONT_HERSHEY_PLAIN,
+                    2,
+                    (0, 255, 0),
+                    3,
                 )
             else:
                 cv2.putText(
-                    img, "unhold", (390, 70), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 3
+                    img,
+                    "point: unhold",
+                    (250, 70),
+                    cv2.FONT_HERSHEY_PLAIN,
+                    2,
+                    (0, 0, 255),
+                    3,
                 )
+
+            if ENABLE_SAM2_TRACKING:
+                if overlap_bbox:
+                    cv2.putText(
+                        img,
+                        "bbox: hold",
+                        (250, 100),
+                        cv2.FONT_HERSHEY_PLAIN,
+                        2,
+                        (0, 255, 0),
+                        3,
+                    )
+                else:
+                    cv2.putText(
+                        img,
+                        "bbox: unhold",
+                        (250, 100),
+                        cv2.FONT_HERSHEY_PLAIN,
+                        2,
+                        (0, 0, 255),
+                        3,
+                    )
 
             # Concatenate the original image and the image with hand landmarks and object prediction
             vis = np.concatenate((origin_img, img), axis=1)
@@ -216,14 +286,18 @@ class HandObjectDetection:
 if __name__ == "__main__":
     model = HandObjectDetection()
     model.prediction_from_video(
-        "/Users/jimmytyyang/Downloads/hand_interaction_with_bottle.mp4", "bottle"
+        "/fsx-siro/jimmytyyang/data/hand_object_data/hand_interaction_with_bottle.mp4",
+        "bottle",
     )
     model.prediction_from_video(
-        "/Users/jimmytyyang/Downloads/hand_interaction_with_can.mp4", "can"
+        "/fsx-siro/jimmytyyang/data/hand_object_data/hand_interaction_with_can.mp4",
+        "can",
     )
     model.prediction_from_video(
-        "/Users/jimmytyyang/Downloads/hand_interaction_with_toy_plush.mp4", "toy_plush"
+        "/fsx-siro/jimmytyyang/data/hand_object_data/hand_interaction_with_toy_plush.mp4",
+        "toy_plush",
     )
     model.prediction_from_video(
-        "/Users/jimmytyyang/Downloads/hand_interaction_with_cup.mp4", "cup"
+        "/fsx-siro/jimmytyyang/data/hand_object_data/hand_interaction_with_cup.mp4",
+        "cup",
     )
