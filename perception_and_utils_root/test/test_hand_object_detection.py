@@ -1,6 +1,9 @@
 import os
 
 os.environ["IMAGEIO_FFMPEG_EXE"] = "/opt/homebrew/Cellar/ffmpeg/6.1.1_3/bin/ffmpeg"
+import sys  # noqa: E402
+
+sys.path.append("/Users/jimmytyyang/research/spot-sim2real/spot_rl_experiments")
 import time  # noqa: E402
 
 import cv2  # noqa: E402
@@ -9,11 +12,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import mediapipe as mp  # noqa: E402
 import moviepy.editor as moviepy  # noqa: E402
 import numpy as np  # noqa: E402
+from spot_rl.utils.tracking_service import tracking_with_socket  # noqa: E402
 from ultralytics import YOLOWorld  # noqa: E402
 
 # Threshold for number of times that hand point is inside bbox
 THRESHOLD_HAND_IN_BBOX = 1
 MAX_FRAMES = float("inf")
+ENABLE_SAM2_TRACKING = True
 
 
 class HandObjectDetection:
@@ -31,6 +36,16 @@ class HandObjectDetection:
         # Load a pretrained YOLO model
         self.object_detection_model = YOLOWorld("yolov8x-worldv2.pt")
 
+        # Reset the hand tracking parameters
+        self._reset_tracking_params()
+
+    def _reset_tracking_params(self):
+        self._hand_tracking_first_time = (
+            True  # flag to indicate if it is the first time tracking
+        )
+        self._hand_tracking_images = []  # cache the tracking images
+        self._hand_tracking_bboxs = []  # cache the tracking bboxs
+
     def hand_in_bbox(self, xyxy, hand_pixel_location):
         # Check if the hand is inside the bounding box
         num_of_times_that_hand_point_is_inside_bbox = 0
@@ -44,7 +59,16 @@ class HandObjectDetection:
                 num_of_times_that_hand_point_is_inside_bbox += 1
         return num_of_times_that_hand_point_is_inside_bbox
 
-    def prediction(self, video_path="", class_to_detect="toy plush"):
+    def _get_bbox_from_cxcys(self, hand_pixel_location):
+        # Get the bounding box from cx cy pairs
+        cxs = [hand_pixel[0] for hand_pixel in hand_pixel_location]
+        cys = [hand_pixel[1] for hand_pixel in hand_pixel_location]
+        return min(cxs), min(cys), max(cxs), max(cys)
+
+    def prediction_from_video(self, video_path="", class_to_detect="toy plush"):
+
+        # Reset hand tracking parameters
+        self._reset_tracking_params()
 
         # Set the classes to detect
         self.object_detection_model.set_classes([class_to_detect])
@@ -71,6 +95,10 @@ class HandObjectDetection:
             # Copy the image to avoid changing the original image
             origin_img = img.copy()
 
+            # Start tracking using video segmentation model
+            images = np.expand_dims(img, axis=0)  # The size should (1, H, W, C)
+            self._hand_tracking_images.append(images)
+
             # Hand detection timer
             imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             start_time = time.time()
@@ -89,6 +117,53 @@ class HandObjectDetection:
                     self.mpDraw.draw_landmarks(
                         img, handLms, self.mpHands.HAND_CONNECTIONS
                     )
+
+            if ENABLE_SAM2_TRACKING:
+                # Process hand tracking
+                if (
+                    len(self._hand_tracking_images) == 1
+                    and self._hand_tracking_first_time
+                ):
+                    # To see if there is a bounding box in the first frame
+                    self._hand_tracking_first_time = False
+                    if hand_pixel_location == []:
+                        # Do not see the hand yet, so restart the detection
+                        self._reset_tracking_params()
+                    else:
+                        # See the hand at the first frame
+                        self._hand_tracking_bboxs.append(
+                            self._get_bbox_from_cxcys(hand_pixel_location)
+                        )
+                elif len(self._hand_tracking_images) >= 2:
+                    # This means that there is one hand being detected in the previous frame (first frame)
+                    input_images = np.concatenate(self._hand_tracking_images, axis=0)
+                    # Get the previous anchor
+                    bbox = self._hand_tracking_bboxs[-1]
+                    cur_bbox = tracking_with_socket(input_images, bbox)
+                    if cur_bbox is None:
+                        self._hand_tracking_bboxs.append(None)
+                    else:
+                        cur_bbox = [cur_bbox[1], cur_bbox[0], cur_bbox[3], cur_bbox[2]]
+                        self._hand_tracking_bboxs.append(cur_bbox)
+                        # Apply the red bounding box to showcase tracking on the image
+                        img = cv2.rectangle(
+                            img, cur_bbox[:2], cur_bbox[2:], (0, 0, 255), 5
+                        )
+                if len(self._hand_tracking_images) >= 2:
+                    # Prune the data
+                    # Find the frame that has tracking
+                    suc_frame = []
+                    for i, v in enumerate(self._hand_tracking_bboxs):
+                        if v is not None:
+                            suc_frame.append(i)
+                    # Only keep the latest frame that has tracking to keep
+                    # buffer size 2
+                    self._hand_tracking_images = [
+                        self._hand_tracking_images[suc_frame[-1]]
+                    ]
+                    self._hand_tracking_bboxs = [
+                        self._hand_tracking_bboxs[suc_frame[-1]]
+                    ]
 
             # Put the FPS on the image
             fps = 1 / (end_time - start_time)
@@ -140,15 +215,15 @@ class HandObjectDetection:
 
 if __name__ == "__main__":
     model = HandObjectDetection()
-    model.prediction(
+    model.prediction_from_video(
         "/Users/jimmytyyang/Downloads/hand_interaction_with_bottle.mp4", "bottle"
     )
-    model.prediction(
+    model.prediction_from_video(
         "/Users/jimmytyyang/Downloads/hand_interaction_with_can.mp4", "can"
     )
-    model.prediction(
+    model.prediction_from_video(
         "/Users/jimmytyyang/Downloads/hand_interaction_with_toy_plush.mp4", "toy_plush"
     )
-    model.prediction(
+    model.prediction_from_video(
         "/Users/jimmytyyang/Downloads/hand_interaction_with_cup.mp4", "cup"
     )
