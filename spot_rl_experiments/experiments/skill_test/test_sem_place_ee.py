@@ -14,7 +14,7 @@ if __name__ == "__main__":
     enable_estimation_before_place = map_user_input_to_boolean(
         "Use waypoint estimator? Y/N "
     )
-    place_target = "fre_lab_40in_sep"
+    place_target = "fre_lab_32in_sep"
     spotskillmanager = SpotSkillManager(
         use_mobile_pick=False, use_semantic_place=True, use_place_ee=True
     )
@@ -40,7 +40,9 @@ if __name__ == "__main__":
             skill_log["num_steps"] = 0
         episode_log["actions"].append({"place": skill_log})
         curr_date = datetime.today().strftime("%m-%d-%y")
-        file_path = f"logs/semantic_place_ee/{curr_date}/0.5m_minus_20deg_episode_{episode_ctr}.json"
+        file_path = (
+            f"logs/semantic_place_ee/{curr_date}/32in_place_episode_{episode_ctr}.json"
+        )
         with open(file_path, "w") as file:
             json.dump(episode_log, file, indent=4)
             print(f"Saved log: {file_path}")

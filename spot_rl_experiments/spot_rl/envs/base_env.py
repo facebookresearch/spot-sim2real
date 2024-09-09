@@ -437,7 +437,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 )
             elif base_action is not None and arm_ee_action is not None:
                 if self._max_lin_dist_scale == 0.0:
-                    self.spot.set_arm_ee_pos()
+                    self.spot.set_arm_ee_pos(
+                        arm_ee_action,
+                        travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                    )
                 else:
                     self.spot.set_base_vel_and_arm_ee_pos(
                         *base_action,
