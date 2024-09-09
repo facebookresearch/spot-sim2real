@@ -467,7 +467,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         start_time = time.time()
         if arm_ee_action is not None and self._max_lin_dist_scale == 0.0:
-            print("do not move the base")
+            pass
         elif base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
                 if target_yaw is not None and abs(
