@@ -140,7 +140,7 @@ MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
 
 # Base action params for sem place EE 
-MAX_LIN_DIST_SEMANTIC_PLACE: 0.1  # meters
+MAX_LIN_DIST_SEMANTIC_PLACE: 0.0  # meters
 MAX_ANG_DIST_SEMANTIC_PLACE: 5.73  # degrees
 
 # SEMANTIC EE POLICY SCALE PARAMETERS
