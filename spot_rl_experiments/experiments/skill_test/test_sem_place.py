@@ -26,8 +26,6 @@ if __name__ == "__main__":
         place_target = "test_desk"
 
     spotskillmanager = SpotSkillManager(use_mobile_pick=False, use_semantic_place=True)
-    spot_pos1 = spotskillmanager.spot.get_arm_joint_positions(as_array=True)
-
     is_local = False
     if enable_estimation_before_place:
         place_target = None
@@ -35,7 +33,6 @@ if __name__ == "__main__":
 
     # Start testing
     contnue = True
-    INITIAL_ARM_JOINT_ANGLES = [0, -180, 180, 90, 0, -90]
     episode_ctr = 0
     # Get EE Pose Initial
     spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()

@@ -180,7 +180,6 @@ class SpotSkillManager:
         )
 
         if place_config is None:
-            # TODO: overwrite the config
             self.place_config = (
                 construct_config_for_semantic_place()
                 if self.use_semantic_place
