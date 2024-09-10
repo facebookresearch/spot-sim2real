@@ -509,28 +509,28 @@ class SpotSkillManager:
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
             # estimate waypoint
-            try:
-                (
-                    place_target_location,
-                    place_target_in_gripper_camera,
-                    _,
-                ) = detect_place_point_by_pcd_method(
-                    self.spot,
-                    self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
-                    percentile=0 if visualize else 70,
-                    visualize=visualize,
-                    height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+            # try:
+            (
+                place_target_location,
+                place_target_in_gripper_camera,
+                _,
+            ) = detect_place_point_by_pcd_method(
+                self.spot,
+                self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
+                percentile=0 if visualize else 30,
+                visualize=visualize,
+                height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+            )
+            print(f"Estimate Place xyz: {place_target_location}")
+            if visualize:
+                plot_place_point_in_gripper_image(
+                    self.spot, place_target_in_gripper_camera
                 )
-                print(f"Estimate Place xyz: {place_target_location}")
-                if visualize:
-                    plot_place_point_in_gripper_image(
-                        self.spot, place_target_in_gripper_camera
-                    )
-            except Exception as e:
-                message = f"Failed to estimate place way point due to {str(e)}"
-                conditional_print(message=message, verbose=self.verbose)
-                print(message)
-                return False, message
+            # except Exception as e:
+            #     message = f"Failed to estimate place way point due to {str(e)}"
+            #     conditional_print(message=message, verbose=self.verbose)
+            #     print(message)
+            # return False, message
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
         status, message = self.place(
