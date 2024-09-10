@@ -43,7 +43,6 @@ if __name__ == "__main__":
     is_local = False
     # Start testing
     contnue = True
-    INITIAL_ARM_JOINT_ANGLES = [0, -180, 180, 90, 0, -90]
     episode_ctr = 0
     #Get EE Pose Initial
     spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
