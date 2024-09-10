@@ -2,7 +2,10 @@ HEAD_DEPTH: "/raw_head_depth"
 HAND_DEPTH: "/raw_hand_depth"
 HAND_DEPTH_UNSCALED: "/raw_hand_depth_unscaled"
 HAND_RGB: "/hand_rgb"
-
+IRS_RGB: "/irs_rgb"
+IRS_DEPTH: "/irs_depth"
+GRIPPER_RGB: "/gripper_rgb"
+GRIPPER_DEPTH: "/gripper_depth"
 COMPRESSED_IMAGES: "/compressed_images"
 
 FILTERED_HEAD_DEPTH: "/filtered_head_depth"

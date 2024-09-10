@@ -17,12 +17,15 @@ from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import resize_to_tallest
 
-RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
+# from intel_realsense_payload_for_spotsim2real.IntelRealSenseCameraInterface import IntelRealSenseCameraInterface
+
+RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.GRIPPER_DEPTH, rt.GRIPPER_RGB, rt.IRS_RGB]
 
 PROCESSED_IMG_TOPICS = [
     rt.FILTERED_HEAD_DEPTH,
     rt.FILTERED_HAND_DEPTH,
     rt.MASK_RCNN_VIZ_TOPIC,
+    rt.IRS_DEPTH,
 ]
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
@@ -176,6 +179,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             return None
 
         refreshed_topics = [k for k, v in self.updated.items() if v]
+        print("Available topics in self.msgs:", self.last_seen)
 
         # Gather latest images
         raw_msgs = [self.msgs[i] for i in RAW_IMG_TOPICS]
@@ -189,6 +193,8 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         for idx, raw_msg in enumerate(raw_msgs):
             if processed_msgs[idx] is not None:
                 processed_imgs.append(self.msg_to_cv2(processed_msgs[idx]))
+                print(processed_imgs[idx].shape)
+
             elif processed_msgs[idx] is None and raw_msg is not None:
                 processed_imgs.append(np.zeros_like(raw_imgs[idx]))
 
@@ -196,6 +202,21 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
                 imgs[1] = imgs[1][:, 124:-60]
+        # Processing Raw depth
+        raw_imgs[1] = cv2.convertScaleAbs(raw_imgs[1], alpha=0.03)
+        # Resizing Mask RCNNN Image to align width
+        processed_imgs[2] = cv2.resize(processed_imgs[2], (640, 480))
+        # Processing Raw depth
+        processed_imgs[3] = cv2.convertScaleAbs(processed_imgs[3], alpha=0.03)
+        # Add Strips and Labels
+        raw_imgs = [
+            self.overlay_topic_text(img, topic)
+            for img, topic in zip(raw_imgs, RAW_IMG_TOPICS)
+        ]
+        processed_imgs = [
+            self.overlay_topic_text(img, topic)
+            for img, topic in zip(processed_imgs, PROCESSED_IMG_TOPICS)
+        ]
 
         img = np.vstack(
             [
@@ -234,6 +255,48 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         print(" ".join([f"{k[1:]}: {np.mean(self.fps[k]):.2f}" for k in all_topics]))
 
         return img
+
+    @staticmethod
+    def overlay_topic_text(
+        img,
+        topic,
+        box_color=(0, 0, 0),
+        text_color=(0, 0, 0),
+        font_size=1.3,
+        thickness=2,
+    ):
+        # Original image dimensions
+        topic = topic.replace("_", " ").replace("/", "")
+        og_height, og_width = img.shape[:2]
+        strip_height = 50
+        if len(img.shape) == 3:
+            white_strip = 255 * np.ones((strip_height, og_width, 3), dtype=np.uint8)
+        else:
+            white_strip = 255 * np.ones((strip_height, og_width), dtype=np.uint8)
+
+        # Resize the original image height by adding the white strip height
+        viz_img = np.vstack((white_strip, img))
+
+        # FONT AND SIZE
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text = f"{topic}"
+        (text_width, text_height), _ = cv2.getTextSize(text, font, font_size, thickness)
+
+        margin = 50
+        text_x = margin
+        text_y = strip_height - margin + text_height
+        cv2.putText(
+            viz_img,
+            text,
+            (text_x, text_y),
+            font,
+            font_size,
+            text_color,
+            thickness,
+            cv2.LINE_AA,
+        )
+
+        return viz_img
 
 
 def bgrify_grayscale_imgs(imgs):
