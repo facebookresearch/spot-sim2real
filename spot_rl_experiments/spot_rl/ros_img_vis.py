@@ -17,12 +17,15 @@ from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import resize_to_tallest
 
-RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
+# from intel_realsense_payload_for_spotsim2real.IntelRealSenseCameraInterface import IntelRealSenseCameraInterface
+
+RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.GRIPPER_DEPTH, rt.GRIPPER_RGB, rt.IRS_RGB]
 
 PROCESSED_IMG_TOPICS = [
     rt.FILTERED_HEAD_DEPTH,
     rt.FILTERED_HAND_DEPTH,
     rt.MASK_RCNN_VIZ_TOPIC,
+    rt.IRS_DEPTH,
 ]
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
@@ -165,10 +168,20 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
     no_raw = False
     proprioception = False
 
+    # Define a timeout duration (in seconds)
+    TIMEOUT_DURATION = 5
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
         self.fps = {topic: deque(maxlen=10) for topic in self.msgs.keys()}
+
+    def is_empty_image(self, img):
+        """Determine if an image is empty or has no meaningful data"""
+        if np.all(img == 0):
+            print("Image is all zeros")
+            return True
+        return False
 
     def generate_composite(self):
         if not any(self.updated.values()):
@@ -176,26 +189,66 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             return None
 
         refreshed_topics = [k for k, v in self.updated.items() if v]
+        print("Available topics in self.msgs:", self.last_seen)
 
         # Gather latest images
         raw_msgs = [self.msgs[i] for i in RAW_IMG_TOPICS]
         processed_msgs = [self.msgs[i] for i in PROCESSED_IMG_TOPICS]
 
         raw_imgs = [self.msg_to_cv2(i) for i in raw_msgs if i is not None]
-
-        # Replace any Nones with black images if raw version exists. We (safely) assume
-        # here that there is no processed image anyway if the raw image does not exist.
         processed_imgs = []
+        # Handle processed messages and fill with zeros if needed
         for idx, raw_msg in enumerate(raw_msgs):
             if processed_msgs[idx] is not None:
                 processed_imgs.append(self.msg_to_cv2(processed_msgs[idx]))
-            elif processed_msgs[idx] is None and raw_msg is not None:
+            else:
                 processed_imgs.append(np.zeros_like(raw_imgs[idx]))
 
-        # Crop gripper images
+        # Crop and process images as needed
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
                 imgs[1] = imgs[1][:, 124:-60]
+        raw_imgs[1] = cv2.convertScaleAbs(raw_imgs[1], alpha=0.03)
+        processed_imgs[2] = cv2.resize(processed_imgs[2], (640, 480))
+        processed_imgs[3] = cv2.convertScaleAbs(processed_imgs[3], alpha=0.03)
+        for topic in RAW_IMG_TOPICS + PROCESSED_IMG_TOPICS:
+            if topic in RAW_IMG_TOPICS:
+                idx = RAW_IMG_TOPICS.index(topic)
+                if idx < len(raw_imgs):
+                    print(f"Checking RAW_IMG topic: {topic}")
+                    print(np.all(raw_imgs[idx] == 0))
+                    if self.is_empty_image(raw_imgs[idx]):
+                        print(f"Image for topic {topic} is empty or disconnected.")
+                        raw_imgs[idx] = self.overlay_text(
+                            raw_imgs[idx],
+                            "DISCONNECTED",
+                            color=(255, 0, 0),
+                            size=2.0,
+                            thickness=4,
+                        )
+            if topic in PROCESSED_IMG_TOPICS:
+                idx = PROCESSED_IMG_TOPICS.index(topic)
+                if idx < len(processed_imgs):
+                    print(f"Checking PROCESSED_IMG topic: {topic}")
+                    if self.is_empty_image(processed_imgs[idx]):
+                        print(f"Image for topic {topic} is empty or disconnected.")
+                        processed_imgs[idx] = self.overlay_text(
+                            processed_imgs[idx],
+                            "DISCONNECTED",
+                            color=(255, 0, 0),
+                            size=2.0,
+                            thickness=4,
+                        )
+
+        # Overlay topic text
+        raw_imgs = [
+            self.overlay_topic_text(img, topic)
+            for img, topic in zip(raw_imgs, RAW_IMG_TOPICS)
+        ]
+        processed_imgs = [
+            self.overlay_topic_text(img, topic)
+            for img, topic in zip(processed_imgs, PROCESSED_IMG_TOPICS)
+        ]
 
         img = np.vstack(
             [
@@ -234,6 +287,48 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         print(" ".join([f"{k[1:]}: {np.mean(self.fps[k]):.2f}" for k in all_topics]))
 
         return img
+
+    @staticmethod
+    def overlay_topic_text(
+        img,
+        topic,
+        box_color=(0, 0, 0),
+        text_color=(0, 0, 0),
+        font_size=1.3,
+        thickness=2,
+    ):
+        # Original image dimensions
+        topic = topic.replace("_", " ").replace("/", "")
+        og_height, og_width = img.shape[:2]
+        strip_height = 50
+        if len(img.shape) == 3:
+            white_strip = 255 * np.ones((strip_height, og_width, 3), dtype=np.uint8)
+        else:
+            white_strip = 255 * np.ones((strip_height, og_width), dtype=np.uint8)
+
+        # Resize the original image height by adding the white strip height
+        viz_img = np.vstack((white_strip, img))
+
+        # FONT AND SIZE
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text = f"{topic}"
+        (text_width, text_height), _ = cv2.getTextSize(text, font, font_size, thickness)
+
+        margin = 50
+        text_x = margin
+        text_y = strip_height - margin + text_height
+        cv2.putText(
+            viz_img,
+            text,
+            (text_x, text_y),
+            font,
+            font_size,
+            text_color,
+            thickness,
+            cv2.LINE_AA,
+        )
+
+        return viz_img
 
 
 def bgrify_grayscale_imgs(imgs):

@@ -103,10 +103,18 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         rt.HAND_DEPTH,
         rt.HAND_RGB,
         rt.HAND_DEPTH_UNSCALED,
+        rt.IRS_RGB,
+        rt.IRS_DEPTH,
+        rt.GRIPPER_RGB,
+        rt.GRIPPER_DEPTH,
     ]
     sources = [
         Cam.FRONTRIGHT_DEPTH,
         Cam.FRONTLEFT_DEPTH,
+        Cam.HAND_COLOR,
+        Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        Cam.INTEL_REALSENSE_COLOR,
+        Cam.INTEL_REALSENSE_DEPTH,
         Cam.HAND_COLOR,
         Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME,
     ]
@@ -132,17 +140,95 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
         hand_depth_unscaled = imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME]
         hand_rgb = imgs[Cam.HAND_COLOR]
+        empty_color_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        empty_depth_img = np.zeros((480, 640), dtype=np.uint16)
+        # intel_img_src = [Cam.INTEL_REALSENSE_COLOR]
+        # intel_realsense_color = spot.get_image_responses(
+        #     intel_img_src, quality=100, await_the_resp=False
+        # )
+        # intel_response = intel_realsense_color.result()[0]
+        # intel_image: np.ndarray = image_response_to_cv2(intel_response)
 
-        msgs = self.imgs_to_msgs(head_depth, hand_depth, hand_rgb, hand_depth_unscaled)
+        # intel_depth_src = [Cam.INTEL_REALSENSE_DEPTH]
+        # intel_realsense_depth = spot.get_image_responses(
+        #     intel_depth_src, quality=100, await_the_resp=False
+        # )
+        # intel_response_depth = intel_realsense_depth.result()[0]
+        # intel_image_depth: np.ndarray = image_response_to_cv2(intel_response_depth)
+        try:
+            intel_img_src = [Cam.INTEL_REALSENSE_COLOR]
+            intel_realsense_color = self.spot.get_image_responses(
+                intel_img_src, quality=100, await_the_resp=False
+            )
+            intel_response = intel_realsense_color.result()[0]
+            intel_image = image_response_to_cv2(intel_response)
+            intel_depth_src = [Cam.INTEL_REALSENSE_DEPTH]
+            intel_realsense_depth = self.spot.get_image_responses(
+                intel_depth_src, quality=100, await_the_resp=False
+            )
+            intel_response_depth = intel_realsense_depth.result()[0]
+            intel_image_depth = image_response_to_cv2(intel_response_depth)
+        except Exception as e:
+            rospy.logwarn(f"Failed to retrieve Intel RealSense color image: {e}")
+            intel_image = empty_color_img
+            intel_image_depth = empty_depth_img
+
+        gripper_img_src = [Cam.HAND_COLOR]
+        gripper_color = spot.get_image_responses(
+            gripper_img_src, quality=100, await_the_resp=False
+        )
+        gripper_response = gripper_color.result()[0]
+        gripper_image: np.ndarray = image_response_to_cv2(gripper_response)
+
+        gripper_depth_src = [Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+        gripper_depth = spot.get_image_responses(
+            gripper_depth_src, quality=100, await_the_resp=False
+        )
+        gripper_response_depth = gripper_depth.result()[0]
+        gripper_image_depth: np.ndarray = image_response_to_cv2(gripper_response_depth)
+
+        msgs = self.imgs_to_msgs(
+            head_depth,
+            hand_depth,
+            hand_rgb,
+            hand_depth_unscaled,
+            intel_image,
+            intel_image_depth,
+            gripper_image,
+            gripper_image_depth,
+        )
 
         for topic, msg in zip(self.pubs.keys(), msgs):
             self.pubs[topic].publish(msg)
 
-    def imgs_to_msgs(self, head_depth, hand_depth, hand_rgb, hand_depth_unscaled):
+    def imgs_to_msgs(
+        self,
+        head_depth,
+        hand_depth,
+        hand_rgb,
+        hand_depth_unscaled,
+        intel_image,
+        intel_image_depth,
+        gripper_image,
+        gripper_image_depth,
+    ):
         head_depth_msg = self.cv2_to_msg(head_depth, "mono8")
         hand_depth_msg = self.cv2_to_msg(hand_depth, "mono8")
         hand_rgb_msg = self.cv2_to_msg(hand_rgb, "bgr8")
         hand_depth_unscaled_msg = self.cv2_to_msg(hand_depth_unscaled, "mono16")
+
+        intel_realsense_color_msg = self.cv2_to_msg(
+            intel_image, "bgr8"
+        )  # Added message for Intel RealSense color
+        intel_realsense_depth_msg = self.cv2_to_msg(
+            intel_image_depth, "mono16"
+        )  # Added message for Intel RealSense color
+        gripper_color_msg = self.cv2_to_msg(
+            gripper_image, "bgr8"
+        )  # Added message for gripper color
+        gripper_depth_msg = self.cv2_to_msg(
+            gripper_image_depth, "mono16"
+        )  # Added message for gripper color
 
         timestamp = rospy.Time.now()
         head_depth_msg.header = Header(stamp=timestamp)
@@ -150,7 +236,22 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         hand_rgb_msg.header = Header(stamp=timestamp)
         hand_depth_unscaled_msg.header = Header(stamp=timestamp)
 
-        return head_depth_msg, hand_depth_msg, hand_rgb_msg, hand_depth_unscaled_msg
+        intel_realsense_color_msg.header = Header(stamp=timestamp)
+        intel_realsense_depth_msg.header = Header(stamp=timestamp)
+
+        gripper_color_msg.header = Header(stamp=timestamp)
+        gripper_depth_msg.header = Header(stamp=timestamp)
+
+        return (
+            head_depth_msg,
+            hand_depth_msg,
+            hand_rgb_msg,
+            hand_depth_unscaled_msg,
+            intel_realsense_color_msg,
+            intel_realsense_depth_msg,
+            gripper_color_msg,
+            gripper_depth_msg,
+        )
 
     @staticmethod
     def _scale_depth(img, head_depth=False):
