@@ -162,8 +162,9 @@ def arr2str(arr):
 
 def calculate_height(object_tag):
     # Iterate through each dictionary in the world_graph
+    default_config = construct_config_for_semantic_place()
     script_dir = os.path.dirname(__file__)  # Directory of the script
-    json_file_path = os.path.join(script_dir, "cfslam_object_relations.json")
+    json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
 
     with open(json_file_path) as f:
         world_graph = json.load(f)
@@ -179,7 +180,6 @@ def calculate_height(object_tag):
         return default_height
 
     # getting default height as threshold height in config
-    default_config = construct_config_for_semantic_place()
     default_height = default_config.HEIGHT_THRESHOLD
     for rel in world_graph:
         # Iterate through all keys in the dictionary
