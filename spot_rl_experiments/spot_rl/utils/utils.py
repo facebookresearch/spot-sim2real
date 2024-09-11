@@ -161,28 +161,23 @@ def arr2str(arr):
 
 
 def calculate_height(object_tag):
-    # Iterate through each dictionary in the world_graph
     default_config = construct_config_for_semantic_place()
-    script_dir = os.path.dirname(__file__)  # Directory of the script
+    script_dir = os.path.dirname(__file__)
     json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
 
     with open(json_file_path) as f:
         world_graph = json.load(f)
-    # Get Object id from string object_tag
     try:
         object_id_str, object_tag = object_tag.split("_", 1)
-        object_id = int(object_id_str)  # Convert ID to integer
+        object_id = int(object_id_str)
     except ValueError:
         print(f"Invalid object_tag format: '{object_tag}'")
-        # Return default height if the format is invalid
         default_config = construct_config_for_semantic_place()
         default_height = default_config.HEIGHT_THRESHOLD
         return default_height
 
-    # getting default height as threshold height in config
     default_height = default_config.HEIGHT_THRESHOLD
     for rel in world_graph:
-        # Iterate through all keys in the dictionary
         for key, value in rel.items():
             if isinstance(value, dict):
                 if (
