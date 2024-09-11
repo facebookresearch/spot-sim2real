@@ -30,7 +30,6 @@ if __name__ == "__main__":
     is_local = False
     # Start testing
     contnue = True
-    INITIAL_ARM_JOINT_ANGLES = [0, -180, 180, 90, 0, -90]
     episode_ctr = 0
     # Get EE Pose Initial in rest position
     spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
@@ -45,22 +44,12 @@ if __name__ == "__main__":
         episode_log = {"actions": []}  # mypy: ignore-errors
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
-        if enable_estimation_before_place:
-            is_local = True
-            spotskillmanager.place(
-                place_target,
-                is_local=is_local,
-                visualize=False,
-                enable_waypoint_estimation=True,
-            )
-        else:
-            spotskillmanager.place(
-                place_target,
-                is_local=is_local,
-                visualize=True,
-                enable_waypoint_estimation=False,
-            )
-
+        spotskillmanager.place(
+            place_target,
+            is_local=enable_estimation_before_place,
+            visualize=False,
+            enable_waypoint_estimation=enable_estimation_before_place,
+        )
         skill_log = spotskillmanager.place_controller.skill_result_log
         if "num_steps" not in skill_log:
 

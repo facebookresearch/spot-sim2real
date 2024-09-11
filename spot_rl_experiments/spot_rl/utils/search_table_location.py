@@ -410,7 +410,6 @@ def detect_place_point_by_pcd_method(
     print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
 
     img_with_bbox = None
-    visualize = True
     if visualize:
         img_with_bbox = img.copy()
         for xy in corners_xys:

@@ -20,7 +20,7 @@ if __name__ == "__main__":
         )
         spotskillmanager.nav("kitchen_counter")
         spotskillmanager.place(
-            "", is_local=True, visualize=False, enable_waypoint_estimation=True
+            None, is_local=True, visualize=False, enable_waypoint_estimation=True
         )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 

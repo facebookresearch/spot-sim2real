@@ -114,7 +114,6 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
-        print("USE MOBILE PICK VARIABLE IS SET TO :", self._use_mobile_pick)
         self.use_semantic_place = use_semantic_place
 
         # Create the spot object, init lease, and construct configs
@@ -176,7 +175,6 @@ class SpotSkillManager:
         )
 
         if place_config is None:
-            # TODO: overwrite the config
             self.place_config = (
                 construct_config_for_semantic_place()
                 if self.use_semantic_place
@@ -469,6 +467,18 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
+    def set_arm_joint_angles(self, place_target: str = None):
+        height = calculate_height(place_target)
+        if height < self.place_config.HEIGHT_THRESHOLD:
+            self.arm_joint_angles = (
+                self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
+            )
+        else:
+            self.arm_joint_angles = (
+                self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
+            )
+        return self.arm_joint_angles
+
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
@@ -489,7 +499,7 @@ class SpotSkillManager:
             verbose=self.verbose,
         )
 
-        if enable_waypoint_estimation is False:
+        if not enable_waypoint_estimation:
             # Get the place target coordinates
             try:
                 place_target_location = place_target_from_waypoint(
@@ -509,15 +519,8 @@ class SpotSkillManager:
                 is_local = True
         else:
             message = "No place target specified, estimating point through heuristic"
-            height = calculate_height(place_target)
-            if height < self.place_config.HEIGHT_THRESHOLD:
-                self.arm_joint_angles = (
-                    self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
-                )
-            else:
-                self.arm_joint_angles = (
-                    self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
-                )
+            # Estimate Joint angles from height of the object using Concept graph
+            self.arm_joint_angles = self.set_arm_joint_angles(place_target)
 
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
@@ -582,16 +585,8 @@ class SpotSkillManager:
             "next-to",
         ], f"Place skill does not support proposition of {proposition}"
 
-        height = calculate_height(object_target)
-        if height < self.place_config.HEIGHT_THRESHOLD:
-            print("HERE")
-            self.arm_joint_angles = (
-                self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
-            )
-        else:
-            self.arm_joint_angles = (
-                self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
-            )
+        # Estimate Joint angles from height of the object using Concept graph
+        self.arm_joint_angles = self.set_arm_joint_angles(object_target)
 
         # Esitmate the waypoint
         (
