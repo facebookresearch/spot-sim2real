@@ -140,20 +140,38 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
         hand_depth_unscaled = imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME]
         hand_rgb = imgs[Cam.HAND_COLOR]
+        empty_color_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        empty_depth_img = np.zeros((480, 640), dtype=np.uint16)
+        # intel_img_src = [Cam.INTEL_REALSENSE_COLOR]
+        # intel_realsense_color = spot.get_image_responses(
+        #     intel_img_src, quality=100, await_the_resp=False
+        # )
+        # intel_response = intel_realsense_color.result()[0]
+        # intel_image: np.ndarray = image_response_to_cv2(intel_response)
 
-        intel_img_src = [Cam.INTEL_REALSENSE_COLOR]
-        intel_realsense_color = spot.get_image_responses(
-            intel_img_src, quality=100, await_the_resp=False
-        )
-        intel_response = intel_realsense_color.result()[0]
-        intel_image: np.ndarray = image_response_to_cv2(intel_response)
-
-        intel_depth_src = [Cam.INTEL_REALSENSE_DEPTH]
-        intel_realsense_depth = spot.get_image_responses(
-            intel_depth_src, quality=100, await_the_resp=False
-        )
-        intel_response_depth = intel_realsense_depth.result()[0]
-        intel_image_depth: np.ndarray = image_response_to_cv2(intel_response_depth)
+        # intel_depth_src = [Cam.INTEL_REALSENSE_DEPTH]
+        # intel_realsense_depth = spot.get_image_responses(
+        #     intel_depth_src, quality=100, await_the_resp=False
+        # )
+        # intel_response_depth = intel_realsense_depth.result()[0]
+        # intel_image_depth: np.ndarray = image_response_to_cv2(intel_response_depth)
+        try:
+            intel_img_src = [Cam.INTEL_REALSENSE_COLOR]
+            intel_realsense_color = self.spot.get_image_responses(
+                intel_img_src, quality=100, await_the_resp=False
+            )
+            intel_response = intel_realsense_color.result()[0]
+            intel_image = image_response_to_cv2(intel_response)
+            intel_depth_src = [Cam.INTEL_REALSENSE_DEPTH]
+            intel_realsense_depth = self.spot.get_image_responses(
+                intel_depth_src, quality=100, await_the_resp=False
+            )
+            intel_response_depth = intel_realsense_depth.result()[0]
+            intel_image_depth = image_response_to_cv2(intel_response_depth)
+        except Exception as e:
+            rospy.logwarn(f"Failed to retrieve Intel RealSense color image: {e}")
+            intel_image = empty_color_img
+            intel_image_depth = empty_depth_img
 
         gripper_img_src = [Cam.HAND_COLOR]
         gripper_color = spot.get_image_responses(
