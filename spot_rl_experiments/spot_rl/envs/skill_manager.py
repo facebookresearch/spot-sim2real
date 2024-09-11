@@ -1,9 +1,9 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+# black: ignore-errors
 
-
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 import magnum as mn
 import numpy as np
@@ -36,6 +36,7 @@ from spot_rl.utils.search_table_location import (
     plot_place_point_in_gripper_image,
 )
 from spot_rl.utils.utils import (
+    calculate_height,
     get_waypoint_yaml,
     nav_target_from_waypoint,
     place_target_from_waypoint,
@@ -231,8 +232,8 @@ class SpotSkillManager:
         # Reset the policies and environments via the controllers
         raise NotImplementedError
 
-    @multimethod
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:
+    @multimethod  # type: ignore
+    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the nav action on the navigation target specified as a known string
 
@@ -466,8 +467,15 @@ class SpotSkillManager:
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
+    def set_arm_joint_angles(self, place_target: str = None):
+        height = calculate_height(place_target)
+        if height < self.place_config.HEIGHT_THRESHOLD:
+            return self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
+        else:
+            return self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
+
     @multimethod  # type: ignore
-    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False) -> Tuple[bool, str]:  # type: ignore
+    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
@@ -475,6 +483,7 @@ class SpotSkillManager:
             place_target (str): Name of the place target (as stored in waypoints.yaml)
             ee_orientation_at_grasping (list): The ee orientation at grasping. If users specifiy, the robot will place the object in the desired pose
                 This is only used for the semantic place skills.
+            enable_waypoint_estimation (bool) : This flag determines whether the place policy must use waypoint estimation or not
 
         Returns:
             bool: True if place was successful, False otherwise
@@ -485,7 +494,7 @@ class SpotSkillManager:
             verbose=self.verbose,
         )
 
-        if place_target is not None:
+        if not enable_waypoint_estimation:
             # Get the place target coordinates
             try:
                 place_target_location = place_target_from_waypoint(
@@ -495,7 +504,6 @@ class SpotSkillManager:
                 message = f"Failed - place target {place_target} not found - use the exact name"
                 conditional_print(message=message, verbose=self.verbose)
                 return False, message
-
             if self.use_semantic_place:
                 # Convert HOME frame coordinates into body frame
                 place_target_location = (
@@ -506,6 +514,9 @@ class SpotSkillManager:
                 is_local = True
         else:
             message = "No place target specified, estimating point through heuristic"
+            # Estimate Joint angles from height of the object using Concept graph
+            self.arm_joint_angles = self.set_arm_joint_angles(place_target)
+
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
             # estimate waypoint
@@ -516,7 +527,7 @@ class SpotSkillManager:
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
-                    self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
+                    self.arm_joint_angles,
                     percentile=0 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
@@ -569,6 +580,9 @@ class SpotSkillManager:
             "next-to",
         ], f"Place skill does not support proposition of {proposition}"
 
+        # Estimate Joint angles from height of the object using Concept graph
+        self.arm_joint_angles = self.set_arm_joint_angles(object_target)
+
         # Esitmate the waypoint
         (
             place_target_location,
@@ -578,7 +592,7 @@ class SpotSkillManager:
             object_target,
             proposition,
             self.spot,
-            self.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES,
+            self.arm_joint_angles,
             percentile=70,
             visualize=visualize,
             height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,

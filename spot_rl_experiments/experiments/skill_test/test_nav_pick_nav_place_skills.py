@@ -19,7 +19,9 @@ if __name__ == "__main__":
             enable_force_control=True,
         )
         spotskillmanager.nav("kitchen_counter")
-        spotskillmanager.place(None, is_local=True, visualize=False)
+        spotskillmanager.place(
+            None, is_local=True, visualize=False, enable_waypoint_estimation=True
+        )
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
 
     # Navigate to dock and shutdown
