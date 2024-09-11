@@ -470,14 +470,9 @@ class SpotSkillManager:
     def set_arm_joint_angles(self, place_target: str = None):
         height = calculate_height(place_target)
         if height < self.place_config.HEIGHT_THRESHOLD:
-            self.arm_joint_angles = (
-                self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
-            )
+            return self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
         else:
-            self.arm_joint_angles = (
-                self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
-            )
-        return self.arm_joint_angles
+            return self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
 
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
