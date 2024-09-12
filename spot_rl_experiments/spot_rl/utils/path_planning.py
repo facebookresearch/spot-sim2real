@@ -106,7 +106,7 @@ def fill_up_occupancy_grid(occupancy_grid):
 
 
 def get_occupancy_grid():
-    if False:  # osp.exists(CACHE_PATH):
+    if osp.exists(CACHE_PATH):
         with open(CACHE_PATH, "rb") as file:
             data = pkl.load(file)
             filled_data = fill_up_occupancy_grid(data)

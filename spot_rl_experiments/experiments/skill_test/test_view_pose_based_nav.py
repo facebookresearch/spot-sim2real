@@ -18,11 +18,9 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 )
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 2
-WAYPOINT_TEST = [
-    ([8.2, 6.0, 0.1], [1.3, 1.0, 0.8], ["teddy bear"])
-] * NUM_REPEAT  # x, y
-receptacle_name = "teddy_bear"
+NUM_REPEAT = 1
+WAYPOINT_TEST = [([4.3, -2.0, 0.6], [0.9, 0.7, 0.3], ["sink"])] * NUM_REPEAT  # x, y
+receptacle_name = "sink"
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
@@ -95,9 +93,8 @@ class SpotRosSkillExecutor:
                 VISUALIZE,
                 osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
             )
-            breakpoint()
-            # Sequentially give the point
             # breakpoint()
+            # Sequentially give the points
             if len(nav_pts) > 0:
                 final_pt_i = len(nav_pts) - 1
                 agg_metrics = {
