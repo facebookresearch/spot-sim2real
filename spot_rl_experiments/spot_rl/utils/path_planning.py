@@ -98,8 +98,13 @@ def fill_up_occupancy_grid(occupancy_grid):
     # temp hack to make bedroom dresser work
 
     grid = occupancy_grid["occupancy_grid"]
+    # for old graph
     grid[87, 59:68] = 1
     grid[73:87, 68] = 1
+    # for Jimmy's graph
+    grid[96:111, 69] = 1
+    grid[5:46, 68] = 1
+    grid[3:46, 68] = 1
     occupancy_grid["occupancy_grid"] = grid
     # breakpoint()
     return occupancy_grid
