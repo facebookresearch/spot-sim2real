@@ -11,10 +11,12 @@ from copy import deepcopy
 from typing import Any, List
 
 import blosc
+import bosdyn.client
 import cv2
 import magnum as mn
 import numpy as np
 import rospy
+from bosdyn.client.exceptions import RpcError
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from spot_rl.utils.depth_map_utils import filter_depth
@@ -123,23 +125,62 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         super().__init__()
         self.spot = spot
 
+    def _convert_np_to_msg(self, img: np.ndarray, encoding: str):
+        """
+        Converts a NumPy array to a ROS Image message.
+        """
+        try:
+            # Convert the NumPy array to a ROS Image message
+            img_msg = self.cv2_to_msg(img, encoding)
+            return img_msg
+        except Exception as e:
+            rospy.logwarn(f"Failed to convert NumPy array to ROS message: {e}")
+            # Return an empty message if conversion fails
+            return self.cv2_to_msg(np.zeros_like(img), encoding)
+
     def _publish(self):
         image_responses = self.spot.get_image_responses(
             self.sources[:2], quality=100, await_the_resp=False
         )
-        hand_image_responses = self.spot.get_hand_image()
+        # hand_image_responses = self.spot.get_hand_image()
         image_responses = image_responses.result()
-        image_responses.extend(hand_image_responses)
+        # image_responses.extend(hand_image_responses)
 
-        imgs_list = [image_response_to_cv2(r) for r in image_responses]
-        imgs = {k: v for k, v in zip(self.sources, imgs_list)}
+        try:
+            hand_image_responses = self.spot.get_hand_image()
+            image_responses.extend(hand_image_responses)
+            imgs_list = [image_response_to_cv2(r) for r in image_responses]
+            imgs = {k: v for k, v in zip(self.sources, imgs_list)}
+            # head_depth = np.hstack([imgs[Cam.FRONTRIGHT_DEPTH], imgs[Cam.FRONTLEFT_DEPTH]])
 
-        head_depth = np.hstack([imgs[Cam.FRONTRIGHT_DEPTH], imgs[Cam.FRONTLEFT_DEPTH]])
+            # head_depth = self._scale_depth(head_depth, head_depth=True)
+            hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
+            hand_depth_unscaled = imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME]
+            hand_rgb = imgs[Cam.HAND_COLOR]
 
-        head_depth = self._scale_depth(head_depth, head_depth=True)
-        hand_depth = self._scale_depth(imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME])
-        hand_depth_unscaled = imgs[Cam.HAND_DEPTH_IN_HAND_COLOR_FRAME]
-        hand_rgb = imgs[Cam.HAND_COLOR]
+        except RpcError as e:
+            rospy.logwarn(f"RpcError occurred while retrieving hand images: {e}")
+
+            # Assign empty images when there's an error
+            hand_rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+            hand_depth = np.zeros((480, 640), dtype=np.uint16)
+
+            hand_depth_unscaled = hand_depth
+            hand_depth = self._scale_depth(hand_depth)
+            hand_rgb = hand_rgb
+
+        if Cam.FRONTRIGHT_DEPTH in self.sources and Cam.FRONTLEFT_DEPTH in self.sources:
+            fr_right_depth = self.spot.get_image_responses(
+                [Cam.FRONTRIGHT_DEPTH], quality=100, await_the_resp=False
+            ).result()[0]
+            fr_left_depth = self.spot.get_image_responses(
+                [Cam.FRONTLEFT_DEPTH], quality=100, await_the_resp=False
+            ).result()[0]
+            fr_right_depth_img = image_response_to_cv2(fr_right_depth)
+            fr_left_depth_img = image_response_to_cv2(fr_left_depth)
+            head_depth = np.hstack([fr_right_depth_img, fr_left_depth_img])
+            head_depth = self._scale_depth(head_depth, head_depth=True)
+
         empty_color_img = np.zeros((480, 640, 3), dtype=np.uint8)
         empty_depth_img = np.zeros((480, 640), dtype=np.uint16)
         # intel_img_src = [Cam.INTEL_REALSENSE_COLOR]
@@ -212,6 +253,15 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         gripper_image,
         gripper_image_depth,
     ):
+        if head_depth.dtype != np.uint8:
+            raise ValueError("head_depth must be of type np.uint8 for mono8 encoding")
+        if hand_depth.dtype != np.uint8:
+            raise ValueError("hand_depth must be of type np.uint8 for mono8 encoding")
+        if hand_depth_unscaled.dtype != np.uint16:
+            raise ValueError(
+                "hand_depth_unscaled must be of type np.uint16 for mono16 encoding"
+            )
+
         head_depth_msg = self.cv2_to_msg(head_depth, "mono8")
         hand_depth_msg = self.cv2_to_msg(hand_depth, "mono8")
         hand_rgb_msg = self.cv2_to_msg(hand_rgb, "bgr8")

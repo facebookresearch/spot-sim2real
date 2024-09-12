@@ -48,6 +48,8 @@ try:
 except Exception:
     pass
 
+import signal
+
 from sensor_msgs.msg import Image
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pose_estimation import pose_estimation
@@ -698,8 +700,12 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.detections_buffer["filtered_depth"][self.detection_timestamp],
             )
             arm_depth = self.msg_to_cv2(filtered_hand_depth, "mono8")
+            if np.all(arm_depth == 0):
+                os.kill(os.getpid(), signal.SIGKILL)
         else:
             arm_depth = self.msg_to_cv2(self.filtered_hand_depth, "mono8")
+            if np.all(arm_depth == 0):
+                os.kill(os.getpid(), signal.SIGKILL)
 
         # Crop out black vertical bars on the left and right edges of aligned depth img
         arm_depth = arm_depth[:, LEFT_CROP:-RIGHT_CROP]

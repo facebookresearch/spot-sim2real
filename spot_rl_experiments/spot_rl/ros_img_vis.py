@@ -203,7 +203,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 processed_imgs.append(self.msg_to_cv2(processed_msgs[idx]))
             else:
                 processed_imgs.append(np.zeros_like(raw_imgs[idx]))
-
+        for i, img in enumerate(raw_imgs):
+            print(f"Shape of raw_img {i} ({RAW_IMG_TOPICS[i]}): {img.shape}")
+        for i, img in enumerate(processed_imgs):
+            print(f"Shape of raw_img {i} ({PROCESSED_IMG_TOPICS[i]}): {img.shape}")
         # Crop and process images as needed
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
