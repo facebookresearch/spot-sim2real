@@ -8,7 +8,7 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
     get_navigation_points,
 )
 
-bboxs_info = {
+bboxs_info_old = {
     "coffee_table": {
         "bbox_center": [
             2.6,
@@ -75,21 +75,68 @@ bboxs_info = {
         "object_tag": ["teddy bear"],
     },
 }
+
+bboxs_info = {
+    "sink": {
+        "bbox_center": [4.3, -2.0, 0.6],
+        "bbox_extent": [0.9, 0.7, 0.3],
+        "object_tag": ["sink"],
+        "object_id": 42,
+    },
+    "teddy bear": {
+        "id": 5,
+        "bbox_extent": [0.9, 0.7, 0.6],
+        "bbox_center": [9.0, 6.3, 0.1],
+        "object_tag": "dresser drawer",
+    },
+    "chair_besides_cabinet_in_living_room": {
+        "id": 8,
+        "bbox_extent": [1.3, 1.3, 0.9],
+        "bbox_center": [5.9, 4.7, 0.0],
+        "object_tag": "chair",
+    },
+    "cabinet_in_living_room": {
+        "id": 9,
+        "bbox_extent": [2.0, 1.0, 0.7],
+        "bbox_center": [6.0, 3.4, 0.1],
+        "object_tag": "wooden cabinet or drawer",
+    },
+    "office_shelf": {
+        "id": 20,
+        "bbox_extent": [2.0, 0.7, 0.6],
+        "bbox_center": [-0.7, 7.5, 0.2],
+        "object_tag": "wooden desk",
+    },
+    "cabinet": {
+        "id": 27,
+        "bbox_extent": [1.0, 0.8, 0.7],
+        "bbox_center": [2.1, 5.3, 0.1],
+        "object_tag": "wooden cabinet",
+    },
+    "kitchen_island": {
+        "id": 29,
+        "bbox_extent": [0.5, 0.3, 0.2],
+        "bbox_center": [3.4, -0.7, 0.5],
+        "object_tag": "chair",
+    },
+}
+
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "dining_table":  # receptacle_name == "teddy_bear":
+    if receptacle_name == "coffee_table":  # receptacle_name == "teddy_bear":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
+        if isinstance(bbox_info["object_tag"], str):
+            bbox_info["object_tag"] = [bbox_info["object_tag"]]
         # Get the view poses
         view_poses = get_view_poses(
             bbox_info["bbox_center"],
             bbox_info["bbox_extent"],
             bbox_info["object_tag"],
-            [],
             VISUALIZE,
         )
         # Get the robot x, y, yaw

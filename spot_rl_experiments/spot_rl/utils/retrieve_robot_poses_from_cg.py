@@ -16,10 +16,14 @@ from spot_rl.utils.path_planning import get_xyzxyz, plt
 PATH_TO_CACHE_FILE = osp.join(
     osp.dirname(osp.abspath(__file__)), "scene_map_cfslam_pruned.pkl.gz"
 )
-PATH_TO_RAW_DATA_PKL = osp.join(osp.dirname(osp.abspath(__file__)), "data.pkl")
+PATH_TO_RAW_DATA_PKL = osp.join(osp.dirname(osp.abspath(__file__)), "data_old.pkl")
 VISUALIZE = True
+POSES_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "poses")
+RGB_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "rgb")
 VISUALIZATION_DIR = "image_vis_for_mined_rgb_from_cg"
 ANCHOR_OBJECT_CENTER = np.array([8.2, 6.0, 0.1])
+USE_YOLO = False
+SCAN_TYPE = "r3d"
 
 
 def resize_crop(masked_rgb_image, x1, y1, x2, y2):
@@ -53,7 +57,10 @@ def resize_crop(masked_rgb_image, x1, y1, x2, y2):
 
 
 def get_index_in_raw_data(rgb_path: str) -> int:
-    return int(osp.basename(rgb_path).split(".")[0][5:])
+    if SCAN_TYPE == "r3d":
+        return int(osp.basename(rgb_path).split(".")[0])
+    else:
+        return int(osp.basename(rgb_path).split(".")[0][5:])
 
 
 def draw_bbox_with_confidence(image, bbox, confidence):
@@ -133,6 +140,27 @@ def get_pixel_area(x1, y1, x2, y2):
     return int(w * h)
 
 
+def get_robot_view_pose_from_raw_data(index_in_raw_data, raw_data):
+    if SCAN_TYPE == "r3d":
+        pose_path = osp.join(POSES_PATH, f"{index_in_raw_data}.npy")
+        assert osp.exists(pose_path)
+        pose = np.load(pose_path)
+        return pose[:3, 3]  # third compo should be yaw
+    else:
+        assert raw_data is not None
+        return raw_data[index_in_raw_data]["base_pose_xyt"]
+
+
+def get_rgb_image_from_raw_data(index_in_raw_data, raw_data):
+    if SCAN_TYPE == "r3d":
+        rgb_path = osp.join(RGB_PATH, f"{index_in_raw_data}.png")
+        assert osp.exists(rgb_path)
+        return cv2.imread(rgb_path)
+    else:
+        assert raw_data is not None
+        return raw_data[index_in_raw_data]["camera_data"][0]["raw_image"]
+
+
 socket = None
 
 
@@ -172,8 +200,10 @@ def get_view_poses(
     data_list = []
     previously_seen_data = {}
     raw_data = None
-    with open(PATH_TO_RAW_DATA_PKL, "rb") as f:
-        raw_data = pickle.load(f)
+
+    if SCAN_TYPE != "r3d":
+        with open(PATH_TO_RAW_DATA_PKL, "rb") as f:
+            raw_data = pickle.load(f)
 
     if visulize:
         try:
@@ -209,7 +239,9 @@ def get_view_poses(
             min_dist = min(min_dist, dist_to_anchor_center)
             if (
                 dist_to_anchor_center < dist_thresh
-            ):  # and object_item["caption_dict"]["response"]["object_tag"] == object_tags[0]:
+                and object_item["caption_dict"]["response"]["object_tag"]
+                == object_tags[0]
+            ):
                 print(f"Detected classes around given receptacle {set(class_names)}")
                 # if class_name in query_class_names
                 for class_i in range(len(object_item["color_path"])):
@@ -219,14 +251,14 @@ def get_view_poses(
                     add_data_flag = True
                     bbox = object_item["xyxy"][class_i]
                     pixel_area = object_item["pixel_area"][class_i]
-
                     # yoloworld detection
-                    raw_image = raw_image_in_data = raw_data[index_in_raw_data][
-                        "camera_data"
-                    ][0]["raw_image"]
-                    bbox, conf, pixel_area = detect_with_yolo(
-                        raw_image, object_tags, visualize=False
-                    )
+                    if USE_YOLO:
+                        raw_image = get_rgb_image_from_raw_data(
+                            index_in_raw_data, raw_data
+                        )
+                        bbox, conf, pixel_area = detect_with_yolo(
+                            raw_image, object_tags, visualize=False
+                        )
 
                     if bbox is None:
                         continue
@@ -254,21 +286,21 @@ def get_view_poses(
                             "pixel_area": pixel_area,
                             "rgb_path": rgb_path,
                             "index_in_raw_data": index_in_raw_data,
-                            "robot_xy_yaw": raw_data[index_in_raw_data][
-                                "base_pose_xyt"
-                            ],
+                            "robot_xy_yaw": get_robot_view_pose_from_raw_data(
+                                index_in_raw_data, raw_data
+                            ),
                         }
                         # print(f'Yaw Gripper {yaw_gripper}, Yaw BAse {np.rad2deg(raw_data[index_in_raw_data]["base_pose_xyt"][-1])}')
                         if visulize:
-                            raw_image_in_data = raw_data[index_in_raw_data][
-                                "camera_data"
-                            ][0]["raw_image"]
+                            raw_image_in_data = get_rgb_image_from_raw_data(
+                                index_in_raw_data, raw_data
+                            )
                             image_vis = draw_bbox_with_confidence(
                                 raw_image_in_data, data["bbox"], data["conf"]
                             )
                             cv2.imwrite(
                                 osp.join(
-                                    VISUALIZATION_DIR,
+                                    visualize_dir,
                                     f"comparison_{len(data_list)}.png",
                                 ),
                                 image_vis,

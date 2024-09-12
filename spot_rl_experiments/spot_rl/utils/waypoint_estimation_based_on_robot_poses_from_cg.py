@@ -99,9 +99,12 @@ def intersect_ray_with_aabb(ray_origin, ray_direction, box_min, box_max):
     return True, intersection_point_1, intersection_point_2, t_min, t_max
 
 
-def determin_nearest_edge(robot_xy, bbox_centers, boxMin, boxMax, static_offset=0.0):
+def determin_nearest_edge(
+    robot_xy, bbox_centers, boxMin, boxMax, static_offset=0.0, nonreachable_indices=[]
+):
     if len(bbox_centers) == 3:
         bbox_centers = bbox_centers[:2]
+    assert len(nonreachable_indices) < 4, "all edges seem to be non reachable"
     raydir = (bbox_centers - robot_xy) / np.linalg.norm(bbox_centers - robot_xy)
     STATIC_OFFSET = static_offset
     (x1, y1), (x2, y2) = boxMin[:2], boxMax[:2]
@@ -132,15 +135,21 @@ def determin_nearest_edge(robot_xy, bbox_centers, boxMin, boxMax, static_offset=
         (face_4_vector, face_4_adjusted),
     ]
     angles_betwn_approach_vector_and_faces = [
-        angle_between_vectors(raydir[:2], face[0])[1] for face in faces
+        angle_between_vectors(raydir[:2], face[0])[1]
+        if idx not in nonreachable_indices
+        else 180
+        for idx, face in enumerate(faces)
     ]
     min_idx = np.argmin(angles_betwn_approach_vector_and_faces)
     _ = angles_betwn_approach_vector_and_faces[min_idx]
     nearestfacevector, nearestface = faces[min_idx]
 
     yaw_calc = angle_and_sign_between_vectors(np.array([1, 0]), nearestfacevector)
-
-    return nearestface, nearestfacevector, yaw_calc
+    other_waypoints = [
+        face[1].tolist() + [angle_and_sign_between_vectors(np.array([1, 0]), face[0])]
+        for face in faces
+    ]
+    return nearestface, nearestfacevector, yaw_calc, other_waypoints
 
 
 def get_max_diag_dist_using_pcd():
@@ -177,7 +186,10 @@ def sort_robot_view_poses_from_cg(
 
 
 def get_waypoint_from_robot_view_poses(
-    robot_view_poses, bbox_centers: np.ndarray, bbox_extents: np.ndarray
+    robot_view_poses,
+    bbox_centers: np.ndarray,
+    bbox_extents: np.ndarray,
+    nonreachable_edges_indices=[],
 ):
     sorted_robot_view_poses = sort_robot_view_poses_from_cg(
         robot_view_poses, bbox_centers, 0.33, 0.33, 0.33
@@ -185,12 +197,17 @@ def get_waypoint_from_robot_view_poses(
     best_robot_view_pos = sorted_robot_view_poses[0]
     print(f"Best robot view pose {best_robot_view_pos}")
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
-    nearestedge, facevector, yaw_calc = determin_nearest_edge(
-        best_robot_view_pos[0][:2], bbox_centers, boxMin, boxMax, 0.5
+    nearestedge, facevector, yaw_calc, other_waypoints = determin_nearest_edge(
+        best_robot_view_pos[0][:2],
+        bbox_centers,
+        boxMin,
+        boxMax,
+        0.5,
+        nonreachable_edges_indices,
     )
     waypoint = nearestedge.tolist()
     waypoint.append(yaw_calc)
-    return waypoint, best_robot_view_pos
+    return waypoint, best_robot_view_pos, other_waypoints
 
 
 def get_navigation_points(
@@ -220,9 +237,40 @@ def get_navigation_points(
             ]
         )
 
-    waypoint, best_robot_view_pos = get_waypoint_from_robot_view_poses(
-        robot_view_poses, bbox_centers, bbox_extents
+    _, _, _, four_waypoint_edges = determin_nearest_edge(
+        np.array([0, 0]), bbox_centers, boxMin, boxMax, static_offset=0.5
     )
+    # filter edges based on reachability
+    nonreachable_edges_indices = []
+    reachable_indices = []
+    reachable_paths = []
+    for wei, waypoint_edge in enumerate(four_waypoint_edges):
+        path_edge = path_planning_using_a_star(
+            cur_robot_xy, waypoint_edge[:2]  # best_robot_view_pos[0][:2]
+        )
+        if not len(path_edge):
+            nonreachable_edges_indices.append(wei)
+        else:
+            reachable_indices.append(wei)
+            reachable_paths.append(path_edge)
+    print(f"non reachable indices {nonreachable_edges_indices}")
+    if len(nonreachable_edges_indices) == 4:
+        # either raise error or consider it path planning failure & continue
+        nonreachable_edges_indices = []
+
+    if len(nonreachable_edges_indices) == 3:
+        # no need to test robot view poses since only 1 edge is reachable
+        waypoint = four_waypoint_edges[reachable_indices[0]]
+        path = reachable_paths[0]
+    else:
+        (
+            waypoint,
+            best_robot_view_pos,
+            other_waypoints,
+        ) = get_waypoint_from_robot_view_poses(
+            robot_view_poses, bbox_centers, bbox_extents, nonreachable_edges_indices
+        )
+
     path = path_planning_using_a_star(
         cur_robot_xy,  # best_robot_view_pos[0][:2]
         waypoint[:2],
