@@ -151,7 +151,12 @@ class SpotRosSkillExecutor:
                     bbox_center_place, bbox_extent_place, query_class_place, metric_list
                 )
                 if nav_suc:
-                    self.spotskillmanager.place(None)
+                    self.spotskillmanager.place(
+                        query_class_place[0],
+                        is_local=True,
+                        visualize=False,
+                        enable_waypoint_estimation=True,
+                    )
 
             # breakpoint()
             # Reset
