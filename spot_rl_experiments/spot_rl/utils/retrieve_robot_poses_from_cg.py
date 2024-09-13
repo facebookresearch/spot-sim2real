@@ -13,13 +13,14 @@ from spot_rl.utils.path_planning import get_xyzxyz, plt
 
 # new changes: Select view poses based on distance
 # query_class_names = ["furniture", "counter", "locker", "vanity", "wine glass"]  # keep all the class names as same as possible
+ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocessed"  # osp.dirname(osp.abspath(__file__))
 PATH_TO_CACHE_FILE = osp.join(
-    osp.dirname(osp.abspath(__file__)), "scene_map_cfslam_pruned.pkl.gz"
+    ROOT_PATH, "sg_cache", "map", "scene_map_cfslam_pruned.pkl.gz"
 )
-PATH_TO_RAW_DATA_PKL = osp.join(osp.dirname(osp.abspath(__file__)), "data_old.pkl")
+PATH_TO_RAW_DATA_PKL = osp.join(ROOT_PATH, "data_old.pkl")
 VISUALIZE = True
-POSES_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "poses")
-RGB_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "rgb")
+POSES_PATH = osp.join(ROOT_PATH, "poses")
+RGB_PATH = osp.join(ROOT_PATH, "rgb")
 VISUALIZATION_DIR = "image_vis_for_mined_rgb_from_cg"
 ANCHOR_OBJECT_CENTER = np.array([8.2, 6.0, 0.1])
 USE_YOLO = False
@@ -194,6 +195,7 @@ def get_view_poses(
     anchor_object_center,
     anchor_object_extent,
     object_tags,
+    object_id=None,
     visulize=False,
     visualize_dir=VISUALIZATION_DIR,
 ):
@@ -237,6 +239,9 @@ def get_view_poses(
 
             # bbox_center_from_caption_field = object_item["caption_dict"]["bbox_center"]
             min_dist = min(min_dist, dist_to_anchor_center)
+            # if int(object_item["caption_dict"]["id"]) == int(object_id):
+            #     breakpoint()
+            # breakpoint()
             if (
                 dist_to_anchor_center < dist_thresh
                 and object_item["caption_dict"]["response"]["object_tag"]

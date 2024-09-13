@@ -76,7 +76,7 @@ bboxs_info_old = {
     },
 }
 
-bboxs_info = {
+bboxs_info_iphone_fixed_classes_old_jmmy = {
     "sink": {
         "bbox_center": [4.3, -2.0, 0.6],
         "bbox_extent": [0.9, 0.7, 0.3],
@@ -121,13 +121,83 @@ bboxs_info = {
     },
 }
 
+bboxs_info = {
+    "coffee_table": {
+        "id": 68,
+        "bbox_extent": [0.9, 0.5, 0.3],
+        "bbox_center": [2.3, 2.3, -0.1],
+        "object_tag": "coffee table",
+    },
+    "sink": {
+        "id": 119,
+        "bbox_extent": [0.9, 0.7, 0.3],
+        "bbox_center": [4.3, -2.0, 0.6],
+        "object_tag": "sink",
+    },
+    "dining_table": {
+        "id": 95,
+        "bbox_extent": [1.7, 0.7, 0.1],
+        "bbox_center": [0.1, -2.0, 0.5],
+        "object_tag": "dining table",
+    },
+    "teddy_bear": {
+        "id": 10,
+        "bbox_extent": [1.4, 0.9, 0.2],
+        "bbox_center": [8.8, 6.1, 0.0],
+        "object_tag": "cabinet",
+        "category_tag": "furniture",
+    },
+    "cabinet": {
+        "id": 35,
+        "bbox_extent": [0.9, 0.5, 0.4],
+        "bbox_center": [1.4, 5.8, 0.0],
+        "object_tag": "cabinet",
+    },
+    "box_of_cereal": {
+        "id": 135,
+        "bbox_extent": [0.7, 0.6, 0.1],
+        "bbox_center": [4.9, -4.5, 0.8],
+        "object_tag": "gas stove",
+    },
+    "wooden_dresser": {
+        "id": 23,
+        "bbox_extent": [2.0, 1.1, 0.7],
+        "bbox_center": [6.0, 3.4, 0.1],
+        "object_tag": "furniture",
+    },
+    "office_chair": {
+        "id": 38,
+        "bbox_extent": [0.7, 0.5, 0.1],
+        "bbox_center": [0.3, 7.3, 0.3],
+        "object_tag": "chair",
+    },
+    "white_couch": {
+        "id": 33,
+        "bbox_extent": [0.4, 0.4, 0.1],
+        "bbox_center": [2.8, 2.3, 0.1],
+        "object_tag": "white couch",
+    },
+    "kitchen_island": {
+        "id": 154,
+        "bbox_extent": [0.8, 0.5, 0.3],
+        "bbox_center": [3.2, -1.1, 0.5],
+        "object_tag": "chair",
+    },
+    "shelf": {
+        "id": 51,
+        "bbox_extent": [1.5, 0.8, 0.6],
+        "bbox_center": [-0.9, 8.3, 1.1],
+        "object_tag": "shelf",
+    },
+}
+
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "coffee_table":  # receptacle_name == "teddy_bear":
+    if receptacle_name == "cabinet":  # receptacle_name == "teddy_bear":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):
@@ -137,6 +207,7 @@ for receptacle_name in bboxs_info:
             bbox_info["bbox_center"],
             bbox_info["bbox_extent"],
             bbox_info["object_tag"],
+            bbox_info.get("id", None),
             VISUALIZE,
         )
         # Get the robot x, y, yaw

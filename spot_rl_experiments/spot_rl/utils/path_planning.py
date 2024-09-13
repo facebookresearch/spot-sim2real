@@ -211,12 +211,32 @@ def convert_path_to_real_waypoints(path, min_x, min_y):
     return filter_path
 
 
+def convert_real_waypoint_to_occupancy_pixel(
+    x,
+    y,
+    occupancy_min_x,
+    occupancy_max_x,
+    occupancy_min_y,
+    occupancy_max_y,
+    occupancy_scale,
+):
+    X = floor(
+        map_x_from_cg_to_grid(x, occupancy_min_x, occupancy_max_x) * occupancy_scale
+    )
+    Y = floor(
+        map_y_from_cg_to_grid(y, occupancy_min_y, occupancy_max_y) * occupancy_scale
+    )
+    return X, Y
+
+
 def path_planning_using_a_star(
     xy_position_robot_in_cg,
     goal_xy,
     save_fig_name=None,
     visualize=False,
     other_view_poses=None,
+    all_faces=None,
+    best_view_pose=None,
     occupancy_grid=None,
     occupancy_max_x=None,
     occupancy_max_y=None,
@@ -238,31 +258,27 @@ def path_planning_using_a_star(
             occupancy_grid, structure=DILATION_MAT
         ).astype(int)
 
-    X = floor(
-        map_x_from_cg_to_grid(
-            xy_position_robot_in_cg[0], occupancy_min_x, occupancy_max_x
-        )
-        * occupancy_scale
+    start_in_grid = convert_real_waypoint_to_occupancy_pixel(
+        *xy_position_robot_in_cg,
+        occupancy_min_x,
+        occupancy_max_x,
+        occupancy_min_y,
+        occupancy_max_y,
+        occupancy_scale,
     )
-    Y = floor(
-        map_y_from_cg_to_grid(
-            xy_position_robot_in_cg[1], occupancy_min_y, occupancy_max_y
-        )
-        * occupancy_scale
-    )
-    start_in_grid = np.array([X, Y])
+    start_in_grid = np.array(start_in_grid)
 
     occupancy_grid_visualization = binary_to_image(occupancy_grid.copy())
     bestpath = None
-    X = floor(
-        map_x_from_cg_to_grid(goal_xy[0], occupancy_min_x, occupancy_max_x)
-        * occupancy_scale
+    goal_in_grid = convert_real_waypoint_to_occupancy_pixel(
+        *goal_xy,
+        occupancy_min_x,
+        occupancy_max_x,
+        occupancy_min_y,
+        occupancy_max_y,
+        occupancy_scale,
     )
-    Y = floor(
-        map_y_from_cg_to_grid(goal_xy[1], occupancy_min_y, occupancy_max_y)
-        * occupancy_scale
-    )
-    goal_in_grid = np.array([X, Y])
+    goal_in_grid = np.array(goal_in_grid)
     print(f"start pos {start_in_grid}, goal in grid {goal_in_grid}")
     path = astar(
         dilated_occupancy_grid,
@@ -277,14 +293,33 @@ def path_planning_using_a_star(
         (255, 0, 0),
         1,
     )
+
+    if all_faces is not None:
+        for face in all_faces:
+            u, v = face[:2]
+            u, v = convert_real_waypoint_to_occupancy_pixel(
+                u,
+                v,
+                occupancy_min_x,
+                occupancy_max_x,
+                occupancy_min_y,
+                occupancy_max_y,
+                occupancy_scale,
+            )
+            occupancy_grid_visualization = cv2.circle(
+                occupancy_grid_visualization,
+                (v, u),
+                1,
+                (0, 0, 255),
+                1,
+            )
     occupancy_grid_visualization = cv2.circle(
         occupancy_grid_visualization,
         (goal_in_grid[1], goal_in_grid[0]),
         1,
-        (0, 0, 255),
+        (238, 211, 14),
         1,
     )
-
     if len(path) > 0:
         filter_path = convert_path_to_real_waypoints(
             path, occupancy_min_x, occupancy_min_y
@@ -323,7 +358,24 @@ def path_planning_using_a_star(
                 (0, 255, 255),
                 -1,
             )
-
+    if best_view_pose is not None:
+        u, v = best_view_pose
+        u, v = convert_real_waypoint_to_occupancy_pixel(
+            u,
+            v,
+            occupancy_min_x,
+            occupancy_max_x,
+            occupancy_min_y,
+            occupancy_max_y,
+            occupancy_scale,
+        )
+        occupancy_grid_visualization = cv2.circle(
+            occupancy_grid_visualization,
+            (v, u),
+            1,
+            (127, 94, 24),
+            -1,
+        )
     if visualize:
         plt.imshow(occupancy_grid_visualization, cmap="gray")
         plt.title("Path Planning")

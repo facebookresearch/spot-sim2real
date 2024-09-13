@@ -10,6 +10,8 @@ from spot_rl.utils.path_planning import (
     pkl,
 )
 
+STATIC_OFFSET = 0.5
+
 
 def angle_and_sign_between_vectors(a, b):
     """
@@ -202,7 +204,7 @@ def get_waypoint_from_robot_view_poses(
         bbox_centers,
         boxMin,
         boxMax,
-        0.5,
+        STATIC_OFFSET,
         nonreachable_edges_indices,
     )
     waypoint = nearestedge.tolist()
@@ -238,7 +240,7 @@ def get_navigation_points(
         )
 
     _, _, _, four_waypoint_edges = determin_nearest_edge(
-        np.array([0, 0]), bbox_centers, boxMin, boxMax, static_offset=0.5
+        np.array([0, 0]), bbox_centers, boxMin, boxMax, static_offset=STATIC_OFFSET
     )
     # filter edges based on reachability
     nonreachable_edges_indices = []
@@ -257,11 +259,13 @@ def get_navigation_points(
     if len(nonreachable_edges_indices) == 4:
         # either raise error or consider it path planning failure & continue
         nonreachable_edges_indices = []
+    # nonreachable_edges_indices =[]
 
     if len(nonreachable_edges_indices) == 3:
         # no need to test robot view poses since only 1 edge is reachable
         waypoint = four_waypoint_edges[reachable_indices[0]]
         path = reachable_paths[0]
+        best_robot_view_pos = robot_view_poses[0]
     else:
         (
             waypoint,
@@ -277,6 +281,8 @@ def get_navigation_points(
         savefigname,
         visualize=visualize,
         other_view_poses=[view_pose[0][:2] for view_pose in robot_view_poses],  # type: ignore
+        all_faces=four_waypoint_edges if visualize else None,
+        best_view_pose=best_robot_view_pos[0][:2] if visualize else None,
     )
     waypoint[-1] = np.deg2rad(waypoint[-1])
     path.append(waypoint)
