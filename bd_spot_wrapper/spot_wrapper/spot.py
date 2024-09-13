@@ -14,6 +14,7 @@
 import os
 import os.path as osp
 import time
+import traceback
 from collections import OrderedDict
 from typing import Any, Dict, List, Tuple
 
@@ -215,9 +216,14 @@ class Spot:
             self.intelrealsense_image_client = robot.ensure_client(
                 "intel-realsense-image-service"
             )
+            self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
+            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
+
         except Exception:
             print("There is no intel-realsense-image_service. Using gripper cameras")
             self.intelrealsense_image_client = None
+            self.gripper_T_intel = None
+            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
 
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
@@ -229,20 +235,9 @@ class Spot:
             InverseKinematicsClient.default_service_name
         )
 
-        # TODO: Add safety net
-        self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
-        print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
-
         # Used to re-center origin of global frame
-        if osp.isfile(HOME_TXT):
-            with open(HOME_TXT) as f:
-                data = f.read()
-            self.global_T_home = np.array([float(d) for d in data.split(", ")[:9]])
-            self.global_T_home = self.global_T_home.reshape([3, 3])
-            self.robot_recenter_yaw = float(data.split(", ")[-1])
-        else:
-            self.global_T_home = None
-            self.robot_recenter_yaw = None
+        # Read home.txt file and port its contents.
+        (self.global_T_home, self.robot_recenter_yaw) = self.read_home_robot()
 
         # Print the battery charge level of the robot
         self.loginfo(f"Current battery charge: {self.get_battery_charge()}%")
@@ -1125,19 +1120,45 @@ class Spot:
         )
         return local_T_global
 
-    def home_robot(self, write_to_file: bool = False):
-        print(f"Updating robot pose w.r.t home. write_to_file={write_to_file}")
-        x, y, yaw = self.get_xy_yaw(use_boot_origin=True)
-        local_T_global = self._get_local_T_global()
-        self.global_T_home = np.linalg.inv(local_T_global)
-        self.robot_recenter_yaw = yaw
+    def write_home_robot(self):
+        """
+        Updates home frame to current robot frame. Spot-sim2real uses home frame as its global frame for all skills
+        """
+        # Init local variables
+        global_T_home = None
+        robot_recenter_yaw = None
 
-        if write_to_file:
-            as_string = list(self.global_T_home.flatten()) + [yaw]
+        print("Updating robot pose w.r.t home in home.txt")
+        _, _, yaw = self.get_xy_yaw(use_boot_origin=True)  # vision_T_body
+        local_T_global = self._get_local_T_global()
+        global_T_home = np.linalg.inv(local_T_global)
+        robot_recenter_yaw = yaw
+
+        try:
+            as_string = list(global_T_home.flatten()) + [robot_recenter_yaw]
             as_string = f"{as_string}"[1:-1]  # [1:-1] removes brackets
             with open(HOME_TXT, "w") as f:
                 f.write(as_string)
-            self.loginfo(f"Wrote:\n{as_string}\nto: {HOME_TXT}")
+            print(f"Wrote: \n{as_string}\nto: {HOME_TXT}")
+        except Exception:
+            print(
+                "Encountered exception while persisting global_T_home into home.txt file",
+                traceback.print_exc(),
+            )
+
+    def read_home_robot(self):
+        """Returns - Tuple of global_T_home & robot_recenter_yaw. Both will be None if Home.txt file doesn't exist"""
+        print("Reading robot pose w.r.t home from home.txt")
+        global_T_home = None
+        robot_recenter_yaw = None
+        if osp.isfile(HOME_TXT):
+            with open(HOME_TXT) as f:
+                data = f.read()
+            global_T_home = np.array([float(d) for d in data.split(", ")[:9]])
+            global_T_home = global_T_home.reshape([3, 3])
+            robot_recenter_yaw = float(data.split(", ")[-1])
+
+        return (global_T_home, robot_recenter_yaw)
 
     def get_base_transform_to(self, child_frame):
         kin_state = self.robot_state_client.get_robot_state().kinematic_state
@@ -1146,7 +1167,7 @@ class Spot:
         ).parent_tform_child
         return kin_state.position, kin_state.rotation
 
-    def dock(self, dock_id: int = DOCK_ID, home_robot: bool = False) -> None:
+    def dock(self, dock_id: int = DOCK_ID, home_robot: bool = True) -> None:
         """
         Dock the robot to the specified dock
         `blocking_dock_robot` will also move the robot to the dock if the dock is in view
@@ -1156,11 +1177,18 @@ class Spot:
             dock_id: The dock to dock to
             home_robot: Whether to reset home the robot after docking
         """
+        # If spot is NOT on docking station, blocking_dock_robot will raise an exception
+        # and home_txt will not get updated
         blocking_dock_robot(self.robot, dock_id)
         if home_robot:
-            self.home_robot(write_to_file=True)
+            print("Will Home Robot")
+            self.write_home_robot()
 
     def undock(self):
+        """
+        DO NOT USE THIS FUNCTION DIRECTLY.
+        USE def power_robot() INSTEAD.
+        """
         blocking_undock(self.robot)
 
     def power_robot(self):
@@ -1169,32 +1197,64 @@ class Spot:
         """
         self.power_on()
 
+        most_recent_global_T_home_and_yaw_tuple = self.read_home_robot()
+        exception_free_undocking: bool = True
+
         # Undock if docked, otherwise stand up
         try:
             self.undock()
         except Exception:
             print("Undocking failed: just standing up instead...")
+            exception_free_undocking = False
             self.blocking_stand()
 
-    def shutdown(self, should_dock: bool = False) -> None:
+        if exception_free_undocking:
+            print(
+                "Robot undocked from docking station without exceptions, will update self.global_T_home"
+            )
+            (
+                self.global_T_home,
+                self.robot_recenter_yaw,
+            ) = most_recent_global_T_home_and_yaw_tuple
+        else:
+            print("Exception occured, will NOT update self.global_T_home")
+
+    def shutdown(self, should_dock: bool = False, home_robot=True) -> None:
         """
         Stops the robot and docks it if should_dock is True else sits the robot down
 
         Args:
             should_dock: bool indicating whether to dock the robot or not
+            home_robot: bool indicating whether home.txt file should be updated or not
         """
+        print(f"Called spot.shutdown() with should_dock={should_dock}")
         try:
+            successful_docking = True
             if should_dock:
-                print("Executing automatic docking")
+                print(
+                    f"Executing automatic docking for Dock_ID={DOCK_ID}, home_robot={home_robot}"
+                )
                 dock_start_time = time.time()
                 while time.time() - dock_start_time < 2:
                     try:
-                        self.dock(dock_id=DOCK_ID, home_robot=True)
+                        print("Searching for dock")
+                        self.dock(dock_id=DOCK_ID, home_robot=home_robot)
+                        successful_docking = True
                     except Exception:
+                        print(
+                            "Exception occured while docking : ", traceback.print_exc()
+                        )
                         print("Dock not found... trying again")
+                        successful_docking = False
                         time.sleep(0.1)
-            else:
-                print("Will sit down here")
+
+            print(
+                f"Docking status - should_dock={should_dock} , successful_docking={successful_docking}"
+            )
+            if not (should_dock and successful_docking):
+                print(
+                    "Did not reset home due as didn't dock on base. \nWill sit down here."
+                )
                 self.sit()
         finally:
             self.power_off()

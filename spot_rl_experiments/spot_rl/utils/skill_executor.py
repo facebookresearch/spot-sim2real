@@ -76,7 +76,7 @@ class SpotRosSkillExecutor:
             # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, is_local=True)
             # Call semantic place skills
             succeded, msg = self.spotskillmanager.place(
-                None, is_local=True, visualize=False
+                None, is_local=True, visualize=False, enable_waypoint_estimation=True
             )
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":

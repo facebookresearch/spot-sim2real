@@ -4,12 +4,15 @@
 
 
 import argparse
+import json
+import os
 import os.path as osp
 from collections import OrderedDict
 
 import numpy as np
 import rospy
 import yaml
+from spot_rl.utils.construct_configs import construct_config_for_semantic_place
 from yacs.config import CfgNode as CN
 
 this_dir = osp.dirname(osp.abspath(__file__))
@@ -155,6 +158,50 @@ def arr2str(arr):
     if arr is not None:
         return f"[{', '.join([f'{i:.2f}' for i in arr])}]"
     return
+
+
+def calculate_height(object_tag):
+    default_config = construct_config_for_semantic_place()
+    script_dir = os.path.dirname(__file__)
+    json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
+
+    with open(json_file_path) as f:
+        world_graph = json.load(f)
+    try:
+        object_id_str, object_tag = object_tag.split("_", 1)
+        object_id = int(object_id_str)
+    except ValueError:
+        print(f"Invalid object_tag format: '{object_tag}'")
+        default_config = construct_config_for_semantic_place()
+        default_height = default_config.HEIGHT_THRESHOLD
+        return default_height
+
+    default_height = default_config.HEIGHT_THRESHOLD
+    for rel in world_graph:
+        for key, value in rel.items():
+            if isinstance(value, dict):
+                if (
+                    value.get("id") == object_id
+                    and value.get("object_tag") == object_tag
+                ):
+                    object_node = value
+                    # Extract the height
+                    if "bbox_center" in object_node and "bbox_extent" in object_node:
+                        bbox_center = object_node["bbox_center"]
+                        bbox_extent = object_node["bbox_extent"]
+                        # Calculate the height
+                        height = bbox_center[2] + bbox_extent[2]
+                        return height
+                    else:
+                        print(
+                            f"Object with ID '{object_id}' and tag '{object_tag}' missing bbox properties! Returning Default Height"
+                        )
+                        return default_height
+    # If the object tag is empty, we return the threhold height
+    print(
+        f"Object with ID '{object_id}' and tag '{object_tag}' not found in world_graph"
+    )
+    return default_height
 
 
 class FixSizeOrderedDict(OrderedDict):
