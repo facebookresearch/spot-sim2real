@@ -469,7 +469,10 @@ class SpotSkillManager:
         return status, message
 
     def set_arm_joint_angles(self, place_target: str = None):
-        height = calculate_height(place_target)
+        try:
+            height = calculate_height(place_target)
+        except Exception:
+            height = 0.90
         if height < self.place_config.HEIGHT_THRESHOLD:
             return self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
         else:
