@@ -118,10 +118,8 @@ class SpotRosSkillExecutor:
             # Use the following for the hardcode waypoint place
             # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, is_local=True)
             # Call semantic place skills
-            skill_input = skill_input.split("_")[1]
-            print(f"input to place: {skill_input}")
             succeded, msg = self.spotskillmanager.place(
-                skill_input,
+                None,
                 is_local=True,
                 visualize=False,
                 enable_waypoint_estimation=True,
