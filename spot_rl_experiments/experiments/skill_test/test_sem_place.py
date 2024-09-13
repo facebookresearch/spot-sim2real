@@ -32,7 +32,7 @@ if __name__ == "__main__":
         rospy.set_param("is_gripper_blocked", 0)
         spotskillmanager.place(place_target, is_local=is_local, visualize=False)
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
-    if contnue is False:
+    if not contnue:
         spotskillmanager.spot.sit()
 
 # The following is a helpful tip to debug the arm
