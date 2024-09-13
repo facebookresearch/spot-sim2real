@@ -17,8 +17,6 @@ from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import resize_to_tallest
 
-# from intel_realsense_payload_for_spotsim2real.IntelRealSenseCameraInterface import IntelRealSenseCameraInterface
-
 RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.GRIPPER_DEPTH, rt.GRIPPER_RGB, rt.IRS_RGB]
 
 PROCESSED_IMG_TOPICS = [
