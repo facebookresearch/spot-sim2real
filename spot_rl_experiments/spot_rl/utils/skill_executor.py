@@ -79,15 +79,16 @@ class SpotRosSkillExecutor:
             bbox_center = np.array([float(v) for v in bbox_info[0:3]])
             bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
             query_class_names = bbox_info[6:]
+            query_class_names[0] = query_class_names[0].replace("_", " ")
             # Get the view poses
             view_poses = get_view_poses(
-                bbox_center, bbox_extent, query_class_names, True
+                bbox_center, bbox_extent, query_class_names, False
             )
             # Get the robot x, y, yaw
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points
             nav_pts = get_navigation_points(
-                view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
+                view_poses, bbox_center, bbox_extent, [x, y], False, "pathplanning.png"
             )
 
             # Sequentially give the point
@@ -104,6 +105,8 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = "Cannot navigate to the point"
+            # Reset skill name and input and publish message
+            self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "pick":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
