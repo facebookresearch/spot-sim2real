@@ -733,7 +733,7 @@ class SpotSkillManager:
         "Get the env for the ease of the access"
         return self.nav_controller.env
 
-    def dock(self):
+    def dock(self, home_robot=True):
         # Stow back the arm
         self.get_env().reset_arm()
 
@@ -744,7 +744,7 @@ class SpotSkillManager:
             status, message = self.nav("dock")
 
             # Dock
-            self.spot.shutdown(should_dock=True)
+            self.spot.shutdown(should_dock=True, home_robot=home_robot)
         except Exception:
             message = "Error encountered while docking"
             conditional_print(message=message, verbose=self.verbose)
@@ -777,4 +777,4 @@ if __name__ == "__main__":
     spotskillmanager.place("test_place_left")
 
     # Navigate to dock and shutdown
-    spotskillmanager.dock()
+    spotskillmanager.dock(home_robot=True)
