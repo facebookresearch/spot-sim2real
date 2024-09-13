@@ -5,6 +5,8 @@
 # Reference code Boston Dynamics Spot-sdk: https://github.com/boston-dynamics/spot-sdk/tree/master/python/examples/web_cam_image_service
 
 import logging
+import os
+import signal
 import time
 from typing import Any, List
 
@@ -211,17 +213,24 @@ class IntelRealSenseCameraInterface(CameraInterface):
                         )
                         pass
             else:
-                return (
-                    IntelRealSenseCameraInterface.DEPTH_FRAME,
-                    IntelRealSenseCameraInterface.CAPTURE_TIME,
-                )
+                try:
+                    return (
+                        IntelRealSenseCameraInterface.DEPTH_FRAME,
+                        IntelRealSenseCameraInterface.CAPTURE_TIME,
+                    )
+                except Exception as e:
+                    _LOGGER.warning(
+                        f"Unable to display the IntelRealSense images captured.{str(e)}"
+                    )
+                    os.kill(os.getpid(), signal.SIGINT)  # Kill the entire code
+                    # pass
 
             return color_image, capture_time
         except Exception as e:
             print(
                 f"Unsuccessful in getting frames from self.pipeline.wait_for_frames() due to {str(e)}"
             )
-            exit(0)
+            os.kill(os.getpid(), signal.SIGINT)  # Kill the entire code
 
     def image_decode(self, image_data, image_proto, image_req):
         pixel_format = image_req.pixel_format
