@@ -176,10 +176,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
         self.fps = {topic: deque(maxlen=10) for topic in self.msgs.keys()}
 
+    # Checking for empty image to make an overlay text
     def is_empty_image(self, img):
         """Determine if an image is empty or has no meaningful data"""
         if np.all(img == 0):
-            print("Image is all zeros")
             return True
         return False
 
@@ -189,7 +189,6 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             return None
 
         refreshed_topics = [k for k, v in self.updated.items() if v]
-        print("Available topics in self.msgs:", self.last_seen)
 
         # Gather latest images
         raw_msgs = [self.msgs[i] for i in RAW_IMG_TOPICS]
@@ -203,23 +202,22 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 processed_imgs.append(self.msg_to_cv2(processed_msgs[idx]))
             else:
                 processed_imgs.append(np.zeros_like(raw_imgs[idx]))
-        for i, img in enumerate(raw_imgs):
-            print(f"Shape of raw_img {i} ({RAW_IMG_TOPICS[i]}): {img.shape}")
-        for i, img in enumerate(processed_imgs):
-            print(f"Shape of raw_img {i} ({PROCESSED_IMG_TOPICS[i]}): {img.shape}")
+
         # Crop and process images as needed
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
                 imgs[1] = imgs[1][:, 124:-60]
+
+        # Resizing and lowering the contrast in depth image
         raw_imgs[1] = cv2.convertScaleAbs(raw_imgs[1], alpha=0.03)
         processed_imgs[2] = cv2.resize(processed_imgs[2], (640, 480))
         processed_imgs[3] = cv2.convertScaleAbs(processed_imgs[3], alpha=0.03)
-        for topic in RAW_IMG_TOPICS + PROCESSED_IMG_TOPICS:
+
+        # Check for topic in list and call is_empty_image() to check whether the image is empty and then overlay text.
+        for topic in RAW_IMG_TOPICS:
             if topic in RAW_IMG_TOPICS:
                 idx = RAW_IMG_TOPICS.index(topic)
                 if idx < len(raw_imgs):
-                    print(f"Checking RAW_IMG topic: {topic}")
-                    print(np.all(raw_imgs[idx] == 0))
                     if self.is_empty_image(raw_imgs[idx]):
                         print(f"Image for topic {topic} is empty or disconnected.")
                         raw_imgs[idx] = self.overlay_text(
@@ -229,10 +227,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                             size=2.0,
                             thickness=4,
                         )
+        for topic in PROCESSED_IMG_TOPICS:
             if topic in PROCESSED_IMG_TOPICS:
                 idx = PROCESSED_IMG_TOPICS.index(topic)
                 if idx < len(processed_imgs):
-                    print(f"Checking PROCESSED_IMG topic: {topic}")
                     if self.is_empty_image(processed_imgs[idx]):
                         print(f"Image for topic {topic} is empty or disconnected.")
                         processed_imgs[idx] = self.overlay_text(
@@ -292,6 +290,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         return img
 
     @staticmethod
+    # Method to obtain image, add a white strip on top of the image by resizing it and putting text on that white strip
     def overlay_topic_text(
         img,
         topic,
@@ -302,7 +301,9 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
     ):
         # Original image dimensions
         topic = topic.replace("_", " ").replace("/", "")
+
         og_height, og_width = img.shape[:2]
+
         strip_height = 50
         if len(img.shape) == 3:
             white_strip = 255 * np.ones((strip_height, og_width, 3), dtype=np.uint8)
@@ -312,7 +313,6 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         # Resize the original image height by adding the white strip height
         viz_img = np.vstack((white_strip, img))
 
-        # FONT AND SIZE
         font = cv2.FONT_HERSHEY_SIMPLEX
         text = f"{topic}"
         (text_width, text_height), _ = cv2.getTextSize(text, font, font_size, thickness)
