@@ -22,12 +22,12 @@ NUM_REPEAT = 2
 # Center, extent, object_tags
 WAYPOINT_TEST = [
     (
-        [2.1, 5.3, 0.1],
-        [1.0, 0.8, 0.7],
-        ["wooden cabinet"],
-        [3.4, -0.7, 0.5],
-        [0.5, 0.3, 0.2],
-        ["chair"],
+        [3.4, 2.7, 0.1],
+        [1.2, 1.1, 0.7],
+        ["white cabinet"],
+        [-0.7, 2.8, 0.5],
+        [0.6, 0.6, 0.2],
+        ["sink"],
     )
 ] * NUM_REPEAT  # x, y
 object_to_pickup = "bottle"

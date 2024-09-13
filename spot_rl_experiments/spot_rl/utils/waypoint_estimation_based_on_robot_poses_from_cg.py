@@ -221,7 +221,6 @@ def get_navigation_points(
 
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
     # print("boxMin", boxMin, "boxMax", boxMax)
-
     if robot_view_pose_data is None:
         robot_view_pose_data = pkl.load(
             open("robot_view_poses_for_bedroom_dresser.pkl", "rb")
