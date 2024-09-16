@@ -170,13 +170,15 @@ def calculate_height(object_tag):
         with open(json_file_path) as f:
             world_graph = json.load(f)
     else:
-        print(f"Concept Graph File does not exist. Using default height: {default_height}")
+        print(
+            f"Concept Graph File does not exist. Using default height: {default_height}"
+        )
         return default_height
     try:
         object_id_str, object_tag = object_tag.split("_", 1)
         object_id = int(object_id_str)
-    except ValueError:
-        print(f"Invalid object_tag format: '{object_tag}'")
+    except Exception as e:
+        print(f"Invalid object_tag format: {object_tag} due to {e}")
         return default_height
 
     for rel in world_graph:
