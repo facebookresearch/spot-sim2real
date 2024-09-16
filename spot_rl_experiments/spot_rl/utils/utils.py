@@ -164,19 +164,21 @@ def calculate_height(object_tag):
     default_config = construct_config_for_semantic_place()
     script_dir = os.path.dirname(__file__)
     json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
+    default_height = default_config.HEIGHT_THRESHOLD
 
-    with open(json_file_path) as f:
-        world_graph = json.load(f)
+    if osp.isfile(json_file_path):
+        with open(json_file_path) as f:
+            world_graph = json.load(f)
+    else:
+        print(f"Concept Graph File does not exist. Using default height: {default_height}")
+        return default_height
     try:
         object_id_str, object_tag = object_tag.split("_", 1)
         object_id = int(object_id_str)
     except ValueError:
         print(f"Invalid object_tag format: '{object_tag}'")
-        default_config = construct_config_for_semantic_place()
-        default_height = default_config.HEIGHT_THRESHOLD
         return default_height
 
-    default_height = default_config.HEIGHT_THRESHOLD
     for rel in world_graph:
         for key, value in rel.items():
             if isinstance(value, dict):
