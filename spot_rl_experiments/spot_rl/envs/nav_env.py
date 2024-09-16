@@ -5,6 +5,7 @@
 
 import magnum as mn
 import numpy as np
+import rospy
 from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -74,6 +75,22 @@ class SpotNavEnv(SpotBaseEnv):
         else:
             self.succ_distance = self.config.SUCCESS_DISTANCE
             self.succ_angle = np.deg2rad(self.config.SUCCESS_ANGLE_DIST)
+
+        # Move arm to initial configuration
+        cmd_id = self.spot.set_arm_joint_positions(
+            positions=np.deg2rad(self.config.GAZE_ARM_JOINT_ANGLES), travel_time=1
+        )
+
+        # Block until arm arrives with incremental timeout for 3 attempts
+        timeout_sec = 1.0
+        max_allowed_timeout_sec = 3.0
+        status = False
+        while status is False and timeout_sec <= max_allowed_timeout_sec:
+            status = self.spot.block_until_arm_arrives(cmd_id, timeout_sec=timeout_sec)
+            timeout_sec += 1.0
+
+        # Make sure the we use gripper image for the detection of the object
+        rospy.set_param("is_gripper_blocked", 0)
 
         return observations
 

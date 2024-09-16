@@ -97,9 +97,12 @@ class OwlVit:
 
         return self.get_most_confident_bounding_box_per_label(results)
 
-    def run_inference_and_return_img(self, img, vis_img_required=True):
+    def run_inference_and_return_img(
+        self, img, vis_img_required=True, multi_objects_per_label=False
+    ):
         """
         img: an open cv image in (H, W, C) format
+        multi_objects_per_label: if want to return multiple detections per label
         """
         # img = img.to(self.device)
 
@@ -129,7 +132,9 @@ class OwlVit:
         #    self.show_img_with_overlaid_bounding_boxes(img, results)
 
         return (
-            self.get_most_confident_bounding_box_per_label(results),
+            self.get_confident_bounding_box_per_label(results)
+            if multi_objects_per_label
+            else self.get_most_confident_bounding_box_per_label(results),
             self.create_img_with_bounding_box_no_ranking(img, results)
             if vis_img_required
             else None,
@@ -236,6 +241,51 @@ class OwlVit:
             result.append(
                 [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
             )
+
+        return result
+
+    def get_confident_bounding_box_per_label(self, results):
+        """
+        Returns the confident bounding box for each label above the threshold.
+        Each label could have multiple detections.
+        """
+        boxes, scores, labels = (
+            results[0]["boxes"],
+            results[0]["scores"],
+            results[0]["labels"],
+        )
+        boxes = boxes.to("cpu")
+        labels = labels.to("cpu")
+        scores = scores.to("cpu")
+
+        # Initialize dictionaries to store most confident bounding boxes and scores per label
+        target_boxes = {}
+        target_scores = {}
+
+        for box, score, label in zip(boxes, scores, labels):
+            box = [round(i, 2) for i in box.tolist()]
+            if score >= self.score_threshold:
+                if label.item() not in target_scores:
+                    target_scores[label.item()] = [score.item()]
+                    target_boxes[label.item()] = [box]
+                else:
+                    target_scores[label.item()].append(score.item())
+                    target_boxes[label.item()].append(box)
+
+        # Format the output
+        result = []
+        for label, boxs in target_boxes.items():
+            for i, box in enumerate(boxs):
+                x1 = int(box[0])
+                y1 = int(box[1])
+                x2 = int(box[2])
+                y2 = int(box[3])
+
+                # Strip the prefix from the label
+                label_without_prefix = self.labels[0][label][len(self.prefix) + 1 :]
+                result.append(
+                    [label_without_prefix, target_scores[label][i], [x1, y1, x2, y2]]
+                )
 
         return result
 

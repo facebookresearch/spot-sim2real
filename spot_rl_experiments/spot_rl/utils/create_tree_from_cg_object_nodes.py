@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import gzip
 import json
 import os.path as osp
@@ -53,6 +54,7 @@ def populate_quad_tree():
 
             data_dict = {}
             error = 0
+            error = 0
             for i, object_item in enumerate(cache_file):
                 object_tag = object_item["caption_dict"]["response"]["object_tag"]
                 id = object_item["caption_dict"]["id"]
@@ -74,12 +76,19 @@ def populate_quad_tree():
                     error += 1
             print(f"Number of errors while creating the tree {error}")
             # quads.visualize(tree)
+                try:
+                    assert tree.insert((x, y), data=f"{id}_{object_tag}")
+                except Exception:
+                    error += 1
+            print(f"Number of errors while creating the tree {error}")
+            # quads.visualize(tree)
             return tree, data_dict
 
 
 def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
     xin_query = -1 * y_incg
     yin_query = x_incg
+    region = 1
     region = 1
     bb = quads.BoundingBox(
         min_x=xin_query - region,

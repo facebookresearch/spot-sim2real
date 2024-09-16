@@ -56,6 +56,7 @@ from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 
 # Import core classes
 from spot_wrapper.spot import Spot, image_response_to_cv2
+from spot_wrapper.spot import Spot, image_response_to_cv2
 
 ###
 ### Atomic Skills is a skill which requires its own policy and environment and does not depend on other atomic or composite skills

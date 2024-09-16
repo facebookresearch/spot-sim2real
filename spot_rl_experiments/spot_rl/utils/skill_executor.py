@@ -49,6 +49,19 @@ class SpotRosSkillExecutor:
         rospy.set_param("/viz_object", "None")
         rospy.set_param("/viz_place", "None")
 
+    def check_pick_condition(self):
+        """ "Check pick condition in spot-sim2real side"""
+        robot_holding = (
+            self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
+        )
+        if robot_holding:
+            return (
+                False,
+                "The arm is currently grasping the object. Make the agent place the grasped object first.",
+            )
+        else:
+            return True, ""
+
     def execute_skills(self):
         """Execute skills."""
 
@@ -189,8 +202,15 @@ class SpotRosSkillExecutor:
         elif skill_name == "pick":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             rospy.set_param("/viz_object", skill_input)
+            # Set the multi class object target
+            rospy.set_param("multi_class_object_target", skill_input)
             self.reset_skill_msg()
-            succeded, msg = self.spotskillmanager.pick(skill_input)
+            pick_pass, pick_msg = self.check_pick_condition()
+            if pick_pass:
+                succeded, msg = self.spotskillmanager.pick(skill_input)
+            else:
+                succeded = False
+                msg = pick_msg
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_object", "None")
         elif skill_name == "place":

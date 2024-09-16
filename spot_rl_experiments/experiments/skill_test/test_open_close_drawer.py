@@ -17,6 +17,8 @@ if __name__ == "__main__":
     contnue = True
     while contnue:
         rospy.set_param("enable_tracking", False)
+        # Set the skill name for better debugging
+        rospy.set_param("/skill_name_input", "0,Open,drawer")
         spotskillmanager.opendrawer()
         close_drawer = map_user_input_to_boolean(
             "Do you want to close the drawer ? Y/N "
