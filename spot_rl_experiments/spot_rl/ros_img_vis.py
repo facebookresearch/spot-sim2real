@@ -167,9 +167,6 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
     no_raw = False
     proprioception = False
 
-    # Define a timeout duration (in seconds)
-    TIMEOUT_DURATION = 5
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
