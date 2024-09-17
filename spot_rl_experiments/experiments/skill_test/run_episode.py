@@ -68,7 +68,6 @@ def parse_yaml(file_path):
             for action, args in action_dict.items():
                 method = getattr(action_taker, action, None)
                 if method:
-                    # breakpoint()
                     status, _ = method(*args)
                     controller = getattr(action_taker, controller_dict[action], None)
                     if controller:
