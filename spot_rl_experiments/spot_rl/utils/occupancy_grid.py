@@ -58,7 +58,7 @@ def buil_occupancy_grid(path_to_PCD, scale=10.0):
         # breakpoint()
         for point in pcd:
             x, y, z = point
-            if z > 0.0:
+            if z > 0.0 and z <= 1.5:
                 try:
                     X = floor(map_x_from_cg_to_grid(x, min_x, max_x) * scale)
                     Y = floor(map_y_from_cg_to_grid(y, min_y, max_y) * scale)

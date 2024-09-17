@@ -121,7 +121,7 @@ bboxs_info_iphone_fixed_classes_old_jmmy = {
     },
 }
 
-bboxs_info = {
+bboxs_info_iphone_fixed_classes_new_jmmy = {
     "coffee_table": {
         "id": 68,
         "bbox_extent": [0.9, 0.5, 0.3],
@@ -191,13 +191,28 @@ bboxs_info = {
     },
 }
 
+bboxs_info = {
+    "sink": {
+        "id": 270,
+        "bbox_extent": [0.9, 0.6, 0.3],
+        "bbox_center": [4.3, -2.0, 0.6],
+        "object_tag": "sink",
+    },
+    "couch": {
+        "id": 176,
+        "bbox_extent": [1.0, 1.0, 0.4],
+        "bbox_center": [1.4, 2.1, -0.0],
+        "object_tag": "white couch",
+    },
+}
+bboxs_info = bboxs_info_iphone_fixed_classes_new_jmmy
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "cabinet":  # receptacle_name == "teddy_bear":
+    if receptacle_name == "wooden_dresser":  # receptacle_name == "teddy_bear":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):

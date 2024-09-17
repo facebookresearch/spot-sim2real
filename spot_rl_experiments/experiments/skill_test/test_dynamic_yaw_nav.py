@@ -15,7 +15,7 @@ from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import get_angle_between_two_vectors
 
 NUM_REPEAT = 1
-WAYPOINT_TEST = [[2.3, 2.75, -90.0]] * NUM_REPEAT  # x, y
+WAYPOINT_TEST = [[1.4, 3.1, -90.0]] * NUM_REPEAT  # x, y
 
 
 class SpotRosSkillExecutor:

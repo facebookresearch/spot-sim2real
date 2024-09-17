@@ -18,20 +18,20 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 )
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 2
+NUM_REPEAT = 1
 # Center, extent, object_tags
 WAYPOINT_TEST = [
     (
-        [2.1, 5.3, 0.1],
-        [1.0, 0.8, 0.7],
-        ["wooden cabinet"],
-        [3.4, -0.7, 0.5],
-        [0.5, 0.3, 0.2],
+        [0.3, 7.3, 0.3],
+        [0.7, 0.5, 0.1],
         ["chair"],
+        [1.4, 5.8, 0.0],
+        [0.9, 0.5, 0.4],
+        ["cabinet"],
     )
 ] * NUM_REPEAT  # x, y
 object_to_pickup = "bottle"
-receptacle_name = "cabinet_to_kitchen_island"
+receptacle_name = "chair_to_cabinet"
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
@@ -79,7 +79,9 @@ class SpotRosSkillExecutor:
         bbox_center = np.array(bbox_center)
         bbox_extent = np.array(bbox_extent)
         # Get the view poses
-        view_poses = get_view_poses(bbox_center, bbox_extent, query_class_names, False)
+        view_poses = get_view_poses(
+            bbox_center, bbox_extent, query_class_names, None, False
+        )
         # Get the robot x, y, yaw
         x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
         # Get the navigation points

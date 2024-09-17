@@ -15,7 +15,7 @@ from spot_rl.utils.occupancy_grid import (
 )
 
 # Define the structure element (the neighborhood for dilation)
-DILATION_MAT = np.ones((5, 5))
+DILATION_MAT = np.ones((1, 1))
 
 CACHE_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "occupancy_grid_cache.pkl")
 
@@ -114,7 +114,7 @@ def get_occupancy_grid():
     if osp.exists(CACHE_PATH):
         with open(CACHE_PATH, "rb") as file:
             data = pkl.load(file)
-            filled_data = fill_up_occupancy_grid(data)
+            filled_data = data  # fill_up_occupancy_grid(data)
             return filled_data
     elif osp.exists(PCD_PATH):
         (
@@ -133,7 +133,9 @@ def get_occupancy_grid():
             "min_x": min_x,
             "min_y": min_y,
         }
-        occupancy_grid_cache = fill_up_occupancy_grid(occupancy_grid_cache)
+        occupancy_grid_cache = (
+            occupancy_grid_cache  # fill_up_occupancy_grid(occupancy_grid_cache)
+        )
         print("couldnot find occupancy cache, building from pcd & saving a cache")
         with open(CACHE_PATH, "wb") as file:
             pkl.dump(occupancy_grid_cache, file)

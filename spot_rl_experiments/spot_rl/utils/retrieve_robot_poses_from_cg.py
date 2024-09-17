@@ -13,7 +13,7 @@ from spot_rl.utils.path_planning import get_xyzxyz, plt
 
 # new changes: Select view poses based on distance
 # query_class_names = ["furniture", "counter", "locker", "vanity", "wine glass"]  # keep all the class names as same as possible
-ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocessed"  # osp.dirname(osp.abspath(__file__))
+ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
 PATH_TO_CACHE_FILE = osp.join(
     ROOT_PATH, "sg_cache", "map", "scene_map_cfslam_pruned.pkl.gz"
 )
