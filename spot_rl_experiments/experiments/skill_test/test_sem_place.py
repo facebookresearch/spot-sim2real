@@ -54,7 +54,7 @@ if __name__ == "__main__":
         input("Place an object in Spot's gripper and press Enter to continue...")
         #Place Object and Close Gripper
         rospy.set_param("is_gripper_blocked", 0)
-        episode_log = {"actions": []}
+        episode_log = {"actions": []}  # type: ignore
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
         # The following is a helpful tip to debug the arm
