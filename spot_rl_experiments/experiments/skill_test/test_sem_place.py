@@ -44,12 +44,12 @@ if __name__ == "__main__":
     # Start testing
     contnue = True
     episode_ctr = 0
-    #Get EE Pose Initial
+    # Get EE Pose Initial
     spot_pos, spot_ort = spotskillmanager.spot.get_ee_pos_in_body_frame()
-    #Set Orientation as Zero
+    # Set Orientation as Zero
     spot_ort = np.zeros(3)
     while contnue:
-        #Open Gripper
+        # Open Gripper
         spotskillmanager.spot.open_gripper()
         input("Place an object in Spot's gripper and press Enter to continue...")
 
@@ -73,7 +73,7 @@ if __name__ == "__main__":
             print(f"Saved log: {file_path}")
         episode_ctr += 1
         contnue = map_user_input_to_boolean("Do you want to do it again ? Y/N ")
-        #Return the arm to the original position
+        # Return the arm to the original position
         spot_pos = spotskillmanager.spot.get_ee_pos_in_body_frame()[0]
         spotskillmanager.spot.move_gripper_to_point(spot_pos, spot_ort)
 # The following is a helpful tip to debug the arm
