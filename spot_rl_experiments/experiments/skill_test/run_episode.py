@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
@@ -45,8 +44,8 @@ def save_logs_as_json():
 
 atexit.register(save_logs_as_json)
 # Register the signal handler for termination signals
-signal.signal(signal.SIGINT, save_logs_as_json)
-signal.signal(signal.SIGTERM, save_logs_as_json)
+signal.signal(signal.SIGINT, save_logs_as_json)  # type: ignore
+signal.signal(signal.SIGTERM, save_logs_as_json)  # type: ignore
 
 
 def parse_yaml(file_path):
