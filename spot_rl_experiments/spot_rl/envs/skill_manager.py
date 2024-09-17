@@ -534,7 +534,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.arm_joint_angles,
-                    percentile=70 if visualize else 70,
+                    percentile=70 if visualize else 30,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
@@ -550,7 +550,7 @@ class SpotSkillManager:
                 return False, message
 
         edge_x = float(edge_point_in_base[0])
-        offset_kept = 0.5
+        offset_kept = 0.7
         travel_time = 2
         if edge_x > offset_kept:
             walk_distance = edge_x - offset_kept

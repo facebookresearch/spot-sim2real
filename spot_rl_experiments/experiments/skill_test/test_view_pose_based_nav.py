@@ -18,16 +18,22 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 )
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 1
+NUM_REPEAT = 2
 # Center, extent, object_tags
 WAYPOINT_TEST = [
     (
-        [3.2, -1.1, 0.5],
-        [0.8, 0.5, 0.3],
-        ["chair"],
-        [6.0, 3.4, 0.1],
-        [2.0, 1.1, 0.7],
-        ["furniture"],
+        {
+            "id": 154,
+            "bbox_extent": [0.8, 0.5, 0.3],
+            "bbox_center": [3.2, -1.1, 0.5],
+            "object_tag": "chair",
+        },
+        {
+            "id": 51,
+            "bbox_extent": [1.5, 0.8, 0.6],
+            "bbox_center": [-0.9, 8.3, 1.1],
+            "object_tag": "shelf",
+        },
     )
 ] * NUM_REPEAT  # x, y
 object_to_pickup = "bottle"
@@ -135,15 +141,21 @@ class SpotRosSkillExecutor:
             self.spotskillmanager = SpotSkillManager(
                 use_mobile_pick=True, use_semantic_place=True
             )
+            pick_location_address, plac_location_address = waypoint
 
-            (
-                bbox_center,
-                bbox_extent,
-                query_class_names,
-                bbox_center_place,
-                bbox_extent_place,
-                query_class_place,
-            ) = waypoint
+            _, bbox_extent, bbox_center, query_class_names = list(
+                pick_location_address.values()
+            )
+
+            _, bbox_extent_place, bbox_center_place, query_class_place = list(
+                plac_location_address.values()
+            )
+
+            if isinstance(query_class_names, str):
+                query_class_names = [query_class_names]
+            if isinstance(query_class_place, str):
+                query_class_place = [query_class_place]
+
             metric_list, nav_suc = self.nav(
                 bbox_center, bbox_extent, query_class_names, metrics_list
             )
