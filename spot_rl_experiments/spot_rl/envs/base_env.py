@@ -464,6 +464,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         print(f"base_action: {arr2str(base_action)}\tarm_action: {arr2str(arm_action)}")
 
+        # Spin until enough time has passed during this step
         start_time = time.time()
         if arm_ee_action is not None and self._max_lin_dist_scale == 0.0:
             pass
