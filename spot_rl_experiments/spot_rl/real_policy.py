@@ -403,7 +403,7 @@ class SemanticPlaceEEPolicy(RealPolicy):
                 ),
                 "ee_pos": spaces.Box(
                     shape=[
-                        3,
+                        6,
                     ],
                     low=np.finfo(np.float32).min,
                     high=np.finfo(np.float32).max,

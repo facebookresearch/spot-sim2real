@@ -492,11 +492,9 @@ class Pick(Skill):
         self,
         enable_pose_estimation: bool = False,
         enable_pose_correction: bool = False,
-        mesh_name: str = "",
     ) -> None:
         self.enable_pose_estimation = enable_pose_estimation
         self.enable_pose_correction = enable_pose_correction
-        self.mesh_name = mesh_name
 
     def set_force_control(self, enable_force_control: bool = False):
         self.enable_force_control = enable_force_control
@@ -588,7 +586,6 @@ class Pick(Skill):
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
                 "grasp_mode": self.grasp_mode,
-                "mesh_name": self.mesh_name,
             }
         else:
             action_dict = {
@@ -598,7 +595,6 @@ class Pick(Skill):
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
                 "grasp_mode": self.grasp_mode,
-                "mesh_name": self.mesh_name,
             }
 
         return action_dict
@@ -731,7 +727,6 @@ class MobilePickEE(Pick):
             "enable_pose_correction": self.enable_pose_correction,
             "enable_force_control": self.enable_force_control,
             "grasp_mode": self.grasp_mode,
-            "mesh_name": self.mesh_name,
         }
 
         return action_dict

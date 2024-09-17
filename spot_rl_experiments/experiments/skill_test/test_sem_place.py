@@ -63,7 +63,7 @@ if __name__ == "__main__":
         skill_log = spotskillmanager.place_controller.skill_result_log
         if "num_steps" not in skill_log:
             skill_log["num_steps"] = 0
-        episode_log["actions"].append({f"place": skill_log})
+        episode_log["actions"].append({"place": skill_log})
         curr_date = datetime.today().strftime("%m-%d-%y")
         file_path = (
             f"logs/semantic_place/{curr_date}/episode_sem_pl_run2_{episode_ctr}.json"
