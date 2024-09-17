@@ -152,7 +152,6 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
 
             hand_depth_unscaled = hand_depth
             hand_depth = self._scale_depth(hand_depth)
-            hand_rgb = hand_rgb
 
         if Cam.FRONTRIGHT_DEPTH in self.sources and Cam.FRONTLEFT_DEPTH in self.sources:
             fr_right_depth = self.spot.get_image_responses(
@@ -165,9 +164,6 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
             fr_left_depth_img = image_response_to_cv2(fr_left_depth)
             head_depth = np.hstack([fr_right_depth_img, fr_left_depth_img])
             head_depth = self._scale_depth(head_depth, head_depth=True)
-
-        empty_color_img = np.zeros((480, 640, 3), dtype=np.uint8)
-        empty_depth_img = np.zeros((480, 640), dtype=np.uint16)
 
         # Trying to obtain RS RGB and Depth images
         try:
@@ -186,8 +182,8 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         # Exception to give out as empty images
         except Exception as e:
             rospy.logwarn(f"Failed to retrieve Intel RealSense color image: {e}")
-            intel_image = empty_color_img
-            intel_image_depth = empty_depth_img
+            intel_image = np.zeros((480, 640, 3), dtype=np.uint8)
+            intel_image_depth = np.zeros((480, 640), dtype=np.uint16)
 
         gripper_img_src = [Cam.HAND_COLOR]
         gripper_color = spot.get_image_responses(

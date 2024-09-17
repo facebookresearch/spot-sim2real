@@ -183,3 +183,47 @@ def rotate_img(img: np.ndarray, num_of_rotation: int = 3) -> np.ndarray:
     """
     img = np.ascontiguousarray(np.rot90(img, k=num_of_rotation))
     return img
+
+
+# Method to obtain image, add a white strip on top of the image by resizing it and putting text on that white strip
+def overlay_topic_text(
+    img,
+    topic,
+    box_color=(0, 0, 0),
+    text_color=(0, 0, 0),
+    font_size=1.3,
+    thickness=2,
+):
+    # Original image dimensions
+    topic = topic.replace("_", " ").replace("/", "")
+
+    og_height, og_width = img.shape[:2]
+
+    strip_height = 50
+    if len(img.shape) == 3:
+        white_strip = 255 * np.ones((strip_height, og_width, 3), dtype=np.uint8)
+    else:
+        white_strip = 255 * np.ones((strip_height, og_width), dtype=np.uint8)
+
+    # Resize the original image height by adding the white strip height
+    viz_img = np.vstack((white_strip, img))
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    text = f"{topic}"
+    (text_width, text_height), _ = cv2.getTextSize(text, font, font_size, thickness)
+
+    margin = 50
+    text_x = margin
+    text_y = strip_height - margin + text_height
+    cv2.putText(
+        viz_img,
+        text,
+        (text_x, text_y),
+        font,
+        font_size,
+        text_color,
+        thickness,
+        cv2.LINE_AA,
+    )
+
+    return viz_img

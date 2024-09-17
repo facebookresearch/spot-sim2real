@@ -700,10 +700,14 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 self.detections_buffer["filtered_depth"][self.detection_timestamp],
             )
             arm_depth = self.msg_to_cv2(filtered_hand_depth, "mono8")
+            # We terminate the script and hence the policy
+            # when the intel realsense is disconnected and empty images are passed
             if np.all(arm_depth == 0):
                 os.kill(os.getpid(), signal.SIGKILL)
         else:
             arm_depth = self.msg_to_cv2(self.filtered_hand_depth, "mono8")
+            # We terminate the script and hence the policy
+            # when the intel realsense is disconnected and empty images are passed
             if np.all(arm_depth == 0):
                 os.kill(os.getpid(), signal.SIGKILL)
 

@@ -93,7 +93,6 @@ class SpotRobotSubscriberMixin:
             if rospy.get_time() - start_time > timeout:
                 rospy.logwarn(f"[{self.node_name}]: Timeout waiting for image topics.")
                 break
-            rospy.sleep(1)
 
     # Added Try-catch statement to debug errors from Image callbacks
     def img_callback(self, topic, msg):

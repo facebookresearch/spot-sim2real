@@ -13,6 +13,7 @@ import cv2
 import numpy as np
 import rospy
 import tqdm
+from perception_and_utils.utils.image_utils import overlay_topic_text
 from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import resize_to_tallest
@@ -177,9 +178,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
     # Checking for empty image to make an overlay text
     def is_empty_image(self, img):
         """Determine if an image is empty or has no meaningful data"""
-        if np.all(img == 0):
-            return True
-        return False
+        return np.all(img == 0)
 
     def generate_composite(self):
         if not any(self.updated.values()):
@@ -212,40 +211,34 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         processed_imgs[3] = cv2.convertScaleAbs(processed_imgs[3], alpha=0.03)
 
         # Check for topic in list and call is_empty_image() to check whether the image is empty and then overlay text.
-        for topic in RAW_IMG_TOPICS:
-            if topic in RAW_IMG_TOPICS:
-                idx = RAW_IMG_TOPICS.index(topic)
-                if idx < len(raw_imgs):
-                    if self.is_empty_image(raw_imgs[idx]):
-                        print(f"Image for topic {topic} is empty or disconnected.")
-                        raw_imgs[idx] = self.overlay_text(
-                            raw_imgs[idx],
-                            "DISCONNECTED",
-                            color=(255, 0, 0),
-                            size=2.0,
-                            thickness=4,
-                        )
-        for topic in PROCESSED_IMG_TOPICS:
-            if topic in PROCESSED_IMG_TOPICS:
-                idx = PROCESSED_IMG_TOPICS.index(topic)
-                if idx < len(processed_imgs):
-                    if self.is_empty_image(processed_imgs[idx]):
-                        print(f"Image for topic {topic} is empty or disconnected.")
-                        processed_imgs[idx] = self.overlay_text(
-                            processed_imgs[idx],
-                            "DISCONNECTED",
-                            color=(255, 0, 0),
-                            size=2.0,
-                            thickness=4,
-                        )
+        for idx, topic in enumerate(RAW_IMG_TOPICS):
+            if idx < len(raw_imgs) and self.is_empty_image(raw_imgs[idx]):
+                print(f"Image for topic {topic} is empty or disconnected.")
+                raw_imgs[idx] = self.overlay_text(
+                    raw_imgs[idx],
+                    "DISCONNECTED",
+                    color=(255, 0, 0),
+                    size=2.0,
+                    thickness=4,
+                )
+        for idx, topic in enumerate(PROCESSED_IMG_TOPICS):
+            if idx < len(processed_imgs) and self.is_empty_image(processed_imgs[idx]):
+                print(f"Image for topic {topic} is empty or disconnected.")
+                processed_imgs[idx] = self.overlay_text(
+                    processed_imgs[idx],
+                    "DISCONNECTED",
+                    color=(255, 0, 0),
+                    size=2.0,
+                    thickness=4,
+                )
 
         # Overlay topic text
         raw_imgs = [
-            self.overlay_topic_text(img, topic)
+            overlay_topic_text(img, topic)
             for img, topic in zip(raw_imgs, RAW_IMG_TOPICS)
         ]
         processed_imgs = [
-            self.overlay_topic_text(img, topic)
+            overlay_topic_text(img, topic)
             for img, topic in zip(processed_imgs, PROCESSED_IMG_TOPICS)
         ]
 
@@ -286,50 +279,6 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         print(" ".join([f"{k[1:]}: {np.mean(self.fps[k]):.2f}" for k in all_topics]))
 
         return img
-
-    @staticmethod
-    # Method to obtain image, add a white strip on top of the image by resizing it and putting text on that white strip
-    def overlay_topic_text(
-        img,
-        topic,
-        box_color=(0, 0, 0),
-        text_color=(0, 0, 0),
-        font_size=1.3,
-        thickness=2,
-    ):
-        # Original image dimensions
-        topic = topic.replace("_", " ").replace("/", "")
-
-        og_height, og_width = img.shape[:2]
-
-        strip_height = 50
-        if len(img.shape) == 3:
-            white_strip = 255 * np.ones((strip_height, og_width, 3), dtype=np.uint8)
-        else:
-            white_strip = 255 * np.ones((strip_height, og_width), dtype=np.uint8)
-
-        # Resize the original image height by adding the white strip height
-        viz_img = np.vstack((white_strip, img))
-
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        text = f"{topic}"
-        (text_width, text_height), _ = cv2.getTextSize(text, font, font_size, thickness)
-
-        margin = 50
-        text_x = margin
-        text_y = strip_height - margin + text_height
-        cv2.putText(
-            viz_img,
-            text,
-            (text_x, text_y),
-            font,
-            font_size,
-            text_color,
-            thickness,
-            cv2.LINE_AA,
-        )
-
-        return viz_img
 
 
 def bgrify_grayscale_imgs(imgs):
