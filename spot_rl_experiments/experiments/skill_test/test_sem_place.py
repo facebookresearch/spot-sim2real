@@ -45,9 +45,9 @@ if __name__ == "__main__":
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
         spotskillmanager.place(
-            place_target,
+            None,
             is_local=enable_estimation_before_place,
-            visualize=False,
+            visualize=True,
             enable_waypoint_estimation=enable_estimation_before_place,
         )
         skill_log = spotskillmanager.place_controller.skill_result_log

@@ -22,12 +22,12 @@ NUM_REPEAT = 1
 # Center, extent, object_tags
 WAYPOINT_TEST = [
     (
-        [0.3, 7.3, 0.3],
-        [0.7, 0.5, 0.1],
+        [3.2, -1.1, 0.5],
+        [0.8, 0.5, 0.3],
         ["chair"],
-        [1.4, 5.8, 0.0],
-        [0.9, 0.5, 0.4],
-        ["cabinet"],
+        [6.0, 3.4, 0.1],
+        [2.0, 1.1, 0.7],
+        ["furniture"],
     )
 ] * NUM_REPEAT  # x, y
 object_to_pickup = "bottle"
@@ -90,7 +90,7 @@ class SpotRosSkillExecutor:
             bbox_center,
             bbox_extent,
             [x, y],
-            VISUALIZE,
+            False,
             osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
         )
         # breakpoint()

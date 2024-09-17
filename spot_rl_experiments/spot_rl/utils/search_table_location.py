@@ -351,11 +351,13 @@ def rank_planes(
             )
         )
     )
+    index_of_min_dist_point = int(np.argmin(distances_of_points_for_selected_plane))
     return (
         argmax,
         planes_points[argmax][
             index_in_og_plane
         ],  # if not visualize else planes_points[argmax][indices_of_max_dist[argmax]],
+        planes_points[argmax][index_of_min_dist_point],
         sp.SO3(body_T_intel.rotationMatrix()) * all_plane_normals,
     )
 
@@ -515,7 +517,7 @@ def detect_place_point_by_pcd_method(
         [compute_plane_normal(plane)[0] for plane in all_planes], dtype=np.float32
     )
 
-    plane_index, selected_point, normals_in_body = rank_planes(
+    plane_index, selected_point, edge_point, normals_in_body = rank_planes(
         all_planes,
         all_plane_normals,
         body_T_hand,
@@ -545,6 +547,9 @@ def detect_place_point_by_pcd_method(
     )[0]
 
     selected_point_in_gripper = np.array(gripper_T_intel * selected_point)
+    edge_point_in_gripper = np.array(gripper_T_intel * edge_point)
+    edge_point_in_base = np.array(body_T_hand * edge_point_in_gripper)
+
     print(f"Intel point {selected_point}, Gripper Point {selected_point_in_gripper}")
 
     img_with_bbox = None
@@ -572,7 +577,7 @@ def detect_place_point_by_pcd_method(
     # Static Offset adjustment
     placexyz[0] += 0.10
     placexyz[2] += height_adjustment_offset
-    return placexyz, selected_point_in_gripper, img_with_bbox
+    return placexyz, selected_point_in_gripper, edge_point_in_base, img_with_bbox
 
 
 def detect_with_rospy_subscriber(object_name, image_scale=0.7):

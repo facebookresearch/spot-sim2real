@@ -3,6 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 # black: ignore-errors
 
+import time
 from typing import Any, Dict, Tuple
 
 import magnum as mn
@@ -528,11 +529,12 @@ class SpotSkillManager:
                 (
                     place_target_location,
                     place_target_in_gripper_camera,
+                    edge_point_in_base,
                     _,
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.arm_joint_angles,
-                    percentile=0 if visualize else 70,
+                    percentile=70 if visualize else 70,
                     visualize=visualize,
                     height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
                 )
@@ -546,6 +548,25 @@ class SpotSkillManager:
                 conditional_print(message=message, verbose=self.verbose)
                 print(message)
                 return False, message
+
+        edge_x = float(edge_point_in_base[0])
+        offset_kept = 0.5
+        travel_time = 2
+        if edge_x > offset_kept:
+            walk_distance = edge_x - offset_kept
+            (
+                before_walking_x,
+                before_walking_y,
+                before_walking_yaw,
+            ) = self.spot.get_xy_yaw()
+            self.spot.set_base_position(walk_distance, 0, 0, travel_time, True)
+            time.sleep(travel_time)
+            after_walking_x, after_walking_y, after_walking_yaw = self.spot.get_xy_yaw()
+            walk_distance = after_walking_x - before_walking_x
+            # print(f"place target before {place_target_location}")
+            place_target_location[0] -= walk_distance
+            # print(f"New place target {place_target_location}")
+            # breakpoint()
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
         status, message = self.place(
