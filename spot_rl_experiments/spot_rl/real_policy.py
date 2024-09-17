@@ -401,7 +401,7 @@ class SemanticPlaceEEPolicy(RealPolicy):
                 "articulated_agent_jaw_depth": spaces.Box(
                     shape=[240, 228, 1], low=0.0, high=1.0, dtype=np.float32
                 ),
-                "ee_pos": spaces.Box(
+                "ee_pose": spaces.Box(
                     shape=[
                         6,
                     ],
