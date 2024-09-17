@@ -1,7 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-# mypy: ignore-errors
 import json
 from datetime import datetime
 
@@ -30,7 +29,7 @@ if __name__ == "__main__":
         spotskillmanager.spot.open_gripper()
         input("Place an object in Spot's gripper and press Enter to continue...")
         rospy.set_param("is_gripper_blocked", 0)
-        episode_log = {"actions": []}
+        episode_log = {"actions": []}  # type: ignore
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
 
