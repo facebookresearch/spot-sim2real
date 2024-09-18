@@ -45,7 +45,7 @@ WEIGHTS:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/ssp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -120,7 +120,7 @@ OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
 OPEN_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
 
 #GRASP DISTANCE THRESHOLD
-GRASP_DISTANCE_THRESHOLD: 0.7
+GRASP_DISTANCE_THRESHOLD: 1.5
 GRASP_DISTANCE_THRESHOLD_EE: 1.5
 
 # Semantic Pick
