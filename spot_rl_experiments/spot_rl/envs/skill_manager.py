@@ -541,6 +541,14 @@ class SpotSkillManager:
 
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
+            percentile = 0 if visualize else 70
+            if self.use_semantic_place and self.use_place_ee:
+                height_adjustment_threshold = 0.1
+                percentile = 0 if visualize else 50
+            elif self.use_semantic_place:
+                height_adjustment_threshold = 0.05
+            else:
+                height_adjustment_threshold = 0.23
             # estimate waypoint
             try:
                 (
@@ -550,9 +558,9 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.arm_joint_angles,
-                    percentile=0 if visualize else 70,
+                    percentile=percentile,
                     visualize=visualize,
-                    height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+                    height_adjustment_offset=height_adjustment_threshold,
                 )
                 print(f"Estimate Place xyz: {place_target_location}")
                 if visualize:
