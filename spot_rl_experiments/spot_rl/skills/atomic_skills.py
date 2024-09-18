@@ -752,6 +752,7 @@ class Place(Skill):
             raise e
 
         place_target = goal_dict.get("place_target")
+        cg_location = goal_dict.get("CG_location")
         is_local = goal_dict.get("is_local", False)
         ee_orientation_at_grasping = goal_dict.get("ee_orientation_at_grasping", None)
 
@@ -760,18 +761,25 @@ class Place(Skill):
             message=f"Place target object at x, y, z : {x}, {y}, {z} in {'spot' if is_local else 'spots world'} frame.",
             verbose=self.verbose,
         )
+        conditional_print(
+            message=f"Place target object at x, y, z : {cg_location} in {'spot' if is_local else 'spots world'} frame.",
+            verbose=self.verbose,
+        )
 
         # Reset the env and policy
         observations = self.env.reset(
             place_target,
+            cg_location,
             is_local,
             ee_orientation_at_grasping=ee_orientation_at_grasping,
         )
+        self.cg_location = cg_location
         if self.policy is not None:
             self.policy.reset()
 
         # Logging and Debug
         self.env.say(f"Placing at {place_target}")
+        self.env.say(f"At the location{cg_location}")
         print(
             "CAUTION: The robot will DROP the object from the place_target location, please use objects that are not fragile!"
         )
@@ -806,7 +814,7 @@ class Place(Skill):
     def move_arm_to_goal_via_intermediate_point(
         self, goal_dict: Dict[str, Any]
     ) -> Tuple[bool, str]:
-        """
+        """construct_config_for_semantic_place
         Does not use policies to execute place operation
 
         Move arm to place_target via intermediate point using BD APIs.
@@ -884,8 +892,7 @@ class Place(Skill):
         # Add sleep as open_gripper() is a non-blocking call
         time.sleep(1)
 
-        # Reset the arm here
-        self.env.reset_arm()
+        # Reset the arm resetm()
 
         # Check for success and return appropriately
         status = False

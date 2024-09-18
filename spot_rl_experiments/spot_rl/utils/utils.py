@@ -208,6 +208,68 @@ def calculate_height(object_tag):
     return default_height
 
 
+def bbox_coords(object_tag, fn_to_convert_from_home_to_base):
+    default_config = construct_config_for_semantic_place()
+    script_dir = os.path.dirname(__file__)
+    json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
+    default_height = default_config.HEIGHT_THRESHOLD
+
+    if osp.isfile(json_file_path):
+        with open(json_file_path) as f:
+            world_graph = json.load(f)
+    else:
+        print(
+            f"Concept Graph File does not exist. Using default height: {default_height}"
+        )
+        return default_height
+    try:
+        object_id_str, object_tag = object_tag.split("_", 1)
+        object_id = int(object_id_str)
+    except Exception as e:
+        print(f"Invalid object_tag format: {object_tag} due to {e}")
+        return default_height
+
+    for rel in world_graph:
+        for key, value in rel.items():
+            if isinstance(value, dict):
+                if (
+                    value.get("id") == object_id
+                    and value.get("object_tag") == object_tag
+                ):
+                    object_node = value
+                    if "bbox_center" in object_node and "bbox_extent" in object_node:
+                        bbox_center = object_node["bbox_center"]
+                        bbox_extent = object_node["bbox_extent"]
+                        # Calculate the coords
+                        x_center, y_center, z_center = bbox_center
+                        length, width, depth = bbox_extent
+                        half_length = length
+                        half_width = width
+                        half_depth = depth
+
+                        # Calculate xmin, xmax, ymin, ymax
+                        xmin = x_center - half_length
+                        xmax = x_center + half_length
+                        ymax = y_center - half_width
+                        ymin = y_center + half_width
+                        zmin = z_center - half_depth
+                        zmax = z_center + half_depth
+                        maxc = np.array([xmax, ymax, zmax])
+                        minc = np.array([xmin, ymin, zmin])
+
+                        return maxc, minc
+                    else:
+                        print(
+                            f"Object with ID '{object_id}' and tag '{object_tag}' missing bbox properties!"
+                        )
+                        return None
+    # If the object tag is empty, we return the threhold height
+    print(
+        f"Object with ID '{object_id}' and tag '{object_tag}' not found in world_graph"
+    )
+    return None
+
+
 class FixSizeOrderedDict(OrderedDict):
     def __init__(self, *args, maxlen=0, **kwargs):
         self._maxlen = maxlen

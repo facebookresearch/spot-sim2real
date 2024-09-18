@@ -470,6 +470,7 @@ class SpotSkillManager:
     def set_arm_joint_angles(self, place_target: str = None):
         height = calculate_height(place_target)
         if height < self.place_config.HEIGHT_THRESHOLD:
+            print("OBJECT HEIGHT", height)
             return self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
         else:
             return self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
@@ -550,6 +551,7 @@ class SpotSkillManager:
             place_z,
             ee_orientation_at_grasping=ee_orientation_at_grasping,
             is_local=is_local,
+            cg_location=place_target,
         )
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -625,6 +627,7 @@ class SpotSkillManager:
         z: float,
         is_local: bool = False,
         ee_orientation_at_grasping: np.ndarray = None,
+        cg_location: str = " ",
     ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
@@ -644,6 +647,7 @@ class SpotSkillManager:
             "place_target": (x, y, z),
             "is_local": is_local,
             "ee_orientation_at_grasping": ee_orientation_at_grasping,
+            "CG_location": cg_location,
         }  # type: Dict[str, Any]
         status, message = self.place_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)

@@ -13,6 +13,7 @@ import quaternion
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
+from spot_rl.utils.utils import bbox_coords
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import angle_between_quat
 
@@ -78,6 +79,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Define the place variables
         self.place_target = None
         self.place_target_is_local = False
+        self.cg_location = None
         self.placed = False
 
         # Set gripper variables
@@ -121,12 +123,13 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
                     self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN
                 )
 
-    def reset(self, place_target, target_is_local=False, *args, **kwargs):
+    def reset(self, place_target, cg_location, target_is_local=False, *args, **kwargs):
         assert place_target is not None
         self.place_target = np.array(place_target)
         self.place_target_is_local = target_is_local
 
         self._time_step = 0
+        self.cg_location = cg_location
 
         # Decide the reset arm angle and then reset the arm
         self.decide_init_arm_joint(kwargs["ee_orientation_at_grasping"])
@@ -157,15 +160,25 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # Place command is issued if the place action is smaller than zero
         place = action_dict.get("grip_action", None) <= 0.0
+        print("PLACE TARGET", self.cg_location)
+        maxc, minc = bbox_coords(self.cg_location, self.get_target_in_base_frame)
 
+        # In SPOT FRAME
+        # lower_bouns=np.array([x_min,y_min,z_min])
+        # upper_bound=np.array([x_max,y_max,z_max])
+        lb = self.get_target_in_base_frame(minc)
+        up = self.get_target_in_base_frame(maxc)
+        print("bbox lower bound", lb)
+        print("bbox upper bound", up)
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
         cur_place_sensor_xyz = self.get_place_sensor(True)
+        breakpoint()
+        if cur_place_sensor_xyz[0] < lb[0] or cur_place_sensor_xyz > up[0]:
+            print("X range is outta scope")
+            pass
         if (
-            abs(cur_place_sensor_xyz[2]) < 0.05
-            and np.linalg.norm(
-                np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
-            )
-            < 0.25
+            abs(cur_place_sensor_xyz[2]) < lb[2]
+            and (lb[1] >= cur_place_sensor_xyz[1] or cur_place_sensor_xyz[1] <= lb[1])
             and self._time_step >= 50
         ):
             place = True
