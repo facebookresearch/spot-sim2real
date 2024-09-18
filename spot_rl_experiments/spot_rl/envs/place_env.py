@@ -239,10 +239,23 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
 
+    # def get_observations(self):
+    #     observations = super().get_observations()
+    #     if "joint" in observations:
+    #         del observations["joint"]
+    #     xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+    #     observations["ee_pose"] = np.concatenate([xyz, rpy])
+    #     return observations
     def get_observations(self):
         observations = super().get_observations()
-        if "joint" in observations:
-            del observations["joint"]
+        # if "joint" in observations:
+        #     del observations["joint"]
+        obj_goal_sensor = self.get_place_sensor(False)
         xyz, rpy = self.spot.get_ee_pos_in_body_frame()
         observations["ee_pose"] = np.concatenate([xyz, rpy])
+        print("CURRENT END EFFECTOR POSE", observations["ee_pose"])
+        observations["obj_goal_sensor"] = obj_goal_sensor
+        print("CURRENT obj_goal_sensor", observations["obj_goal_sensor"])
+        # breakpoint()
+
         return observations
