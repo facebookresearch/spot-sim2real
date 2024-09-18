@@ -147,16 +147,20 @@ class SpotRosSkillExecutor:
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
-            # Use the following for the hardcode waypoint place
-            # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, is_local=True)
-            # Call semantic place skills
-            rospy.set_param("is_gripper_blocked", 0)
-            succeded, msg = self.spotskillmanager.place(
-                skill_input,
-                is_local=True,
-                visualize=False,
-                enable_waypoint_estimation=True,
-            )
+            if self.spotskillmanager.allow_semantic_place:
+                # Call semantic place skills
+                rospy.set_param("is_gripper_blocked", 0)
+                succeded, msg = self.spotskillmanager.place(
+                    skill_input,
+                    is_local=True,
+                    visualize=False,
+                    enable_waypoint_estimation=True,
+                )
+            else:
+                # Use the following for the hardcode waypoint for static place
+                succeded, msg = self.spotskillmanager.place(
+                    0.6, 0.0, 0.4, is_local=True
+                )
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
