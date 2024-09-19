@@ -176,6 +176,19 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
     def is_empty_image(self, img):
         """Determine if an image is empty or has no meaningful data"""
         return np.all(img == 0)
+    # function to display "Disconnected" if topics are publishign emtpy images
+    def overlay_disconnected_msg(self,imgs,topic):
+        if self.is_empty_image(imgs):
+            print(f"Image for topic {topic} is empty or disconnected.")
+            imgs = self.overlay_text(
+                        imgs,
+                        "DISCONNECTED",
+                        color=(255, 0, 0),
+                        size=2.0,
+                        thickness=4,
+                    )
+        return imgs
+
 
     def generate_composite(self):
         if not any(self.updated.values()):
@@ -208,26 +221,9 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         processed_imgs[3] = cv2.convertScaleAbs(processed_imgs[3], alpha=0.03)
 
         # Check for topic in list and call is_empty_image() to check whether the image is empty and then overlay text.
-        for idx, topic in enumerate(RAW_IMG_TOPICS):
-            if idx < len(raw_imgs) and self.is_empty_image(raw_imgs[idx]):
-                print(f"Image for topic {topic} is empty or disconnected.")
-                raw_imgs[idx] = self.overlay_text(
-                    raw_imgs[idx],
-                    "DISCONNECTED",
-                    color=(255, 0, 0),
-                    size=2.0,
-                    thickness=4,
-                )
-        for idx, topic in enumerate(PROCESSED_IMG_TOPICS):
-            if idx < len(processed_imgs) and self.is_empty_image(processed_imgs[idx]):
-                print(f"Image for topic {topic} is empty or disconnected.")
-                processed_imgs[idx] = self.overlay_text(
-                    processed_imgs[idx],
-                    "DISCONNECTED",
-                    color=(255, 0, 0),
-                    size=2.0,
-                    thickness=4,
-                )
+        for idx, (raw_img, processed_img) in enumerate(zip(raw_imgs, processed_imgs)):
+            raw_img = self.overlay_disconnected_msg(raw_img, RAW_IMG_TOPICS[idx])
+            processed_img = self.overlay_disconnected_msg(processed_img, PROCESSED_IMG_TOPICS[idx])
 
         # Overlay topic text
         raw_imgs = [
