@@ -19,6 +19,9 @@ WEIGHTS_TORCHSCRIPT:
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
+  # Semantic place EE
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
 
@@ -40,6 +43,9 @@ WEIGHTS:
 
   # Semantic place
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
+
+  # Semantic place EE
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -104,12 +110,18 @@ PLACE_ACTION_SPACE_LENGTH: 4
 SEMANTIC_PLACE_ACTION_SPACE_LENGTH: 9
 SEMANTIC_PLACE_JOINT_BLACKLIST: [3]
 
+# Semantic Place EE
+SEMANTIC_PLACE_EE_ACTION_SPACE_LENGTH: 10
+
 # Open Close Drawer env
 MAX_LIN_DIST_OPEN_CLOSE_DRAWER: 0.0
 MAX_ANG_DIST_OPEN_CLOSE_DRAWER: 3.73 # degrees
 OPEN_CLOSE_DRAWER_ACTION_SPACE_LENGTH: 8
-OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.75
+OPEN_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE: 0.3
 
+#GRASP DISTANCE THRESHOLD
+GRASP_DISTANCE_THRESHOLD: 1.5
+GRASP_DISTANCE_THRESHOLD_EE: 1.5
 
 # Semantic Pick
 IMG_SRC: 0 # 1 for intel & 0 for gripper
@@ -126,6 +138,16 @@ RECEPTACLES:
 # Base action params
 MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
+
+# Base action params for sem place EE 
+MAX_LIN_DIST_SEMANTIC_PLACE: 0.0  # meters
+MAX_ANG_DIST_SEMANTIC_PLACE: 5.73  # degrees
+
+# SEMANTIC EE POLICY SCALE PARAMETERS
+EE_DIST_SCALE_SEMANTIC_PLACE : 0.3
+EE_ROT_SCALE_SEMANTIC_PLACE : 0.3
+EE_DIST_SCALE_MOBILE_GAZE : 0.1
+EE_ROT_SCALE_MOBILE_GAZE : 0.0125
 
 # Arm action params
 MAX_JOINT_MOVEMENT: 0.0872665  # Gaze arm speed (5 deg)

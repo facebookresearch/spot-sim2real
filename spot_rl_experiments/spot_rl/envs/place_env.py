@@ -73,8 +73,14 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         config.INITIAL_ARM_JOINT_ANGLES = copy.deepcopy(
             config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
         )
-        super().__init__(config, spot)
-
+        max_lin_dist_sem_place = "MAX_LIN_DIST_SEMANTIC_PLACE"
+        max_ang_dist_sem_place = "MAX_ANG_DIST_SEMANTIC_PLACE"
+        super().__init__(
+            config,
+            spot,
+            max_lin_dist_key=max_lin_dist_sem_place,
+            max_ang_dist_key=max_ang_dist_sem_place,
+        )
         # Define the place variables
         self.place_target = None
         self.place_target_is_local = False
@@ -219,4 +225,24 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             "joint": self.get_arm_joints(self.config.SEMANTIC_PLACE_JOINT_BLACKLIST),
             "is_holding": np.ones((1,)),
         }
+        return observations
+
+
+class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
+    """This is Spot semantic place class"""
+
+    def __init__(self, config, spot: Spot, use_semantic_place: bool = False):
+
+        super().__init__(config, spot)
+
+        # Define End Effector Policy Scale Values
+        self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
+        self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
+
+    def get_observations(self):
+        observations = super().get_observations()
+        if "joint" in observations:
+            del observations["joint"]
+        xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+        observations["ee_pose"] = np.concatenate([xyz, rpy])
         return observations

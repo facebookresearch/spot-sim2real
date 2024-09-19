@@ -25,4 +25,6 @@ data/*
 spot_rl_experiments/experiments/skill_test/logs/*
 spot_rl_experiments/experiments/skill_test/table_detections/*
 ros_tcp/ros_communication_client.egg-info/**
+spot_rl_experiments/experiments/skill_test/episode_configs/*
 *.npy
+*.csv

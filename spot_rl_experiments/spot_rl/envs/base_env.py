@@ -291,6 +291,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         :param base_action: np.array of velocities (linear, angular)
         :param arm_action: np.array of radians denoting how each joint is to be moved
+        :param arm_ee_action: np.array of IK control based on x, y, z, roll, pitch, yaw
         :param grasp: whether to call the grasp_hand_depth() method
         :param place: whether to call the open_gripper() method
         :param semantic_place: whether to call the open_gripper() method, but distable turning wrist behavior
@@ -301,6 +302,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         # Get Base & Arm actions, grasp and place from action dictionary
         base_action = action_dict.get("base_action", None)
         arm_action = action_dict.get("arm_action", None)
+        arm_ee_action = action_dict.get("arm_ee_action", None)
         semantic_place = action_dict.get("semantic_place", False)
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
@@ -405,6 +407,19 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             else:
                 arm_action = None
 
+        if arm_ee_action is not None:
+            arm_ee_action = rescale_actions(arm_ee_action)
+            if np.count_nonzero(arm_ee_action) > 0:
+                arm_ee_action[0:3] *= self.arm_ee_dist_scale
+                arm_ee_action[3:6] *= self.arm_ee_rot_scale
+                xyz, rpy = self.spot.get_ee_pos_in_body_frame()
+                cur_ee_pose = np.concatenate((xyz, rpy), axis=0)
+                # Wrap the heading
+                arm_ee_action += cur_ee_pose
+                arm_ee_action[3:] = wrap_heading(arm_ee_action[3:])
+            else:
+                arm_ee_action = None
+
         if not (grasp or place):
             if self.slowdown_base > -1 and base_action is not None:
                 # self.ctrl_hz = self.slowdown_base
@@ -413,14 +428,25 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 )  # / self.ctrl_hz
                 print("Slow down...")
             if base_action is not None and arm_action is not None:
-                print("input base_action velocity:", arr2str(base_action))
-                print("input arm_action:", arr2str(arm_action))
                 self.spot.set_base_vel_and_arm_pos(
                     *base_action,
                     arm_action,
                     travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
                     disable_obstacle_avoidance=disable_oa,
                 )
+            elif arm_ee_action is not None:
+                if base_action is None:
+                    self.spot.set_arm_ee_pos(
+                        arm_ee_action,
+                        travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                    )
+                else:
+                    self.spot.set_base_vel_and_arm_ee_pos(
+                        *base_action,
+                        arm_ee_action,
+                        travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
+                        disable_obstacle_avoidance=disable_oa,
+                    )
             elif base_action is not None:
                 self.spot.set_base_velocity(
                     *base_action,
@@ -440,7 +466,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # Spin until enough time has passed during this step
         start_time = time.time()
-        if base_action is not None or arm_action is not None:
+        if arm_ee_action is not None and self._max_lin_dist_scale == 0.0:
+            pass
+        elif base_action is not None or arm_action is not None:
             while time.time() < start_time + 1 / self.ctrl_hz:
                 if target_yaw is not None and abs(
                     wrap_heading(self.yaw - target_yaw)

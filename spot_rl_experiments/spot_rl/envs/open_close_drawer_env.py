@@ -67,7 +67,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # Distance threshold to call IK to approach the drawers
         self._dis_threshold_ee_to_handle = (
-            config.OPEM_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE
+            config.OPEN_CLOSE_DRAWER_DISTANCE_BETWEEN_EE_HANDLE
         )
 
         # Flag for using Boston Dynamics API to open the cabinet or not
