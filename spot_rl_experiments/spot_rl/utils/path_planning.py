@@ -1,10 +1,13 @@
 import math
 import os.path as osp
+import pickle
 from math import floor
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import open3d as o3d
+import yaml
 from scipy.ndimage import binary_dilation
 from spot_rl.utils.a_star import astar
 from spot_rl.utils.occupancy_grid import (
@@ -17,9 +20,26 @@ from spot_rl.utils.occupancy_grid import (
 # Define the structure element (the neighborhood for dilation)
 DILATION_MAT = np.ones((1, 1))
 
-CACHE_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "occupancy_grid_cache.pkl")
 
-PCD_PATH = osp.join(osp.dirname(osp.abspath(__file__)), "point_cloud_fre.pkl")
+def load_config(config_file):
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+# ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
+
+PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
+cg_config = load_config(PATH_TO_CONFIG_FILE)
+
+ROOT_PATH = cg_config["CG_ROOT_PATH"]
+
+CACHE_PATH = osp.join(ROOT_PATH, "occupancy_grid_cache.pkl")
+
+PCD_PATH = osp.join(ROOT_PATH, "point_cloud.pkl")
+
+CG_PCD_PATH = osp.join(ROOT_PATH, "rgb_cloud", "pointcloud.pcd")
 
 OCCUPANCY_SCALE = 10.0
 
@@ -51,7 +71,57 @@ DISTANCE_THRESHOLD_TO_ADD_POINT = 1.0
 #     return accum/num_steps #x,y,yaw
 
 
+def pick_points(pcd):
+    print("")
+    print("1) Please pick at least three correspondences using [shift + left click]")
+    print("   Press [shift + right click] to undo point picking")
+    print("2) After picking points, press 'Q' to close the window")
+    vis = o3d.visualization.VisualizerWithEditing()
+    vis.create_window()
+    vis.add_geometry(pcd)
+    vis.run()  # user picks points
+    vis.destroy_window()
+    print("")
+    return vis.get_picked_points()
+
+
+def convert_cg_pcd_to_pkl(
+    input_cg_pcd_path: str, output_pkl_path: str, visualize=False
+):
+
+    assert osp.exists(input_cg_pcd_path), f"{input_cg_pcd_path} no such file found"
+
+    pcd = o3d.io.read_point_cloud(input_cg_pcd_path)
+    # print(f"Loading point cloud from: {input_cg_pcd_path}, {pcd}")
+
+    assert not pcd.is_empty(), "Error: The point cloud is empty or the file is empty."
+
+    # Downsample the point cloud
+    voxel_size = 0.05
+    downsampled_pcd = pcd.voxel_down_sample(voxel_size)
+    print(f"Downsampling the point cloud... {downsampled_pcd}")
+
+    # Visualize if the flag is set
+    if visualize:
+        print("Visualizing the downsampled point cloud...")
+        _ = pick_points(pcd)
+
+    # Save the downsampled points to a pickle file
+    points = np.array(downsampled_pcd.points)
+    # Convert Open3D vector of points to a list of lists
+
+    # Dump the points to a pickle file
+    with open(output_pkl_path, "wb") as f:
+        pickle.dump(points, f)
+
+    print(f"Saving the downsampled points to {output_pkl_path}...")
+
+
 def get_xyzxyz(centroid, extents):
+    # extents = np.array(extents)
+    # extents *= 2.0
+    # extents = extents.tolist()
+
     x1 = centroid[0] - (extents[0] / 2.0)
     y1 = centroid[1] - (extents[1] / 2.0)
     z1 = centroid[2] - (extents[2] / 2.0)
@@ -116,32 +186,34 @@ def get_occupancy_grid():
             data = pkl.load(file)
             filled_data = data  # fill_up_occupancy_grid(data)
             return filled_data
-    elif osp.exists(PCD_PATH):
-        (
-            occupancy_grid,
-            occupancy_scale,
-            max_x,
-            max_y,
-            min_x,
-            min_y,
-        ) = buil_occupancy_grid(PCD_PATH, OCCUPANCY_SCALE)
-        occupancy_grid_cache = {
-            "occupancy_grid": occupancy_grid,
-            "scale": occupancy_scale,
-            "max_x": max_x,
-            "max_y": max_y,
-            "min_x": min_x,
-            "min_y": min_y,
-        }
-        occupancy_grid_cache = (
-            occupancy_grid_cache  # fill_up_occupancy_grid(occupancy_grid_cache)
-        )
-        print("couldnot find occupancy cache, building from pcd & saving a cache")
-        with open(CACHE_PATH, "wb") as file:
-            pkl.dump(occupancy_grid_cache, file)
-        return occupancy_grid_cache
-    else:
-        raise Exception(f"{PCD_PATH} not found")
+
+    if not osp.exists(PCD_PATH):
+        convert_cg_pcd_to_pkl(CG_PCD_PATH, PCD_PATH)
+
+    assert osp.exists(PCD_PATH), f"Couldn't find {PCD_PATH}"
+    (
+        occupancy_grid,
+        occupancy_scale,
+        max_x,
+        max_y,
+        min_x,
+        min_y,
+    ) = buil_occupancy_grid(PCD_PATH, OCCUPANCY_SCALE)
+    occupancy_grid_cache = {
+        "occupancy_grid": occupancy_grid,
+        "scale": occupancy_scale,
+        "max_x": max_x,
+        "max_y": max_y,
+        "min_x": min_x,
+        "min_y": min_y,
+    }
+    occupancy_grid_cache = (
+        occupancy_grid_cache  # fill_up_occupancy_grid(occupancy_grid_cache)
+    )
+    print("couldnot find occupancy cache, building from pcd & saving a cache")
+    with open(CACHE_PATH, "wb") as file:
+        pkl.dump(occupancy_grid_cache, file)
+    return occupancy_grid_cache
 
 
 def binary_to_image(binary_array):
@@ -380,7 +452,7 @@ def path_planning_using_a_star(
         )
     if visualize:
         plt.imshow(occupancy_grid_visualization, cmap="gray")
-        plt.title("Path Planning")
+        plt.title(osp.basename(save_fig_name).split(".")[0])
         plt.savefig(save_fig_name)
         plt.show()
 

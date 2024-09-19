@@ -1,0 +1,3 @@
+CG_ROOT_PATH: "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"
+SCAN_TYPE: "r3d"
+USE_YOLO: False

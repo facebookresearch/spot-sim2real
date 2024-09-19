@@ -192,27 +192,123 @@ bboxs_info_iphone_fixed_classes_new_jmmy = {
 }
 
 bboxs_info = {
+    "chair_beside_living_console": {
+        "id": 0,
+        "bbox_extent": [1.2, 1.0, 0.5],
+        "bbox_center": [5.9, 4.8, 0.1],
+        "object_tag": "chair",
+    },
+    "wooden_dresser": {  # id 2
+        "id": 27,
+        "bbox_extent": [1.9, 1.0, 0.6],
+        "bbox_center": [6.0, 3.6, 0.1],
+        "object_tag": "wooden cabinet or dresser",
+    },
+    "table_lamp": {
+        "id": 28,
+        "bbox_extent": [0.6, 0.5, 0.4],
+        "bbox_center": [6.2, 4.2, 0.7],
+        "object_tag": "table lamp",
+    },
+    "white_chair_besides_living_room": {
+        "id": 84,
+        "bbox_extent": [1.1, 0.9, 0.6],
+        "bbox_center": [3.1, 5.2, 0.1],
+        "object_tag": "white chair",
+    },
+    "office_right_shelf": {
+        "id": 22,
+        "bbox_extent": [2.3, 1.4, 0.7],
+        "bbox_center": [-1.1, 8.1, 0.8],
+        "object_tag": "wooden shelf/table",
+    },
+    "office_desk": {
+        "id": 21,
+        "bbox_extent": [1.8, 0.8, 0.3],
+        "bbox_center": [-0.9, 7.1, 0.3],
+        "object_tag": "office desk",
+    },
+    "office_left_shelf": {
+        "id": 15,
+        "bbox_extent": [1.0, 0.5, 0.3],
+        "bbox_center": [-0.8, 6.4, 0.1],
+        "object_tag": "shelf",
+    },
+    "kitchen_left_near_fridge": {
+        "id": 32,
+        "bbox_extent": [1.1, 1.0, 0.1],
+        "bbox_center": [6.0, -4.1, 0.2],
+        "object_tag": "kitchen cabinet",
+    },
+    "gas_stove": {
+        "id": 40,
+        "bbox_extent": [2.8, 0.9, 0.1],
+        "bbox_center": [5.1, -4.5, 0.7],
+        "object_tag": "stove",
+    },
+    "fridge": {
+        "id": 31,
+        "bbox_extent": [1.9, 1.2, 0.3],
+        "bbox_center": [6.9, -3.9, 0.6],
+        "object_tag": "large refrigerator",
+    },
     "sink": {
-        "id": 270,
-        "bbox_extent": [0.9, 0.6, 0.3],
-        "bbox_center": [4.3, -2.0, 0.6],
+        "id": 48,
+        "bbox_extent": [1.1, 0.7, 0.3],
+        "bbox_center": [4.4, -2.0, 0.5],
         "object_tag": "sink",
     },
+    "kitchen_island": {  # redo
+        "id": 60,
+        "bbox_extent": [0.9, 0.5, 0.4],
+        "bbox_center": [0.9, -2.6, 0.2],
+        "object_tag": "chair",
+    },
+    "dining_table": {
+        "id": 61,
+        "bbox_extent": [2.1, 1.3, 0.8],
+        "bbox_center": [0.4, -2.3, 0.2],
+        "object_tag": "wooden dining table",
+    },
     "couch": {
-        "id": 176,
-        "bbox_extent": [1.0, 1.0, 0.4],
-        "bbox_center": [1.4, 2.1, -0.0],
+        "id": 74,
+        "bbox_extent": [1.2, 0.7, 0.4],
+        "bbox_center": [1.5, 1.9, 0.2],
+        "object_tag": "colorful pillow",
+    },
+    "white_couch_L": {
+        "id": 72,
+        "bbox_extent": [1.6, 1.5, 0.6],
+        "bbox_center": [-0.4, 2.9, -0.0],
         "object_tag": "white couch",
     },
+    "piilow": {
+        "id": 74,
+        "bbox_extent": [1.2, 0.7, 0.4],
+        "bbox_center": [1.5, 1.9, 0.2],
+        "object_tag": "colorful pillow",
+    },
+    "living_room_desktop_table": {
+        "id": 83,
+        "bbox_extent": [1.6, 0.8, 0.6],
+        "bbox_center": [1.7, 5.2, 0.1],
+        "object_tag": "wooden furniture",
+    },
+    "teady_bear": {
+        "id": 5,
+        "bbox_extent": [0.8, 0.6, 0.4],
+        "bbox_center": [10.6, 2.7, 0.2],
+        "object_tag": "wooden dresser/nightstand",
+    },
 }
-bboxs_info = bboxs_info_iphone_fixed_classes_new_jmmy
+# bboxs_info = bboxs_info_iphone_fixed_classes_new_jmmy
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "wooden_dresser":  # receptacle_name == "teddy_bear":
+    if receptacle_name == "teady_bear":  # receptacle_name == "teddy_bear":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):
@@ -239,6 +335,6 @@ for receptacle_name in bboxs_info:
         print(
             f"Final Nav point for {receptacle_name}:  {*nav_pts[-1][:2], np.rad2deg(nav_pts[-1][-1])}"
         )
-        continu = map_user_input_to_boolean("Continue to next receptacle ?")
+        continu = True  # map_user_input_to_boolean("Continue to next receptacle ?")
         if not continu:
             break

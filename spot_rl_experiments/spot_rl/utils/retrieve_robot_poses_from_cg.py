@@ -7,13 +7,26 @@ from typing import List
 
 import cv2
 import numpy as np
+import yaml
 import zmq
 from scipy.spatial.transform import Rotation as R
 from spot_rl.utils.path_planning import get_xyzxyz, plt
 
-# new changes: Select view poses based on distance
-# query_class_names = ["furniture", "counter", "locker", "vanity", "wine glass"]  # keep all the class names as same as possible
-ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
+
+def load_config(config_file):
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+# ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
+
+PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
+cg_config = load_config(PATH_TO_CONFIG_FILE)
+
+ROOT_PATH = cg_config["CG_ROOT_PATH"]
+
 PATH_TO_CACHE_FILE = osp.join(
     ROOT_PATH, "sg_cache", "map", "scene_map_cfslam_pruned.pkl.gz"
 )
@@ -22,9 +35,8 @@ VISUALIZE = True
 POSES_PATH = osp.join(ROOT_PATH, "poses")
 RGB_PATH = osp.join(ROOT_PATH, "rgb")
 VISUALIZATION_DIR = "image_vis_for_mined_rgb_from_cg"
-ANCHOR_OBJECT_CENTER = np.array([8.2, 6.0, 0.1])
-USE_YOLO = False
-SCAN_TYPE = "r3d"
+USE_YOLO = cg_config.get("USE_YOLO", False)
+SCAN_TYPE = cg_config.get("SCAN_TYPE", "r3d")
 
 
 def resize_crop(masked_rgb_image, x1, y1, x2, y2):
@@ -323,4 +335,5 @@ def get_view_poses(
 
 
 if __name__ == "__main__":
-    get_view_poses(ANCHOR_OBJECT_CENTER, [], [], [])
+    pass
+    # get_view_poses(ANCHOR_OBJECT_CENTER, [], [], [])
