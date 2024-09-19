@@ -13,7 +13,7 @@ import quaternion
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
-from spot_rl.utils.utils import bbox_coords
+from spot_rl.utils.utils import bbox_coords, is_on_top
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import angle_between_quat
 
@@ -161,28 +161,30 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Place command is issued if the place action is smaller than zero
         place = action_dict.get("grip_action", None) <= 0.0
         print("PLACE TARGET", self.cg_location)
+
         maxc, minc = bbox_coords(self.cg_location, self.get_target_in_base_frame)
 
         # In SPOT FRAME
-        # lower_bouns=np.array([x_min,y_min,z_min])
-        # upper_bound=np.array([x_max,y_max,z_max])
-        lb = self.get_target_in_base_frame(minc)
-        up = self.get_target_in_base_frame(maxc)
-        print("bbox lower bound", lb)
-        print("bbox upper bound", up)
+        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        base_T_vision = vision_T_base.inverted()
+
+        base_T_lower = base_T_vision.transform_point(minc)
+        base_T_upper = base_T_vision.transform_point(maxc)
+        ee_pose = self.get_gripper_position_in_base_frame_spot()
+        print("bbox lower bound", base_T_lower)
+        print("bbox upper bound", base_T_upper)
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
         cur_place_sensor_xyz = self.get_place_sensor(True)
+        print(is_on_top(cur_place_sensor_xyz, base_T_lower, base_T_upper))
+        print(is_on_top(ee_pose, base_T_lower, base_T_upper))
         breakpoint()
-        if cur_place_sensor_xyz[0] < lb[0] or cur_place_sensor_xyz > up[0]:
-            print("X range is outta scope")
-            pass
         if (
-            abs(cur_place_sensor_xyz[2]) < lb[2]
-            and (lb[1] >= cur_place_sensor_xyz[1] or cur_place_sensor_xyz[1] <= lb[1])
-            and self._time_step >= 50
+            is_on_top(cur_place_sensor_xyz, base_T_lower, base_T_upper)
+            and is_on_top(ee_pose, base_T_lower, base_T_upper)
+            and abs(cur_place_sensor_xyz[2]) < 0.05
         ):
+            print("Condition satisfied")
             place = True
-
         # If the time steps have been passed for 75 steps, we will just place the object
         if self._time_step >= 75:
             place = True

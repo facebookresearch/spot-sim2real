@@ -208,6 +208,22 @@ def calculate_height(object_tag):
     return default_height
 
 
+def is_on_top(point, min_coord, max_coord, tolerance=1e-6, height_tolerance=0.1):
+    """
+    Check if a point is on the top of the bounding box.
+
+    :param point: (x, y, z) coordinate to check
+    :param center: (x, y, z) center coordinate of the bounding box
+    :param extents: (dx, dy, dz) extents of the bounding box
+    :param tolerance: floating-point tolerance for comparisons
+    :return: Boolean indicating if the point is on top of the box
+    """
+    return (
+        min_coord[0] - tolerance <= point[0] <= max_coord[0] + tolerance
+        and min_coord[1] - tolerance <= point[1] <= max_coord[1] + tolerance
+    )
+
+
 def bbox_coords(object_tag, fn_to_convert_from_home_to_base):
     default_config = construct_config_for_semantic_place()
     script_dir = os.path.dirname(__file__)
