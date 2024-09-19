@@ -176,19 +176,19 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
     def is_empty_image(self, img):
         """Determine if an image is empty or has no meaningful data"""
         return np.all(img == 0)
+
     # function to display "Disconnected" if topics are publishign emtpy images
-    def overlay_disconnected_msg(self,imgs,topic):
+    def overlay_disconnected_msg(self, imgs, topic):
         if self.is_empty_image(imgs):
             print(f"Image for topic {topic} is empty or disconnected.")
             imgs = self.overlay_text(
-                        imgs,
-                        "DISCONNECTED",
-                        color=(255, 0, 0),
-                        size=2.0,
-                        thickness=4,
-                    )
+                imgs,
+                "DISCONNECTED",
+                color=(255, 0, 0),
+                size=2.0,
+                thickness=4,
+            )
         return imgs
-
 
     def generate_composite(self):
         if not any(self.updated.values()):
@@ -223,7 +223,9 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         # Check for topic in list and call is_empty_image() to check whether the image is empty and then overlay text.
         for idx, (raw_img, processed_img) in enumerate(zip(raw_imgs, processed_imgs)):
             raw_img = self.overlay_disconnected_msg(raw_img, RAW_IMG_TOPICS[idx])
-            processed_img = self.overlay_disconnected_msg(processed_img, PROCESSED_IMG_TOPICS[idx])
+            processed_img = self.overlay_disconnected_msg(
+                processed_img, PROCESSED_IMG_TOPICS[idx]
+            )
 
         # Overlay topic text
         raw_imgs = [
