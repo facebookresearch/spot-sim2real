@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if in_fre_lab:
         # at FRE
-        place_target = "160_teddy bear"
+        place_target = "35_cabinet"
     else:
         # at NYC
         place_target = "test_desk"

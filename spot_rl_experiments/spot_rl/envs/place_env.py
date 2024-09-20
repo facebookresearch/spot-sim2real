@@ -165,23 +165,23 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         maxc, minc = bbox_coords(self.cg_location, self.get_target_in_base_frame)
 
         # In SPOT FRAME
-        vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
-        base_T_vision = vision_T_base.inverted()
+        global_T_local = self.curr_transform.inverted()
+        # vision_T_base = self.spot.get_magnum_Matrix4_spot_a_T_b("vision", "body")
+        # base_T_vision = vision_T_base.inverted()
 
-        base_T_lower = base_T_vision.transform_point(minc)
-        base_T_upper = base_T_vision.transform_point(maxc)
-        ee_pose = self.get_gripper_position_in_base_frame_spot()
+        base_T_lower = global_T_local.transform_point(minc)
+        base_T_upper = global_T_local.transform_point(maxc)
+        ee_pose = self.spot.get_ee_pos_in_body_frame()
+        ee_pose = ee_pose[0]
         print("bbox lower bound", base_T_lower)
         print("bbox upper bound", base_T_upper)
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
-        cur_place_sensor_xyz = self.get_place_sensor(True)
-        print(is_on_top(cur_place_sensor_xyz, base_T_lower, base_T_upper))
+        # cur_place_sensor_xyz = self.get_place_sensor(True)
+        print(is_on_top(self.place_target, base_T_lower, base_T_upper))
         print(is_on_top(ee_pose, base_T_lower, base_T_upper))
         breakpoint()
-        if (
-            is_on_top(cur_place_sensor_xyz, base_T_lower, base_T_upper)
-            and is_on_top(ee_pose, base_T_lower, base_T_upper)
-            and abs(cur_place_sensor_xyz[2]) < 0.05
+        if is_on_top(self.place_target, base_T_lower, base_T_upper) and is_on_top(
+            ee_pose, base_T_lower, base_T_upper
         ):
             print("Condition satisfied")
             place = True

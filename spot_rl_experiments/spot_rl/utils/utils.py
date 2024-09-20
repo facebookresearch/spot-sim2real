@@ -218,10 +218,17 @@ def is_on_top(point, min_coord, max_coord, tolerance=1e-6, height_tolerance=0.1)
     :param tolerance: floating-point tolerance for comparisons
     :return: Boolean indicating if the point is on top of the box
     """
-    return (
-        min_coord[0] - tolerance <= point[0] <= max_coord[0] + tolerance
-        and min_coord[1] - tolerance <= point[1] <= max_coord[1] + tolerance
+    x_in_bounds = (
+        min(min_coord[0], max_coord[0]) <= point[0] <= max(min_coord[0], max_coord[0])
     )
+    y_in_bounds = (
+        min(min_coord[1], max_coord[1]) <= point[1] <= max(min_coord[1], max_coord[1])
+    )
+    return x_in_bounds and y_in_bounds
+    # return (
+    #     min_coord[0] - tolerance <= point[0] <= max_coord[0] + tolerance
+    #     and min_coord[1] - tolerance <= point[1] <= max_coord[1] + tolerance
+    # )
 
 
 def bbox_coords(object_tag, fn_to_convert_from_home_to_base):
@@ -259,9 +266,9 @@ def bbox_coords(object_tag, fn_to_convert_from_home_to_base):
                         # Calculate the coords
                         x_center, y_center, z_center = bbox_center
                         length, width, depth = bbox_extent
-                        half_length = length
-                        half_width = width
-                        half_depth = depth
+                        half_length = length / 2
+                        half_width = width / 2
+                        half_depth = depth / 2
 
                         # Calculate xmin, xmax, ymin, ymax
                         xmin = x_center - half_length
