@@ -23,16 +23,16 @@ NUM_REPEAT = 1
 WAYPOINT_TEST = [
     (
         {
+            "id": 53,
+            "bbox_extent": [0.7, 0.5, 0.5],
+            "bbox_center": [3.5, -1.2, 0.3],
+            "object_tag": "chair",
+        },
+        {
             "id": 71,
             "bbox_extent": [0.9, 0.9, 0.6],
             "bbox_center": [1.1, 3.3, -0.1],
             "object_tag": "coffee table",
-        },
-        {
-            "id": 79,
-            "bbox_extent": [3.9, 0.9, 0.5],
-            "bbox_center": [0.9, 2.2, 0.1],
-            "object_tag": "couch",
         },
     )
 ] * NUM_REPEAT  # x, y
@@ -147,7 +147,7 @@ class SpotRosSkillExecutor:
                 pick_location_address.values()
             )
 
-            _, bbox_extent_place, bbox_center_place, query_class_place = list(
+            id, bbox_extent_place, bbox_center_place, query_class_place = list(
                 plac_location_address.values()
             )
 
@@ -166,7 +166,7 @@ class SpotRosSkillExecutor:
                 )
                 if nav_suc:
                     self.spotskillmanager.place(
-                        query_class_place[0],
+                        f"{id}_{query_class_place[0]}",
                         is_local=True,
                         visualize=False,
                         enable_waypoint_estimation=True,
