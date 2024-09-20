@@ -23,16 +23,16 @@ NUM_REPEAT = 1
 WAYPOINT_TEST = [
     (
         {
-            "id": 71,
-            "bbox_extent": [0.9, 0.9, 0.6],
-            "bbox_center": [1.1, 3.3, -0.1],
-            "object_tag": "coffee table",
+            "id": 23,
+            "bbox_extent": [0.6, 0.6, 0.2],
+            "bbox_center": [-0.7, 2.8, 0.5],
+            "object_tag": "sink",
         },
         {
-            "id": 79,
-            "bbox_extent": [3.9, 0.9, 0.5],
-            "bbox_center": [0.9, 2.2, 0.1],
-            "object_tag": "couch",
+            "id": 31,
+            "bbox_extent": [1.4, 0.9, 0.1],
+            "bbox_center": [6.1, 0.2, 0.3],
+            "object_tag": "desk",
         },
     )
 ] * NUM_REPEAT  # x, y

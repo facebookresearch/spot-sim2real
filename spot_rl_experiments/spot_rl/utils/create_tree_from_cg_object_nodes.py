@@ -104,4 +104,4 @@ def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
 
 if __name__ == "__main__":
     tree, data = populate_quad_tree()
-    nodes = query_quad_tree(1.5, 1.9, tree, data)
+    nodes = query_quad_tree(4, 0, tree, data)

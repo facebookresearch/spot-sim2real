@@ -323,6 +323,66 @@ bboxs_info = {
         "object_tag": "wooden nightstand/dresser",
     },
 }
+
+
+bboxs_info = {
+    "23_sink": {
+        "id": 23,
+        "bbox_extent": [0.6, 0.6, 0.2],
+        "bbox_center": [-0.7, 2.8, 0.5],
+        "object_tag": "sink",
+    },
+    "3_wooden_dining_table": {
+        "id": 3,
+        "bbox_extent": [0.3, 0.1, 0.1],
+        "bbox_center": [0.7, 1.3, -0.3],
+        "object_tag": "wooden dining table",
+    },
+    "36_tall_black_bookshelf": {
+        "id": 36,
+        "bbox_extent": [0.9, 0.3, 0.1],
+        "bbox_center": [5.4, 2.7, 0.4],
+        "object_tag": "tall black bookshelf",
+    },
+    "14_white_cabinet": {
+        "id": 14,
+        "bbox_extent": [1.2, 1.1, 0.7],
+        "bbox_center": [3.4, 2.7, 0.1],
+        "object_tag": "white cabinet",
+    },
+    "12_wooden_round_table": {
+        "id": 12,
+        "bbox_extent": [0.9, 0.8, 0.2],
+        "bbox_center": [3.1, -1.3, 0.0],
+        "object_tag": "wooden round table",
+    },
+    "31_desk": {
+        "id": 31,
+        "bbox_extent": [1.4, 0.9, 0.1],
+        "bbox_center": [6.1, 0.2, 0.3],
+        "object_tag": "desk",
+    },
+    "28_office_chair": {
+        "id": 28,
+        "bbox_extent": [0.3, 0.1, 0.1],
+        "bbox_center": [5.6, 0.6, 0.3],
+        "object_tag": "office chair",
+    },
+    "32_office_chair": {
+        "id": 32,
+        "bbox_extent": [1.2, 1.0, 0.7],
+        "bbox_center": [3.7, 0.3, 0.0],
+        "object_tag": "cabinet",
+    },
+    "13_white dresser or cabinet": {
+        "id": 13,
+        "bbox_extent": [1.1, 1.1, 0.7],
+        "bbox_center": [3.1, 0.5, 0.0],
+        "object_tag": "white dresser or cabinet",
+    },
+}
+
+
 # bboxs_info = bboxs_info_iphone_fixed_classes_new_jmmy
 VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "receptacle_before_demo"
@@ -330,7 +390,9 @@ os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "lamp_right_bed":  # receptacle_name == "teddy_bear":
+    if (
+        receptacle_name != "None"
+    ):  # "lamp_right_bed":  # receptacle_name == "teddy_bear":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):
