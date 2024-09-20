@@ -301,6 +301,7 @@ def filter_pointcloud_by_normals_in_the_given_direction(
     return pcd_dir_filtered
 
 
+# For Centering the point selection
 def rank_planes(
     planes: np.ndarray,
     all_plane_normals: np.ndarray,
@@ -319,9 +320,11 @@ def rank_planes(
     # indices_of_min_dist = []
     all_distances = []
     planes_points = [np.array(plane.points).reshape(-1, 3) for plane in planes]
+    planes_points_in_body = []
 
     for plane_points in planes_points:
         plane_points_in_body = body_T_intel * plane_points
+        planes_points_in_body.append(plane_points_in_body)
         norms_of_plane_points = np.linalg.norm(plane_points_in_body, axis=1)
         argmin_dist = int(np.argmin(norms_of_plane_points))
         all_distances.append(np.linalg.norm(plane_points_in_body[:, :3], axis=1))
@@ -339,18 +342,27 @@ def rank_planes(
     # breakpoint()
     argmax = int(np.argmax(cost))
     distances_of_points_for_selected_plane = all_distances[argmax]
-    sorted_distances_of_points = np.sort(distances_of_points_for_selected_plane.copy())
-    selected_distance_based_on_percentile = np.percentile(
-        sorted_distances_of_points, percentile_thresh
+    # sorted_distances_of_points = np.sort(distances_of_points_for_selected_plane.copy())
+    # selected_distance_based_on_percentile = np.percentile(
+    #     sorted_distances_of_points, percentile_thresh
+    # )
+    selected_plane = planes_points[argmax]
+    selected_plane_in_body = planes_points_in_body[argmax]
+    x_percentile = np.percentile(
+        np.sort(selected_plane_in_body[:, 0].copy()), percentile_thresh
     )
-    index_in_og_plane = int(
-        np.argmin(
-            np.abs(
-                distances_of_points_for_selected_plane
-                - selected_distance_based_on_percentile
-            )
-        )
+    y_percentile = (
+        selected_plane_in_body[:, 1].mean() / 2.0
+    )  # np.percentile(np.sort(selected_plane_in_body[:, 1].copy()), 50)
+    percentile_points = np.array(
+        [[x_percentile, y_percentile]] * selected_plane.shape[0]
     )
+    distance_to_percentile_point = np.linalg.norm(
+        selected_plane_in_body[:, :2] - percentile_points, axis=1
+    )
+    # distance_of_y_from_zero = np.abs( 0.0 - planes_points[argmax][:, 1])
+    # point_selection_cost = (distance_to_percentile_point/np.max(distance_to_percentile_point))*(distance_of_y_from_zero/np.max(distance_of_y_from_zero))
+    index_in_og_plane = int(np.argmin(distance_to_percentile_point))
     index_of_min_dist_point = int(np.argmin(distances_of_points_for_selected_plane))
     return (
         argmax,

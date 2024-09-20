@@ -18,27 +18,27 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 )
 from spot_wrapper.utils import get_angle_between_two_vectors
 
-NUM_REPEAT = 2
+NUM_REPEAT = 1
 # Center, extent, object_tags
 WAYPOINT_TEST = [
     (
         {
-            "id": 154,
-            "bbox_extent": [0.8, 0.5, 0.3],
-            "bbox_center": [3.2, -1.1, 0.5],
-            "object_tag": "chair",
+            "id": 71,
+            "bbox_extent": [0.9, 0.9, 0.6],
+            "bbox_center": [1.1, 3.3, -0.1],
+            "object_tag": "coffee table",
         },
         {
-            "id": 51,
-            "bbox_extent": [1.5, 0.8, 0.6],
-            "bbox_center": [-0.9, 8.3, 1.1],
-            "object_tag": "shelf",
+            "id": 79,
+            "bbox_extent": [3.9, 0.9, 0.5],
+            "bbox_center": [0.9, 2.2, 0.1],
+            "object_tag": "couch",
         },
     )
 ] * NUM_REPEAT  # x, y
 object_to_pickup = "bottle"
-receptacle_name = "chair_to_cabinet"
-VISUALIZE = True
+receptacle_name = "coffee_to_office_cabinet"
+VISUALIZE = False
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 

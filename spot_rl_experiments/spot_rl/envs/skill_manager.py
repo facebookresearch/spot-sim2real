@@ -10,7 +10,10 @@ import magnum as mn
 import numpy as np
 import rospy
 from multimethod import multimethod
-from perception_and_utils.utils.generic_utils import conditional_print
+from perception_and_utils.utils.generic_utils import (
+    conditional_print,
+    map_user_input_to_boolean,
+)
 from spot_rl.skills.atomic_skills import (
     Navigation,
     OpenCloseDrawer,

@@ -121,7 +121,7 @@ bboxs_info_iphone_fixed_classes_old_jmmy = {
     },
 }
 
-bboxs_info_iphone_fixed_classes_new_jmmy = {
+fallback_CG = {
     "coffee_table": {
         "id": 68,
         "bbox_extent": [0.9, 0.5, 0.3],
@@ -192,53 +192,12 @@ bboxs_info_iphone_fixed_classes_new_jmmy = {
 }
 
 bboxs_info = {
-    "chair_beside_living_console": {
-        "id": 0,
-        "bbox_extent": [1.2, 1.0, 0.5],
-        "bbox_center": [5.9, 4.8, 0.1],
-        "object_tag": "chair",
-    },
-    "wooden_dresser": {  # id 2
-        "id": 27,
-        "bbox_extent": [1.9, 1.0, 0.6],
-        "bbox_center": [6.0, 3.6, 0.1],
-        "object_tag": "wooden cabinet or dresser",
-    },
-    "table_lamp": {
-        "id": 28,
-        "bbox_extent": [0.6, 0.5, 0.4],
-        "bbox_center": [6.2, 4.2, 0.7],
-        "object_tag": "table lamp",
-    },
-    "white_chair_besides_living_room": {
-        "id": 84,
-        "bbox_extent": [1.1, 0.9, 0.6],
-        "bbox_center": [3.1, 5.2, 0.1],
-        "object_tag": "white chair",
-    },
-    "office_right_shelf": {
-        "id": 22,
-        "bbox_extent": [2.3, 1.4, 0.7],
-        "bbox_center": [-1.1, 8.1, 0.8],
-        "object_tag": "wooden shelf/table",
-    },
-    "office_desk": {
-        "id": 21,
-        "bbox_extent": [1.8, 0.8, 0.3],
-        "bbox_center": [-0.9, 7.1, 0.3],
-        "object_tag": "office desk",
-    },
-    "office_left_shelf": {
-        "id": 15,
-        "bbox_extent": [1.0, 0.5, 0.3],
-        "bbox_center": [-0.8, 6.4, 0.1],
-        "object_tag": "shelf",
-    },
-    "kitchen_left_near_fridge": {
-        "id": 32,
-        "bbox_extent": [1.1, 1.0, 0.1],
-        "bbox_center": [6.0, -4.1, 0.2],
-        "object_tag": "kitchen cabinet",
+    # kitchen area
+    "box_of_cereal": {
+        "id": 39,
+        "bbox_extent": [0.9, 0.8, 0.5],
+        "bbox_center": [4.6, -4.6, 1.7],
+        "object_tag": "bottle",
     },
     "gas_stove": {
         "id": 40,
@@ -259,9 +218,9 @@ bboxs_info = {
         "object_tag": "sink",
     },
     "kitchen_island": {  # redo
-        "id": 60,
-        "bbox_extent": [0.9, 0.5, 0.4],
-        "bbox_center": [0.9, -2.6, 0.2],
+        "id": 53,
+        "bbox_extent": [0.7, 0.5, 0.5],
+        "bbox_center": [3.5, -1.2, 0.3],
         "object_tag": "chair",
     },
     "dining_table": {
@@ -270,11 +229,18 @@ bboxs_info = {
         "bbox_center": [0.4, -2.3, 0.2],
         "object_tag": "wooden dining table",
     },
-    "couch": {
+    # living room
+    "couch_overlapping_with_coffee": {
         "id": 74,
         "bbox_extent": [1.2, 0.7, 0.4],
         "bbox_center": [1.5, 1.9, 0.2],
         "object_tag": "colorful pillow",
+    },
+    "cocuh_left_edge": {
+        "id": 75,
+        "bbox_extent": [3.9, 0.9, 0.5],
+        "bbox_center": [0.9, 2.2, 0.1],
+        "object_tag": "couch",
     },
     "white_couch_L": {
         "id": 72,
@@ -282,11 +248,17 @@ bboxs_info = {
         "bbox_center": [-0.4, 2.9, -0.0],
         "object_tag": "white couch",
     },
-    "piilow": {
-        "id": 74,
-        "bbox_extent": [1.2, 0.7, 0.4],
-        "bbox_center": [1.5, 1.9, 0.2],
-        "object_tag": "colorful pillow",
+    "coffee_table": {
+        "id": 71,
+        "bbox_extent": [0.9, 0.9, 0.6],
+        "bbox_center": [1.1, 3.3, -0.1],
+        "object_tag": "coffee table",
+    },
+    "wooden_dresser": {  # id 2
+        "id": 27,
+        "bbox_extent": [1.9, 1.0, 0.6],
+        "bbox_center": [6.0, 3.6, 0.1],
+        "object_tag": "wooden cabinet or dresser",
     },
     "living_room_desktop_table": {
         "id": 83,
@@ -294,21 +266,71 @@ bboxs_info = {
         "bbox_center": [1.7, 5.2, 0.1],
         "object_tag": "wooden furniture",
     },
-    "teady_bear": {
+    "chair_beside_wooden_dresser": {
+        "id": 0,
+        "bbox_extent": [1.2, 1.0, 0.5],
+        "bbox_center": [5.9, 4.8, 0.1],
+        "object_tag": "chair",
+    },
+    "chair_besides_desktop": {
+        "id": 84,
+        "bbox_extent": [1.1, 0.9, 0.6],
+        "bbox_center": [3.1, 5.2, 0.1],
+        "object_tag": "white chair",
+    },
+    # office
+    "left_cabinet_in_office": {
+        "id": 13,
+        "bbox_extent": [1.7, 0.9, 0.7],
+        "bbox_center": [0.8, 5.9, 0.0],
+        "object_tag": "wooden cabinet or shelf",
+    },
+    "office_right_shelf": {
+        "id": 22,
+        "bbox_extent": [2.3, 1.4, 0.7],
+        "bbox_center": [-1.1, 8.1, 0.8],
+        "object_tag": "wooden shelf/table",
+    },
+    "office_left_shelf": {
+        "id": 15,
+        "bbox_extent": [1.0, 0.5, 0.3],
+        "bbox_center": [-0.8, 6.4, 0.1],
+        "object_tag": "shelf",
+    },
+    "office_desk": {
+        "id": 21,
+        "bbox_extent": [1.8, 0.8, 0.3],
+        "bbox_center": [-0.9, 7.1, 0.3],
+        "object_tag": "office desk",
+    },
+    # bedroom
+    "bedroom_dresser": {
+        "id": 3,
+        "bbox_extent": [1.9, 0.9, 0.7],
+        "bbox_center": [8.5, 6.5, 0.0],
+        "object_tag": "dresser",
+    },
+    "lamp_left_bed": {
         "id": 5,
         "bbox_extent": [0.8, 0.6, 0.4],
         "bbox_center": [10.6, 2.7, 0.2],
         "object_tag": "wooden dresser/nightstand",
     },
+    "lamp_right_bed": {
+        "id": 10,
+        "bbox_extent": [0.9, 0.7, 0.5],
+        "bbox_center": [8.3, 2.6, 0.2],
+        "object_tag": "wooden nightstand/dresser",
+    },
 }
 # bboxs_info = bboxs_info_iphone_fixed_classes_new_jmmy
 VISUALIZE = True
-PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
+PATH_PLANNING_VISUALIZATION_FOLDER = "receptacle_before_demo"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "teady_bear":  # receptacle_name == "teddy_bear":
+    if receptacle_name == "lamp_right_bed":  # receptacle_name == "teddy_bear":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):

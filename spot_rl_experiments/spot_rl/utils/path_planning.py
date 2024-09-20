@@ -169,12 +169,13 @@ def fill_up_occupancy_grid(occupancy_grid):
 
     grid = occupancy_grid["occupancy_grid"]
     # for old graph
-    grid[87, 59:68] = 1
-    grid[73:87, 68] = 1
+    # grid[87, 59:68] = 1
+    # grid[73:87, 68] = 1
     # for Jimmy's graph
-    grid[96:111, 69] = 1
-    grid[5:46, 68] = 1
-    grid[3:46, 68] = 1
+    # grid[96:111, 69] = 1
+    # grid[5:46, 68] = 1
+    # grid[3:46, 68] = 1
+    grid[88, 82:96] = 1
     occupancy_grid["occupancy_grid"] = grid
     # breakpoint()
     return occupancy_grid
@@ -184,7 +185,7 @@ def get_occupancy_grid():
     if osp.exists(CACHE_PATH):
         with open(CACHE_PATH, "rb") as file:
             data = pkl.load(file)
-            filled_data = data  # fill_up_occupancy_grid(data)
+            filled_data = fill_up_occupancy_grid(data)
             return filled_data
 
     if not osp.exists(PCD_PATH):
@@ -207,9 +208,7 @@ def get_occupancy_grid():
         "min_x": min_x,
         "min_y": min_y,
     }
-    occupancy_grid_cache = (
-        occupancy_grid_cache  # fill_up_occupancy_grid(occupancy_grid_cache)
-    )
+    occupancy_grid_cache = fill_up_occupancy_grid(occupancy_grid_cache)
     print("couldnot find occupancy cache, building from pcd & saving a cache")
     with open(CACHE_PATH, "wb") as file:
         pkl.dump(occupancy_grid_cache, file)

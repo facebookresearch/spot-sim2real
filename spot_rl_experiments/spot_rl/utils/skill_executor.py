@@ -118,6 +118,7 @@ class SpotRosSkillExecutor:
             # Use the following for the hardcode waypoint place
             # succeded, msg = self.spotskillmanager.place(0.6, 0.0, 0.4, is_local=True)
             # Call semantic place skills
+            rospy.set_param("is_gripper_blocked", 0)
             succeded, msg = self.spotskillmanager.place(
                 None,
                 is_local=True,
