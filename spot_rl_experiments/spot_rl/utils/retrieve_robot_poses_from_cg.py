@@ -19,8 +19,6 @@ def load_config(config_file):
     return config
 
 
-# ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
-
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
@@ -231,29 +229,20 @@ def get_view_poses(
         anchorboxMin, anchorboxMax = get_xyzxyz(
             anchor_object_center, anchor_object_extent
         )
-        dist_thresh = (
-            2.0  # np.linalg.norm(anchorboxMax[:2] - anchorboxMin[:2]) / 2 + 0.5
-        )
+        dist_thresh = 2.0
         print(f"Using Dist thresh {dist_thresh}")
         for i, object_item in enumerate(cache_file):
             class_names = object_item["class_name"]
 
-            # intersection_with_search_query = list(
-            #     set(query_class_names) & set(class_names)
-            # )
             min_dist = np.inf
-            # for class_i, class_name in enumerate(class_names):
-            # breakpoint()
+
             bbox_np = object_item["bbox_np"]
             max_diag, correct_pair_index = get_max_diag(bbox_np)
             center = (bbox_np[0] + bbox_np[correct_pair_index]) / 2.0
             dist_to_anchor_center = np.linalg.norm(center - anchor_object_center)
 
-            # bbox_center_from_caption_field = object_item["caption_dict"]["bbox_center"]
             min_dist = min(min_dist, dist_to_anchor_center)
-            # if int(object_item["caption_dict"]["id"]) == int(object_id):
-            #     breakpoint()
-            # breakpoint()
+
             if (
                 dist_to_anchor_center < dist_thresh
                 and object_item["caption_dict"]["bbox_center"]
@@ -307,7 +296,7 @@ def get_view_poses(
                                 index_in_raw_data, raw_data
                             ),
                         }
-                        # print(f'Yaw Gripper {yaw_gripper}, Yaw BAse {np.rad2deg(raw_data[index_in_raw_data]["base_pose_xyt"][-1])}')
+
                         if visulize:
                             raw_image_in_data = get_rgb_image_from_raw_data(
                                 index_in_raw_data, raw_data
@@ -326,14 +315,7 @@ def get_view_poses(
 
     if len(data_list) > 0:
         print(f"Found {len(data_list)} instances for given bbox centers & object tag")
-        # with open("robot_view_poses_for_bedroom_dresser.pkl", "wb") as file:
-        #     pickle.dump(data_list, file)
     else:
         print(f"No such class was found, min distance to anchor object is {min_dist}")
 
     return data_list
-
-
-if __name__ == "__main__":
-    pass
-    # get_view_poses(ANCHOR_OBJECT_CENTER, [], [], [])

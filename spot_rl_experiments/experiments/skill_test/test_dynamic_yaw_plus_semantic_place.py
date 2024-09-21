@@ -67,10 +67,7 @@ class SpotRosSkillExecutor:
             self.spotskillmanager = SpotSkillManager(
                 use_mobile_pick=True, use_semantic_place=True
             )
-            # gaze_arm_angles = deepcopy(self.spotskillmanager.pick_config.SEMANTIC_PLACE_ARM_JOINT_ANGLES)
 
-            # self.spotskillmanager.spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
-            # breakpoint()
             x, y = waypoint
             suc, _ = self.spotskillmanager.nav(x, y)
             # Compute the metrics
@@ -83,7 +80,6 @@ class SpotRosSkillExecutor:
             metrics["nav_suc"] = suc
             if suc:  # iff nav succeeds
                 self.spotskillmanager.spot.open_gripper()
-                # time.sleep(30)
                 close_gripper = map_user_input_to_boolean("Close the Gripper ? Y/N")
                 if close_gripper:
                     self.spotskillmanager.spot.close_gripper()

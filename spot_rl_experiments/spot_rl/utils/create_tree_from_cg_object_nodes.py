@@ -15,8 +15,6 @@ def load_config(config_file):
     return config
 
 
-# ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
-
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
@@ -52,8 +50,7 @@ def populate_quad_tree():
             print(f"Y extent {width}, X extent {height}")
             tree = quads.QuadTree((0, 0), width, height)
             tree.insert(quads.Point(0.0, 0.0, data="Dock"))
-            # tree.insert(quads.Point(-5.2, 5.7, data="couch"))
-            # quads.visualize(tree)
+
             data_dict = {}
             for i, object_item in enumerate(cache_file):
                 object_tag = object_item["caption_dict"]["response"]["object_tag"]
@@ -61,7 +58,7 @@ def populate_quad_tree():
                 boxcenter = object_item["caption_dict"]["bbox_center"][:2]
 
                 x, y = -1 * boxcenter[1], boxcenter[0]
-                # breakpoint()
+
                 caption_data = object_item["caption_dict"]
                 data = {
                     "id": caption_data["id"],
@@ -69,9 +66,9 @@ def populate_quad_tree():
                     "bbox_extent": caption_data["bbox_extent"],
                     "bbox_center": caption_data["bbox_center"],
                 }
-                data_dict[f"{x:.1f}, {y:.1f}"] = data  # f"{id}_{object_tag}"
+                data_dict[f"{x:.1f}, {y:.1f}"] = data
                 assert tree.insert((x, y), data=f"{id}_{object_tag}")
-            # quads.visualize(tree)
+
             return tree, data_dict
 
 
@@ -85,18 +82,14 @@ def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
         max_x=xin_query + region,
         max_y=yin_query + region,
     )
-    points = tree.within_bb(
-        bb
-    )  # tree.nearest_neighbors((x_incg, y_incg), count=num_of_neighbours)
-    # print(points)
+    points = tree.within_bb(bb)
+
     converted_points = []
-    # data = []
+
     for point in points:
         key = f"{point.x:.1f}, {point.y:.1f}"
-        # data.append(data_dic.get(key, "NotFound"))
         x_in_cg = point.y
         y_in_cg = -1 * point.x
-        # data = point.data
         pp(data_dic.get(key, "NotFound"))
         converted_points.append((x_in_cg, y_in_cg, data_dic.get(key, "NotFound")))
     return converted_points

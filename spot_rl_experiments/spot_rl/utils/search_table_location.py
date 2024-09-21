@@ -328,24 +328,14 @@ def rank_planes(
         norms_of_plane_points = np.linalg.norm(plane_points_in_body, axis=1)
         argmin_dist = int(np.argmin(norms_of_plane_points))
         all_distances.append(np.linalg.norm(plane_points_in_body[:, :3], axis=1))
-        # indices_of_min_dist.append(argmin_dist)
         euclidean_dist.append(norms_of_plane_points[argmin_dist] / 0.5)
         number_of_pts.append(plane_points.shape[0] / max_number_of_points)
 
-    # euclidean_dist =  np.array(euclidean_dist) / 0.5
-
-    cost = -0.8 * np.array(euclidean_dist) + 0.2 * np.array(
-        number_of_pts
-    )  # + 0.9*cosines
-    # cost = cosines + 0.3*height_of_plane
+    cost = -0.8 * np.array(euclidean_dist) + 0.2 * np.array(number_of_pts)
     # Filter out the point clouds
-    # breakpoint()
     argmax = int(np.argmax(cost))
     distances_of_points_for_selected_plane = all_distances[argmax]
-    # sorted_distances_of_points = np.sort(distances_of_points_for_selected_plane.copy())
-    # selected_distance_based_on_percentile = np.percentile(
-    #     sorted_distances_of_points, percentile_thresh
-    # )
+
     selected_plane = planes_points[argmax]
     selected_plane_in_body = planes_points_in_body[argmax]
     x_percentile = np.percentile(
@@ -360,8 +350,7 @@ def rank_planes(
     distance_to_percentile_point = np.linalg.norm(
         selected_plane_in_body[:, :2] - percentile_points, axis=1
     )
-    # distance_of_y_from_zero = np.abs( 0.0 - planes_points[argmax][:, 1])
-    # point_selection_cost = (distance_to_percentile_point/np.max(distance_to_percentile_point))*(distance_of_y_from_zero/np.max(distance_of_y_from_zero))
+
     index_in_og_plane = int(np.argmin(distance_to_percentile_point))
     index_of_min_dist_point = int(np.argmin(distances_of_points_for_selected_plane))
     return (
@@ -375,7 +364,6 @@ def rank_planes(
 
 
 def compute_plane_normal_by_average(pcd):
-    # pcd = NumpyToPCD(points)
     pcd.estimate_normals(
         search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
     )

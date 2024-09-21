@@ -222,7 +222,6 @@ def get_navigation_points(
 ):
 
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
-    # print("boxMin", boxMin, "boxMax", boxMax)
 
     if robot_view_pose_data is None:
         robot_view_pose_data = pkl.load(
@@ -247,9 +246,7 @@ def get_navigation_points(
     reachable_indices = []
     reachable_paths = []
     for wei, waypoint_edge in enumerate(four_waypoint_edges):
-        path_edge = path_planning_using_a_star(
-            cur_robot_xy, waypoint_edge[:2]  # best_robot_view_pos[0][:2]
-        )
+        path_edge = path_planning_using_a_star(cur_robot_xy, waypoint_edge[:2])
         if not len(path_edge):
             nonreachable_edges_indices.append(wei)
         else:
@@ -259,7 +256,6 @@ def get_navigation_points(
     if len(nonreachable_edges_indices) == 4:
         # either raise error or consider it path planning failure & continue
         nonreachable_edges_indices = []
-    # nonreachable_edges_indices =[]
 
     if len(nonreachable_edges_indices) == 3:
         # no need to test robot view poses since only 1 edge is reachable
@@ -276,7 +272,7 @@ def get_navigation_points(
         )
 
     path = path_planning_using_a_star(
-        cur_robot_xy,  # best_robot_view_pos[0][:2]
+        cur_robot_xy,
         waypoint[:2],
         savefigname,
         visualize=visualize,
@@ -287,8 +283,6 @@ def get_navigation_points(
     waypoint[-1] = np.deg2rad(waypoint[-1])
     path.append(waypoint)
     print(f"Final path x y yaw: {path}")
-    # with open("path.pkl", "wb") as file:
-    #     pkl.dump(path, file)
 
     return path
 

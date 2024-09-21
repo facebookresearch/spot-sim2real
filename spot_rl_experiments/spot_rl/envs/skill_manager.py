@@ -495,10 +495,7 @@ class SpotSkillManager:
         return status, message
 
     def set_arm_joint_angles(self, place_target: str = None):
-        try:
-            height = calculate_height(place_target)
-        except Exception:
-            height = 0.90
+        height = calculate_height(place_target)
         if height < self.place_config.HEIGHT_THRESHOLD:
             return self.place_config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES
         else:
@@ -567,7 +564,7 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.arm_joint_angles,
-                    percentile=70 if visualize else 30,
+                    percentile=percentile,
                     visualize=visualize,
                     height_adjustment_offset=height_adjustment_threshold,
                 )
@@ -581,25 +578,28 @@ class SpotSkillManager:
                 conditional_print(message=message, verbose=self.verbose)
                 print(message)
                 return False, message
-
         edge_x = float(edge_point_in_base[0])
-        offset_kept = 0.7
-        travel_time = 2
-        if edge_x > offset_kept:
-            walk_distance = edge_x - offset_kept
+
+        # Move the base if the robot is too far away from the place target
+        start_walking_distance_threshold = 0.7  # in meters
+        travel_time_for_walking_to_target = 2  # in seconds
+        if edge_x > start_walking_distance_threshold:
+            walk_distance = edge_x - start_walking_distance_threshold
             (
                 before_walking_x,
                 before_walking_y,
                 before_walking_yaw,
             ) = self.spot.get_xy_yaw()
-            self.spot.set_base_position(walk_distance, 0, 0, travel_time, True)
-            time.sleep(travel_time)
+            # Walk to the place target
+            self.spot.set_base_position(
+                walk_distance, 0, 0, travel_time_for_walking_to_target, True
+            )
+            # Wait for the robot to finish walking
+            time.sleep(travel_time_for_walking_to_target)
             after_walking_x, after_walking_y, after_walking_yaw = self.spot.get_xy_yaw()
             walk_distance = after_walking_x - before_walking_x
-            # print(f"place target before {place_target_location}")
+            # Offset the place target location
             place_target_location[0] -= walk_distance
-            # print(f"New place target {place_target_location}")
-            # breakpoint()
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
         status, message = self.place(

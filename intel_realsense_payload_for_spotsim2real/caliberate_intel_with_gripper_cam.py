@@ -74,17 +74,21 @@ if __name__ == "__main__":
         gripper_image, gripper_T_marker = aprilposeestimator_gripper.process_frame(
             gripper_image
         )
-        print(
-            f"Check if the z is close to each other -- gripper_T_marker: {gripper_T_marker.matrix()[:3, 3]}, intel_T_marker: {intel_T_marker.matrix()[:3, 3]}"
-        )
-        cv2.imshow("QR detection", np.hstack((intel_image, gripper_image)))
-        marker_T_intel = intel_T_marker.inverse()
-        gripper_T_intel = (gripper_T_marker * marker_T_intel).matrix()
-        err = gripper_T_intel - prev_diff
-        print(f"error {err} \n")
-        prev_diff = gripper_T_intel
-        save_tf = rospy.get_param("is_save", 0) == 1
-        if save_tf and not np.any(err):
-            np.save("gripper_T_intel.npy", gripper_T_intel)
-            break
+
+        if intel_T_marker is None or gripper_T_marker is None:
+            print("No marker detected")
+        else:
+            print(
+                f"Check if the z is close to each other -- gripper_T_marker: {gripper_T_marker.matrix()[:3, 3]}, intel_T_marker: {intel_T_marker.matrix()[:3, 3]}"
+            )
+            cv2.imshow("QR detection", np.hstack((intel_image, gripper_image)))
+            marker_T_intel = intel_T_marker.inverse()
+            gripper_T_intel = (gripper_T_marker * marker_T_intel).matrix()
+            err = gripper_T_intel - prev_diff
+            print(f"error {err} \n")
+            prev_diff = gripper_T_intel
+            save_tf = rospy.get_param("is_save", 0) == 1
+            if save_tf and not np.any(err):
+                np.save("gripper_T_intel.npy", gripper_T_intel)
+                break
         cv2.waitKey(1)

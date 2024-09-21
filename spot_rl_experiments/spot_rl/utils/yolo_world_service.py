@@ -4,7 +4,7 @@ from ultralytics import YOLOWorld
 # Load a pretrained YOLOv8s-worldv2 model
 model = YOLOWorld("yolov8x-worldv2.pt").cuda()
 
-port = "21001"  # spot_rl_config.SEG_PORT  #
+port = "21001"
 context = zmq.Context()
 socket = context.socket(zmq.REP)
 socket.bind(f"tcp://*:{port}")
@@ -26,15 +26,13 @@ while True:
                 visualization_img = r.plot(img=visualization_img)
             if r.boxes.xyxy.shape[0] > 0:
                 conf = r.boxes.conf.cpu().numpy().tolist()[0]
-                if True:  # conf > 0.6:
+                if True:
                     try:
                         bboxes.append(r.boxes.xyxy.cpu().numpy().tolist()[0])
                         probs.append(conf)
                     except Exception as e:
                         print(e)
                         breakpoint()
-    # Save results to disk
-    # r.save(filename=f"results{i}.jpg")
     if not visualize:
         visualization_img = None
     socket.send_pyobj((bboxes, probs, visualization_img))

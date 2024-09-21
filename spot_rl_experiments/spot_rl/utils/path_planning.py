@@ -27,8 +27,6 @@ def load_config(config_file):
     return config
 
 
-# ROOT_PATH = "/home/tushar/Desktop/try2_habitat_llm/fre_apt_cleaned_preprocesed_jimmy"  # osp.dirname(osp.abspath(__file__))
-
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
@@ -44,31 +42,6 @@ CG_PCD_PATH = osp.join(ROOT_PATH, "rgb_cloud", "pointcloud.pcd")
 OCCUPANCY_SCALE = 10.0
 
 DISTANCE_THRESHOLD_TO_ADD_POINT = 1.0
-
-# def path_planning_based_on_raymarching(occupancy_grid, occupancy_max_x, occupancy_max_y, occupancy_scale, xy_position_robot_in_cg, bbox_centers, bbox_extents):
-
-#     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
-#     robot_position = np.array([*xy_position_robot_in_cg, bbox_centers[-1]+0.1])
-#     rayDir = (bbox_centers - robot_position) / np.linalg.norm(bbox_centers - robot_position)
-#     intersects, pt1, _, t_min, _ = intersect_ray_with_aabb(robot_position, rayDir, boxMin, boxMax)
-#     assert intersects, "couldn't find the intersection"
-#     if intersects:
-#         point_of_intersection = pt1[:2]
-#         newRayDir = (point_of_intersection - xy_position_robot_in_cg)/np.linalg.norm(point_of_intersection - xy_position_robot_in_cg)
-#         rayorigin = xy_position_robot_in_cg
-#         t = 0.0
-#         accum = 0.0
-#         num_steps = 0
-#         while t < t_min:
-#             current_ray_cast_position = rayorigin + t*newRayDir
-#             X = floor(map_x_from_cg_to_grid(current_ray_cast_position[0], occupancy_max_x)*occupancy_scale)
-#             Y = floor(map_y_from_cg_to_grid(current_ray_cast_position[1], occupancy_max_y)*occupancy_scale)
-#             accum += occupancy_grid[X, Y]
-#             t += 0.1
-#             num_steps += 1
-#             #breakpoint()
-#         print(accum, num_steps)
-#     return accum/num_steps #x,y,yaw
 
 
 def pick_points(pcd):
@@ -118,10 +91,6 @@ def convert_cg_pcd_to_pkl(
 
 
 def get_xyzxyz(centroid, extents):
-    # extents = np.array(extents)
-    # extents *= 2.0
-    # extents = extents.tolist()
-
     x1 = centroid[0] - (extents[0] / 2.0)
     y1 = centroid[1] - (extents[1] / 2.0)
     z1 = centroid[2] - (extents[2] / 2.0)
@@ -165,19 +134,10 @@ def angle_between_vectors(v1, v2):
 
 
 def fill_up_occupancy_grid(occupancy_grid):
-    # temp hack to make bedroom dresser work
-
+    """This function is used to fill up the occupancy grid with"""
     grid = occupancy_grid["occupancy_grid"]
-    # for old graph
-    # grid[87, 59:68] = 1
-    # grid[73:87, 68] = 1
-    # for Jimmy's graph
-    # grid[96:111, 69] = 1
-    # grid[5:46, 68] = 1
-    # grid[3:46, 68] = 1
     grid[88, 82:96] = 1
     occupancy_grid["occupancy_grid"] = grid
-    # breakpoint()
     return occupancy_grid
 
 

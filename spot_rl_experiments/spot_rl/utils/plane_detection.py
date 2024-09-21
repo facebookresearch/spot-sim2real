@@ -159,54 +159,10 @@ def DetectMultiPlanes(points, min_ratio=0.05, threshold=0.01, iterations=1000):
     return plane_list
 
 
-# def trying_new_segment_plane(pcd):
-
-#     #assert (pcd.has_normals())
-#     # pcd = NumpyToPCD(points)
-#     if not pcd.has_normals():
-#         pcd.estimate_normals(
-#             search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
-#         )
-#     # using all defaults
-#     oboxes = pcd.detect_planar_patches(
-#         normal_variance_threshold_deg=70,
-#         coplanarity_deg=80,
-#         outlier_ratio=0.75,
-#         min_plane_edge_length=0,
-#         min_num_points=0,
-#         search_param=o3d.geometry.KDTreeSearchParamKNN(knn=30))
-
-#     print("Detected {} patches".format(len(oboxes)))
-
-#     planes = [ pcd.select_by_index(obox.get_point_indices_within_bounding_box(pcd.points)) for obox in oboxes]
-#     geometries = []
-#     for obox in oboxes:
-#         plane_pcd = pcd.select_by_index(obox.get_point_indices_within_bounding_box(pcd.points))
-#         planes.append(plane_pcd)
-#         mesh = o3d.geometry.TriangleMesh.create_from_oriented_bounding_box(obox, scale=[1, 1, 0.0001])
-#         mesh.paint_uniform_color(obox.color)
-#         #geometries.append(plane)
-#         geometries.append(obox)
-
-#     geometries.append(pcd)
-#     o3d.visualization.draw_geometries([pcd])
-#     o3d.visualization.draw_geometries(geometries,
-#                                     zoom=0.62,
-#                                     front=[0.4361, -0.2632, -0.8605],
-#                                     lookat=[2.4947, 1.7728, 1.5541],
-#                                     up=[-0.1726, -0.9630, 0.2071])
-#     #o3d.visualization.draw_geometries(planes)
-#     return planes
-
-
 def plane_detect(pcd, visualize=False):
-    # if visualize:
-    # o3d.visualization.draw_geometries([pcd])
-
     points = PCDToNumpy(pcd)
     points = RemoveNoiseStatistical(points, nb_neighbors=50, std_ratio=0.5)
 
-    # DrawPointCloud(points, color=(0.4, 0.4, 0.4))
     t0 = time.time()
 
     results = DetectMultiPlanes(
@@ -216,7 +172,6 @@ def plane_detect(pcd, visualize=False):
     print("Time:", time.time() - t0)
     planes = []
 
-    # lowest_dist_to_camera, low_i = np.inf, 0
     print(f"{len(results)} plane are detected")
     for i, (_, plane) in enumerate(results):
 
