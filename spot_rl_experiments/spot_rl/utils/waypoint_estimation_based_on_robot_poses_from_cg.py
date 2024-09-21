@@ -290,5 +290,4 @@ def get_navigation_points(
 if __name__ == "__main__":
     vector_x = np.array([1, 0])
     vector_y = np.array([1, -1])
-    # breakpoint()
     print(angle_and_sign_between_vectors(vector_x, vector_y))

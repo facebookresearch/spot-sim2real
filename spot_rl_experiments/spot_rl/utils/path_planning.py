@@ -33,6 +33,8 @@ cg_config = load_config(PATH_TO_CONFIG_FILE)
 
 ROOT_PATH = cg_config["CG_ROOT_PATH"]
 
+FILL_UP_LOCATION = cg_config["FILL_UP_GRID_LOCATION"]
+
 CACHE_PATH = osp.join(ROOT_PATH, "occupancy_grid_cache.pkl")
 
 PCD_PATH = osp.join(ROOT_PATH, "point_cloud.pkl")
@@ -136,7 +138,10 @@ def angle_between_vectors(v1, v2):
 def fill_up_occupancy_grid(occupancy_grid):
     """This function is used to fill up the occupancy grid with"""
     grid = occupancy_grid["occupancy_grid"]
-    grid[88, 82:96] = 1
+    grid[
+        FILL_UP_LOCATION[0] : FILL_UP_LOCATION[1],
+        FILL_UP_LOCATION[2] : FILL_UP_LOCATION[3],
+    ] = 1
     occupancy_grid["occupancy_grid"] = grid
     return occupancy_grid
 

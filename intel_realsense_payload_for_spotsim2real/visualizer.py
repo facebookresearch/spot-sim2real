@@ -192,7 +192,7 @@ if __name__ == "__main__":
             else ["hand_color_image", "hand_depth_in_hand_color_frame"],
         )
         intrinsics = imageresp_from_source[0].source.pinhole.intrinsics
-        # breakpoint()
+
         images = [
             image_response_to_cv2(imgresp, False) for imgresp in imageresp_from_source
         ]

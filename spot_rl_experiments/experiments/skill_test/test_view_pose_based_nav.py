@@ -99,7 +99,7 @@ class SpotRosSkillExecutor:
             False,
             osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
         )
-        # breakpoint()
+
         # Sequentially give the points
         if len(nav_pts) > 0:
             final_pt_i = len(nav_pts) - 1
@@ -172,7 +172,6 @@ class SpotRosSkillExecutor:
                         enable_waypoint_estimation=True,
                     )
 
-            # breakpoint()
             # Reset
             self.spotskillmanager.dock()
 
