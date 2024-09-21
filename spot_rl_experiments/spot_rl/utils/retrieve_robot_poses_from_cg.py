@@ -245,8 +245,8 @@ def get_view_poses(
 
             if (
                 dist_to_anchor_center < dist_thresh
-                and object_item["caption_dict"]["bbox_center"]
-                == anchor_object_center.tolist()
+                and object_item["caption_dict"]["bbox_center"] == anchor_object_center
+                and object_item["caption_dict"]["bbox_extent"] == anchor_object_extent
             ):
                 print(f"Detected classes around given receptacle {set(class_names)}")
                 # if class_name in query_class_names
