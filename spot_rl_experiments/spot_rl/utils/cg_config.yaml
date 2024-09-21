@@ -2,3 +2,4 @@ CG_ROOT_PATH: "data/2024-09-17--19-06-02_fre_apartment_shortscan_preprocessed"
 SCAN_TYPE: "r3d"
 USE_YOLO: False
 FILL_UP_GRID_LOCATION: [88,89,82,96] # in array format: [x1:x2, y1:y2]. The value here is for Fremont apartment
+DILATION_SIZE: 1

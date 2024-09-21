@@ -17,9 +17,6 @@ from spot_rl.utils.occupancy_grid import (
     pkl,
 )
 
-# Define the structure element (the neighborhood for dilation)
-DILATION_MAT = np.ones((1, 1))
-
 
 def load_config(config_file):
     with open(config_file, "r") as file:
@@ -34,6 +31,9 @@ cg_config = load_config(PATH_TO_CONFIG_FILE)
 ROOT_PATH = cg_config["CG_ROOT_PATH"]
 
 FILL_UP_LOCATION = cg_config["FILL_UP_GRID_LOCATION"]
+
+# Define the structure element (the neighborhood for dilation)
+DILATION_MAT = np.ones((cg_config["DILATION_SIZE"], cg_config["DILATION_SIZE"]))
 
 CACHE_PATH = osp.join(ROOT_PATH, "occupancy_grid_cache.pkl")
 
