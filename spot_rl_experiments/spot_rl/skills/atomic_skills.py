@@ -1,8 +1,6 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
-
-
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -12,21 +10,27 @@ from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
 )
-from spot_rl.envs.gaze_env import SpotGazeEnv, SpotSemanticGazeEnv
+from spot_rl.envs.gaze_env import SpotGazeEEEnv, SpotGazeEnv, SpotSemanticGazeEnv
 
 # Import Envs
 from spot_rl.envs.nav_env import SpotNavEnv
 from spot_rl.envs.open_close_drawer_env import SpotOpenCloseDrawerEnv
-from spot_rl.envs.place_env import SpotPlaceEnv, SpotSemanticPlaceEnv
+from spot_rl.envs.place_env import (
+    SpotPlaceEnv,
+    SpotSemanticPlaceEEEnv,
+    SpotSemanticPlaceEnv,
+)
 
 # Import policies
 from spot_rl.real_policy import (
     GazePolicy,
+    MobileGazeEEPolicy,
     MobileGazePolicy,
     NavPolicy,
     OpenCloseDrawerPolicy,
     PlacePolicy,
     SemanticGazePolicy,
+    SemanticPlaceEEPolicy,
     SemanticPlacePolicy,
 )
 
@@ -41,10 +45,12 @@ from spot_rl.utils.construct_configs import (
 
 # Import Utils
 from spot_rl.utils.geometry_utils import (
+    euclidean,
     generate_intermediate_point,
     get_RPY_from_vector,
     is_pose_within_bounds,
     is_position_within_bounds,
+    wrap_angle_deg,
 )
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 
@@ -156,8 +162,15 @@ class Skill:
         while not done:
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
-            observations, _, done, _ = self.env.step(action_dict=action_dict)  # type: ignore
-
+            prev_pose = [
+                self.env.x,  # type: ignore
+                self.env.y,  # type: ignore
+            ]
+            observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
+            curr_pose = [
+                self.env.x,  # type: ignore
+                self.env.y,  # type: ignore
+            ]
             # Record trajectories at every step
             self.skill_result_log["robot_trajectory"].append(
                 {
@@ -168,6 +181,12 @@ class Skill:
                         np.rad2deg(self.env.yaw),  # type: ignore
                     ],
                 }
+            )
+            self.skill_result_log["num_steps"] = info["num_steps"]
+            if "distance_travelled" not in self.skill_result_log:
+                self.skill_result_log["distance_travelled"] = 0
+            self.skill_result_log["distance_travelled"] += euclidean(
+                curr_pose, prev_pose
             )
 
             # Check if we still want to use the same skill
@@ -359,30 +378,30 @@ class Navigation(Skill):
         """Refer to class Skill for documentation"""
         self.env.say("Navigation Skill finished .. checking status")
 
-        dynamic_yaw = goal_dict.get("dynamic_yaw")
-        dynamic_yaw = False if dynamic_yaw is None else dynamic_yaw
-
-        if dynamic_yaw:
-            obs = self.env.get_observations()
-            check_navigation_success = self.env.get_success(obs, False)
-        else:
-            nav_target = goal_dict[
-                "nav_target"
-            ]  # safe to access as sanity check passed
-            # Make the angle from rad to deg
-            _nav_target_pose_deg = (
-                nav_target[0],
-                nav_target[1],
-                np.rad2deg(nav_target[2]),
-            )
-            check_navigation_success = is_pose_within_bounds(
-                self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
-                _nav_target_pose_deg,
-                self.config.SUCCESS_DISTANCE,
-                self.config.SUCCESS_ANGLE_DIST,
-            )
+        nav_target = goal_dict["nav_target"]  # safe to access as sanity check passed
+        # Make the angle from rad to deg
+        _nav_target_pose_deg = (
+            nav_target[0],
+            nav_target[1],
+            np.rad2deg(nav_target[2]),
+        )
+        current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
+        check_navigation_success = is_pose_within_bounds(
+            current_pose,
+            _nav_target_pose_deg,
+            self.config.SUCCESS_DISTANCE,
+            self.config.SUCCESS_ANGLE_DIST,
+        )
 
         # Update result log
+
+        self.skill_result_log["distance_to_goal"] = {
+            "linear": euclidean(current_pose[:2], _nav_target_pose_deg[:2]),
+            "angular": abs(
+                wrap_angle_deg(current_pose[2])
+                - wrap_angle_deg(_nav_target_pose_deg[2])
+            ),
+        }
         self.skill_result_log["time_taken"] = time.time() - self.start_time
         self.skill_result_log["success"] = check_navigation_success
 
@@ -470,7 +489,9 @@ class Pick(Skill):
         self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
 
     def set_pose_estimation_flags(
-        self, enable_pose_estimation: bool = False, enable_pose_correction: bool = False
+        self,
+        enable_pose_estimation: bool = False,
+        enable_pose_correction: bool = False,
     ) -> None:
         self.enable_pose_estimation = enable_pose_estimation
         self.enable_pose_correction = enable_pose_correction
@@ -675,6 +696,39 @@ class SemanticPick(Pick):
             "arm_action": action[0:4],
             "base_action": action[4:6],
         }
+        return action_dict
+
+
+class MobilePickEE(Pick):
+    """
+    Semantic place ee controller is used to execute place for given place targets
+    """
+
+    def __init__(self, spot: Spot, config, use_mobile_pick=True):
+        if not config:
+            config = construct_config_for_gaze()
+        super().__init__(spot, config, use_mobile_pick=True)
+
+        self.policy = MobileGazeEEPolicy(
+            self.config.WEIGHTS.MOBILE_GAZE,
+            device=self.config.DEVICE,
+            config=self.config,
+        )
+        self.policy.reset()
+
+        self.env = SpotGazeEEEnv(config, spot, use_mobile_pick)
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        action_dict = {
+            "arm_ee_action": action[:6],
+            "base_action": action[7:9],
+            "enable_pose_estimation": self.enable_pose_estimation,
+            "enable_pose_correction": self.enable_pose_correction,
+            "enable_force_control": self.enable_force_control,
+            "grasp_mode": self.grasp_mode,
+        }
+
         return action_dict
 
 
@@ -967,6 +1021,34 @@ class SemanticPlace(Place):
             message = "Successfully reached the target position"
         conditional_print(message=message, verbose=self.verbose)
         return status, message
+
+
+class SemanticPlaceEE(SemanticPlace):
+    """
+    Semantic place ee controller is used to execute place for given place targets
+    """
+
+    def __init__(self, spot: Spot, config, use_semantic_place=False):
+        if not config:
+            config = construct_config_for_semantic_place()
+        super().__init__(spot, config)
+
+        self.policy = SemanticPlaceEEPolicy(
+            config.WEIGHTS.SEMANTIC_PLACE_EE, device=config.DEVICE, config=config
+        )
+        self.policy.reset()
+
+        self.env = SpotSemanticPlaceEEEnv(config, spot, use_semantic_place)
+
+    def split_action(self, action: np.ndarray) -> Dict[str, Any]:
+        """Refer to class Skill for documentation"""
+        action_dict = {
+            "arm_ee_action": action[:6],
+            "base_action": action[7:9],
+            "grip_action": action[6],
+        }
+
+        return action_dict
 
 
 class OpenCloseDrawer(Skill):

@@ -11,12 +11,14 @@ import rospy
 from multimethod import multimethod
 from perception_and_utils.utils.generic_utils import conditional_print
 from spot_rl.skills.atomic_skills import (
+    MobilePickEE,
     Navigation,
     OpenCloseDrawer,
     Pick,
     Place,
     SemanticPick,
     SemanticPlace,
+    SemanticPlaceEE,
 )
 from spot_rl.utils.construct_configs import (
     construct_config_for_gaze,
@@ -103,6 +105,8 @@ class SpotSkillManager:
         open_close_drawer_config=None,
         use_mobile_pick: bool = False,
         use_semantic_place: bool = False,
+        use_pick_ee: bool = False,
+        use_place_ee: bool = False,
         verbose: bool = True,
         use_policies: bool = True,
     ):
@@ -115,6 +119,8 @@ class SpotSkillManager:
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
         self.use_semantic_place = use_semantic_place
+        self.use_pick_ee = use_pick_ee
+        self.use_place_ee = use_place_ee
 
         # Create the spot object, init lease, and construct configs
         self.__init_spot(
@@ -204,15 +210,31 @@ class SpotSkillManager:
             spot=self.spot,
             config=self.nav_config,
         )
-        self.gaze_controller = Pick(
-            spot=self.spot,
-            config=self.pick_config,
-            use_mobile_pick=self._use_mobile_pick,
-        )
-        if self.use_semantic_place:
-            self.place_controller = SemanticPlace(
-                spot=self.spot, config=self.place_config
+        if self.use_pick_ee:
+            self.gaze_controller = MobilePickEE(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
             )
+        else:
+            self.gaze_controller = Pick(
+                spot=self.spot,
+                config=self.pick_config,
+                use_mobile_pick=self._use_mobile_pick,
+            )
+        if self.use_semantic_place:
+
+            if self.use_place_ee:
+                self.place_controller = SemanticPlaceEE(
+                    spot=self.spot,
+                    config=self.place_config,
+                    use_semantic_place=self.use_semantic_place,
+                )
+            else:
+                self.place_controller = SemanticPlace(
+                    spot=self.spot,
+                    config=self.place_config,
+                )
         else:
             self.place_controller = Place(
                 spot=self.spot,
@@ -519,6 +541,14 @@ class SpotSkillManager:
 
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
+            percentile = 0 if visualize else 70
+            if self.use_semantic_place and self.use_place_ee:
+                height_adjustment_threshold = 0.1
+                percentile = 0 if visualize else 50
+            elif self.use_semantic_place:
+                height_adjustment_threshold = 0.05
+            else:
+                height_adjustment_threshold = 0.23
             # estimate waypoint
             try:
                 (
@@ -528,9 +558,9 @@ class SpotSkillManager:
                 ) = detect_place_point_by_pcd_method(
                     self.spot,
                     self.arm_joint_angles,
-                    percentile=0 if visualize else 70,
+                    percentile=percentile,
                     visualize=visualize,
-                    height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+                    height_adjustment_offset=height_adjustment_threshold,
                 )
                 print(f"Estimate Place xyz: {place_target_location}")
                 if visualize:
