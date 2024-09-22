@@ -97,4 +97,6 @@ def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
 
 if __name__ == "__main__":
     tree, data = populate_quad_tree()
+    # This script is used to create a quad tree from the CG objects to load the objects in the
+    # graph.
     nodes = query_quad_tree(1.5, 1.9, tree, data)

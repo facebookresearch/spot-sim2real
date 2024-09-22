@@ -175,6 +175,7 @@ def sort_robot_view_poses_from_cg(
     max_diag_dist = get_max_diag_dist_using_pcd()
     for i, robot_view_pose in enumerate(robot_view_poses):
         (x, y, yaw), detectionconf, pixel_area = robot_view_pose
+        # Compute the rank based on the detection confidence, euclidean distance and pixel area
         euclidean_dist = np.linalg.norm(bbox_centers[:2] - np.array([x, y]))
         rank = (
             -alpha * euclidean_dist / max_diag_dist
@@ -193,12 +194,20 @@ def get_waypoint_from_robot_view_poses(
     bbox_extents: np.ndarray,
     nonreachable_edges_indices=[],
 ):
+    """Select the best robot navigation waypoint from the robot view poses"""
+
+    # Sort the robot view poses based on the detection confidence, euclidean distance and pixel area
     sorted_robot_view_poses = sort_robot_view_poses_from_cg(
         robot_view_poses, bbox_centers, 0.33, 0.33, 0.33
     )
+
+    # Select the best robot view pose
     best_robot_view_pos = sorted_robot_view_poses[0]
     print(f"Best robot view pose {best_robot_view_pos}")
+
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
+
+    # Determine the nearest edge from the best_robot_view_pos to the reachable edges
     nearestedge, facevector, yaw_calc, other_waypoints = determin_nearest_edge(
         best_robot_view_pos[0][:2],
         bbox_centers,
@@ -220,39 +229,47 @@ def get_navigation_points(
     visualize=False,
     savefigname=None,
 ):
+    """Get navigation points for a given object in the scene."""
 
+    # Get the bounding box center and extents
     boxMin, boxMax = get_xyzxyz(bbox_centers, bbox_extents)
 
-    if robot_view_pose_data is None:
-        robot_view_pose_data = pkl.load(
-            open("robot_view_poses_for_bedroom_dresser.pkl", "rb")
-        )
+    assert robot_view_pose_data is not None, "Do not have robot view poses"
 
     robot_view_poses = []
     for robot_view_pose in robot_view_pose_data:
         robot_view_poses.append(
             [
-                tuple(robot_view_pose["robot_xy_yaw"].tolist()),
-                float(robot_view_pose["conf"]),
-                int(robot_view_pose["pixel_area"]),
+                tuple(
+                    robot_view_pose["robot_xy_yaw"].tolist()
+                ),  # the pose of the robot
+                float(robot_view_pose["conf"]),  # prediction confidence
+                int(
+                    robot_view_pose["pixel_area"]
+                ),  # the pixel location of the object in the image
             ]
         )
 
+    # Get the locations of the four edge point of the bounding box from top view
     _, _, _, four_waypoint_edges = determin_nearest_edge(
         np.array([0, 0]), bbox_centers, boxMin, boxMax, static_offset=STATIC_OFFSET
     )
-    # filter edges based on reachability
+
+    # filter edges based on reachability from the current robot location to four_waypoint_edges
     nonreachable_edges_indices = []
     reachable_indices = []
     reachable_paths = []
-    for wei, waypoint_edge in enumerate(four_waypoint_edges):
+    for waypoint_i, waypoint_edge in enumerate(four_waypoint_edges):
+        # Do a* path planning from current robot location to the edge point
         path_edge = path_planning_using_a_star(cur_robot_xy, waypoint_edge[:2])
         if not len(path_edge):
-            nonreachable_edges_indices.append(wei)
+            # Do not find the path, mark the edge as non reachable (the edge in inside the clutter)
+            nonreachable_edges_indices.append(waypoint_i)
         else:
-            reachable_indices.append(wei)
+            reachable_indices.append(waypoint_i)
             reachable_paths.append(path_edge)
     print(f"non reachable indices {nonreachable_edges_indices}")
+
     if len(nonreachable_edges_indices) == 4:
         # either raise error or consider it path planning failure & continue
         nonreachable_edges_indices = []
@@ -263,6 +280,7 @@ def get_navigation_points(
         path = reachable_paths[0]
         best_robot_view_pos = robot_view_poses[0]
     else:
+        # Do view poses selection if there are more than 1 reachable edges
         (
             waypoint,
             best_robot_view_pos,
@@ -271,6 +289,7 @@ def get_navigation_points(
             robot_view_poses, bbox_centers, bbox_extents, nonreachable_edges_indices
         )
 
+    # Finally do the path planning from current robot location to the selected waypoint
     path = path_planning_using_a_star(
         cur_robot_xy,
         waypoint[:2],

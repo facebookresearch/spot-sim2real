@@ -55,6 +55,7 @@ def buil_occupancy_grid(path_to_PCD, scale=10.0):
 
         for point in pcd:
             x, y, z = point
+            # Filter the points using height
             if z > 0.0 and z <= 1.5:
                 try:
                     X = floor(map_x_from_cg_to_grid(x, min_x, max_x) * scale)
