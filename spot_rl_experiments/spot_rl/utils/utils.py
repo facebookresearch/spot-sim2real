@@ -33,6 +33,18 @@ ros_frames.set_new_allowed(True)
 ros_frames.merge_from_file(ROS_FRAMES)
 
 
+def load_config(config_file):
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
+cg_config = load_config(PATH_TO_CONFIG_FILE)
+ROOT_PATH = cg_config["CG_ROOT_PATH"]
+
+
 def get_waypoint_yaml(waypoint_file=WAYPOINTS_YAML):
     with open(waypoint_file) as f:
         return yaml.safe_load(f)
@@ -162,8 +174,7 @@ def arr2str(arr):
 
 def calculate_height(object_tag):
     default_config = construct_config_for_semantic_place()
-    script_dir = os.path.dirname(__file__)
-    json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
+    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations.json"
     default_height = default_config.HEIGHT_THRESHOLD
 
     if osp.isfile(json_file_path):

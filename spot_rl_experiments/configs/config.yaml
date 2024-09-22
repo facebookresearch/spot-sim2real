@@ -59,9 +59,6 @@ WEIGHTS:
   DEBLURGAN: "weights/fpn_inception.h5"
   SAM: "weights/sam_vit_h_4b8939.pth"
 
-# CG Json file
-CONCEPT_GRAPH_FILE : "cfslam_object_relations.json"
-
 DEVICE: "cuda:0"
 USE_REMOTE_SPOT: False
 PARALLEL_INFERENCE_MODE: True
