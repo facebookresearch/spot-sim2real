@@ -24,6 +24,7 @@ class SpotRosSkillExecutor:
     def __init__(self, spotskillmanager):
         self.spotskillmanager = spotskillmanager
         self._cur_skill_name_input = None
+        self.reset_image_viz_params()
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -36,12 +37,21 @@ class SpotRosSkillExecutor:
         rospy.set_param("/skill_name_input", "None,None")
         rospy.set_param("/skill_name_suc_msg", f"{skill_name},{succeded},{msg}")
 
+    def reset_image_viz_params(self):
+        """Reset the image viz params"""
+        rospy.set_param("/viz_pick", "None")
+        rospy.set_param("/viz_object", "None")
+        rospy.set_param("/viz_place", "None")
+
     def execute_skills(self):
         """Execute skills."""
 
         # Get the current skill name
         skill_name, skill_input = get_skill_name_and_input_from_ros()
 
+        robot_holding = (
+            self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
+        )
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -51,6 +61,10 @@ class SpotRosSkillExecutor:
             nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
             # Call the skill
             if "None" not in nav_target_xyz:
+                if robot_holding:
+                    rospy.set_param("/viz_place", nav_target_xyz)
+                else:
+                    rospy.set_param("/viz_pick", nav_target_xyz)
                 nav_target_xyz = nav_target_xyz.split("|")[0:-1]
                 for nav_i, nav_target in enumerate(nav_target_xyz):
                     _nav_target = nav_target.split(",")
@@ -64,11 +78,17 @@ class SpotRosSkillExecutor:
                     if not succeded:
                         break
             else:
+                if robot_holding:
+                    rospy.set_param("/viz_place", skill_input)
+                else:
+                    rospy.set_param("/viz_pick", skill_input)
                 succeded, msg = self.spotskillmanager.nav(skill_input)
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
             # Reset the navigation target
             rospy.set_param("nav_target_xyz", "None,None,None|")
+            rospy.set_param("/viz_pick", "None")
+            rospy.set_param("/viz_place", "None")
         elif skill_name == "nav_path_planning_with_view_poses":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             # Get the bbox center and bbox extent
@@ -80,6 +100,10 @@ class SpotRosSkillExecutor:
             bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
             query_class_names = bbox_info[6:]
             query_class_names[0] = query_class_names[0].replace("_", " ")
+            if robot_holding:
+                rospy.set_param("/viz_place", query_class_names[0])
+            else:
+                rospy.set_param("/viz_pick", query_class_names[0])
             # Get the view poses
             view_poses = get_view_poses(
                 bbox_center, bbox_extent, query_class_names, False
@@ -107,11 +131,15 @@ class SpotRosSkillExecutor:
                 msg = "Cannot navigate to the point"
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("/viz_pick", "None")
+            rospy.set_param("/viz_place", "None")
         elif skill_name == "pick":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            rospy.set_param("/viz_object", skill_input)
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.pick(skill_input)
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("/viz_object", "None")
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
