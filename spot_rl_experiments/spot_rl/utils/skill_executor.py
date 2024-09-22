@@ -120,7 +120,7 @@ class SpotRosSkillExecutor:
             # Call semantic place skills
             rospy.set_param("is_gripper_blocked", 0)
             succeded, msg = self.spotskillmanager.place(
-                None,
+                skill_input,
                 is_local=True,
                 visualize=False,
                 enable_waypoint_estimation=True,
