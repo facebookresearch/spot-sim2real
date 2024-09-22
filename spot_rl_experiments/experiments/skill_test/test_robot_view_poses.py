@@ -330,33 +330,29 @@ os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "lamp_right_bed":  # receptacle_name == "teddy_bear":
-        print(f"Current Receptacle {receptacle_name}")
-        bbox_info = bboxs_info[receptacle_name]
-        if isinstance(bbox_info["object_tag"], str):
-            bbox_info["object_tag"] = [bbox_info["object_tag"]]
-        # Get the view poses
-        view_poses = get_view_poses(
-            bbox_info["bbox_center"],
-            bbox_info["bbox_extent"],
-            bbox_info["object_tag"],
-            bbox_info.get("id", None),
-            VISUALIZE,
-        )
-        # Get the robot x, y, yaw
+    print(f"Current Receptacle {receptacle_name}")
+    bbox_info = bboxs_info[receptacle_name]
+    if isinstance(bbox_info["object_tag"], str):
+        bbox_info["object_tag"] = [bbox_info["object_tag"]]
+    # Get the view poses
+    view_poses = get_view_poses(
+        bbox_info["bbox_center"],
+        bbox_info["bbox_extent"],
+        bbox_info["object_tag"],
+        bbox_info.get("id", None),
+        VISUALIZE,
+    )
+    # Get the robot x, y, yaw
 
-        # Get the navigation points
-        nav_pts = get_navigation_points(
-            view_poses,
-            np.array(bbox_info["bbox_center"]),
-            np.array(bbox_info["bbox_extent"]),
-            [0, 0],
-            VISUALIZE,
-            osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
-        )
-        print(
-            f"Final Nav point for {receptacle_name}:  {*nav_pts[-1][:2], np.rad2deg(nav_pts[-1][-1])}"
-        )
-        continu = True  # map_user_input_to_boolean("Continue to next receptacle ?")
-        if not continu:
-            break
+    # Get the navigation points
+    nav_pts = get_navigation_points(
+        view_poses,
+        np.array(bbox_info["bbox_center"]),
+        np.array(bbox_info["bbox_extent"]),
+        [0, 0],
+        VISUALIZE,
+        osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
+    )
+    print(
+        f"Final Nav point for {receptacle_name}:  {*nav_pts[-1][:2], np.rad2deg(nav_pts[-1][-1])}"
+    )
