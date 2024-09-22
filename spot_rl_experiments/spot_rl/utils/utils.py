@@ -12,7 +12,10 @@ from collections import OrderedDict
 import numpy as np
 import rospy
 import yaml
-from spot_rl.utils.construct_configs import construct_config_for_semantic_place
+from spot_rl.utils.construct_configs import (
+    construct_config_for_semantic_place,
+    load_config,
+)
 from yacs.config import CfgNode as CN
 
 this_dir = osp.dirname(osp.abspath(__file__))
@@ -31,12 +34,6 @@ ROS_FRAMES = osp.join(configs_dir, "ros_frame_names.yaml")
 ros_frames = CN()
 ros_frames.set_new_allowed(True)
 ros_frames.merge_from_file(ROS_FRAMES)
-
-
-def load_config(config_file):
-    with open(config_file, "r") as file:
-        config = yaml.safe_load(file)
-    return config
 
 
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")

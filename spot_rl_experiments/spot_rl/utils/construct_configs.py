@@ -5,6 +5,7 @@
 
 import os.path as osp
 
+import yaml
 from yacs.config import CfgNode as CN
 
 this_dir = osp.dirname(osp.abspath(__file__))
@@ -12,6 +13,12 @@ spot_rl_dir = osp.join(osp.dirname(this_dir))
 spot_rl_experiments_dir = osp.join(osp.dirname(spot_rl_dir))
 configs_dir = osp.join(spot_rl_experiments_dir, "configs")
 DEFAULT_CONFIG = osp.join(configs_dir, "config.yaml")
+
+
+def load_config(config_file):
+    with open(config_file, "r") as file:
+        config = yaml.safe_load(file)
+    return config
 
 
 def construct_config(file_path=DEFAULT_CONFIG, opts=None):

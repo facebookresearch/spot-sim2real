@@ -10,14 +10,8 @@ import numpy as np
 import yaml
 import zmq
 from scipy.spatial.transform import Rotation as R
+from spot_rl.utils.construct_config import load_config
 from spot_rl.utils.path_planning import get_xyzxyz, plt
-
-
-def load_config(config_file):
-    with open(config_file, "r") as file:
-        config = yaml.safe_load(file)
-    return config
-
 
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"

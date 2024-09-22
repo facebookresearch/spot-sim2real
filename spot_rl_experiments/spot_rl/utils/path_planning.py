@@ -10,19 +10,13 @@ import open3d as o3d
 import yaml
 from scipy.ndimage import binary_dilation
 from spot_rl.utils.a_star import astar
+from spot_rl.utils.construct_config import load_config
 from spot_rl.utils.occupancy_grid import (
     buil_occupancy_grid,
     map_x_from_cg_to_grid,
     map_y_from_cg_to_grid,
     pkl,
 )
-
-
-def load_config(config_file):
-    with open(config_file, "r") as file:
-        config = yaml.safe_load(file)
-    return config
-
 
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
