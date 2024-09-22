@@ -41,9 +41,9 @@ PCD_PATH = osp.join(ROOT_PATH, "point_cloud.pkl")
 
 CG_PCD_PATH = osp.join(ROOT_PATH, "rgb_cloud", "pointcloud.pcd")
 
-OCCUPANCY_SCALE = 10.0
+OCCUPANCY_SCALE = cg_config["OCCUPANCY_SCALE"]
 
-DISTANCE_THRESHOLD_TO_ADD_POINT = 1.0
+DISTANCE_THRESHOLD_TO_ADD_POINT = cg_config["DISTANCE_THRESHOLD_TO_ADD_POINT"]
 
 
 def pick_points(pcd):

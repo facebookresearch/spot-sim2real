@@ -3,3 +3,5 @@ SCAN_TYPE: "r3d"
 USE_YOLO: False
 FILL_UP_GRID_LOCATION: [88,89,82,96] # in array format: [x1:x2, y1:y2]. The value here is for Fremont apartment
 DILATION_SIZE: 1
+OCCUPANCY_SCALE: 10
+DISTANCE_THRESHOLD_TO_ADD_POINT: 1.0 # The distance threshold to add waypoints in the navigation waypoints

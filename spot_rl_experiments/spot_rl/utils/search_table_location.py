@@ -311,7 +311,6 @@ def rank_planes(
     percentile_thresh=30,
 ):
     """Filter point clouds based on the normal"""
-    # breakpoint()
     body_T_intel: sp.SE3 = body_T_hand * gripper_T_intel
 
     # Compute the dot product to get the cosines
@@ -322,42 +321,48 @@ def rank_planes(
     planes_points = [np.array(plane.points).reshape(-1, 3) for plane in planes]
     planes_points_in_body = []
 
+    # Loop over all the planes
     for plane_points in planes_points:
+        # Get the plane in the body frame
         plane_points_in_body = body_T_intel * plane_points
         planes_points_in_body.append(plane_points_in_body)
         norms_of_plane_points = np.linalg.norm(plane_points_in_body, axis=1)
         argmin_dist = int(np.argmin(norms_of_plane_points))
+        # Record the metrics
         all_distances.append(np.linalg.norm(plane_points_in_body[:, :3], axis=1))
         euclidean_dist.append(norms_of_plane_points[argmin_dist] / 0.5)
         number_of_pts.append(plane_points.shape[0] / max_number_of_points)
 
-    cost = -0.8 * np.array(euclidean_dist) + 0.2 * np.array(number_of_pts)
+    # Compute the score function: the higher the better
+    score = -0.8 * np.array(euclidean_dist) + 0.2 * np.array(number_of_pts)
     # Filter out the point clouds
-    argmax = int(np.argmax(cost))
+    argmax = int(np.argmax(score))
     distances_of_points_for_selected_plane = all_distances[argmax]
-
     selected_plane = planes_points[argmax]
     selected_plane_in_body = planes_points_in_body[argmax]
+
+    # Find the percentile point
+    # For x direction (front of the robot), we get x based on the percentile_thresh
     x_percentile = np.percentile(
         np.sort(selected_plane_in_body[:, 0].copy()), percentile_thresh
     )
-    y_percentile = (
-        selected_plane_in_body[:, 1].mean() / 2.0
-    )  # np.percentile(np.sort(selected_plane_in_body[:, 1].copy()), 50)
+    # For y direction (left of the robot), we get y based on the center of the plane
+    y_percentile = selected_plane_in_body[:, 1].mean() / 2.0
     percentile_points = np.array(
         [[x_percentile, y_percentile]] * selected_plane.shape[0]
     )
+
+    # Compute the distance to the percentile point
     distance_to_percentile_point = np.linalg.norm(
         selected_plane_in_body[:, :2] - percentile_points, axis=1
     )
 
+    # Select the point with the minimum distance to the percentile point
     index_in_og_plane = int(np.argmin(distance_to_percentile_point))
     index_of_min_dist_point = int(np.argmin(distances_of_points_for_selected_plane))
     return (
         argmax,
-        planes_points[argmax][
-            index_in_og_plane
-        ],  # if not visualize else planes_points[argmax][indices_of_max_dist[argmax]],
+        planes_points[argmax][index_in_og_plane],
         planes_points[argmax][index_of_min_dist_point],
         sp.SO3(body_T_intel.rotationMatrix()) * all_plane_normals,
     )
@@ -490,13 +495,15 @@ def detect_place_point_by_pcd_method(
     fy = camera_intrinsics_intel.focal_length.y
     cx = camera_intrinsics_intel.principal_point.x
     cy = camera_intrinsics_intel.principal_point.y
+
     # u,v in pixel -> depth at u,v, intriniscs -> xyz in 3D
     pcd = generate_point_cloud(img, depth_raw, mask, fx, fy, cx, cy)
-    # pcd = pcd.uniform_down_sample(every_k_points=2)
+
+    # Estimate normals
     pcd.estimate_normals(
         search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30)
     )
-    # 0.25 - 0 < angle < 75
+
     pcd = filter_pointcloud_by_normals_in_the_given_direction(
         pcd,
         np.array([0.0, 0.0, 1.0]),
@@ -507,16 +514,15 @@ def detect_place_point_by_pcd_method(
     )
 
     max_number_of_points = len(pcd.points)
-    # Down-sample by using voxel
-    # pcd = pcd.voxel_down_sample(voxel_size=0.01)
-    # print(f"After Downsampling {np.array(pcd.points).shape}")
 
+    # Detect planes
     all_planes = plane_detect(pcd, visualize=visualize)  # returns list of open3d pcd
 
     all_plane_normals = np.array(
         [compute_plane_normal(plane)[0] for plane in all_planes], dtype=np.float32
     )
 
+    # Rank planes by how close the robot is to the plane
     plane_index, selected_point, edge_point, normals_in_body = rank_planes(
         all_planes,
         all_plane_normals,
@@ -529,8 +535,6 @@ def detect_place_point_by_pcd_method(
     plane_pcd = all_planes[plane_index]
 
     if visualize:
-        # for plane_index in range(len(all_planes)):
-        # visualize_all_planes(all_planes, img, camera_intrinsics_intel, all_plane_normals)
         visualize_all_planes(
             [all_planes[plane_index]],
             img,
@@ -562,21 +566,25 @@ def detect_place_point_by_pcd_method(
     img_with_bbox = cv2.circle(
         img_with_bbox, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
     )
+
     # if visualize:
     #     # For debug
     #     cv2.namedWindow("table_detection", cv2.WINDOW_NORMAL)
     #     cv2.imshow("table_detection", img_with_bbox)
     #     cv2.waitKey(0)
     #     cv2.destroyAllWindows()
+
     cv2.imwrite("table_detection.png", img_with_bbox)
 
     point_in_body = body_T_hand * selected_point_in_gripper
     placexyz = np.array(point_in_body)
     # This is useful if we want the place target to be in global frame:
     # convert_point_in_body_to_place_waypoint(point_in_body, spot)
+
     # Static Offset adjustment
     placexyz[0] += 0.10
     placexyz[2] += height_adjustment_offset
+
     return placexyz, selected_point_in_gripper, edge_point_in_base, img_with_bbox
 
 
