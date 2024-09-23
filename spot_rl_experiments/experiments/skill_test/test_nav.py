@@ -1,6 +1,8 @@
 # Copyright (c) Meta Platforms, Inc. and its affiliates.
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
+import time
+
 import rospy
 
 if __name__ == "__main__":
@@ -14,11 +16,14 @@ if __name__ == "__main__":
     )
     skill_input = ";".join(bbox_info)
     rospy.set_param(
-        "/skill_name_input", f"nav_path_planning_with_view_poses,{skill_input}"
+        "/skill_name_input",
+        f"{str(time.time())},nav_path_planning_with_view_poses,{skill_input}",
     )
     print("Listen to the skill execution...")
     while True:
-        msg = rospy.get_param("/skill_name_suc_msg", "None,None,None")
+        msg = rospy.get_param(
+            "/skill_name_suc_msg", f"{str(time.time())},None,None,None"
+        )
         suc_fail = msg.split(",")[1]
         if suc_fail != "None":
             print(msg)

@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import os.path as osp
+import time
 from collections import OrderedDict
 
 import numpy as np
@@ -149,12 +150,14 @@ def get_skill_name_and_input_from_ros():
     """
     Get the ros parameters to get the current skill name and its input
     """
-    skill_name_input = rospy.get_param("/skill_name_input", "None,None")
+    skill_name_input = rospy.get_param(
+        "/skill_name_input", f"{str(time.time())},None,None"
+    )
     skill_name_input = skill_name_input.split(",")
-    if len(skill_name_input) == 2:
+    if len(skill_name_input) == 3:
         # We get the correct format to execute the skill
-        skill_name = skill_name_input[0]
-        skill_input = skill_name_input[1]
+        skill_name = skill_name_input[1]
+        skill_input = skill_name_input[2]
     else:
         # We do not get the skill name and input
         skill_name = "None"
