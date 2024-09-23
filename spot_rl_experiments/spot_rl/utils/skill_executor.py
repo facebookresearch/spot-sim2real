@@ -35,6 +35,8 @@ class SpotRosSkillExecutor:
     def reset_skill_name_input(self, skill_name, succeded, msg):
         """Reset skill name and input, and publish the message"""
         rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
+        if succeded:
+            msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
         rospy.set_param(
             "/skill_name_suc_msg", f"{str(time.time())},{skill_name},{succeded},{msg}"
         )
