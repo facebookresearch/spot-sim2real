@@ -6,7 +6,7 @@ from pprint import pp
 import numpy as np
 import quads
 import yaml
-from spot_rl.utils.construct_config import load_config
+from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz
 
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")

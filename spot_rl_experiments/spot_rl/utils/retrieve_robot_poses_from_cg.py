@@ -10,7 +10,7 @@ import numpy as np
 import yaml
 import zmq
 from scipy.spatial.transform import Rotation as R
-from spot_rl.utils.construct_config import load_config
+from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz, plt
 
 PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")

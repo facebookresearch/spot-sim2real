@@ -10,7 +10,7 @@ import open3d as o3d
 import yaml
 from scipy.ndimage import binary_dilation
 from spot_rl.utils.a_star import astar
-from spot_rl.utils.construct_config import load_config
+from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.occupancy_grid import (
     buil_occupancy_grid,
     map_x_from_cg_to_grid,
