@@ -236,11 +236,12 @@ def get_view_poses(
             dist_to_anchor_center = np.linalg.norm(center - anchor_object_center)
 
             min_dist = min(min_dist, dist_to_anchor_center)
-
             if (
                 dist_to_anchor_center < dist_thresh
-                and object_item["caption_dict"]["bbox_center"] == anchor_object_center
-                and object_item["caption_dict"]["bbox_extent"] == anchor_object_extent
+                and object_item["caption_dict"]["bbox_center"]
+                == anchor_object_center.tolist()
+                and object_item["caption_dict"]["bbox_extent"]
+                == anchor_object_extent.tolist()
             ):
                 print(f"Detected classes around given receptacle {set(class_names)}")
                 # if class_name in query_class_names
