@@ -160,19 +160,26 @@ def arr2str(arr):
     return
 
 
-def calculate_height(object_tag):
-    default_config = construct_config_for_semantic_place()
+def load_cg(default_config):
     script_dir = os.path.dirname(__file__)
     json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
-    default_height = default_config.HEIGHT_THRESHOLD
 
+    world_graph = None
     if osp.isfile(json_file_path):
         with open(json_file_path) as f:
             world_graph = json.load(f)
     else:
-        print(
-            f"Concept Graph File does not exist. Using default height: {default_height}"
-        )
+        print("Concept Graph File does not exist")
+    return world_graph
+
+
+def calculate_height(object_tag):
+    default_config = construct_config_for_semantic_place()
+    default_height = default_config.HEIGHT_THRESHOLD
+
+    world_graph = load_cg(default_config)
+    if not world_graph:
+        print(f"Using default height: {default_height}")
         return default_height
     try:
         object_id_str, object_tag = object_tag.split("_", 1)
@@ -208,7 +215,9 @@ def calculate_height(object_tag):
     return default_height
 
 
-def is_on_top(point, min_coord, max_coord, tolerance=1e-6, height_tolerance=0.1):
+def is_on_top(
+    point, ee_pose, min_coord, max_coord, tolerance=1e-6, height_tolerance=0.1
+):
     """
     Check if a point is on the top of the bounding box.
 
@@ -218,17 +227,46 @@ def is_on_top(point, min_coord, max_coord, tolerance=1e-6, height_tolerance=0.1)
     :param tolerance: floating-point tolerance for comparisons
     :return: Boolean indicating if the point is on top of the box
     """
-    x_in_bounds = (
-        min(min_coord[0], max_coord[0]) <= point[0] <= max(min_coord[0], max_coord[0])
+    place_region_min = point - np.array([0.2] * 3)
+    place_region_max = point + np.array([0.2] * 3)
+
+    place_region_x_bounds_min = min(place_region_min[0], place_region_max[0])
+    bbox_x_bounds_min = min(min_coord[0], max_coord[0])
+    x_bounds_min = max(place_region_x_bounds_min, bbox_x_bounds_min)
+    # For Y
+    place_region_y_bounds_min = min(place_region_min[1], place_region_max[1])
+    bbox_y_bounds_min = min(min_coord[1], max_coord[1])
+    y_bounds_min = max(place_region_y_bounds_min, bbox_y_bounds_min)
+
+    x_in_bounds = x_bounds_min <= point[0] <= max(min_coord[0], max_coord[0])
+    y_in_bounds = y_bounds_min <= point[1] <= max(min_coord[1], max_coord[1])
+
+    ee_x_in_bounds = x_bounds_min <= ee_pose[0] <= max(min_coord[0], max_coord[0])
+    ee_y_in_bounds = (
+        min(min_coord[1], max_coord[1]) <= ee_pose[1] <= max(min_coord[1], max_coord[1])
     )
-    y_in_bounds = (
-        min(min_coord[1], max_coord[1]) <= point[1] <= max(min_coord[1], max_coord[1])
+
+    print("x_in_bounds: ", x_in_bounds, x_bounds_min, max(min_coord[0], max_coord[0]))
+    print(
+        "y_in_bounds: ",
+        y_in_bounds,
+        min(min_coord[1], max_coord[1]),
+        max(min_coord[1], max_coord[1]),
     )
-    return x_in_bounds and y_in_bounds
-    # return (
-    #     min_coord[0] - tolerance <= point[0] <= max_coord[0] + tolerance
-    #     and min_coord[1] - tolerance <= point[1] <= max_coord[1] + tolerance
-    # )
+    print(
+        "EE_IN_X_BOUNDS :",
+        ee_x_in_bounds,
+        min(min_coord[0], max_coord[0]),
+        max(min_coord[0], max_coord[0]),
+    )
+    print(
+        "EE_IN_Y_BOUNDS :",
+        ee_y_in_bounds,
+        min(min_coord[1], max_coord[1]),
+        max(min_coord[1], max_coord[1]),
+    )
+
+    return (x_in_bounds and y_in_bounds), (ee_x_in_bounds and ee_y_in_bounds)
 
 
 def bbox_coords(object_tag, fn_to_convert_from_home_to_base):

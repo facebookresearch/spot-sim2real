@@ -177,12 +177,16 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         print("bbox upper bound", base_T_upper)
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
         # cur_place_sensor_xyz = self.get_place_sensor(True)
-        print(is_on_top(self.place_target, base_T_lower, base_T_upper))
-        print(is_on_top(ee_pose, base_T_lower, base_T_upper))
-        breakpoint()
-        if is_on_top(self.place_target, base_T_lower, base_T_upper) and is_on_top(
-            ee_pose, base_T_lower, base_T_upper
-        ):
+        print("EE_POSE", ee_pose)
+        # wpt_is_on_top = is_on_top(self.place_target, base_T_lower, base_T_upper)
+        wpt_is_on_top, ee_is_on_top = is_on_top(
+            self.place_target, ee_pose, base_T_lower, base_T_upper, tolerance=0.2
+        )
+        # print('wpt is on top: ', wpt_is_on_top)
+        print("ee is on top: ", ee_is_on_top)
+        # breakpoint()
+
+        if wpt_is_on_top and ee_is_on_top:
             print("Condition satisfied")
             place = True
         # If the time steps have been passed for 75 steps, we will just place the object
