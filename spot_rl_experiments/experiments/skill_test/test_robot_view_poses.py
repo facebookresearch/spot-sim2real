@@ -9,10 +9,65 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 )
 
 # NYC lab
-
+bboxs_info_nyc = {
+    "23_sink": {
+        "id": 23,
+        "bbox_extent": [0.6, 0.6, 0.2],
+        "bbox_center": [-0.7, 2.8, 0.5],
+        "object_tag": "sink",
+    },
+    "3_wooden_dining_table": {
+        "id": 3,
+        "bbox_extent": [0.3, 0.1, 0.1],
+        "bbox_center": [0.7, 1.3, -0.3],
+        "object_tag": "wooden dining table",
+    },
+    "36_tall_black_bookshelf": {
+        "id": 36,
+        "bbox_extent": [0.9, 0.3, 0.1],
+        "bbox_center": [5.4, 2.7, 0.4],
+        "object_tag": "tall black bookshelf",
+    },
+    "14_white_cabinet": {
+        "id": 14,
+        "bbox_extent": [1.2, 1.1, 0.7],
+        "bbox_center": [3.4, 2.7, 0.1],
+        "object_tag": "white cabinet",
+    },
+    "12_wooden_round_table": {
+        "id": 12,
+        "bbox_extent": [0.9, 0.8, 0.2],
+        "bbox_center": [3.1, -1.3, 0.0],
+        "object_tag": "wooden round table",
+    },
+    "31_desk": {
+        "id": 31,
+        "bbox_extent": [1.4, 0.9, 0.1],
+        "bbox_center": [6.1, 0.2, 0.3],
+        "object_tag": "desk",
+    },
+    "28_office_chair": {
+        "id": 28,
+        "bbox_extent": [0.3, 0.1, 0.1],
+        "bbox_center": [5.6, 0.6, 0.3],
+        "object_tag": "office chair",
+    },
+    "32_cabinet": {
+        "id": 32,
+        "bbox_extent": [1.2, 1.0, 0.7],
+        "bbox_center": [3.7, 0.3, 0.0],
+        "object_tag": "cabinet",
+    },
+    "13_white dresser or cabinet": {
+        "id": 13,
+        "bbox_extent": [1.1, 1.1, 0.7],
+        "bbox_center": [3.1, 0.5, 0.0],
+        "object_tag": "white dresser or cabinet",
+    },
+}
 
 # Fremont apartment
-bboxs_info = {
+bboxs_info_fre = {
     # kitchen area
     "box_of_cereal": {
         "id": 39,
@@ -149,6 +204,12 @@ VISUALIZE = True
 PATH_PLANNING_VISUALIZATION_FOLDER = "receptacle_before_demo"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
+in_fre_lab = map_user_input_to_boolean("for FRE? Y/N ")
+
+if in_fre_lab:
+    bboxs_info = bboxs_info_fre
+else:
+    bboxs_info = bboxs_info_nyc
 
 for receptacle_name in bboxs_info:
     print(f"Current Receptacle {receptacle_name}")
