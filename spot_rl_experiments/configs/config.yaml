@@ -20,7 +20,9 @@ WEIGHTS_TORCHSCRIPT:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_4_5_contacttest_EEPoseSensor_ckpt.28.pth.torchscript"
+  # SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -45,7 +47,8 @@ WEIGHTS:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+  # SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_4_5_contacttest_EEPoseSensor_ckpt.28.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -140,7 +143,7 @@ MAX_LIN_DIST: 0.25  # meters
 MAX_ANG_DIST: 15.0  # degrees
 
 # Base action params for sem place EE 
-MAX_LIN_DIST_SEMANTIC_PLACE: 0.0  # meters
+MAX_LIN_DIST_SEMANTIC_PLACE: 0.1  # meters
 MAX_ANG_DIST_SEMANTIC_PLACE: 5.73  # degrees
 
 # SEMANTIC EE POLICY SCALE PARAMETERS
