@@ -130,7 +130,7 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         )
         image_responses = image_responses.result()
         # Try to get hand image responses , if obtained then we add it to image responses list. From there,
-        # we ger hand depth and hand rgb. Taking head rgb and depth out of this block, so that the head images run
+        # we get hand depth and hand rgb. Taking head rgb and depth out of this block, so that the head images run
         # without any hinderance.
         try:
             hand_image_responses = self.spot.get_hand_image()
