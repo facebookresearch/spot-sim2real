@@ -184,7 +184,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         #     place = True
         if (
             place_region_max[0] >= ee_pose[0] >= self.edge_point_in_base[0]
-            and place_region_max[2] >= ee_pose[2] >= self.edge_point_in_base[2]
+            and place_region_max[2] >= ee_pose[2] >= self.place_target[2]  # type:ignore
         ):
             print("Condition satisfied")
             place = True
