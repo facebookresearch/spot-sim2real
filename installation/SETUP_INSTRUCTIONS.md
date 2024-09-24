@@ -214,16 +214,6 @@ If you already have an environment then please run following command
 pip install open3d
 ```
 
-### Download inceptionresnet weights
-
-```bash
-# Create dir to store weights if it does not exist
-mkdir -p ~/.cache/torch/hub/checkpoints
-
-# Get weights (May take a while)
-wget http://data.lip6.fr/cadene/pretrainedmodels/inceptionresnetv2-520b38e4.pth -O ~/.cache/torch/hub/checkpoints/inceptionresnetv2-520b38e4.pth --no-check-certificate
-```
-
 ### Setting ROS env variables
 * If using **ROS on only 1 computer** (i.e. you don't need 2 or more machines in the ROS network), follow these steps
     ```bash
