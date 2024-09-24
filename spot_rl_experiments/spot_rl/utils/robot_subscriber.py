@@ -118,5 +118,6 @@ class SpotRobotSubscriberMixin:
             rospy.logerr(
                 f"[{self.node_name}]: Error processing robot state message: {e}"
             )
+
     def msg_to_cv2(self, *args, **kwargs) -> np.array:
         return self.cv_bridge.imgmsg_to_cv2(*args, **kwargs)
