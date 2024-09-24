@@ -15,9 +15,8 @@ import magnum as mn
 import numpy as np
 import rospy
 from perception_and_utils.utils.generic_utils import map_user_input_to_boolean
+from skill_execution_with_benchmark import SpotSkillExecuterWithBenchmark
 from spot_rl.envs.skill_manager import SpotSkillManager
-from spot_rl.utils.utils import ros_topics as rt
-from spot_wrapper.utils import get_angle_between_two_vectors
 
 NUM_REPEAT = 3
 WAYPOINT_TEST = [([5.4, 2.5], [3.6, -4.2])] * NUM_REPEAT  # x, y
@@ -30,43 +29,7 @@ def print_logs():
     print(f"Current metrics while exiting {metrics_list}, Metrics: {metrics}")
 
 
-class SpotRosSkillExecutor:
-    """This class reads the ros buffer to execute skills"""
-
-    def __init__(self):
-        self.spotskillmanager = None
-        self._cur_skill_name_input = None
-
-    def compute_metrics(self, traj, target_point, name_key="nav1"):
-        """ "Compute the metrics"""
-        num_steps = len(traj)
-        final_point = np.array(traj[-1]["pose"][0:2])
-        distance = np.linalg.norm(target_point - final_point)
-        # Compute the angle
-        vector_robot_to_target = target_point - final_point
-        vector_robot_to_target = vector_robot_to_target / np.linalg.norm(
-            vector_robot_to_target
-        )
-        vector_forward_robot = np.array(
-            self.spotskillmanager.get_env().curr_transform.transform_vector(
-                mn.Vector3(1, 0, 0)
-            )
-        )[[0, 1]]
-        vector_forward_robot = vector_forward_robot / np.linalg.norm(
-            vector_forward_robot
-        )
-        dot_product_facing_target = abs(
-            np.dot(vector_robot_to_target, vector_forward_robot)
-        )
-        angle_facing_target = abs(
-            get_angle_between_two_vectors(vector_robot_to_target, vector_forward_robot)
-        )
-        return {
-            f"num_steps_{name_key}": num_steps,
-            f"distance_{name_key}": distance,
-            f"dot_product_facing_target_{name_key}": dot_product_facing_target,
-            f"angle_facing_target_{name_key}": angle_facing_target,
-        }
+class SpotRosSkillExecutor(SpotSkillExecuterWithBenchmark):
 
     def benchmark(self):
         """ "Run the benchmark code to test skills"""
@@ -91,7 +54,7 @@ class SpotRosSkillExecutor:
                     "robot_trajectory"
                 )
             )
-            metrics = self.compute_metrics(traj, np.array([x1, y1]))
+            metrics = self.compute_metrics(traj, np.array([x1, y1]), "_nav1")
             metrics["nav1_suc"] = suc
 
             # iff nav succeeds then we do pick
@@ -109,7 +72,7 @@ class SpotRosSkillExecutor:
                 traj = self.spotskillmanager.nav_controller.get_most_recent_result_log().get(
                     "robot_trajectory"
                 )
-                metrics2 = self.compute_metrics(traj, np.array([x2, y2]), "nav2")
+                metrics2 = self.compute_metrics(traj, np.array([x2, y2]), "_nav2")
                 metrics.update(metrics2)
             else:
                 suc = False
