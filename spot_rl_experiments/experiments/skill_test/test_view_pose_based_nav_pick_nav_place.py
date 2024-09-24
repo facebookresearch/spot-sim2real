@@ -35,9 +35,8 @@ WAYPOINT_TEST = [
             "object_tag": "coffee table",
         },
     )
-] * NUM_REPEAT  # x, y
+] * NUM_REPEAT
 object_to_pickup = "bottle"
-receptacle_name = "coffee_to_office_cabinet"
 VISUALIZE = False
 PATH_PLANNING_VISUALIZATION_FOLDER = "path_planning_vis_for_cg"
 os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
@@ -97,7 +96,7 @@ class SpotRosSkillExecutor:
             bbox_extent,
             [x, y],
             False,
-            osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
+            osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, "nav_receptacle.png"),
         )
 
         # Sequentially give the points
