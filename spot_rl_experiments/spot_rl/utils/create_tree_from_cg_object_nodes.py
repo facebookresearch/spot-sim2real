@@ -9,7 +9,11 @@ import yaml
 from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz
 
-PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+PATH_TO_CONFIG_FILE = osp.join(
+    osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))),
+    "configs",
+    "cg_config.yaml",
+)
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
 
@@ -93,4 +97,4 @@ if __name__ == "__main__":
     tree, data = populate_quad_tree()
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
-    nodes = query_quad_tree(1.5, 1.9, tree, data)
+    nodes = query_quad_tree(-0.8, 2.7, tree, data)

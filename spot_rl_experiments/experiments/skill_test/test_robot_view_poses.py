@@ -66,6 +66,27 @@ bboxs_info_nyc = {
     },
 }
 
+bboxs_info_nyc_object = {
+    "36_sink": {
+        "id": 36,
+        "bbox_extent": [0.6, 0.3, 0.2],
+        "bbox_center": [-0.8, 2.7, 0.3],
+        "object_tag": "sink",
+    },
+    "94_coffee_table": {
+        "id": 94,
+        "bbox_extent": [0.2, 0.1, 0.1],
+        "bbox_center": [3.3, -1.0, -0.4],
+        "object_tag": "coffee table",
+    },
+    "35_can_of_soda": {
+        "id": 35,
+        "bbox_extent": [0.5, 0.3, 0.2],
+        "bbox_center": [-0.8, 2.9, 0.5],
+        "object_tag": "can of soda",
+    },
+}
+
 # Fremont apartment
 bboxs_info_fre = {
     # kitchen area
@@ -209,7 +230,7 @@ in_fre_lab = map_user_input_to_boolean("for FRE? Y/N ")
 if in_fre_lab:
     bboxs_info = bboxs_info_fre
 else:
-    bboxs_info = bboxs_info_nyc
+    bboxs_info = bboxs_info_nyc_object
 
 for receptacle_name in bboxs_info:
     print(f"Current Receptacle {receptacle_name}")
@@ -218,8 +239,8 @@ for receptacle_name in bboxs_info:
         bbox_info["object_tag"] = [bbox_info["object_tag"]]
     # Get the view poses
     view_poses = get_view_poses(
-        bbox_info["bbox_center"],
-        bbox_info["bbox_extent"],
+        np.array(bbox_info["bbox_center"]),
+        np.array(bbox_info["bbox_extent"]),
         bbox_info["object_tag"],
         bbox_info.get("id", None),
         VISUALIZE,
