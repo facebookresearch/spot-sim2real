@@ -13,7 +13,11 @@ from scipy.spatial.transform import Rotation as R
 from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz, plt
 
-PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+PATH_TO_CONFIG_FILE = osp.join(
+    osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))),
+    "configs",
+    "cg_config.yaml",
+)
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
 

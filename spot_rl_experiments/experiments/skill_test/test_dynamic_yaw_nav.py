@@ -19,7 +19,7 @@ WAYPOINT_TEST = [[1.8, 1.1]] * NUM_REPEAT  # x, y
 
 
 class SpotRosSkillExecutor:
-    """This class reads the ros butter to execute skills"""
+    """This class reads the ros buffer to execute skills"""
 
     def __init__(self):
         self.spotskillmanager = None

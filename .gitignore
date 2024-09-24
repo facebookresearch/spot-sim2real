@@ -31,7 +31,8 @@ spot_rl_experiments/experiments/skill_test/episode_configs/*
 *.json
 *.pkl
 *.gz
-*.pt*.pkl*
+*.pt*
+*.pkl*
 *.json
 *.csv
 *.pt

@@ -19,7 +19,7 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 
 
 class SpotRosSkillExecutor:
-    """This class reads the ros butter to execute skills"""
+    """This class reads the ros buffer to execute skills"""
 
     def __init__(self, spotskillmanager):
         self.spotskillmanager = spotskillmanager

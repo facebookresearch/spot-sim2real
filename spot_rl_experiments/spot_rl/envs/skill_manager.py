@@ -581,7 +581,9 @@ class SpotSkillManager:
         edge_x = float(edge_point_in_base[0])
 
         # Move the base if the robot is too far away from the place target
-        start_walking_distance_threshold = 0.7  # in meters
+        start_walking_distance_threshold = self.place_config.get(
+            "MIN_DISTANCE_TO_PLACE_TARGET", 0.7
+        )  # in meters
         travel_time_for_walking_to_target = 2  # in seconds
         if edge_x > start_walking_distance_threshold:
             walk_distance = edge_x - start_walking_distance_threshold

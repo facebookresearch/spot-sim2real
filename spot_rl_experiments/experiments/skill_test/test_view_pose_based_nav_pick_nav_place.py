@@ -44,7 +44,7 @@ os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 class SpotRosSkillExecutor:
-    """This class reads the ros butter to execute skills"""
+    """This class reads the ros buffer to execute skills"""
 
     def __init__(self):
         self.spotskillmanager = None

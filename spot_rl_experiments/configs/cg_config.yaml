@@ -1,4 +1,4 @@
-CG_ROOT_PATH: "data/2024-09-17--19-06-02_fre_apartment_shortscan_preprocessed"
+CG_ROOT_PATH: "/home/tushar/Desktop/try2_habitat_llm/2024-09-17--19-06-02-shortscan_preprocessed"
 # FRE: 2024-09-17--19-06-02_fre_apartment_shortscan_preprocessed
 # NYC: 2024-09-17--19-06-02_nyc_lab_preprocessed
 SCAN_TYPE: "r3d"

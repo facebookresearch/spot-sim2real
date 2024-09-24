@@ -18,7 +18,11 @@ from spot_rl.utils.occupancy_grid import (
     pkl,
 )
 
-PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+PATH_TO_CONFIG_FILE = osp.join(
+    osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))),
+    "configs",
+    "cg_config.yaml",
+)
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
 
@@ -87,15 +91,9 @@ def convert_cg_pcd_to_pkl(
 
 
 def get_xyzxyz(centroid, extents):
-    x1 = centroid[0] - (extents[0] / 2.0)
-    y1 = centroid[1] - (extents[1] / 2.0)
-    z1 = centroid[2] - (extents[2] / 2.0)
-
-    x2 = centroid[0] + (extents[0] / 2.0)
-    y2 = centroid[1] + (extents[1] / 2.0)
-    z2 = centroid[2] + (extents[2] / 2.0)
-
-    return np.array([x1, y1, z1]), np.array([x2, y2, z2])
+    return np.array(centroid) - (np.array(extents) / 2.0), np.array(centroid) + (
+        np.array(extents) / 2.0
+    )
 
 
 def midpoint(x1, x2):

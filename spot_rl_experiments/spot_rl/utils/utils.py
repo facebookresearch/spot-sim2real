@@ -37,7 +37,11 @@ ros_frames.set_new_allowed(True)
 ros_frames.merge_from_file(ROS_FRAMES)
 
 
-PATH_TO_CONFIG_FILE = osp.join(osp.dirname(osp.abspath(__file__)), "cg_config.yaml")
+PATH_TO_CONFIG_FILE = PATH_TO_CONFIG_FILE = osp.join(
+    osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))),
+    "configs",
+    "cg_config.yaml",
+)
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
 ROOT_PATH = cg_config["CG_ROOT_PATH"]
