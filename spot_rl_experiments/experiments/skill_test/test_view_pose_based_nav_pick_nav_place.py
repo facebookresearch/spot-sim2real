@@ -44,7 +44,6 @@ os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 
 
 class SpotRosSkillExecutor(SpotSkillExecuterWithBenchmark):
-
     def nav(self, bbox_center, bbox_extent, query_class_names, metrics_list):
         bbox_center = np.array(bbox_center)
         bbox_extent = np.array(bbox_extent)

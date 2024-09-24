@@ -30,7 +30,6 @@ def print_logs():
 
 
 class SpotRosSkillExecutor(SpotSkillExecuterWithBenchmark):
-
     def benchmark(self):
         """ "Run the benchmark code to test skills"""
         global metrics_list

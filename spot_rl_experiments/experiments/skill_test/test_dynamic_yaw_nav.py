@@ -18,7 +18,6 @@ WAYPOINT_TEST = [[1.8, 1.1]] * NUM_REPEAT  # x, y
 
 
 class SpotRosSkillExecutor(SpotSkillExecuterWithBenchmark):
-
     def benchmark(self):
         """ "Run the benchmark code to test skills"""
 

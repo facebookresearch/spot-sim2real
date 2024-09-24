@@ -14,7 +14,7 @@ class SpotSkillExecuterWithBenchmark(ABC):
         self._cur_skill_name_input = None
 
     def compute_metrics(self, traj, target_point, name_key="_nav1"):
-        """ Compute the metrics """
+        """Compute the metrics"""
         num_steps = len(traj)
         final_point = np.array(traj[-1]["pose"][0:2])
         distance = np.linalg.norm(target_point - final_point)
