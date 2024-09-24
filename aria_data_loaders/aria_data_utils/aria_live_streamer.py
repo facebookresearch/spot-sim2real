@@ -19,7 +19,7 @@ try:
 except Exception as e:
     print(f"Cannot import sophuspy due to {e}. Import sophus instead")
     import sophus as sp
-from aria_data_utils.aria_sdk_utils import update_iptables
+from aria_data_utils.aria_sdk_utils import update_iptables_aria
 from geometry_msgs.msg import Pose, PoseStamped
 from nav_msgs.msg import Odometry
 from perception_and_utils.perception.detector_wrappers.april_tag_detector import (
@@ -85,7 +85,6 @@ class AriaLiveReader:
     """
 
     def __init__(self, verbose: bool = False) -> None:
-        super().__init__()
         self.verbose = verbose
         self._in_index = 0
         self._out_index = 0
@@ -576,7 +575,7 @@ def main(do_update_iptables: bool, read_only: bool, debug: bool, hz: int):
     rospy.init_node("aria_live_reader", log_level=_log_level)
     rospy.logwarn("Starting up ROS node")
     if do_update_iptables:
-        update_iptables()
+        update_iptables_aria()
     else:
         rospy.logwarn("Not updating iptables")
     object_name = "bottle"

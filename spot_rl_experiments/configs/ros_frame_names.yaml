@@ -4,7 +4,9 @@ SPOT: "spot"
 ARIA_WORLD: "ariaWorld"
 ARIA: "aria" # aria in cpf frame
 ARIA_DEVICE: "ariaDevice" # aria in device frame
-
+QUEST3_WORLD: "quest3World"
+QUEST3_CAMERA: "camera"
+QUEST3_DEVICE: "device"
 MARKER: "marker"
 
 

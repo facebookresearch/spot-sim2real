@@ -6,7 +6,7 @@
 from typing import Any, Dict, Tuple
 
 import numpy as np
-
+from perception_and_utils.utils.data_frame import DataFrame
 
 class GenericDetector:
     def __init__(self):
@@ -18,5 +18,5 @@ class GenericDetector:
     def disable_detector(self):
         self.is_enabled = False
 
-    def process_frame(self, img_frame: np.ndarray) -> Tuple[np.ndarray, Dict[str, Any]]:
+    def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
         raise NotImplementedError

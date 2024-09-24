@@ -15,7 +15,7 @@ except Exception as e:
 from scipy.spatial.transform import Rotation
 
 FILTER_DIST = 2.4  # in meters (distance for valid detection)
-FIXED_LIST_LENGTH = 10  # Fixed length of the a_T_b_{position,orientation} lists used for average computation
+FIXED_LIST_LENGTH = 1  # Fixed length of the a_T_b_{position,orientation} lists used for average computation
 
 
 def compute_avg_sophus_SE3_from_nplist(
@@ -40,9 +40,11 @@ def compute_avg_sophus_SE3_from_nplist(
     a_T_b_position_np = np.array(a_T_b_position_list)
     avg_a_T_b_position = np.mean(a_T_b_position_np, axis=0)
 
-    a_T_b_quaternion_np = np.array(a_T_b_quaternion_list)
+    a_T_b_quaternion_np = np.array(a_T_b_quaternion_list).reshape(-1, 4)
     avg_a_T_b_quaternion = np.mean(a_T_b_quaternion_np, axis=0)
-
+    # avg_a_T_b_quaternion = average_quaternion_numpy(
+    #     a_T_b_quaternion_np, W=None
+    # )
     avg_sp_se3 = sp.SE3(
         Rotation.from_quat(avg_a_T_b_quaternion).as_matrix(), avg_a_T_b_position
     )
@@ -100,9 +102,9 @@ def get_running_avg_a_T_b(
 
         a_T_b_position_list.append(b_position)
 
-        # Ensure quaternion's w is always positive for effective averaging as multiple quaternions can represent the same rotation
+        # Ensure quaternion's w is always negative for effective averaging as multiple quaternions can represent the same rotation
         quat = Rotation.from_matrix(a_T_b.rotationMatrix()).as_quat()
-        if quat[3] > 0:
+        if quat[3] < 0.0:
             quat = -1.0 * quat
         a_T_b_quaternion_list.append(quat)
 
@@ -119,3 +121,9 @@ def get_running_avg_a_T_b(
         )
 
     return a_T_b_position_list, a_T_b_quaternion_list, avg_a_T_b
+
+def average_quaternion_numpy(Q, W=None):
+    if W is not None:
+        Q *= W[:, None]
+    eigvals, eigvecs = np.linalg.eig(Q.T@Q)
+    return eigvecs[:, eigvals.argmax()]
