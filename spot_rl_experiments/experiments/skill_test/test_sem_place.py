@@ -30,9 +30,9 @@ if __name__ == "__main__":
     spot_pos1 = spotskillmanager.spot.get_arm_joint_positions(as_array=True)
 
     # is_local = False
-    # if enable_estimation_before_place:
-    #     place_target = None
-    #     is_local = True
+    if enable_estimation_before_place:
+        place_target = None
+        is_local = True
 
     # # Start testing
     # contnue = True
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
         spotskillmanager.place(
-            None,
+            place_target,
             is_local=enable_estimation_before_place,
             visualize=True,
             enable_waypoint_estimation=enable_estimation_before_place,

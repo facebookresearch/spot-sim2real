@@ -808,6 +808,7 @@ class Place(Skill):
         place_target = goal_dict.get("place_target")
         is_local = goal_dict.get("is_local", False)
         ee_orientation_at_grasping = goal_dict.get("ee_orientation_at_grasping", None)
+        edge_point_in_base = goal_dict.get("edge_coords", None)
 
         (x, y, z) = place_target
         conditional_print(
@@ -818,6 +819,7 @@ class Place(Skill):
         # Reset the env and policy
         observations = self.env.reset(
             place_target,
+            edge_point_in_base,
             is_local,
             ee_orientation_at_grasping=ee_orientation_at_grasping,
         )

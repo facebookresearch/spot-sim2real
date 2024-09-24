@@ -127,10 +127,13 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
                     self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN
                 )
 
-    def reset(self, place_target, target_is_local=False, *args, **kwargs):
+    def reset(
+        self, place_target, edge_point_in_base, target_is_local=False, *args, **kwargs
+    ):
         assert place_target is not None
         self.place_target = np.array(place_target)
         self.place_target_is_local = target_is_local
+        self.edge_point_in_base = np.array(edge_point_in_base)
 
         self._time_step = 0
 
@@ -165,15 +168,25 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         place = action_dict.get("grip_action", None) <= 0.0
 
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
-        cur_place_sensor_xyz = self.get_place_sensor(True)
+        ee_pose = self.spot.get_ee_pos_in_body_frame()[0]
+        place_region_max = self.edge_point_in_base + np.array([0.2] * 3)
+        print("EDGE POINT IN BASE", self.edge_point_in_base)
+        print("EE_POSE", ee_pose)
+        # cur_place_sensor_xyz = self.get_place_sensor(True)
+        # if (
+        #     abs(cur_place_sensor_xyz[2]) < 0.05
+        #     and np.linalg.norm(
+        #         np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
+        #     )
+        #     < 0.25
+        #     and self._time_step >= 50
+        # ):
+        #     place = True
         if (
-            abs(cur_place_sensor_xyz[2]) < 0.05
-            and np.linalg.norm(
-                np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
-            )
-            < 0.25
-            and self._time_step >= 50
+            place_region_max[0] >= ee_pose[0] >= self.edge_point_in_base[0]
+            and place_region_max[2] >= ee_pose[2] >= self.edge_point_in_base[2]
         ):
+            print("Condition satisfied")
             place = True
 
         # If the time steps have been passed for 75 steps, we will just place the object

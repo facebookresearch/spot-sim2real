@@ -608,6 +608,7 @@ class SpotSkillManager:
             place_z,
             ee_orientation_at_grasping=ee_orientation_at_grasping,
             is_local=is_local,
+            edge_point_in_base=edge_point_in_base,
         )
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -683,6 +684,7 @@ class SpotSkillManager:
         z: float,
         is_local: bool = False,
         ee_orientation_at_grasping: np.ndarray = None,
+        edge_point_in_base: np.ndarray = None,
     ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
@@ -702,6 +704,7 @@ class SpotSkillManager:
             "place_target": (x, y, z),
             "is_local": is_local,
             "ee_orientation_at_grasping": ee_orientation_at_grasping,
+            "edge_coords": edge_point_in_base,
         }  # type: Dict[str, Any]
         status, message = self.place_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
