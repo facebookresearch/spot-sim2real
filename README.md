@@ -265,8 +265,9 @@ python spot_rl_experiments/spot_rl/utils/skill_executor.py
 #### Step3. Use ROS to use skill in your application. Now you can call skills in non-blocking way.
 ```python
 # In your application, you import rospy for calling which skill to use
+import time # Get a timer
 import rospy # This is the only package you need to install in your environment
-rospy.set_param("skill_name_input", "Navigate,desk") # Call navigation skills to navigate to the desk. This is a non-blocking call.
+rospy.set_param("skill_name_input", f"{str(time.time())},Navigate,desk") # Call navigation skills to navigate to the desk. This is a non-blocking call.
 ```
 
 ## :eyeglasses: Run Spot-Aria project code

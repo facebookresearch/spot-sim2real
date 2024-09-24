@@ -43,10 +43,11 @@ class SpotNavEnv(SpotBaseEnv):
             )
 
     def reset(self, goal_xy, goal_heading, dynamic_yaw=False):
+        self._enable_dynamic_yaw = dynamic_yaw
         self._goal_xy = np.array(goal_xy, dtype=np.float32)
         self.goal_heading = goal_heading
         observations = super().reset()
-        self._enable_dynamic_yaw = dynamic_yaw
+
         assert len(self._goal_xy) == 2
 
         if self._enable_dynamic_yaw:

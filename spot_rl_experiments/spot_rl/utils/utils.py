@@ -7,12 +7,16 @@ import argparse
 import json
 import os
 import os.path as osp
+import time
 from collections import OrderedDict
 
 import numpy as np
 import rospy
 import yaml
-from spot_rl.utils.construct_configs import construct_config_for_semantic_place
+from spot_rl.utils.construct_configs import (
+    construct_config_for_semantic_place,
+    load_config,
+)
 from yacs.config import CfgNode as CN
 
 this_dir = osp.dirname(osp.abspath(__file__))
@@ -31,6 +35,16 @@ ROS_FRAMES = osp.join(configs_dir, "ros_frame_names.yaml")
 ros_frames = CN()
 ros_frames.set_new_allowed(True)
 ros_frames.merge_from_file(ROS_FRAMES)
+
+
+PATH_TO_CONFIG_FILE = PATH_TO_CONFIG_FILE = osp.join(
+    osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))),
+    "configs",
+    "cg_config.yaml",
+)
+assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
+cg_config = load_config(PATH_TO_CONFIG_FILE)
+ROOT_PATH = cg_config["CG_ROOT_PATH"]
 
 
 def get_waypoint_yaml(waypoint_file=WAYPOINTS_YAML):
@@ -140,12 +154,14 @@ def get_skill_name_and_input_from_ros():
     """
     Get the ros parameters to get the current skill name and its input
     """
-    skill_name_input = rospy.get_param("/skill_name_input", "None,None")
+    skill_name_input = rospy.get_param(
+        "/skill_name_input", f"{str(time.time())},None,None"
+    )
     skill_name_input = skill_name_input.split(",")
-    if len(skill_name_input) == 2:
+    if len(skill_name_input) == 3:
         # We get the correct format to execute the skill
-        skill_name = skill_name_input[0]
-        skill_input = skill_name_input[1]
+        skill_name = skill_name_input[1]
+        skill_input = skill_name_input[2]
     else:
         # We do not get the skill name and input
         skill_name = "None"
@@ -162,8 +178,7 @@ def arr2str(arr):
 
 def calculate_height(object_tag):
     default_config = construct_config_for_semantic_place()
-    script_dir = os.path.dirname(__file__)
-    json_file_path = os.path.join(script_dir, default_config.CONCEPT_GRAPH_FILE)
+    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations.json"
     default_height = default_config.HEIGHT_THRESHOLD
 
     if osp.isfile(json_file_path):
