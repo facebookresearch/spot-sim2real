@@ -48,7 +48,7 @@ class SpotRosSkillExecutor(SpotSkillExecuterWithBenchmark):
         bbox_center = np.array(bbox_center)
         bbox_extent = np.array(bbox_extent)
         # Get the view poses
-        view_poses = get_view_poses(
+        view_poses, _ = get_view_poses(
             bbox_center, bbox_extent, query_class_names, None, False
         )
         # Get the robot x, y, yaw

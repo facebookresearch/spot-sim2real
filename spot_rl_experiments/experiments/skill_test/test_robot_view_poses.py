@@ -335,7 +335,7 @@ for receptacle_name in bboxs_info:
         if isinstance(bbox_info["object_tag"], str):
             bbox_info["object_tag"] = [bbox_info["object_tag"]]
         # Get the view poses
-        view_poses = get_view_poses(
+        view_poses, _ = get_view_poses(
             np.array(bbox_info["bbox_center"]),
             np.array(bbox_info["bbox_extent"]),
             bbox_info["object_tag"],
