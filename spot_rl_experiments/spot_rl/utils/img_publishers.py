@@ -620,7 +620,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             )
 
             object_info.append(
-                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]}"
+                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score}"
             )
             print(
                 f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y} {z}"
