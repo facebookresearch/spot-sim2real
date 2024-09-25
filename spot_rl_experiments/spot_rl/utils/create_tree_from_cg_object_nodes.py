@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import gzip
 import os.path as osp
 import pickle
@@ -6,6 +7,7 @@ from pprint import pp
 import numpy as np
 import quads
 import yaml
+from spot_rl.utils.cache_file_in_redis import load_dict_from_redis
 from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz
 
@@ -50,6 +52,7 @@ def populate_quad_tree():
             tree.insert(quads.Point(0.0, 0.0, data="Dock"))
 
             data_dict = {}
+            error = 0
             for i, object_item in enumerate(cache_file):
                 object_tag = object_item["caption_dict"]["response"]["object_tag"]
                 id = object_item["caption_dict"]["id"]
@@ -65,15 +68,19 @@ def populate_quad_tree():
                     "bbox_center": caption_data["bbox_center"],
                 }
                 data_dict[f"{x:.1f}, {y:.1f}"] = data
-                assert tree.insert((x, y), data=f"{id}_{object_tag}")
-
+                try:
+                    assert tree.insert((x, y), data=f"{id}_{object_tag}")
+                except Exception:
+                    error += 1
+            print(f"Number of errors while creating the tree {error}")
+            # quads.visualize(tree)
             return tree, data_dict
 
 
 def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
     xin_query = -1 * y_incg
     yin_query = x_incg
-    region = 3
+    region = 1
     bb = quads.BoundingBox(
         min_x=xin_query - region,
         min_y=yin_query - region,
@@ -94,7 +101,14 @@ def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
 
 
 if __name__ == "__main__":
-    tree, data = populate_quad_tree()
+    cache_file_for_quad_tree = "quad_tree.pkl"
+    if osp.exists(cache_file_for_quad_tree):
+        with open(cache_file_for_quad_tree, "rb") as f:
+            tree, data = pickle.load(f)
+    else:
+        tree, data = populate_quad_tree()
+        with open(cache_file_for_quad_tree, "wb") as f:
+            pickle.dump((tree, data), f)
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
-    nodes = query_quad_tree(1.5, 1.9, tree, data)
+    nodes = query_quad_tree(0.6, -2.9, tree, data)
