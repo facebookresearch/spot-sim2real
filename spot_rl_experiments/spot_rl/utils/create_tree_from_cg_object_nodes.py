@@ -7,7 +7,6 @@ from pprint import pp
 import numpy as np
 import quads
 import yaml
-from spot_rl.utils.cache_file_in_redis import load_dict_from_redis
 from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz
 
@@ -111,4 +110,4 @@ if __name__ == "__main__":
             pickle.dump((tree, data), f)
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
-    nodes = query_quad_tree(0.6, -2.9, tree, data)
+    nodes = query_quad_tree(3.2, -1.2, tree, data)

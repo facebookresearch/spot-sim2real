@@ -234,6 +234,12 @@ bbox_info_static_graph = {
         "bbox_center": [3.3, -4.8, 0.8],
         "object_tag": "bottle",
     },
+    "receptacle_for_botle": {
+        "id": 158,
+        "bbox_extent": [2.3, 0.9, 0.1],
+        "bbox_center": [4.3, -4.4, 0.6],
+        "object_tag": "stove top oven",
+    },
     # living room
     "coffee table_in_living_room": {
         "id": 116,
@@ -246,6 +252,12 @@ bbox_info_static_graph = {
         "bbox_extent": [0.3, 0.1, 0.1],
         "bbox_center": [6.3, 3.2, 0.6],
         "object_tag": "avocado",
+    },
+    "avocado_receptacle": {
+        "id": 0,
+        "bbox_extent": [1.2, 0.9, 0.6],
+        "bbox_center": [5.9, 4.9, 0.2],
+        "object_tag": "furniture",
     },
     "birthday_cake_on_coffee_table": {
         "id": 100,
@@ -303,6 +315,12 @@ bbox_info_static_graph = {
         "bbox_center": [8.7, 6.4, 0.6],
         "object_tag": "ball",
     },
+    "receptacle_for_ball": {
+        "id": 6,
+        "bbox_extent": [1.2, 1.1, 0.7],
+        "bbox_center": [8.9, 6.3, 0.3],
+        "object_tag": "furniture",
+    },
     "garlic_toy_on_left_lamp_stand_in_bedroom": {
         "id": 15,
         "bbox_extent": [0.3, 0.1, 0.1],
@@ -329,7 +347,7 @@ else:
     bboxs_info = bboxs_info_nyc
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "white_vase_on_dining_table_in_kitchen":
+    if receptacle_name == "receptacle_for_botle":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):
