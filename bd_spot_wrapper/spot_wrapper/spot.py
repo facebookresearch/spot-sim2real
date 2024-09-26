@@ -1143,6 +1143,15 @@ class Spot:
             return robot_tform.x, robot_tform.y, yaw
         return self.xy_yaw_global_to_home(robot_tform.x, robot_tform.y, yaw)
 
+    def get_z(self):
+        """
+        Returns the relative x and y distance from start, as well as relative heading
+        """
+        robot_state = self.robot_state_client.get_robot_state()
+        robot_state_kin = robot_state.kinematic_state
+        robot_tform = get_vision_tform_body(robot_state_kin.transforms_snapshot)
+        return robot_tform.z
+
     def xy_yaw_global_to_home(self, x, y, yaw):
         x, y, w = self.global_T_home.dot(np.array([x, y, 1.0]))
         x, y = x / w, y / w
