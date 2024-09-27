@@ -1,12 +1,14 @@
 # mypy: ignore-errors
 import gzip
+import json
 import os.path as osp
 import pickle
+import time
+from copy import deepcopy
 from pprint import pp
 
 import numpy as np
 import quads
-import yaml
 from spot_rl.utils.construct_configs import load_config
 from spot_rl.utils.path_planning import get_xyzxyz
 
@@ -94,9 +96,49 @@ def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
         key = f"{point.x:.1f}, {point.y:.1f}"
         x_in_cg = point.y
         y_in_cg = -1 * point.x
-        pp(data_dic.get(key, "NotFound"))
+        # pp(data_dic.get(key, "NotFound"))
         converted_points.append((x_in_cg, y_in_cg, data_dic.get(key, "NotFound")))
     return converted_points
+
+
+def map_nodes_from_cache_to_json(nodes_in_cache):
+    PATH_TO_OBJECT_RELATIONS_JSON = osp.join(
+        ROOT_PATH, "sg_cache", "cfslam_object_relations.json"
+    )
+    if osp.exists(PATH_TO_OBJECT_RELATIONS_JSON):
+        with open(PATH_TO_OBJECT_RELATIONS_JSON, "r") as f:
+            json_data = json.load(f)
+    # map objects from cache to json, since ids in json could be different
+    for i, node in enumerate(nodes_in_cache):
+        data = node[-1]
+        bbox_center, bbox_extent = data["bbox_center"], data["bbox_extent"]
+        # object_tag = data["object_tag"]
+        for json_node in json_data:
+            object_1, object_2 = json_node.get("object1", None), json_node.get(
+                "object2", None
+            )
+            match_found: bool = False
+            for object in [object_1, object_2]:
+                if object is not None:
+                    if (
+                        object["bbox_center"] == bbox_center
+                        and object["bbox_extent"] == bbox_extent
+                    ):
+                        nodes_in_cache[i][-1]["id"] = object["id"]
+                        nodes_in_cache[i][-1]["object_tag"] = object["object_tag"]
+                        match_found = True
+                        break
+            if match_found:
+                break
+        assert (
+            match_found
+        ), f"could not find {data} in json file {PATH_TO_OBJECT_RELATIONS_JSON} but found in cache file {PATH_TO_CACHE_FILE}"
+
+    for node in nodes_in_cache:
+        # print(json.dumps(node[-1], indent=4))
+        pp(node[-1])
+
+    return nodes_in_cache
 
 
 if __name__ == "__main__":
@@ -110,4 +152,6 @@ if __name__ == "__main__":
             pickle.dump((tree, data), f)
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
-    nodes = query_quad_tree(3.2, -1.2, tree, data)
+    start_time = time.time()
+    nodes = map_nodes_from_cache_to_json(query_quad_tree(3.1, -1.2, tree, data))
+    print(f"Finished querying the world map in {time.time() - start_time} secs")

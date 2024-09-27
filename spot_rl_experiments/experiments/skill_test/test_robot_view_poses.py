@@ -192,6 +192,12 @@ bboxs_info_fre = {
         "bbox_center": [10.6, 2.7, 0.2],
         "object_tag": "wooden dresser/nightstand",
     },
+    "green_pumpkin_toy_on_night_stand": {
+        "id": 12,
+        "bbox_extent": [0.2, 0.2, 0.1],
+        "bbox_center": [10.4, 2.5, 0.4],
+        "object_tag": "green pumpkin toy",
+    },
     "lamp_right_bed": {
         "id": 10,
         "bbox_extent": [0.9, 0.7, 0.5],
@@ -308,6 +314,12 @@ bbox_info_static_graph = {
         "bbox_center": [2.0, 8.7, 0.1],
         "object_tag": "cup",
     },
+    "brown_leather_chair_for_cup": {
+        "id": 78,
+        "bbox_extent": [0.9, 0.8, 0.4],
+        "bbox_center": [2.0, 8.8, 0.1],
+        "object_tag": "brown leather chair",
+    },
     # bedroom
     "ball_on_dresser_in_bedroom": {
         "id": 5,
@@ -333,6 +345,12 @@ bbox_info_static_graph = {
         "bbox_center": [8.3, 2.4, 0.4],
         "object_tag": "tomato toy",
     },
+    "test_this": {
+        "id": 10,
+        "bbox_extent": [0.7, 0.5, 0.3],
+        "bbox_center": [10.5, 2.6, 0.1],
+        "object_tag": "wooden dresser",
+    },
 }
 
 VISUALIZE = True
@@ -347,7 +365,7 @@ else:
     bboxs_info = bboxs_info_nyc
 
 for receptacle_name in bboxs_info:
-    if receptacle_name == "receptacle_for_botle":
+    if receptacle_name == "test_this":
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
         if isinstance(bbox_info["object_tag"], str):
