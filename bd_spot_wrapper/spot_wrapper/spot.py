@@ -1308,6 +1308,9 @@ class Spot:
         finally:
             self.power_off()
 
+    def is_intel_service_available(self):
+        return self.intelrealsense_image_client is not None
+
     def select_hand_image(self, is_rgb=True, img_src: List[str] = []):
         """
         Gets hand raw rgb and depth, returns List[rgbimage, unscaleddepthimage] image object is BD source image object which has kinematic snapshot
@@ -1344,7 +1347,11 @@ class Spot:
             SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
 
-        if self.is_gripper_blocked and not force_get_gripper:
+        if (
+            self.is_intel_service_available()
+            and self.is_gripper_blocked
+            and not force_get_gripper
+        ):
             return self.select_hand_image(img_src=realsense_img_srcs)
         else:
             return self.select_hand_image(is_rgb=is_rgb)
