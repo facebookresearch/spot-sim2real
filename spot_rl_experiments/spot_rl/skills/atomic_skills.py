@@ -385,7 +385,15 @@ class Navigation(Skill):
             nav_target[1],
             np.rad2deg(nav_target[2]),
         )
-        current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
+        # TODO - skll debug: Check if we need to use the current pose from the spot itself or the pose from the skill result log
+        # current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
+        current_pose = self.spot.get_xy_yaw()
+        print(
+            "pose from log:",
+            self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
+            "pose from spot:",
+            current_pose,
+        )
         check_navigation_success = is_pose_within_bounds(
             current_pose,
             _nav_target_pose_deg,
@@ -555,8 +563,25 @@ class Pick(Skill):
                 f"Did the robot successfully pick the right object - {target_object}?"
             )
             success_status_from_user_feedback = map_user_input_to_boolean(user_prompt)
+
+        # TODO - skll debug: check if this works or not
+        # Get the images from the env and check if the image is being block by the object
+        arm_depth, _ = self.env.get_gripper_images()
+        block_value_threshold = 0.1
+        block_percentage_threshold = 0.5
+        is_object_block_camera = (
+            np.sum(arm_depth < block_value_threshold) / arm_depth.size
+        ) >= block_percentage_threshold
+        print(
+            "is_object_block_camera: ",
+            is_object_block_camera,
+            np.sum(arm_depth < block_value_threshold),
+            arm_depth.size,
+        )
         check_pick_success = (
-            self.env.grasp_attempted and success_status_from_user_feedback
+            self.env.grasp_attempted
+            and success_status_from_user_feedback
+            and is_object_block_camera
         )
 
         # Update result log
