@@ -385,15 +385,7 @@ class Navigation(Skill):
             nav_target[1],
             np.rad2deg(nav_target[2]),
         )
-        # TODO - skll debug: Check if we need to use the current pose from the spot itself or the pose from the skill result log
-        # current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
-        current_pose = self.spot.get_xy_yaw()
-        print(
-            "pose from log:",
-            self.skill_result_log.get("robot_trajectory")[-1].get("pose"),
-            "pose from spot:",
-            current_pose,
-        )
+        current_pose = self.skill_result_log.get("robot_trajectory")[-1].get("pose")
         check_navigation_success = is_pose_within_bounds(
             current_pose,
             _nav_target_pose_deg,
