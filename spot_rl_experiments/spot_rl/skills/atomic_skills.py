@@ -389,8 +389,12 @@ class Navigation(Skill):
         check_navigation_success = is_pose_within_bounds(
             current_pose,
             _nav_target_pose_deg,
-            self.config.SUCCESS_DISTANCE,
-            self.config.SUCCESS_ANGLE_DIST,
+            self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
+            if self.env._enable_dynamic_yaw
+            else self.config.self.config.SUCCESS_DISTANCE,
+            self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
+            if self.env._enable_dynamic_yaw
+            else self.config.self.config.SUCCESS_ANGLE_DIST,
         )
 
         # Update result log
