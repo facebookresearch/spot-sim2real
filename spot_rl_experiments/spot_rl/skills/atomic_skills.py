@@ -55,7 +55,7 @@ from spot_rl.utils.geometry_utils import (
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 
 # Import core classes
-from spot_wrapper.spot import Spot
+from spot_wrapper.spot import Spot, image_response_to_cv2
 
 ###
 ### Atomic Skills is a skill which requires its own policy and environment and does not depend on other atomic or composite skills
@@ -559,8 +559,28 @@ class Pick(Skill):
                 f"Did the robot successfully pick the right object - {target_object}?"
             )
             success_status_from_user_feedback = map_user_input_to_boolean(user_prompt)
+
+        # Get the images from the env and check if the image is being block by the object
+        time.sleep(0.5)
+        # Get the hand depth images to test if the gripper is holding something
+        hand_image_responses = self.spot.get_hand_image()
+        imgs_list = [image_response_to_cv2(r) for r in hand_image_responses]
+        hand_depth = imgs_list[1] / 1000.0  # from mm to meter
+        # Meta parameters
+        block_value_threshold = 0.1
+        block_percentage_threshold = 0.65
+        # check the value -- the gripper close state is about 0.48
+        block_ratio = np.sum(hand_depth < block_value_threshold) / hand_depth.size
+        is_object_block_camera = block_ratio >= block_percentage_threshold
+
+        print(
+            f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {block_percentage_threshold}"
+        )
+
         check_pick_success = (
-            self.env.grasp_attempted and success_status_from_user_feedback
+            self.env.grasp_attempted
+            and success_status_from_user_feedback
+            and is_object_block_camera
         )
 
         # Update result log
