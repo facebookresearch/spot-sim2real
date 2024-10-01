@@ -117,7 +117,7 @@ class SpotRosSkillExecutor:
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points
             nav_pts = get_navigation_points(
-                view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
+                view_poses, bbox_center, bbox_extent, [x, y], False, "pathplanning.png"
             )
 
             # Sequentially give the point

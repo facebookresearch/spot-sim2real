@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 import gzip
 import json
 import os.path as osp
@@ -96,7 +95,6 @@ def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
         key = f"{point.x:.1f}, {point.y:.1f}"
         x_in_cg = point.y
         y_in_cg = -1 * point.x
-        # pp(data_dic.get(key, "NotFound"))
         converted_points.append((x_in_cg, y_in_cg, data_dic.get(key, "NotFound")))
     return converted_points
 
@@ -148,7 +146,7 @@ if __name__ == "__main__":
             tree, data = pickle.load(f)
     else:
         tree, data = populate_quad_tree()
-        with open(cache_file_for_quad_tree, "wb") as f:
+        with open(cache_file_for_quad_tree, "wb") as f:  # type: ignore
             pickle.dump((tree, data), f)
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
