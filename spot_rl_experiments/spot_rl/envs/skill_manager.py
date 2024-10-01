@@ -120,15 +120,19 @@ class SpotSkillManager:
         # Create the spot object, init lease, and construct configs
         self.spot: Spot = None  # will be initialized in __init_spot()
 
+        # Create the spot object, init lease, and construct configs
+        self.__init_spot(spot=spot)
+
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
-        self.use_semantic_place = use_semantic_place
+        self.allow_semantic_place = (
+            use_semantic_place and self.spot.is_intel_service_available()
+        )
         self.use_pick_ee = use_pick_ee
         self.use_place_ee = use_place_ee
 
-        # Create the spot object, init lease, and construct configs
-        self.__init_spot(
-            spot=spot,
+        # Construct configs for nav, gaze, place and open-close drawers
+        self.__init_configs(
             nav_config=nav_config,
             pick_config=pick_config,
             place_config=place_config,
@@ -136,7 +140,7 @@ class SpotSkillManager:
         )
 
         # Initiate the controllers for nav, gaze, and place
-        self.__initiate_controllers(use_policies=use_policies)
+        self.__init_controllers(use_policies=use_policies)
 
         self.orientation_solver: OrientationSolver = OrientationSolver()
 
@@ -153,13 +157,9 @@ class SpotSkillManager:
     def __init_spot(
         self,
         spot: Spot = None,
-        nav_config=None,
-        pick_config=None,
-        place_config=None,
-        open_close_drawer_config=None,
     ):
         """
-        Initialize the Spot object, acquire lease, and construct configs
+        Initialize the Spot object, and acquire lease
         """
         if spot is None:
             # Create Spot object
@@ -176,7 +176,17 @@ class SpotSkillManager:
         else:
             self.spot = spot
 
-        # Construct configs for nav, gaze, and place
+    def __init_configs(
+        self,
+        nav_config=None,
+        pick_config=None,
+        place_config=None,
+        open_close_drawer_config=None,
+    ):
+        """
+        Construct configs for nav, pick, place, open/close
+        """
+
         self.nav_config = construct_config_for_nav() if not nav_config else nav_config
         self.pick_config = (
             construct_config_for_gaze(max_episode_steps=350)
@@ -187,7 +197,7 @@ class SpotSkillManager:
         if place_config is None:
             self.place_config = (
                 construct_config_for_semantic_place()
-                if self.use_semantic_place
+                if self.allow_semantic_place
                 else construct_config_for_place()
             )
         else:
@@ -199,21 +209,18 @@ class SpotSkillManager:
             else open_close_drawer_config
         )
 
-        self.open_close_drawer_config = (
-            construct_config_for_open_close_drawer()
-            if not open_close_drawer_config
-            else open_close_drawer_config
-        )
-
-    def __initiate_controllers(self, use_policies: bool = True):
+    def __init_controllers(self, use_policies: bool = True):
         """
-        Initiate the controllers for nav, gaze, and place
+        Initiate the controllers for nav, pick, place, and open-close drawers
         """
 
+        # Init nav controller
         self.nav_controller = Navigation(
             spot=self.spot,
             config=self.nav_config,
         )
+
+        # Init pick controller
         if self.use_pick_ee:
             self.gaze_controller = MobilePickEE(
                 spot=self.spot,
@@ -226,13 +233,15 @@ class SpotSkillManager:
                 config=self.pick_config,
                 use_mobile_pick=self._use_mobile_pick,
             )
-        if self.use_semantic_place:
+
+        # Init place controller
+        if self.allow_semantic_place:
 
             if self.use_place_ee:
                 self.place_controller = SemanticPlaceEE(
                     spot=self.spot,
                     config=self.place_config,
-                    use_semantic_place=self.use_semantic_place,
+                    use_semantic_place=self.allow_semantic_place,  # TODO: Mostly not needed
                 )
             else:
                 self.place_controller = SemanticPlace(
@@ -245,10 +254,14 @@ class SpotSkillManager:
                 config=self.place_config,
                 use_policies=use_policies,
             )
+
+        # Init open-close drawer controller
         self.open_close_drawer_controller = OpenCloseDrawer(
             spot=self.spot,
             config=self.open_close_drawer_config,
         )
+
+        # Init semantic pick controller
         self.semantic_gaze_controller = SemanticPick(
             spot=self.spot,
             config=self.pick_config,
@@ -531,7 +544,7 @@ class SpotSkillManager:
                 message = f"Failed - place target {place_target} not found - use the exact name"
                 conditional_print(message=message, verbose=self.verbose)
                 return False, message
-            if self.use_semantic_place:
+            if self.allow_semantic_place:
                 # Convert HOME frame coordinates into body frame
                 place_target_location = (
                     self.place_controller.env.get_target_in_base_frame(
@@ -547,10 +560,10 @@ class SpotSkillManager:
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
             percentile = 0 if visualize else 70
-            if self.use_semantic_place and self.use_place_ee:
+            if self.allow_semantic_place and self.use_place_ee:
                 height_adjustment_threshold = 0.1
                 percentile = 0 if visualize else 50
-            elif self.use_semantic_place:
+            elif self.allow_semantic_place:
                 height_adjustment_threshold = 0.05
             else:
                 height_adjustment_threshold = 0.23
@@ -655,7 +668,7 @@ class SpotSkillManager:
             self.arm_joint_angles,
             percentile=70,
             visualize=visualize,
-            height_adjustment_offset=0.10 if self.use_semantic_place else 0.23,
+            height_adjustment_offset=0.10 if self.allow_semantic_place else 0.23,
             image_scale=self.get_env().config.IMAGE_SCALE,
         )
 
