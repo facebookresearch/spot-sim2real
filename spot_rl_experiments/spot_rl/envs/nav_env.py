@@ -5,6 +5,7 @@
 
 import magnum as mn
 import numpy as np
+import rospy
 from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -74,6 +75,9 @@ class SpotNavEnv(SpotBaseEnv):
         else:
             self.succ_distance = self.config.SUCCESS_DISTANCE
             self.succ_angle = np.deg2rad(self.config.SUCCESS_ANGLE_DIST)
+
+        # Make sure the we use gripper image for the detection of the object
+        rospy.set_param("is_gripper_blocked", 0)
 
         return observations
 

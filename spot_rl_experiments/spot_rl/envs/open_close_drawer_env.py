@@ -114,6 +114,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         # Update target object name as provided in config
         observations = super().reset(target_obj_name="drawer handle", *args, **kwargs)
         rospy.set_param("object_target", self.target_obj_name)
+        rospy.set_param("multi_class_object_target", self.target_obj_name)
         rospy.set_param("enable_tracking", True)
 
         # Flag for done
@@ -389,10 +390,12 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
 
         # We close gripper here
         if z != 0 and z < self._dis_threshold_ee_to_handle:
+            rospy.set_param("/pick_lock_on", True)
             # Do IK to approach the target
             self.approach_handle_and_grasp()
             # If we can do IK, then we call it successful
             done = self._success
+            rospy.set_param("/pick_lock_on", False)
 
         return observations, reward, done, info
 

@@ -588,7 +588,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
-        for detection_str in new_detections:
+        for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
@@ -686,11 +686,13 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # Add new classes here to the model
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
-        # TODO: Update this with fixed set list of objects for demo
-        multi_classes = [["ball", "cup"]]
-        self.owlvit.update_label(multi_classes)
+        # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
+        multi_classes = rospy.get_param("/multi_class_object_target").split(",")
+        self.owlvit.update_label([multi_classes])
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
-        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
+        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(
+            hand_rgb, multi_objects_per_label=True
+        )
         # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
         if bbox_xy is not None and bbox_xy != []:
             detections = []
@@ -779,6 +781,7 @@ if __name__ == "__main__":
     elif open_voc:
         # Add open voc object detector here
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
+        rospy.set_param("multi_class_object_target", "cup,bottle")
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:

@@ -269,6 +269,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.should_end = False
         rospy.set_param("is_whiten_black", True)
         rospy.set_param("enable_tracking", False)
+        rospy.set_param("/pick_lock_on", False)
         observations = self.get_observations()
         return observations
 
@@ -928,6 +929,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                         print("Too off center to grasp!:", x / 640, y / 480)
             else:
                 print(f"Too far to grasp ({self.target_object_distance})!")
+
+        if grasp:
+            rospy.set_param("/pick_lock_on", True)
 
         return grasp
 
