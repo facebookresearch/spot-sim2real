@@ -22,7 +22,7 @@ class SpotRosSkillExecutor:
     """This class reads the ros buffer to execute skills"""
 
     def __init__(self, spotskillmanager):
-        self.spotskillmanager = spotskillmanager
+        self.spotskillmanager: SpotSkillManager = spotskillmanager
         self._cur_skill_name_input = None
         self.reset_image_viz_params()
 
@@ -109,9 +109,10 @@ class SpotRosSkillExecutor:
             else:
                 rospy.set_param("/viz_pick", query_class_names[0])
             # Get the view poses
-            view_poses = get_view_poses(
+            view_poses, category_tag = get_view_poses(
                 bbox_center, bbox_extent, query_class_names, False
             )
+
             # Get the robot x, y, yaw
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points
@@ -126,7 +127,25 @@ class SpotRosSkillExecutor:
                     x, y, yaw = pt
                     if pt_i == final_pt_i:
                         # Do normal point nav with yaw for the final location
-                        succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
+                        if category_tag is not None and "object" in category_tag:
+                            # increse nav error threshold for final nav
+                            # take a backup of prev error margins
+                            navconfig = self.spotskillmanager.nav_controller.env.config
+                            backup_success_distance, backup_success_angle = (
+                                navconfig.SUCCESS_DISTANCE,
+                                navconfig.SUCCESS_ANGLE_DIST,
+                            )
+                            navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
+                                backup_success_distance * 2.0,
+                                backup_success_angle * 2.0,
+                            )
+                            succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
+                            navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
+                                backup_success_distance,
+                                backup_success_angle,
+                            )
+                        else:
+                            succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
                     else:
                         # Do dynamic point yaw here for the intermediate points
                         succeded, msg = self.spotskillmanager.nav(x, y)

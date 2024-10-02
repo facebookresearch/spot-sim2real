@@ -130,10 +130,11 @@ def angle_between_vectors(v1, v2):
 def fill_up_occupancy_grid(occupancy_grid):
     """This function is used to fill up the occupancy grid with"""
     grid = occupancy_grid["occupancy_grid"]
-    grid[
-        FILL_UP_LOCATION[0] : FILL_UP_LOCATION[1],
-        FILL_UP_LOCATION[2] : FILL_UP_LOCATION[3],
-    ] = 1
+    for fill_up_location in FILL_UP_LOCATION:
+        grid[
+            fill_up_location[0] : fill_up_location[1],
+            fill_up_location[2] : fill_up_location[3],
+        ] = 1
     occupancy_grid["occupancy_grid"] = grid
     return occupancy_grid
 

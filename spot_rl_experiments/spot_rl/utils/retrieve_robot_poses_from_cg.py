@@ -228,6 +228,7 @@ def get_view_poses(
             anchor_object_center, anchor_object_extent
         )
         dist_thresh = 2.0
+        category_tag = None
         print(f"Using Dist thresh {dist_thresh}")
         for i, object_item in enumerate(cache_file):
             class_names = object_item["class_name"]
@@ -248,6 +249,7 @@ def get_view_poses(
                 == anchor_object_extent.tolist()
             ):
                 print(f"Detected classes around given receptacle {set(class_names)}")
+                category_tag = object_item["caption_dict"]["response"]["category_tag"]
                 # if class_name in query_class_names
                 for class_i in range(len(object_item["color_path"])):
                     rgb_path = object_item["color_path"][class_i]
@@ -317,4 +319,4 @@ def get_view_poses(
     else:
         print(f"No such class was found, min distance to anchor object is {min_dist}")
 
-    return data_list
+    return data_list, category_tag

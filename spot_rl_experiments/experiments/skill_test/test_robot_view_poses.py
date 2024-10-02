@@ -192,11 +192,164 @@ bboxs_info_fre = {
         "bbox_center": [10.6, 2.7, 0.2],
         "object_tag": "wooden dresser/nightstand",
     },
+    "green_pumpkin_toy_on_night_stand": {
+        "id": 12,
+        "bbox_extent": [0.2, 0.2, 0.1],
+        "bbox_center": [10.4, 2.5, 0.4],
+        "object_tag": "green pumpkin toy",
+    },
     "lamp_right_bed": {
         "id": 10,
         "bbox_extent": [0.9, 0.7, 0.5],
         "bbox_center": [8.3, 2.6, 0.2],
         "object_tag": "wooden nightstand/dresser",
+    },
+}
+
+bbox_info_static_graph = {
+    # kitchen
+    "pumpkin_on_kitchen_island": {
+        "id": 178,
+        "bbox_extent": [0.3, 0.2, 0.1],
+        "bbox_center": [3.2, -1.2, 0.7],
+        "object_tag": "green apple",
+    },
+    "white_vase_on_dining_table_in_kitchen": {
+        "id": 215,
+        "bbox_extent": [0.3, 0.2, 0.2],
+        "bbox_center": [0.4, -2.4, 0.6],
+        "object_tag": "white vase",
+    },
+    "dining_table_in_kitchen": {
+        "id": 203,
+        "bbox_extent": [0.5, 0.3, 0.1],
+        "bbox_center": [0.6, -2.9, -0.0],
+        "object_tag": "wooden dining table",
+    },
+    "sink_in_kitchen": {
+        "id": 171,
+        "bbox_extent": [0.9, 0.6, 0.3],
+        "bbox_center": [4.3, -2.0, 0.5],
+        "object_tag": "sink",
+    },
+    "bottle_on_kitchen_counter": {
+        # not working well,
+        # can choose something else in vicinity
+        "id": 153,
+        "bbox_extent": [0.1, 0.0, 0.0],
+        "bbox_center": [3.3, -4.8, 0.8],
+        "object_tag": "bottle",
+    },
+    "receptacle_for_botle": {
+        "id": 158,
+        "bbox_extent": [2.3, 0.9, 0.1],
+        "bbox_center": [4.3, -4.4, 0.6],
+        "object_tag": "stove top oven",
+    },
+    # living room
+    "coffee table_in_living_room": {
+        "id": 116,
+        "bbox_extent": [0.9, 0.8, 0.6],
+        "bbox_center": [1.2, 3.3, 0.1],
+        "object_tag": "table with decorations",
+    },
+    "avocado_on_living_room_console": {
+        "id": 85,
+        "bbox_extent": [0.3, 0.1, 0.1],
+        "bbox_center": [6.3, 3.2, 0.6],
+        "object_tag": "avocado",
+    },
+    "avocado_receptacle": {
+        "id": 0,
+        "bbox_extent": [1.2, 0.9, 0.6],
+        "bbox_center": [5.9, 4.9, 0.2],
+        "object_tag": "furniture",
+    },
+    "birthday_cake_on_coffee_table": {
+        "id": 100,
+        "bbox_extent": [0.9, 0.8, 0.7],
+        "bbox_center": [1.2, 3.3, 0.0],
+        "object_tag": "birthday cake on coffee table",
+    },
+    "white_couch_in_living_room": {
+        "id": 126,
+        "bbox_extent": [2.9, 1.1, 0.6],
+        "bbox_center": [1.5, 2.2, 0.1],
+        "object_tag": "white couch",
+    },
+    "pengun_plush_toy_on_white_chair": {
+        "id": 106,
+        "bbox_extent": [1.0, 0.8, 0.5],
+        "bbox_center": [3.4, 5.1, 0.2],
+        "object_tag": "stuffed penguin toy",
+    },
+    "white_chair_beside_living_room_console": {
+        "id": 82,
+        "bbox_extent": [0.2, 0.1, 0.0],
+        "bbox_center": [5.8, 5.3, -0.3],
+        "object_tag": "white couch",
+    },
+    # Office
+    "coffee_cup_on_office_desk": {
+        "id": 54,
+        "bbox_extent": [0.3, 0.2, 0.2],
+        "bbox_center": [-0.8, 7.0, 0.5],
+        "object_tag": "coffee cup",
+    },
+    "computer_on_left_office_cabinet": {
+        "id": 44,
+        "bbox_extent": [0.8, 0.5, 0.2],
+        "bbox_center": [1.1, 5.7, 0.9],
+        "object_tag": "computer monitor",
+    },
+    "can_of_food_on_chair_in_office": {
+        "id": 75,
+        "bbox_extent": [0.8, 0.8, 0.4],
+        "bbox_center": [1.2, 8.8, 0.1],
+        "object_tag": "can of food on a chair",
+    },
+    "cup_on_chair_in_office": {
+        "id": 80,
+        "bbox_extent": [0.2, 0.1, 0.1],
+        "bbox_center": [2.0, 8.7, 0.1],
+        "object_tag": "cup",
+    },
+    "brown_leather_chair_for_cup": {
+        "id": 78,
+        "bbox_extent": [0.9, 0.8, 0.4],
+        "bbox_center": [2.0, 8.8, 0.1],
+        "object_tag": "brown leather chair",
+    },
+    # bedroom
+    "ball_on_dresser_in_bedroom": {
+        "id": 5,
+        "bbox_extent": [0.3, 0.2, 0.1],
+        "bbox_center": [8.7, 6.4, 0.6],
+        "object_tag": "ball",
+    },
+    "receptacle_for_ball": {
+        "id": 6,
+        "bbox_extent": [1.2, 1.1, 0.7],
+        "bbox_center": [8.9, 6.3, 0.3],
+        "object_tag": "furniture",
+    },
+    "garlic_toy_on_left_lamp_stand_in_bedroom": {
+        "id": 15,
+        "bbox_extent": [0.3, 0.1, 0.1],
+        "bbox_center": [10.6, 2.4, 0.4],
+        "object_tag": "garlic toy",
+    },
+    "tomato_toy_on_right_lamp_stand_in_bedroom": {
+        "id": 29,
+        "bbox_extent": [0.1, 0.1, 0.0],
+        "bbox_center": [8.3, 2.4, 0.4],
+        "object_tag": "tomato toy",
+    },
+    "test_this": {
+        "id": 10,
+        "bbox_extent": [0.7, 0.5, 0.3],
+        "bbox_center": [10.5, 2.6, 0.1],
+        "object_tag": "wooden dresser",
     },
 }
 
@@ -207,7 +360,7 @@ os.makedirs(PATH_PLANNING_VISUALIZATION_FOLDER, exist_ok=True)
 in_fre_lab = map_user_input_to_boolean("for FRE? Y/N ")
 
 if in_fre_lab:
-    bboxs_info = bboxs_info_fre
+    bboxs_info = bbox_info_static_graph
 else:
     bboxs_info = bboxs_info_nyc
 
@@ -217,7 +370,7 @@ for receptacle_name in bboxs_info:
     if isinstance(bbox_info["object_tag"], str):
         bbox_info["object_tag"] = [bbox_info["object_tag"]]
     # Get the view poses
-    view_poses = get_view_poses(
+    view_poses, _ = get_view_poses(
         np.array(bbox_info["bbox_center"]),
         np.array(bbox_info["bbox_extent"]),
         bbox_info["object_tag"],
