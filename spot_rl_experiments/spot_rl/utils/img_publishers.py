@@ -781,7 +781,7 @@ if __name__ == "__main__":
     elif open_voc:
         # Add open voc object detector here
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
-        rospy.set_param("multi_class_object_target", "cup,bottle")
+        rospy.set_param("multi_class_object_target", "cup,bottle,ball")
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:
