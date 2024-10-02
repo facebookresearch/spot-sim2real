@@ -111,22 +111,22 @@ def determin_nearest_edge(
     STATIC_OFFSET = static_offset
     (x1, y1), (x2, y2) = boxMin[:2], boxMax[:2]
     face_1 = np.array([midpoint(x1, x2), y1 - 0.0])
-    face_1_vector = bbox_centers - face_1  # x1,y1, x2,y1
+    face_1_vector = bbox_centers - face_1 + 1e-8  # x1,y1, x2,y1
     face_1_vector = face_1_vector / np.linalg.norm(face_1_vector)
     face_1_adjusted = np.array([midpoint(x1, x2), y1 - STATIC_OFFSET])
 
     face_2 = np.array([midpoint(x1, x2), y2 + 0.0])
-    face_2_vector = bbox_centers - face_2  # x1,y2, x2,y2
+    face_2_vector = bbox_centers - face_2 + 1e-8  # x1,y2, x2,y2
     face_2_vector = face_2_vector / np.linalg.norm(face_2_vector)
     face_2_adjusted = np.array([midpoint(x1, x2), y2 + STATIC_OFFSET])
 
     face_3 = np.array([x1 - 0.0, midpoint(y1, y2)])
-    face_3_vector = bbox_centers - face_3  # x1, y1, x1, y2
+    face_3_vector = bbox_centers - face_3 + 1e-8  # x1, y1, x1, y2
     face_3_vector = face_3_vector / np.linalg.norm(face_3_vector)
     face_3_adjusted = np.array([x1 - STATIC_OFFSET, midpoint(y1, y2)])
 
     face_4 = np.array([x2 + 0.0, midpoint(y1, y2)])
-    face_4_vector = bbox_centers - face_4  # x2, y1, x2, y2
+    face_4_vector = bbox_centers - face_4 + 1e-8  # x2, y1, x2, y2
     face_4_vector = face_4_vector / np.linalg.norm(face_4_vector)
     face_4_adjusted = np.array([x2 + STATIC_OFFSET, midpoint(y1, y2)])
 
