@@ -484,7 +484,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         # For the depth images
         self.img_msg_depth = None
         rospy.Subscriber(rt.HAND_DEPTH_UNSCALED, Image, self.depth_cb, queue_size=1)
-        rospy.Subscriber(rt.HAND_DEPTH_UNSCALED, Image, self.depth_cb, queue_size=1)
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
 
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC

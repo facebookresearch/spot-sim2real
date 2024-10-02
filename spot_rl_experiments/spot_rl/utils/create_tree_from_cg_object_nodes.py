@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 import gzip
 import json
 import os.path as osp
