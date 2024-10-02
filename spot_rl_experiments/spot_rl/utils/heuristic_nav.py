@@ -455,7 +455,45 @@ def heurisitic_object_search_and_navigation(
     return found
 
 
+def scan_arm(
+    spot: Spot,
+    angle_start=-90,
+    angle_end=110,
+    angle_interval=5,
+    gaze_arm_angles=None,
+):
+
+    # Read gaze arn angles from config if None is passed
+    if gaze_arm_angles is None:
+        config = construct_config()
+        gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES)
+    else:
+        assert (
+            len(gaze_arm_angles) == 6
+        ), f"Expected 6 elements in gaze_arm_angles, got {len(gaze_arm_angles)}"
+    spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), travel_time=5)
+    semicircle_range = np.concatenate(
+        [
+            np.arange(0, angle_start, -angle_interval),
+            np.arange(angle_start, angle_end, angle_interval),
+            np.arange(angle_end, 0, -angle_interval),
+        ]
+    )
+    rate = angle_interval
+    for _, angle in enumerate(semicircle_range):
+        print(f"Scanning in {angle} cone")
+        angle_time = int(np.abs(gaze_arm_angles[0] - angle) / rate)
+        gaze_arm_angles[0] = angle
+        spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
+        time.sleep(0.5)
+
+
 if __name__ == "__main__":
     print(
         "Please see the example in spot_rl_experiments/experiments/skill_test/test_spot_to_aria.py"
     )
+
+    spot = Spot("heuristic_nav")
+    with spot.get_lease(hijack=True):
+        spot.power_robot()
+        scan_arm(spot)

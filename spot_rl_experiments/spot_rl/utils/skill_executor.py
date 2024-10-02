@@ -6,10 +6,12 @@ import argparse
 import os
 import os.path as osp
 import time
+import traceback
 
 import numpy as np
 import rospy
 from spot_rl.envs.skill_manager import SpotSkillManager
+from spot_rl.utils.heuristic_nav import scan_arm
 from spot_rl.utils.retrieve_robot_poses_from_cg import get_view_poses
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 from spot_rl.utils.utils import ros_topics as rt
@@ -87,6 +89,20 @@ class SpotRosSkillExecutor:
                 else:
                     rospy.set_param("/viz_pick", skill_input)
                 succeded, msg = self.spotskillmanager.nav(skill_input)
+
+            # Run scan arm if gripper is NOT holding any item
+            print(
+                f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
+            )
+            if succeded and not robot_holding:
+                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+                time.sleep(1)
+                print("Scanning area with arm")
+                scan_arm(self.spotskillmanager.spot)
+            else:
+                print("Will not scan arm")
+            rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
+
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
             # Reset the navigation target
@@ -152,6 +168,20 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = "Cannot navigate to the point"
+
+            # Run scan arm if gripper is NOT holding any item
+            print(
+                f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
+            )
+            if succeded and not robot_holding:
+                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+                time.sleep(1)
+                print("Scanning area with arm")
+                scan_arm(self.spotskillmanager.spot)
+            else:
+                print("Will not scan arm")
+            rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
+
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_pick", "None")
@@ -216,7 +246,7 @@ def main():
         while not rospy.is_shutdown():
             executor.execute_skills()
     except Exception as e:
-        print(f"Ending script: {e}")
+        print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
 
 
 if __name__ == "__main__":
