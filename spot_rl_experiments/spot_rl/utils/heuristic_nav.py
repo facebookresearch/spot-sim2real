@@ -7,10 +7,12 @@ import os
 import time
 from copy import deepcopy
 from glob import glob
+from typing import Any, List
 
 import cv2
 import magnum
 import magnum as mn
+import matplotlib.pyplot as plt
 import numpy as np
 import rospy
 from scipy import stats as st
@@ -18,13 +20,29 @@ from scipy import stats as st
 # from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.models import OwlVit
 from spot_rl.models.yolov8predictor import YOLOV8Predictor
+from spot_rl.utils.geometry_utils import wrap_angle_deg
 from spot_rl.utils.mask_rcnn_utils import get_deblurgan_model
 from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     get_best_uvz_from_detection,
+    sample_patch_around_point,
 )
 from spot_rl.utils.utils import construct_config
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
+from std_msgs.msg import String
+
+MAX_PUBLISH_FREQ = 20
+MAX_DEPTH = 3.5
+MAX_HAND_DEPTH = 1.7
+DETECTIONS_BUFFER_LEN = 30
+LEFT_CROP = 124
+RIGHT_CROP = 60
+NEW_WIDTH = 228
+NEW_HEIGHT = 240
+# ORIG_WIDTH = 640
+# ORIG_HEIGHT = 480
+WIDTH_SCALE = 0.5
+HEIGHT_SCALE = 0.5
 
 
 def get_z_offset_by_corner_detection(
@@ -157,12 +175,34 @@ def get_arguments_for_image_search(spot: Spot):
         unscaled_dep_img, max_depth=unscaled_dep_img.max() * 0.001, as_img=False
     )
     intrinsics = imgs[0].source.pinhole.intrinsics
-    vision_T_hand: mn.Matrix4 = spot.get_magnum_Matrix4_spot_a_T_b(
-        "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
-    )
-    body_T_hand: mn.Matrix4 = spot.get_magnum_Matrix4_spot_a_T_b(
-        "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
-    )
+
+    vision_T_hand: Any[mn.Matrix4] = None
+    body_T_hand: Any[mn.Matrix4] = None
+    try:
+        vision_T_hand = spot.get_magnum_Matrix4_spot_a_T_b(
+            "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        )
+        body_T_hand = spot.get_magnum_Matrix4_spot_a_T_b(
+            "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+        )
+    except Exception as e:
+        print(e)
+        breakpoint()
+
+    if any(
+        x is None
+        for x in [
+            rgb_img,
+            unscaled_dep_img,
+            dep_img,
+            vision_T_hand,
+            body_T_hand,
+            intrinsics,
+            spot,
+        ]
+    ):
+        return None
+
     return (
         rgb_img,
         unscaled_dep_img,
@@ -185,17 +225,20 @@ class ImageSearch:
     """
 
     def __init__(
-        self, corner_static_offset: float = 0.5, use_yolov8=True, visualize=True
+        self,
+        corner_static_offset: float = 0.5,
+        use_yolov8=True,
+        visualize=True,
+        multi_class=True,
     ):
         config = construct_config()
         self.image_scale = float(config.IMAGE_SCALE)
         self.grayscale = config.GRAYSCALE_MASK_RCNN
         self.visualize = visualize
         self.corner_static_offset = corner_static_offset
-        self.owlvit = OwlVit([["ball"]], 0.05, False) if not use_yolov8 else None
 
-        # if self.owlvit:
         self.deblur_gan = get_deblurgan_model(config)
+        self.owlvit = OwlVit([["ball"]], 0.05, False, 2) if not use_yolov8 else None
         self.yolov8predictor: YOLOV8Predictor = (
             YOLOV8Predictor(
                 "/home/tusharsangam/Desktop/spot-sim2real/spot_rl_experiments/weights/torchscript/yolov8x.torchscript"
@@ -204,6 +247,7 @@ class ImageSearch:
             else None
         )
         self.normal_object_to_coco_class_id = {"ball": 32.0}
+        self.multi_class = multi_class
 
     def preprocess_image(self, img, image_scale):
         if image_scale != 1.0:
@@ -214,7 +258,6 @@ class ImageSearch:
                 fy=self.image_scale,
                 interpolation=cv2.INTER_AREA,
             )
-
         if self.deblur_gan is not None:
             img = self.deblur_gan(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -291,6 +334,7 @@ class ImageSearch:
         rgb_img_vis = rgb_img.copy() if self.visualize else None
 
         det_status, det = self.object_detection(rgb_img, object_target)
+
         if not det_status:
             return False, (None, None, None), rgb_img_vis
         x1, y1, x2, y2, conf = det
@@ -353,7 +397,90 @@ class ImageSearch:
                 )
             return True, (global_x, global_y, theta), rgb_img_vis
 
-        return False, (None, None, None), rgb_img_vis
+        return False, rgb_img_vis
+
+    def detect3d_object_locations(
+        self,
+        object_targets: List[str],
+        rgb_img: np.ndarray,
+        unscaled_depth: np.ndarray,
+        hand_depth_img: np.ndarray,
+        vision_T_hand: mn.Matrix4,
+        body_T_hand: mn.Matrix4,
+        cam_intrinsics,
+        spot: Spot,
+    ):
+
+        self.owlvit.update_label([object_targets])
+
+        bbox_xy, rgb_img_vis = self.owlvit.run_inference_and_return_img(
+            img=self.preprocess_image(rgb_img, self.image_scale),
+            vis_img_required=True,
+            multi_objects_per_label=self.multi_class,
+        )
+
+        # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
+        if bbox_xy is not None and bbox_xy != []:
+            detections = []
+            for detection in bbox_xy:
+                str_det = f'{detection[0]},{detection[1]},{",".join([str(i) for i in detection[2]])}'
+                detections.append(str_det)
+            bbox_xy_string = ";".join(detections)
+        else:
+            bbox_xy_string = "None"
+        new_detections_str = f"{bbox_xy_string}"  # No need to add timestamp
+        new_detections = new_detections_str.split(";")
+
+        object_info = []
+
+        for det_i, detection_str in enumerate(new_detections):
+            if detection_str == "None":
+                continue
+            class_label, score, x1_str, y1_str, x2_str, y2_str = detection_str.split(
+                ","
+            )
+            # Compute the center pixel
+            x1, y1, x2, y2 = [
+                int(float(i) / self.image_scale)
+                for i in [x1_str, y1_str, x2_str, y2_str]
+            ]
+
+            try:
+                depth_raw = unscaled_depth / 1000.0
+
+                cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
+                Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1.0)
+                if np.isnan(Z):
+                    print(f"Affordance Prediction : Z is NaN for {class_label} = {Z}")
+                    continue
+                elif Z > MAX_HAND_DEPTH:
+                    print(
+                        f"Affordance Prediction : Z is out of bounds for {class_label} = {Z}"
+                    )
+                    continue
+
+                point_in_gripper = get_3d_point(cam_intrinsics, (cx, cy), Z)
+                assert (
+                    point_in_gripper is not None
+                ), f"Unpossible Affordance Point is NaN for {class_label}, skipping"
+
+            except Exception as e:
+                print(f"Issue of predicting location: {e}")
+                continue
+
+            if np.isnan(point_in_gripper).any():
+                continue
+
+            point_in_global_3d = vision_T_hand.transform_point(
+                mn.Vector3(*point_in_gripper)
+            )
+
+            object_info.append(
+                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score}"
+            )
+            print(f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2}")
+
+        return object_info, rgb_img_vis
 
 
 def heurisitic_object_search_and_navigation(
@@ -408,9 +535,11 @@ def heurisitic_object_search_and_navigation(
     gaze_arm_angles = deepcopy(skillmanager.pick_config.GAZE_ARM_JOINT_ANGLES)
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
     time.sleep(1.5)
-    found, (x, y, theta), visulize_img = image_search.search(
-        object_target, *get_arguments_for_image_search(spot)
-    )
+    img_search_args = get_arguments_for_image_search(spot)
+    if img_search_args is not None:
+        found, (x, y, theta), visulize_img = image_search.search(
+            object_target, *img_search_args
+        )
     rate = angle_interval  # control time taken to rotate the arm, higher the rotation higher is the time
     if not found:
         # start semi circle search
@@ -421,18 +550,20 @@ def heurisitic_object_search_and_navigation(
             gaze_arm_angles[0] = angle
             spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
             time.sleep(1.5)
-            (
-                found,
-                (x, y, theta),
-                visulize_img,
-            ) = image_search.search(  # type : ignore
-                object_target, *get_arguments_for_image_search(spot)
-            )
-            if save_cone_search_images:
-                cv2.imwrite(f"imagesearch_{angle}.png", visulize_img)
-            if found:
-                print(f"In Cone Search object found at {(x,y,theta)}")
-                break
+            img_search_args = get_arguments_for_image_search(spot)
+            if img_search_args is not None:
+                (
+                    found,
+                    (x, y, theta),
+                    visulize_img,
+                ) = image_search.search(  # type : ignore
+                    object_target, *img_search_args
+                )
+                if save_cone_search_images:
+                    cv2.imwrite(f"imagesearch_{angle}.png", visulize_img)
+                if found:
+                    print(f"In Cone Search object found at {(x,y,theta)}")
+                    break
 
     else:
         if save_cone_search_images:
@@ -457,21 +588,39 @@ def heurisitic_object_search_and_navigation(
 
 def scan_arm(
     spot: Spot,
+    publisher,
     angle_start=-90,
-    angle_end=110,
-    angle_interval=5,
+    angle_end=90,
+    angle_interval=30,
     gaze_arm_angles=None,
 ):
-
-    # Read gaze arn angles from config if None is passed
+    # Create image search object
+    image_search = ImageSearch(
+        corner_static_offset=0.5, use_yolov8=False, visualize=False, multi_class=True
+    )
+    multi_classes = [
+        "ball",
+        "can",
+        "bottle",
+        "pineapple plush toy",
+        "caterpillar toy",
+        "avocado plush toy",
+        "frog plush toy",
+        "donut plush toy",
+    ]
+    # Read gaze arm angles from config if None is passed
     if gaze_arm_angles is None:
         config = construct_config()
-        gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES)
+        gaze_arm_angles = deepcopy(
+            config.GAZE_ARM_JOINT_ANGLES
+        )  # TODO: Toggle between short and tall receptacles
     else:
         assert (
             len(gaze_arm_angles) == 6
         ), f"Expected 6 elements in gaze_arm_angles, got {len(gaze_arm_angles)}"
-    spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), travel_time=5)
+
+    spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), travel_time=5)
+    spot.open_gripper()
     semicircle_range = np.concatenate(
         [
             np.arange(0, angle_start, -angle_interval),
@@ -479,21 +628,108 @@ def scan_arm(
             np.arange(angle_end, 0, -angle_interval),
         ]
     )
-    rate = angle_interval
+    # rate = angle_interval
     for _, angle in enumerate(semicircle_range):
         print(f"Scanning in {angle} cone")
-        angle_time = int(np.abs(gaze_arm_angles[0] - angle) / rate)
+        angle_time = 1.0  # int(np.abs(gaze_arm_angles[0] - angle) / rate)
         gaze_arm_angles[0] = angle
-        spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
-        time.sleep(0.5)
+        spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
+        time.sleep(1.5)
+        img_search_args = get_arguments_for_image_search(spot)
+        if img_search_args is not None:
+            (
+                object_info_list,
+                visulize_img,
+            ) = image_search.detect3d_object_locations(  # type : ignore
+                multi_classes, *img_search_args
+            )
+            publisher.publish(";".join(object_info_list))
+            # TODO: Publish MaskRCNN viz
+            cv2.imshow("Image", visulize_img)
+            cv2.waitKey(100)
+
+
+def scan_base(
+    spot: Spot,
+    publisher,
+    angle_start=-90,
+    angle_end=90,
+    angle_interval=30,
+    gaze_arm_angles=None,
+):
+    # Create image search object
+    image_search = ImageSearch(
+        corner_static_offset=0.5, use_yolov8=False, visualize=False, multi_class=True
+    )
+    multi_classes = [
+        "ball",
+        "can",
+        "bottle",
+        "pineapple plush toy",
+        "caterpillar toy",
+        "avocado plush toy",
+        "frog plush toy",
+        "donut plush toy",
+    ]
+
+    # Read gaze arm angles from config if None is passed
+    if gaze_arm_angles is None:
+        config = construct_config()
+        gaze_arm_angles = deepcopy(
+            config.GAZE_ARM_JOINT_ANGLES
+        )  # TODO: Toggle between short and tall receptacles
+    else:
+        assert (
+            len(gaze_arm_angles) == 6
+        ), f"Expected 6 elements in gaze_arm_angles, got {len(gaze_arm_angles)}"
+    spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), travel_time=5)
+    spot.open_gripper()
+    semicircle_range = np.concatenate(
+        [
+            np.arange(0, angle_start, -angle_interval),
+            np.arange(angle_start, angle_end, angle_interval),
+            np.arange(angle_end, 0, -angle_interval),
+        ]
+    )
+    # rate = angle_interval
+    x0, y0, theta0 = spot.get_xy_yaw()
+    for _, angle in enumerate(semicircle_range):
+        print(f"{x0=}, {y0=}, {theta0=}")
+        new_theta_deg = -wrap_angle_deg(
+            np.rad2deg(theta0) + angle, wrapping_360=False
+        )  # Need to flip sign hence negating it
+        new_theta_rad = np.deg2rad(new_theta_deg)
+        print(f"Scanning in {new_theta_deg} cone by base motion")
+        angle_time = 1.0  # int(np.abs(new_theta_deg - theta0) / rate)
+        spot.set_base_position(x0, y0, new_theta_rad, angle_time)
+        time.sleep(1.5)
+        img_search_args = get_arguments_for_image_search
+        if img_search_args is not None:
+            (
+                object_info_list,
+                visulize_img,
+            ) = image_search.detect3d_object_locations(  # type : ignore
+                multi_classes, *img_search_args(spot)
+            )
+            publisher.publish(";".join(object_info_list))
+            # TODO: Publish MaskRCNN viz
+            cv2.imshow("Image", visulize_img)
+            cv2.waitKey(100)
 
 
 if __name__ == "__main__":
     print(
         "Please see the example in spot_rl_experiments/experiments/skill_test/test_spot_to_aria.py"
     )
+    rospy.init_node("Test_heuristic_methods")
 
+    detection_topic = "/dwg_obj_pub"
+    # Creating a publisher for Multiclass owlvit detecetions
+    detection_publisher = rospy.Publisher(
+        detection_topic, String, queue_size=1, tcp_nodelay=True
+    )
     spot = Spot("heuristic_nav")
     with spot.get_lease(hijack=True):
         spot.power_robot()
-        scan_arm(spot)
+        spot.open_gripper()
+        scan_base(spot, publisher=detection_publisher)

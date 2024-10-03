@@ -12,13 +12,14 @@ import traceback
 import numpy as np
 import rospy
 from spot_rl.envs.skill_manager import SpotSkillManager
-from spot_rl.utils.heuristic_nav import scan_arm
+from spot_rl.utils.heuristic_nav import scan_arm, scan_base
 from spot_rl.utils.retrieve_robot_poses_from_cg import get_view_poses
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 from spot_rl.utils.utils import ros_topics as rt
 from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
     get_navigation_points,
 )
+from std_msgs.msg import String
 
 
 class SpotRosSkillExecutor:
@@ -29,6 +30,12 @@ class SpotRosSkillExecutor:
         self._cur_skill_name_input = None
         self._is_robot_on_dock = False
         self.reset_image_viz_params()
+
+        # Creating a publisher for Multiclass owlvit detecetions
+        self.detection_topic = "/dwg_obj_pub"
+        self.detection_publisher = rospy.Publisher(
+            self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        )
 
         # Listen to cancel msg
         self.end = False
@@ -136,7 +143,7 @@ class SpotRosSkillExecutor:
                 rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
                 time.sleep(1)
                 print("Scanning area with arm")
-                scan_arm(self.spotskillmanager.spot)
+                scan_arm(self.spotskillmanager.spot, publisher=self.detection_publisher)
             else:
                 print("Will not scan arm")
             rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
@@ -215,7 +222,7 @@ class SpotRosSkillExecutor:
                 rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
                 time.sleep(1)
                 print("Scanning area with arm")
-                scan_arm(self.spotskillmanager.spot)
+                scan_arm(self.spotskillmanager.spot, publisher=self.detection_publisher)
             else:
                 print("Will not scan arm")
             rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
