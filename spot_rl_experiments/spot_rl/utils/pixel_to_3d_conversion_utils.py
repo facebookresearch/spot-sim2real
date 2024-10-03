@@ -9,7 +9,15 @@ def sample_patch_around_point(
     """
     Samples a median depth in 5x5 patch around given x, y (pixel location in depth image array) as center in raw depth image
     """
-    h, w = depth_raw.shape
+    if isinstance(depth_raw, np.ndarray):
+        h, w = depth_raw.shape
+    elif isinstance(depth_raw, tuple):
+        depth_raw = depth_raw[0]
+        h, w = depth_raw.shape
+    else:
+        raise TypeError(
+            f"Expected depth_raw to be nd_array or tuple but got {type(depth_raw)}"
+        )
     x1, x2 = cx - patch_size // 2, cx + patch_size // 2
     y1, y2 = cy - patch_size // 2, cy + patch_size // 2
     x1, x2 = np.clip([x1, x2], 0, w)

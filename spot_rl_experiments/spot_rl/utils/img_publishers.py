@@ -622,7 +622,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
                     print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
             except Exception as e:
-                print(f"Issue of predicting location: {e}")
+                print(f"Issue of predicting location for {class_label} : {e}")
                 continue
 
             if np.isnan(point_in_gripper).any():
@@ -640,8 +640,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             )
 
         # publish data
-        self.publish_new_detection(";".join(object_info))
-        self.publish_viz_img(viz_img, header)
+        # self.publish_new_detection(";".join(object_info))
+        # self.publish_viz_img(viz_img, header)
 
         stopwatch.print_stats()
 
@@ -686,8 +686,8 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # Add new classes here to the model
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
-        # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
-        multi_classes = rospy.get_param("/multi_class_object_target").split(",")
+        multi_classes = ["ball", "cup"]
+        # multi_classes = rospy.get_param("/multi_class_object_target").split(",")
         self.owlvit.update_label([multi_classes])
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(
