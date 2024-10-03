@@ -104,8 +104,6 @@ class OwlVit:
         img: an open cv image in (H, W, C) format
         multi_objects_per_label: if want to return multiple detections per label
         """
-        # img = img.to(self.device)
-
         inputs = self.processor(text=self.labels, images=img, return_tensors="pt")
         target_sizes = (
             torch.Tensor([[max(img.shape[:2]), max(img.shape[:2])]]).to(self.device)
@@ -127,9 +125,6 @@ class OwlVit:
             results = self.processor.post_process_object_detection(
                 outputs=outputs, target_sizes=target_sizes
             )
-        # img = img.to('cpu')
-        # if self.show_img:
-        #    self.show_img_with_overlaid_bounding_boxes(img, results)
 
         return (
             self.get_confident_bounding_box_per_label(results)
