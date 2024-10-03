@@ -625,12 +625,11 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 )
             except Exception as e:
                 print(f"Issue of predicting location for {class_label} : {e}")
-                print(traceback.format_exc())
                 continue
 
         # publish data
-        self.publish_new_detection(";".join(object_info))
-        self.publish_viz_img(viz_img, header)
+        # self.publish_new_detection(";".join(object_info))
+        # self.publish_viz_img(viz_img, header)
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
