@@ -33,7 +33,12 @@ if __name__ == "__main__":
         spotskillmanager.spot.close_gripper()
         input("waiting for user to get ready with camera")
 
-        spotskillmanager.place(place_target, is_local=is_local, visualize=False,enable_waypoint_estimation=enable_estimation_before_place)
+        spotskillmanager.place(
+            place_target,
+            is_local=is_local,
+            visualize=False,
+            enable_waypoint_estimation=enable_estimation_before_place,
+        )
         skill_log = spotskillmanager.place_controller.skill_result_log
         if "num_steps" not in skill_log:
             skill_log["num_steps"] = 0
