@@ -1137,6 +1137,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=0.3)
         time.sleep(0.6)
 
+    #New function to turn wrist to clip it to 160 deg (as per BD Documentation)
+    def turn_wrist_place(self):
+        arm_positions = np.array(self.current_arm_pose)
+        arm_positions[-1] = arm_positions[-1] + np.deg2rad(90)
+        arm_positions=wrap_heading(arm_positions,wrap_angle=160)
+        self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=0.3)
+        time.sleep(0.6)
+
+
 
 def get_obj_dist_and_bbox(obj_bbox, arm_depth):
     x1, y1, x2, y2 = obj_bbox

@@ -1711,7 +1711,7 @@ def draw_crosshair(img):
 
     return img
 
-
-def wrap_heading(heading):
+def wrap_heading(heading, wrap_angle=180):
     """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
-    return (heading + np.pi) % (2 * np.pi) - np.pi
+    wrap_angle_rad = np.deg2rad(wrap_angle)
+    return (heading + wrap_angle_rad) % (2 * wrap_angle_rad) - wrap_angle_rad
