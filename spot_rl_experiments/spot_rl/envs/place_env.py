@@ -100,14 +100,22 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Place steps
         self._time_step = 0
 
+        # Check whether its ee env
+        self.ee_env = False
+
     def decide_init_arm_joint(self, ee_orientation_at_grasping):
         """Decide the place location"""
 
         # User does not set the gripper orientation
         if ee_orientation_at_grasping is None:
-            self.initial_arm_joint_angles = np.deg2rad(
-                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
-            )
+            if self.is_ee_env:
+                self.initial_arm_joint_angles = np.deg2rad(
+                    self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE
+                )
+            else:
+                self.initial_arm_joint_angles = np.deg2rad(
+                    self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
+                )
         else:
             # Get the pitch and yaw
             pitch = ee_orientation_at_grasping[1]
@@ -244,14 +252,7 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         # Define End Effector Policy Scale Values
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
-
-    def decide_init_arm_joint(self, ee_orientation_at_grasping):
-        """Decide the place location, using specific angles for EE env"""
-        # Use INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE for the initial angles
-        if ee_orientation_at_grasping is None:
-            self.initial_arm_joint_angles = np.deg2rad(
-                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE
-            )
+        self.ee_env = True
 
     def get_observations(self):
         observations = super().get_observations()
