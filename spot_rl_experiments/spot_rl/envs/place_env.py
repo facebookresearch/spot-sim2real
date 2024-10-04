@@ -164,6 +164,10 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Place command is issued if the place action is smaller than zero
         place = action_dict.get("grip_action", None) <= 0.0
 
+        if place:
+            self.turn_wrist_place()
+            print("POSE")
+
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
         cur_place_sensor_xyz = self.get_place_sensor(True)
         if (
@@ -174,10 +178,12 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             < 0.25
             and self._time_step >= 50
         ):
+            self.turn_wrist_place()
             place = True
 
         # If the time steps have been passed for 75 steps, we will just place the object
         if self._time_step >= 75:
+            self.turn_wrist_place()
             place = True
 
         self._time_step += 1
@@ -238,6 +244,14 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         # Define End Effector Policy Scale Values
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
+    
+    def decide_init_arm_joint(self, ee_orientation_at_grasping):
+        """Decide the place location, using specific angles for EE env"""
+        # Use INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE for the initial angles
+        if ee_orientation_at_grasping is None:
+            self.initial_arm_joint_angles = np.deg2rad(
+                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE
+            )
 
     def get_observations(self):
         observations = super().get_observations()
