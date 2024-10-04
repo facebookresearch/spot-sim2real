@@ -77,6 +77,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
         self._cab_door = "left"
 
     def reset(self, goal_dict=None, *args, **kwargs):
+        rospy.set_param("is_gripper_blocked", 0)
         self.spot.open_gripper()
 
         # Move arm to initial configuration
@@ -395,7 +396,6 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             self.approach_handle_and_grasp()
             # If we can do IK, then we call it successful
             done = self._success
-            rospy.set_param("/pick_lock_on", False)
 
         return observations, reward, done, info
 

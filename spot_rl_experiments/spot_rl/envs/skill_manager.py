@@ -617,6 +617,10 @@ class SpotSkillManager:
             place_target_location[0] -= walk_distance
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
+
+        # Set place target location for viz
+        rospy.set_param("place_target_xyz", f"{place_x},{place_y},{place_z}|")
+
         status, message = self.place(
             place_x,
             place_y,

@@ -246,6 +246,10 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             succeded, msg = True, rospy.get_param("human_state", "standing")
             self.reset_skill_name_input(skill_name, succeded, msg)
+        elif skill_name == "dock":
+            print(f"current skill_name {skill_name} skill_input {skill_input}")
+            self.spotskillmanager.dock()
+            rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
 
 
 def main():
