@@ -1145,6 +1145,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=0.3)
         time.sleep(0.6)
 
+
 def get_obj_dist_and_bbox(obj_bbox, arm_depth):
     x1, y1, x2, y2 = obj_bbox
     x1 = max(int(float(x1 - LEFT_CROP) * WIDTH_SCALE), 0)
