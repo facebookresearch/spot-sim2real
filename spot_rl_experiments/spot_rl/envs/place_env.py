@@ -244,7 +244,7 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         # Define End Effector Policy Scale Values
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
-    
+
     def decide_init_arm_joint(self, ee_orientation_at_grasping):
         """Decide the place location, using specific angles for EE env"""
         # Use INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE for the initial angles
