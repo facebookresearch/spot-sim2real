@@ -36,7 +36,11 @@ class FPSCounter:
 
 class RosbridgeBSONTCPClient:
     def __init__(
-        self, host="localhost", port=9090, timeoutinsec: int = 60, verbose: bool = False
+        self,
+        host="localhost",
+        port=9090,
+        timeoutinsec: int = None,
+        verbose: bool = False,
     ) -> None:
         self.host: str = host
         self.port: int = port
@@ -53,7 +57,9 @@ class RosbridgeBSONTCPClient:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Backup for candidate socket selection
         # self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        self.socket.settimeout(self.timeoutsec)
+        self.socket.settimeout(
+            self.timeoutsec
+        )  # NOTE: We want to set indefinite timeout for all subscribers of ros_tcp
         self.socket.connect((self.host, self.port))
         self.socket_id = self.socket.fileno()
         self.connected = True
