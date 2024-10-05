@@ -146,7 +146,7 @@ class SpotRosSkillExecutor:
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points
             nav_pts = get_navigation_points(
-                view_poses, bbox_center, bbox_extent, [x, y], False, "pathplanning.png"
+                view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
             )
 
             # Sequentially give the point
@@ -186,13 +186,13 @@ class SpotRosSkillExecutor:
             print(
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
             )
-            if succeded and not robot_holding:
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
-                time.sleep(1)
-                print("Scanning area with arm")
-                scan_arm(self.spotskillmanager.spot)
-            else:
-                print("Will not scan arm")
+            # if succeded and not robot_holding:
+            #     rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+            #     time.sleep(1)
+            #     print("Scanning area with arm")
+            #     scan_arm(self.spotskillmanager.spot)
+            # else:
+            #     print("Will not scan arm")
             rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message

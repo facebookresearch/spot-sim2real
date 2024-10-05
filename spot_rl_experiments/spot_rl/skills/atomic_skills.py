@@ -571,7 +571,7 @@ class Pick(Skill):
         block_percentage_threshold = 0.65
         # check the value -- the gripper close state is about 0.48
         block_ratio = np.sum(hand_depth < block_value_threshold) / hand_depth.size
-        is_object_block_camera = block_ratio >= block_percentage_threshold
+        is_object_block_camera = True  # block_ratio >= block_percentage_threshold
 
         print(
             f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {block_percentage_threshold}"
