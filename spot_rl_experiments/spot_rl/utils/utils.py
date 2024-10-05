@@ -178,7 +178,7 @@ def arr2str(arr):
 
 def calculate_height(object_tag):
     default_config = construct_config_for_semantic_place()
-    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations.json"
+    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations_cleaned.json"
     default_height = default_config.HEIGHT_THRESHOLD
 
     if osp.isfile(json_file_path):
