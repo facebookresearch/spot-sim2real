@@ -216,7 +216,7 @@ def convert_path_to_real_waypoints(path, min_x, min_y):
         # print(new_waypoint)
         path_converted.append(new_waypoint)
 
-    assert len(path_converted) > 2
+    assert len(path_converted) >= 2
 
     filter_path = []
     for ii in range(len(path_converted) - 2):
