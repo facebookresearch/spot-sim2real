@@ -194,3 +194,7 @@ ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
 
 # Prints
 VERBOSE: True
+
+# Check pick success condition
+BLOCK_VALUE_THRESHOLD: 0.1 # The value of the scaled depth image to be considered as being blocked by object
+BLOCK_PERCENTAGE_THRESHOLD: 0.65 # The percentage of the image that is being blocked to be considered as object is hold. Use zero for no check

@@ -566,15 +566,15 @@ class Pick(Skill):
         hand_image_responses = self.spot.get_hand_image()
         imgs_list = [image_response_to_cv2(r) for r in hand_image_responses]
         hand_depth = imgs_list[1] / 1000.0  # from mm to meter
-        # Meta parameters
-        block_value_threshold = 0.1
-        block_percentage_threshold = 0.65
-        # check the value -- the gripper close state is about 0.48
-        block_ratio = np.sum(hand_depth < block_value_threshold) / hand_depth.size
-        is_object_block_camera = block_ratio >= block_percentage_threshold
+
+        # Check the value -- the gripper close state is about 0.48
+        block_ratio = (
+            np.sum(hand_depth < self.config.BLOCK_VALUE_THRESHOLD) / hand_depth.size
+        )
+        is_object_block_camera = block_ratio >= self.config.BLOCK_PERCENTAGE_THRESHOLD
 
         print(
-            f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {block_percentage_threshold}"
+            f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {self.config.BLOCK_PERCENTAGE_THRESHOLD}"
         )
 
         check_pick_success = (
@@ -593,6 +593,11 @@ class Pick(Skill):
         if check_pick_success:
             status = True
             message = "Successfully picked the target object"
+        else:
+            # If pick fails, we open the gripper again to ensure the gripper state is correct
+            self.spot.open_gripper()
+            time.sleep(0.5)
+
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
