@@ -247,7 +247,7 @@ selected_nodes = {
         "orginal_class_name": "ball plush toy",
         "on_top_of": "dresser",
     },
-    "lamp": {
+    "lamp_left": {
         "id": 19,
         "object_tag": "lamp",
         "bbox_extent": [0.7, 0.4, 0.1],
@@ -289,7 +289,7 @@ selected_nodes = {
         "category_tag": "furniture",
         "orginal_class_name": "pillow",
     },
-    "lamp": {
+    "lamp_right": {
         "id": 23,
         "object_tag": "lamp",
         "bbox_extent": [0.7, 0.5, 0.4],
@@ -308,28 +308,28 @@ if __name__ == "__main__":
     unique_ids = list(
         set(
             [
-                node_data["id"]
-                for _, node_data in selected_nodes.items()
-                if isinstance(node_data["id"], int)
+                node_data["id"]  # type: ignore
+                for _, node_data in selected_nodes.items()  # type: ignore
+                if isinstance(node_data["id"], int)  # type: ignore
             ]
         )
     )
     unique_ids = sorted(unique_ids)
 
     for node_name, node_data in selected_nodes.items():
-        if "on_top_of" not in node_data:
+        if "on_top_of" not in node_data:  # type: ignore
             continue
-        parent_node_name = node_data["on_top_of"]
+        parent_node_name = node_data["on_top_of"]  # type: ignore
         parent_node_data = selected_nodes[parent_node_name]
 
-        node_data["object_tag"] = node_name.replace("_", " ")
-        parent_node_data["object_tag"] = parent_node_name.replace("_", " ")
+        node_data["object_tag"] = node_name.replace("_", " ")  # type: ignore
+        parent_node_data["object_tag"] = parent_node_name.replace("_", " ")  # type: ignore
 
         objects = [node_data, parent_node_data]
         for i, object in enumerate(objects):
-            if isinstance(object["id"], str) and "not present" in object["id"]:
-                objects[i]["id"] = unique_ids[-1] + 1
-                unique_ids.append(objects[i]["id"])
+            if isinstance(object["id"], str) and "not present" in object["id"]:  # type: ignore
+                objects[i]["id"] = unique_ids[-1] + 1  # type: ignore
+                unique_ids.append(objects[i]["id"])  # type: ignore
 
         relation_node = {
             "object1": objects[0],

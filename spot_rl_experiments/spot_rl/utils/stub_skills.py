@@ -80,7 +80,7 @@ def execute_skills():
             )
 
             # Get the navigation points
-            nav_pts = get_navigation_points(
+            _ = get_navigation_points(
                 view_poses,
                 bbox_center,
                 bbox_extent,
