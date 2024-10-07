@@ -220,7 +220,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             (img.shape[0], int(img.shape[1] / 4), img.shape[2]), dtype=np.uint8
         )
         display_img = self.overlay_text(
-            display_img, information_string, color=(255, 0, 0), size=1.5, thickness=4
+            display_img, information_string, color=(255, 0, 0), size=0.9, thickness=4
         )
         img = resize_to_tallest([img, display_img], hstack=True)
 
