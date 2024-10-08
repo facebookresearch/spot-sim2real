@@ -163,7 +163,7 @@ class Skill:
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
             if "should_dock" in goal_dict:
-                action_dict['should_dock'] = goal_dict['should_dock']
+                action_dict["should_dock"] = goal_dict["should_dock"]
             prev_pose = [
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
@@ -217,12 +217,12 @@ class Skill:
         """
         status = False
         message = ""
-        try:
-            status, message = self.execute_rl_loop(goal_dict=goal_dict)
-            print(f"Feedback from skill: {message}")
-        except Exception as e:
-            message = f"Error encountered in skill execution - {e}"
-            conditional_print(message=message, verbose=self.verbose)
+        # try:
+        status, message = self.execute_rl_loop(goal_dict=goal_dict)
+        print(f"Feedback from skill: {message}")
+        # except Exception as e:
+        ##    message = f"Error encountered in skill execution - {e}"
+        #    conditional_print(message=message, verbose=self.verbose)
 
         return status, message
 

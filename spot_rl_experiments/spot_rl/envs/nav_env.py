@@ -3,6 +3,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import os
+
 import magnum as mn
 import numpy as np
 import rospy
@@ -10,7 +12,6 @@ from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_wrapper.spot import Spot, wrap_heading
-import os
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 549))
 
@@ -166,16 +167,17 @@ class SpotNavEnv(SpotBaseEnv):
 
     def step(self, *args, **kwargs):
         observations, reward, done, info = super().step(*args, **kwargs)
-        print('NAV ENV ARGS: ', args)
         should_dock = False
-        if "should_dock" in args[0]:
-            should_dock = args[0]["should_dock"]
-        
+        if "should_dock" in kwargs["action_dict"]:
+            should_dock = kwargs["action_dict"]["should_dock"]
+        print(f"should_dock {should_dock}")
         if should_dock:
             try:
-                self.spot.dock(dock=DOCK_ID, home_robot=True)
-            except:
-                pass
+                print("try  to dock")
+                self.spot.dock(dock_id=DOCK_ID, home_robot=True)
+                print("dock suc!!")
+            except Exception as e:
+                print(f"error {e}")
 
         # Slow the base down if we are close to the nav target to slow down the the heading changes
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
