@@ -198,3 +198,4 @@ VERBOSE: True
 # Check pick success condition
 BLOCK_VALUE_THRESHOLD: 0.1 # The value of the scaled depth image to be considered as being blocked by object
 BLOCK_PERCENTAGE_THRESHOLD: 0.65 # The percentage of the image that is being blocked to be considered as object is hold. Use zero for no check
+GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING: 10 # in percentage

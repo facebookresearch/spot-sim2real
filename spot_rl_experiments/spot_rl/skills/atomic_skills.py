@@ -573,14 +573,28 @@ class Pick(Skill):
         )
         is_object_block_camera = block_ratio >= self.config.BLOCK_PERCENTAGE_THRESHOLD
 
+        # Check the openness of the gripper
+        # This value is between 0 (close) and 100 (open)
+        _gripper_open_percentage = (
+            self.spot.robot_state_client.get_robot_state().manipulator_state.gripper_open_percentage
+        )
+        is_gripper_open_slightly = (
+            _gripper_open_percentage
+            > self.config.GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING
+        )
+
         print(
             f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {self.config.BLOCK_PERCENTAGE_THRESHOLD}"
+        )
+        print(
+            f"is_gripper_open_slightly: {is_gripper_open_slightly} with gripper open {_gripper_open_percentage}% and threshold {self.config.GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING}"
         )
 
         check_pick_success = (
             self.env.grasp_attempted
             and success_status_from_user_feedback
             and is_object_block_camera
+            and is_gripper_open_slightly
         )
 
         # Update result log
