@@ -585,48 +585,47 @@ if __name__ == "__main__":
         spotskillmanager = None
 
     for receptacle_name in bboxs_info:
-        if receptacle_name in ["bed"]:
-            print(f"Current Receptacle {receptacle_name}")
-            bbox_info = bboxs_info[receptacle_name]
-            if isinstance(bbox_info["object_tag"], str):
-                bbox_info["object_tag"] = [bbox_info["object_tag"]]
-            # Get the view poses
-            view_poses, _ = get_view_poses(
-                np.array(bbox_info["bbox_center"]),
-                np.array(bbox_info["bbox_extent"]),
-                bbox_info["object_tag"],
-                bbox_info.get("id", None),
-                VISUALIZE,
-            )
-            # Get the robot x, y, yaw
+        print(f"Current Receptacle {receptacle_name}")
+        bbox_info = bboxs_info[receptacle_name]
+        if isinstance(bbox_info["object_tag"], str):
+            bbox_info["object_tag"] = [bbox_info["object_tag"]]
+        # Get the view poses
+        view_poses, _ = get_view_poses(
+            np.array(bbox_info["bbox_center"]),
+            np.array(bbox_info["bbox_extent"]),
+            bbox_info["object_tag"],
+            bbox_info.get("id", None),
+            VISUALIZE,
+        )
+        # Get the robot x, y, yaw
 
-            # Get the navigation points
-            if spotskillmanager is not None and run_real_hardware_nav:
-                curr_x, curr_y, _ = spotskillmanager.spot.get_xy_yaw()
-            else:
-                curr_x, curr_y = 1, 0
+        # Get the navigation points
+        if spotskillmanager is not None and run_real_hardware_nav:
+            curr_x, curr_y, _ = spotskillmanager.spot.get_xy_yaw()
+        else:
+            curr_x, curr_y = 1, 0
 
-            nav_pts = get_navigation_points(
-                view_poses,
-                np.array(bbox_info["bbox_center"]),
-                np.array(bbox_info["bbox_extent"]),
-                [curr_x, curr_y],
-                VISUALIZE,
-                osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
-            )
-            print(
-                f"Final Nav point for {receptacle_name}:  {*nav_pts[-1][:2], np.rad2deg(nav_pts[-1][-1])}"
-            )
-            if spotskillmanager is not None and run_real_hardware_nav:
-                if len(nav_pts) > 0:
-                    final_pt_i = len(nav_pts) - 1
-                    num_steps = 0
-                    for pt_i, pt in enumerate(nav_pts):
-                        x, y, yaw = pt
-                        if pt_i == final_pt_i:
-                            # Do normal point nav with yaw for the final location
-                            succeded, msg = spotskillmanager.nav(x, y, yaw, False)
-                        else:
-                            # Do dynamic point yaw here for the intermediate points
-                            succeded, msg = spotskillmanager.nav(x, y)
-                        spotskillmanager.nav_controller.skill_result_log
+        nav_pts = get_navigation_points(
+            view_poses,
+            np.array(bbox_info["bbox_center"]),
+            np.array(bbox_info["bbox_extent"]),
+            [curr_x, curr_y],
+            VISUALIZE,
+            osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
+        )
+        print(
+            f"Final Nav point for {receptacle_name}:  {*nav_pts[-1][:2], np.rad2deg(nav_pts[-1][-1])}"
+        )
+        if spotskillmanager is not None and run_real_hardware_nav:
+            if len(nav_pts) > 0:
+                final_pt_i = len(nav_pts) - 1
+                num_steps = 0
+                for pt_i, pt in enumerate(nav_pts):
+                    x, y, yaw = pt
+                    if pt_i == final_pt_i:
+                        # Do normal point nav with yaw for the final location
+                        succeded, msg = spotskillmanager.nav(x, y, yaw, False)
+                    else:
+                        # Do dynamic point yaw here for the intermediate points
+                        succeded, msg = spotskillmanager.nav(x, y)
+                    spotskillmanager.nav_controller.skill_result_log
