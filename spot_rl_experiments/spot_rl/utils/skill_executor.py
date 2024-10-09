@@ -3,6 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import argparse
+import json
 import os
 import os.path as osp
 import time
@@ -19,6 +20,8 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
     get_navigation_points,
 )
 
+LOG_PATH = "/home/achuthan/Desktop/spot-sim2real/spot_rl_experiments/experiments/skill_test/logs/"
+
 
 class SpotRosSkillExecutor:
     """This class reads the ros buffer to execute skills"""
@@ -27,6 +30,9 @@ class SpotRosSkillExecutor:
         self.spotskillmanager: SpotSkillManager = spotskillmanager
         self._cur_skill_name_input = None
         self.reset_image_viz_params()
+        self.episode_log = {"actions": []}
+        self.total_steps = 0
+        self.total_time = 0
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -66,7 +72,10 @@ class SpotRosSkillExecutor:
         """Execute skills."""
 
         # Get the current skill name
+        skill_log = {"success": False, "num_steps": 0}
         skill_name, skill_input = get_skill_name_and_input_from_ros()
+        final_success = True
+        metric_list = []
 
         robot_holding = (
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
@@ -117,6 +126,10 @@ class SpotRosSkillExecutor:
             rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message
+            skill_log = self.spotskillmanager.nav_controller.skill_result_log
+            if "num_steps" not in skill_log:
+                skill_log["num_steps"] = 0
+            self.episode_log["actions"].append({"nav": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
             # Reset the navigation target
             rospy.set_param("nav_target_xyz", "None,None,None|")
@@ -178,6 +191,11 @@ class SpotRosSkillExecutor:
                     else:
                         # Do dynamic point yaw here for the intermediate points
                         succeded, msg = self.spotskillmanager.nav(x, y)
+                    skill_log = self.spotskillmanager.nav_controller.skill_result_log
+                    if "num_steps" not in skill_log:
+                        skill_log["num_steps"] = 0
+                    self.episode_log["actions"].append({"nav_viewpose": skill_log})
+
             else:
                 succeded = False
                 msg = "Cannot navigate to the point"
@@ -193,6 +211,7 @@ class SpotRosSkillExecutor:
             #     scan_arm(self.spotskillmanager.spot)
             # else:
             #     print("Will not scan arm")
+
             rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message
@@ -211,14 +230,20 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = pick_msg
+            skill_log = self.spotskillmanager.gaze_controller.skill_result_log
+            if "num_steps" not in skill_log:
+                skill_log["num_steps"] = 0
+            self.episode_log["actions"].append({"pick": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_object", "None")
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            rospy.set_param("is_gripper_blocked", 0)
             self.reset_skill_msg()
+            breakpoint()
             if self.spotskillmanager.allow_semantic_place:
+                print("Here")
                 # Call semantic place skills
-                rospy.set_param("is_gripper_blocked", 0)
                 succeded, msg = self.spotskillmanager.place(
                     skill_input,
                     is_local=True,
@@ -230,6 +255,11 @@ class SpotRosSkillExecutor:
                 succeded, msg = self.spotskillmanager.place(
                     0.6, 0.0, 0.4, is_local=True
                 )
+            skill_log = self.spotskillmanager.place_controller.skill_result_log
+            if "num_steps" not in skill_log:
+                skill_log["num_steps"] = 0
+            self.episode_log["actions"].append({"place": skill_log})
+
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -246,6 +276,19 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             succeded, msg = True, rospy.get_param("human_state", "standing")
             self.reset_skill_name_input(skill_name, succeded, msg)
+
+        self.total_steps += len(metric_list)
+        self.total_time += sum(
+            metric["time_taken"] for metric in metric_list if "time_taken" in metric
+        )
+        self.episode_log["total_time"] = self.total_time
+        self.episode_log["final_success"] = final_success and skill_log["success"]
+        self.episode_log["total_steps"] = self.total_steps
+
+    def save_logs_as_json(self):
+        file_path = osp.join(LOG_PATH, "E2E_L3_IR32_children.json")
+        with open(file_path, "w") as file:
+            json.dump(self.episode_log, file, indent=4)
 
 
 def main():
@@ -265,6 +308,7 @@ def main():
         # While loop to run in the background
         while not rospy.is_shutdown():
             executor.execute_skills()
+            executor.save_logs_as_json()
     except Exception as e:
         print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
 
