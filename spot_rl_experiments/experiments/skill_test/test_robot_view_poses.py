@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 import os
 import os.path as osp
 

@@ -225,6 +225,8 @@ class SpotRosSkillExecutor:
                     visualize=False,
                     enable_waypoint_estimation=True,
                 )
+                if succeded:
+                    rospy.set_param("is_gripper_blocked", 0)
             else:
                 # Use the following for the hardcode waypoint for static place
                 succeded, msg = self.spotskillmanager.place(
