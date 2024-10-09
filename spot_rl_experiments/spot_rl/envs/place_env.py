@@ -13,9 +13,8 @@ import quaternion
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
-from spot_wrapper.spot import Spot
+from spot_wrapper.spot import Spot, wrap_heading
 from spot_wrapper.utils import angle_between_quat
-from spot_wrapper.spot import wrap_heading
 
 
 class SpotPlaceEnv(SpotBaseEnv):
@@ -170,8 +169,8 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         if (
             abs(cur_place_sensor_xyz[2]) < 0.05
             and np.linalg.norm(
-            np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
-        )
+                np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
+            )
             < 0.25
             and self._time_step >= 50
         ):
@@ -189,7 +188,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         place = action_dict.get("grip_action", None) <= 0.0
 
         if not place:
-            place = self.heuristic_should_place(place)
+            place = self.heuristic_should_place()
 
         self._time_step += 1
 
@@ -282,9 +281,7 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         action_dict["semantic_place"] = place
 
         # Set the travel time scale so that the arm movement is smooth
-        return super().step(
-            action_dict, travel_time_scale=1.0 / 0.9 * 1.75, *args, **kwargs
-        )
+        return super().step(action_dict, *args, **kwargs)
 
     def get_observations(self):
         observations = super().get_observations()
