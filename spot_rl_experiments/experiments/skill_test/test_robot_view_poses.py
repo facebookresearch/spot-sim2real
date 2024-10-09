@@ -574,7 +574,7 @@ if __name__ == "__main__":
     if in_fre_lab:
         bboxs_info = bbox_info_static_graph_v2
     else:
-        bboxs_info = bboxs_info_nyc
+        bboxs_info = bboxs_info_nyc # type: ignore
 
     if run_real_hardware_nav:
         spotskillmanager = SpotSkillManager(
@@ -586,7 +586,7 @@ if __name__ == "__main__":
     for receptacle_name in bboxs_info:
         print(f"Current Receptacle {receptacle_name}")
         bbox_info = bboxs_info[receptacle_name]
-        if isinstance(bbox_info["object_tag"], str):
+        if isinstance(bbox_info["object_tag"], str): #type : ignore
             bbox_info["object_tag"] = [bbox_info["object_tag"]]
         # Get the view poses
         view_poses, _ = get_view_poses(
