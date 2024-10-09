@@ -329,7 +329,9 @@ class SpotRosSkillExecutor:
             rospy.set_param("is_gripper_blocked", 0)
             rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             self.reset_skill_msg()
+            breakpoint()
             if self.spotskillmanager.allow_semantic_place:
+                print("Here")
                 # Call semantic place skills
                 succeded, msg = self.spotskillmanager.place(
                     skill_input,
