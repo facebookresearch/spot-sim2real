@@ -15,6 +15,7 @@ from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import angle_between_quat
+from spot_wrapper.spot import wrap_heading
 
 
 class SpotPlaceEnv(SpotBaseEnv):
@@ -100,9 +101,6 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         # Place steps
         self._time_step = 0
 
-        # Check whether its ee env
-        self.ee_env = False
-
     def decide_init_arm_joint(self, ee_orientation_at_grasping):
         """Decide the place location"""
 
@@ -165,34 +163,33 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         self.placed = False
         return observations
 
-    def step(self, action_dict: Dict[str, Any], *args, **kwargs):
-
+    def heuristic_should_place(self):
         place = False
-
-        # Place command is issued if the place action is smaller than zero
-        place = action_dict.get("grip_action", None) <= 0.0
-
-        if place:
-            self.turn_wrist_place()
-            print("POSE")
-
         # If the time steps have been passed for 50 steps and gripper is in the desired place location
         cur_place_sensor_xyz = self.get_place_sensor(True)
         if (
             abs(cur_place_sensor_xyz[2]) < 0.05
             and np.linalg.norm(
-                np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
-            )
+            np.array([cur_place_sensor_xyz[0], cur_place_sensor_xyz[1]])
+        )
             < 0.25
             and self._time_step >= 50
         ):
-            self.turn_wrist_place()
             place = True
 
         # If the time steps have been passed for 75 steps, we will just place the object
         if self._time_step >= 75:
-            self.turn_wrist_place()
             place = True
+        return place
+
+    def step(self, action_dict: Dict[str, Any], *args, **kwargs):
+        place = False
+
+        # Place command is issued if the place action is smaller than zero
+        place = action_dict.get("grip_action", None) <= 0.0
+
+        if not place:
+            place = self.heuristic_should_place(place)
 
         self._time_step += 1
 
@@ -253,6 +250,41 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
         self.ee_env = True
+
+    def decide_init_arm_joint(self, ee_orientation_at_grasping):
+        self.initial_arm_joint_angles = np.deg2rad(
+            self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE
+        )
+
+    # New function to turn wrist to clip it to 160 deg (as per BD Documentation)
+    def turn_wrist_place(self):
+        arm_positions = np.array(self.current_arm_pose)
+        arm_positions[-1] = arm_positions[-1] + np.deg2rad(90)
+        arm_positions = wrap_heading(arm_positions, wrap_angle=160)
+        self.spot.set_arm_joint_positions(positions=arm_positions, travel_time=0.3)
+        time.sleep(0.6)
+
+    def step(self, action_dict: Dict[str, Any], *args, **kwargs):
+        place = False
+
+        # Place command is issued if the place action is smaller than zero
+        place = action_dict.get("grip_action", None) <= 0.0
+        if not place:
+            place = self.heuristic_should_place()
+
+        if place:
+            self.turn_wrist_place()
+
+        self._time_step += 1
+
+        # Write into action dict
+        action_dict["place"] = place
+        action_dict["semantic_place"] = place
+
+        # Set the travel time scale so that the arm movement is smooth
+        return super().step(
+            action_dict, travel_time_scale=1.0 / 0.9 * 1.75, *args, **kwargs
+        )
 
     def get_observations(self):
         observations = super().get_observations()
