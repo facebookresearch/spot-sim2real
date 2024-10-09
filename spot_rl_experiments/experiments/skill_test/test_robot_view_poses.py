@@ -1,3 +1,4 @@
+# mypy: ignore-errors
 import os
 import os.path as osp
 
@@ -572,9 +573,9 @@ if __name__ == "__main__":
         from spot_rl.envs.skill_manager import SpotSkillManager
 
     if in_fre_lab:
-        bboxs_info = bbox_info_static_graph_v2
+        bboxs_info = bbox_info_static_graph_v2  # type: ignore
     else:
-        bboxs_info = bboxs_info_nyc # type: ignore
+        bboxs_info = bboxs_info_nyc  # type: ignore
 
     if run_real_hardware_nav:
         spotskillmanager = SpotSkillManager(
@@ -584,16 +585,16 @@ if __name__ == "__main__":
         spotskillmanager = None
 
     for receptacle_name in bboxs_info:
-        print(f"Current Receptacle {receptacle_name}")
-        bbox_info = bboxs_info[receptacle_name]
-        if isinstance(bbox_info["object_tag"], str): #type : ignore
-            bbox_info["object_tag"] = [bbox_info["object_tag"]]
+        print(f"Current Receptacle {receptacle_name}")  # type : ignore
+        bbox_info = bboxs_info[receptacle_name]  # type : ignore
+        if isinstance(bbox_info["object_tag"], str):  # type : ignore
+            bbox_info["object_tag"] = [bbox_info["object_tag"]]  # type: ignore
         # Get the view poses
         view_poses, _ = get_view_poses(
-            np.array(bbox_info["bbox_center"]),
-            np.array(bbox_info["bbox_extent"]),
-            bbox_info["object_tag"],
-            bbox_info.get("id", None),
+            np.array(bbox_info["bbox_center"]),  # type: ignore
+            np.array(bbox_info["bbox_extent"]),  # type: ignore
+            bbox_info["object_tag"],  # type: ignore
+            bbox_info.get("id", None),  # type: ignore
             VISUALIZE,
         )
         # Get the robot x, y, yaw
@@ -606,8 +607,8 @@ if __name__ == "__main__":
 
         nav_pts = get_navigation_points(
             view_poses,
-            np.array(bbox_info["bbox_center"]),
-            np.array(bbox_info["bbox_extent"]),
+            np.array(bbox_info["bbox_center"]),  # type: ignore
+            np.array(bbox_info["bbox_extent"]),  # type: ignore
             [curr_x, curr_y],
             VISUALIZE,
             osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
