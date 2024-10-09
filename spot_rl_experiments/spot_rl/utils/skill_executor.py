@@ -33,6 +33,7 @@ class SpotRosSkillExecutor:
         This is useful for returning the message (e.g., if skill fails or not) from spot-sim2real to high-level planner.
         """
         rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
+        rospy.set_param("/replanning", f"{str(time.time())},{False}")
 
     def reset_skill_name_input(self, skill_name, succeded, msg):
         """Reset skill name and input, and publish the message"""
@@ -42,6 +43,7 @@ class SpotRosSkillExecutor:
         rospy.set_param(
             "/skill_name_suc_msg", f"{str(time.time())},{skill_name},{succeded},{msg}"
         )
+        rospy.set_param("/replanning", f"{str(time.time())},{succeded}")
 
     def reset_image_viz_params(self):
         """Reset the image viz params"""
@@ -262,6 +264,7 @@ def main():
     # Clean up the ros parameters
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
+    rospy.set_param("/replanning", f"{str(time.time())},{False}")
 
     # Call the skill manager
     spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
