@@ -66,6 +66,8 @@ def populate_quad_tree():
                     "object_tag": caption_data["response"]["object_tag"],
                     "bbox_extent": caption_data["bbox_extent"],
                     "bbox_center": caption_data["bbox_center"],
+                    "category_tag": caption_data["response"]["category_tag"],
+                    "orginal_class_name": caption_data["orginal_class_name"],
                 }
                 data_dict[f"{x:.1f}, {y:.1f}"] = data
                 try:
@@ -77,10 +79,10 @@ def populate_quad_tree():
             return tree, data_dict
 
 
-def query_quad_tree(x_incg, y_incg, tree: quads.QuadTree, data_dic):
+def query_quad_tree(x_incg, y_incg, region, tree: quads.QuadTree, data_dic):
     xin_query = -1 * y_incg
     yin_query = x_incg
-    region = 1
+
     bb = quads.BoundingBox(
         min_x=xin_query - region,
         min_y=yin_query - region,
@@ -109,6 +111,8 @@ def map_nodes_from_cache_to_json(nodes_in_cache):
     # map objects from cache to json, since ids in json could be different
     for i, node in enumerate(nodes_in_cache):
         data = node[-1]
+        if isinstance(data, str):
+            continue
         bbox_center, bbox_extent = data["bbox_center"], data["bbox_extent"]
         # object_tag = data["object_tag"]
         for json_node in json_data:
@@ -128,9 +132,15 @@ def map_nodes_from_cache_to_json(nodes_in_cache):
                         break
             if match_found:
                 break
-        assert (
-            match_found
-        ), f"could not find {data} in json file {PATH_TO_OBJECT_RELATIONS_JSON} but found in cache file {PATH_TO_CACHE_FILE}"
+        try:
+            assert (
+                match_found
+            ), f"could not find {data} in json file {PATH_TO_OBJECT_RELATIONS_JSON} but found in cache file {PATH_TO_CACHE_FILE}"
+        except Exception:
+            nodes_in_cache[i][-1]["id"] = (
+                str(nodes_in_cache[i][-1]["id"]) + " but not present in json"
+            )
+            # print(f"could not find {data} in json file {PATH_TO_OBJECT_RELATIONS_JSON} but found in cache file {PATH_TO_CACHE_FILE}")
 
     for node in nodes_in_cache:
         # print(json.dumps(node[-1], indent=4))
@@ -140,7 +150,7 @@ def map_nodes_from_cache_to_json(nodes_in_cache):
 
 
 if __name__ == "__main__":
-    cache_file_for_quad_tree = "quad_tree.pkl"
+    cache_file_for_quad_tree = osp.join(ROOT_PATH, "quad_tree.pkl")
     if osp.exists(cache_file_for_quad_tree):
         with open(cache_file_for_quad_tree, "rb") as f:
             tree, data = pickle.load(f)
@@ -151,5 +161,5 @@ if __name__ == "__main__":
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
     start_time = time.time()
-    nodes = map_nodes_from_cache_to_json(query_quad_tree(3.1, -1.2, tree, data))
-    print(f"Finished querying the world map in {time.time() - start_time} secs")
+    nodes = map_nodes_from_cache_to_json(query_quad_tree(0.5, -1.6, 1.0, tree, data))
+    print(f"Finished querying the quadtree map in {time.time() - start_time} secs")

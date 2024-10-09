@@ -351,7 +351,7 @@ def path_planning_using_a_star(
         (238, 211, 14),
         1,
     )
-    if len(path) > 0:
+    if len(path) > 2:
         filter_path = convert_path_to_real_waypoints(
             path, occupancy_min_x, occupancy_min_y
         )

@@ -146,7 +146,7 @@ class SpotRosSkillExecutor:
             x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
             # Get the navigation points
             nav_pts = get_navigation_points(
-                view_poses, bbox_center, bbox_extent, [x, y], False, "pathplanning.png"
+                view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
             )
 
             # Sequentially give the point
@@ -225,6 +225,8 @@ class SpotRosSkillExecutor:
                     visualize=False,
                     enable_waypoint_estimation=True,
                 )
+                if succeded:
+                    rospy.set_param("is_gripper_blocked", 0)
             else:
                 # Use the following for the hardcode waypoint for static place
                 succeded, msg = self.spotskillmanager.place(
