@@ -1057,6 +1057,25 @@ class Spot:
 
         return cmd_id
 
+    def blocking_set_arm_joint_positions(
+        self, positions, travel_time=1.0, max_vel=2.5, max_acc=15, return_cmd=False
+    ):
+        """
+        BLOCKING CALL
+        Takes in 6 joint targets and moves each arm joint to the corresponding target.
+        Ordering: sh0, sh1, el0, el1, wr0, wr1
+        :param positions: np.array or list of radians
+        :param travel_time: how long execution should take
+        :param max_vel: max allowable velocity
+        :param max_acc: max allowable acceleration
+        :return: cmd_id
+        """
+        cmd_id = self.set_arm_joint_positions(
+            positions, travel_time, max_vel, max_acc, return_cmd
+        )
+        time.sleep(travel_time)
+        return cmd_id
+
     def set_base_vel_and_arm_pos(
         self,
         x_vel,
@@ -1455,6 +1474,8 @@ class Spot:
         )
         # BD api's function get_a_tform_b uses given transforms tree to make a_T_b
         se3_pose = get_a_tform_b(frame_tree_snapshot, a, b)
+        if se3_pose is None:
+            raise ValueError(f"Could not find transform between frames {a=} and {b=}")
         # convert SE3Pose to magnum Matrix 4 transformation, seperate rotation & translation
         pos = se3_pose.get_translation()
         quat = se3_pose.rotation.normalize()
