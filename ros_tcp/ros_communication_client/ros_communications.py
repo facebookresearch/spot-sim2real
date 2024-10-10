@@ -171,25 +171,32 @@ class Subscriber:
         del self.tcp_connection
 
     def recieve(self):
-        while not self.stop_event.is_set():
-            rosmsg = self.tcp_connection.recv_bson()
-            self.fps_counter = (
-                FPSCounter() if self.fps_counter is None else self.fps_counter
-            )
 
-            if rosmsg["op"] == "publish" and rosmsg["topic"] == self.topic_name:
-                try:
-                    data = self.from_msg_type(rosmsg)
-                except Exception as e:
-                    print(
-                        f"topic name : {self.topic_name}, Error {str(e)}, recieved data : {[(key, value) for key, value in rosmsg['msg'].items() if key != 'data']}"
-                    )
-                    raise e
-                self.fps_counter.update(verbose=self.verbose)
-                if self.callback_fn is not None:
-                    self.callback_fn(data)
-                else:
-                    self.data = data
+        try:
+            while not self.stop_event.is_set():
+                rosmsg = self.tcp_connection.recv_bson()
+                self.fps_counter = (
+                    FPSCounter() if self.fps_counter is None else self.fps_counter
+                )
+                # print(f"Data recieved {rosmsg['msg'].keys()}")
+                if rosmsg["op"] == "publish" and rosmsg["topic"] == self.topic_name:
+                    # print("ros msg:", rosmsg["msg"]["encoding"], self.topic_name)
+                    try:
+                        data = self.from_msg_type(rosmsg)
+                    except Exception as e:
+                        print("ros msg:", rosmsg["msg"]["encoding"], self.topic_name)
+                        raise e
+
+                    self.fps_counter.update(verbose=self.verbose)
+                    if self.callback_fn is not None:
+                        self.callback_fn(data)
+                    else:
+                        self.data = data
+        except Exception:
+            import traceback
+
+            print(f"Exception occrd for {self.topic_name}   --   {self.msg_type}")
+            print("Exception : \n", traceback.print_exc())
 
     def subscribe(self):
         subscription_msg = {
@@ -326,7 +333,6 @@ if __name__ == "__main__":
     subscriber = Subscriber(
         "/new_image_pub", "sensor_msgs/Image", callback_fn=show_image
     )
-
     while time.time() - start_time <= 60:
         time.sleep(1)
     subscriber.unsubscribe()
