@@ -1,0 +1,112 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "spot_rl_launch_local_with_ros_vis",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "spot_rl_launch_local && sleep 5 && spot_rl_ros_img_vis"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      },
+      {
+        "label": "spot_skill_executor",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 2 && cd ${workspaceFolder}/spot_rl_experiments/spot_rl/utils && python skill_executor.py"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      },
+      {
+        "label": "spot_skill_stub_executor",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 2 && cd ${workspaceFolder}/spot_rl_experiments/spot_rl/utils && python stub_skills.py"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      },
+      {
+        "label": "planner",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "set -a && source ${workspaceFolder}/.vscode/.env && set +a && source $CONDA_PATH/etc/profile.d/conda.sh && conda activate $CONDA_PATH/envs/$HABITAT_LLM && cd $HABITAT_LLM_PATH/ && bash scripts/run_react_fre_planner.sh" 
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      },
+      {
+        "label": "Run Planner with Real Spot Skills",
+        "dependsOn": [
+          "spot_rl_launch_local_with_ros_vis",
+          "spot_skill_executor",
+          "planner"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": true,
+          "panel": "shared",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      },
+      {
+        "label": "Run Planner with Stub Spot Skills",
+        "dependsOn": [
+          "spot_rl_launch_local_with_ros_vis",
+          "spot_skill_stub_executor",
+          "planner"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": true,
+          "panel": "shared",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      }
+    ]
+  }
+  
