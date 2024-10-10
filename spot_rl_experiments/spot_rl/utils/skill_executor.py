@@ -26,6 +26,7 @@ class SpotRosSkillExecutor:
     def __init__(self, spotskillmanager):
         self.spotskillmanager: SpotSkillManager = spotskillmanager
         self._cur_skill_name_input = None
+        self._pre_in_dock = False
         self.reset_image_viz_params()
 
     def reset_skill_msg(self):
@@ -67,6 +68,11 @@ class SpotRosSkillExecutor:
 
         # Get the current skill name
         skill_name, skill_input = get_skill_name_and_input_from_ros()
+
+        # Power on the robot if the robot was in the dock
+        if self._pre_in_dock:
+            self.spotskillmanager.spot.power_robot()
+            self._pre_in_dock = False  # reset the flag
 
         robot_holding = (
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
@@ -250,7 +256,9 @@ class SpotRosSkillExecutor:
             self.reset_skill_name_input(skill_name, succeded, msg)
         elif skill_name == "dock":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            self.reset_skill_msg()
             self.spotskillmanager.dock()
+            self._pre_in_dock = True
             rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
 
 
