@@ -7,7 +7,7 @@
         "command": "bash",
         "args": [
           "-c",
-          "spot_rl_launch_local && sleep 5 && spot_rl_ros_img_vis"
+          "spot_rl_launch_local && spot_rl_ros_img_vis"
         ],
         "problemMatcher": [],
         "presentation": {
@@ -25,7 +25,7 @@
         "command": "bash",
         "args": [
           "-c",
-          "sleep 2 && cd ${workspaceFolder}/spot_rl_experiments/spot_rl/utils && python skill_executor.py"
+          "sleep 5 && cd ${workspaceFolder}/spot_rl_experiments/spot_rl/utils && python skill_executor.py"
         ],
         "problemMatcher": [],
         "presentation": {
@@ -43,7 +43,7 @@
         "command": "bash",
         "args": [
           "-c",
-          "sleep 2 && cd ${workspaceFolder}/spot_rl_experiments/spot_rl/utils && python stub_skills.py"
+          "sleep 5 && cd ${workspaceFolder}/spot_rl_experiments/spot_rl/utils && python stub_skills.py"
         ],
         "problemMatcher": [],
         "presentation": {
@@ -61,7 +61,7 @@
         "command": "bash",
         "args": [
           "-c",
-          "set -a && source ${workspaceFolder}/.vscode/.env && set +a && source $CONDA_PATH/etc/profile.d/conda.sh && conda activate $CONDA_PATH/envs/$HABITAT_LLM && cd $HABITAT_LLM_PATH/ && bash scripts/run_react_fre_planner.sh" 
+          "sleep 5 && set -a && source ${workspaceFolder}/.vscode/.env && set +a && source $CONDA_PATH/etc/profile.d/conda.sh && conda activate $CONDA_PATH/envs/$HABITAT_LLM && cd $HABITAT_LLM_PATH/ && bash scripts/run_react_fre_planner.sh" 
         ],
         "problemMatcher": [],
         "presentation": {
