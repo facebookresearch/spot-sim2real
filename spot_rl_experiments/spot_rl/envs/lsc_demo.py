@@ -18,8 +18,6 @@ from spot_rl.models.sentence_similarity import SentenceSimilarity
 from spot_rl.utils.utils import construct_config, get_default_parser, get_waypoint_yaml
 from spot_rl.utils.whisper_translator import WhisperTranslator
 
-DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 549))
-
 
 def main(spot, config):
     # Reset the viz params

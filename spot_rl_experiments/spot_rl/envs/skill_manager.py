@@ -287,7 +287,7 @@ class SpotSkillManager:
             message=f"Received nav target request for - {nav_target}",
             verbose=self.verbose,
         )
-        should_dock = False
+        should_dock = nav_target == "dock"
         if nav_target is not None:
             # Get the nav target coordinates
             try:
@@ -295,7 +295,6 @@ class SpotSkillManager:
                     nav_target, self.waypoints_yaml_dict
                 )
                 self.current_receptacle_name = nav_target
-                should_dock = nav_target == "dock"
             except Exception:
                 message = (
                     f"Failed - nav target {nav_target} not found - use the exact name"
@@ -318,7 +317,7 @@ class SpotSkillManager:
         y: float,
         theta: float,
         reset_current_receptacle_name: bool = True,
-        should_dock: bool= False
+        should_dock: bool = False,
     ) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a metric location
@@ -339,8 +338,10 @@ class SpotSkillManager:
             receptacle_name = getattr(self, "current_receptacle_name", None)
             setattr(self, "current_receptacle_name", receptacle_name)
 
-        goal_dict = {"nav_target": (x, y, theta),
-                    "should_dock": should_dock}  # type: Dict[str, Any]
+        goal_dict = {
+            "nav_target": (x, y, theta),
+            "should_dock": should_dock,
+        }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -595,7 +596,6 @@ class SpotSkillManager:
                 print(message)
                 return False, message
 
-        if enable_waypoint_estimation:
             edge_x = float(edge_point_in_base[0])
 
             # Move the base if the robot is too far away from the place target

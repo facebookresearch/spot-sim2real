@@ -167,17 +167,12 @@ class SpotNavEnv(SpotBaseEnv):
 
     def step(self, *args, **kwargs):
         observations, reward, done, info = super().step(*args, **kwargs)
-        should_dock = False
-        if "should_dock" in kwargs["action_dict"]:
-            should_dock = kwargs["action_dict"]["should_dock"]
-        print(f"should_dock {should_dock}")
-        if should_dock:
+
+        if kwargs["action_dict"].get("should_dock", False):
             try:
-                print("try  to dock")
                 self.spot.dock(dock_id=DOCK_ID, home_robot=True)
-                print("dock suc!!")
             except Exception as e:
-                print(f"error {e}")
+                print(f"error while docking {str(e)}")
 
         # Slow the base down if we are close to the nav target to slow down the the heading changes
         dist_to_goal, _ = observations["target_point_goal_gps_and_compass_sensor"]
