@@ -38,6 +38,7 @@ from spot_rl.utils.heuristic_nav import (
 from spot_rl.utils.pose_estimation import OrientationSolver
 from spot_rl.utils.search_table_location import (
     contrained_place_point_estimation,
+    convert_point_in_body_to_place_waypoint,
     detect_place_point_by_pcd_method,
     plot_place_point_in_gripper_image,
 )
@@ -619,7 +620,11 @@ class SpotSkillManager:
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
 
         # Set place target location for viz
-        rospy.set_param("place_target_xyz", f"{place_x},{place_y},{place_z}|")
+        global_x, global_y, global_z = convert_point_in_body_to_place_waypoint(
+            mn.Vector3(place_x, place_y, place_z), self.spot
+        )
+        rospy.set_param("place_target_xyz", f"{global_x},{global_y},{global_z}|")
+        print("place_target_xyz:", global_x, global_y, global_z)
 
         status, message = self.place(
             place_x,
