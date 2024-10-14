@@ -5,6 +5,7 @@
 import argparse
 import os
 import os.path as osp
+import threading
 import time
 import traceback
 
@@ -29,6 +30,11 @@ class SpotRosSkillExecutor:
         self._is_robot_on_dock = False
         self.reset_image_viz_params()
 
+        # Listen to cancel msg
+        self.end = False
+        thread = threading.Thread(target=self.read_cancel_msg)
+        thread.start()
+
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
         This is useful for returning the message (e.g., if skill fails or not) from spot-sim2real to high-level planner.
@@ -49,6 +55,19 @@ class SpotRosSkillExecutor:
         rospy.set_param("/viz_pick", "None")
         rospy.set_param("/viz_object", "None")
         rospy.set_param("/viz_place", "None")
+
+    def read_cancel_msg(self):
+        while True:
+            cancel = rospy.get_param("/cancel", False)
+            if cancel:
+                print("Cancel!!! Robot returns to dock")
+                spotskillmanager = SpotSkillManager(
+                    use_mobile_pick=True, use_semantic_place=True
+                )
+                spotskillmanager.dock()
+                self.end = True
+                rospy.set_param("/cancel", False)  # Reset
+                raise SystemExit
 
     def check_pick_condition(self):
         """ "Check pick condition in spot-sim2real side"""
@@ -270,17 +289,21 @@ def main():
     # Clean up the ros parameters
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
+    rospy.set_param("/cancel", False)
 
-    # Call the skill manager
-    spotskillmanager = SpotSkillManager(use_mobile_pick=True, use_semantic_place=True)
-    executor = None
-    try:
-        executor = SpotRosSkillExecutor(spotskillmanager)
-        # While loop to run in the background
-        while not rospy.is_shutdown():
-            executor.execute_skills()
-    except Exception as e:
-        print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
+    while True:
+        # Call the skill manager
+        spotskillmanager = SpotSkillManager(
+            use_mobile_pick=True, use_semantic_place=True
+        )
+        executor = None
+        try:
+            executor = SpotRosSkillExecutor(spotskillmanager)
+            # While loop to run in the background
+            while not rospy.is_shutdown() and not executor.end:
+                executor.execute_skills()
+        except Exception as e:
+            print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
 
 
 if __name__ == "__main__":
