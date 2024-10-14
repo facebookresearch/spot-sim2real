@@ -112,6 +112,7 @@ class SpotRosSkillExecutor:
         skill_name, skill_input = get_skill_name_and_input_from_ros()
         final_success = True
         metric_list = []
+        # import ipdb; ipdb.set_trace()
 
         # Power on the robot if the robot was in the dock
         if self._is_robot_on_dock:
@@ -280,7 +281,6 @@ class SpotRosSkillExecutor:
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             rospy.set_param("is_gripper_blocked", 0)
             self.reset_skill_msg()
-            breakpoint()
             if self.spotskillmanager.allow_semantic_place:
                 print("Here")
                 # Call semantic place skills
@@ -334,7 +334,7 @@ class SpotRosSkillExecutor:
         self.episode_log["total_steps"] = self.total_steps
 
     def save_logs_as_json(self):
-        file_path = osp.join(LOG_PATH, "E2E_L3_IR32_children.json")
+        file_path = osp.join(LOG_PATH, "E2E_L3_NP_IR102_tajinn.json")
         with open(file_path, "w") as file:
             json.dump(self.episode_log, file, indent=4)
 
