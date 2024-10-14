@@ -105,14 +105,9 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # User does not set the gripper orientation
         if ee_orientation_at_grasping is None:
-            if self.is_ee_env:
-                self.initial_arm_joint_angles = np.deg2rad(
-                    self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE
-                )
-            else:
-                self.initial_arm_joint_angles = np.deg2rad(
-                    self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
-                )
+            self.initial_arm_joint_angles = np.deg2rad(
+                self.config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
+            )
         else:
             # Get the pitch and yaw
             pitch = ee_orientation_at_grasping[1]
@@ -248,7 +243,6 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         # Define End Effector Policy Scale Values
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE
         self.arm_ee_rot_scale = self.config.EE_ROT_SCALE_SEMANTIC_PLACE
-        self.ee_env = True
 
     def decide_init_arm_joint(self, ee_orientation_at_grasping):
         self.initial_arm_joint_angles = np.deg2rad(
@@ -281,7 +275,8 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
         action_dict["semantic_place"] = place
 
         # Set the travel time scale so that the arm movement is smooth
-        return super().step(action_dict, *args, **kwargs)
+        # Note: This is a temporary fix. Needs to be refactored
+        return SpotBaseEnv.step(self, action_dict, *args, **kwargs)
 
     def get_observations(self):
         observations = super().get_observations()
