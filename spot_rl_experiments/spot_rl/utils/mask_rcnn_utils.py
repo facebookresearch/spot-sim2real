@@ -10,8 +10,8 @@ from deblur_gan.predictor import DeblurGANv2
 
 try:
     from mask_rcnn_detectron2.inference import MaskRcnnInference
-except ModuleNotFoundError:
-    raise
+except Exception:
+    ModuleNotFoundError
 
 
 def generate_mrcnn_detections(
