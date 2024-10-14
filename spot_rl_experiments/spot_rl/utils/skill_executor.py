@@ -54,6 +54,10 @@ class SpotRosSkillExecutor:
         self.detection_publisher = rospy.Publisher(
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
+        # Listen to cancel msg
+        self.end = False
+        thread = threading.Thread(target=self.read_cancel_msg)
+        thread.start()
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
