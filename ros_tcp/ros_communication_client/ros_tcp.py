@@ -44,7 +44,7 @@ class RosbridgeBSONTCPClient:
     ) -> None:
         self.host: str = host
         self.port: int = port
-        self.socket = None  # type: ignore
+        self.socket: socket.socket = None
         self.socket_id: int = None
         self.timeoutsec: int = timeoutinsec
         self.connected: bool = False
