@@ -629,7 +629,7 @@ class SpotSkillManager:
             print("place_target_xyz in global frame:", global_x, global_y, global_z)
         else:
             rospy.set_param("place_target_xyz", f"{place_x},{place_y},{place_z}|")
-            print("place_target_xyz in local frame:", place_x, place_y, place_z)
+            print("place_target_xyz in global frame:", place_x, place_y, place_z)
 
         status, message = self.place(
             place_x,
