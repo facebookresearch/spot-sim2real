@@ -624,7 +624,7 @@ class SpotSkillManager:
             mn.Vector3(place_x, place_y, place_z), self.spot
         )
         rospy.set_param("place_target_xyz", f"{global_x},{global_y},{global_z}|")
-        print("place_target_xyz:", global_x, global_y, global_z)
+        print("place_target_xyz in global frame:", global_x, global_y, global_z)
 
         status, message = self.place(
             place_x,
