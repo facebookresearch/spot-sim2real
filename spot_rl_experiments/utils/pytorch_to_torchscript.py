@@ -121,7 +121,7 @@ class PolicyConverter:
         self.device = torch.device(device)
 
         # Load the checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location="cpu")
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
 
         # Load the config
         config = checkpoint["config"]
