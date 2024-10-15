@@ -194,7 +194,7 @@ class SpotRosSkillExecutor:
                 rospy.set_param("/viz_pick", query_class_names[0])
             # Get the view poses
             view_poses, category_tag = get_view_poses(
-                bbox_center, bbox_extent, query_class_names, False
+                bbox_center, bbox_extent, query_class_names, True
             )
 
             # Get the robot x, y, yaw
@@ -352,7 +352,7 @@ def main():
     while True:
         # Call the skill manager
         spotskillmanager = SpotSkillManager(
-            use_mobile_pick=True, use_semantic_place=True
+            use_mobile_pick=True, use_semantic_place=True, use_place_ee=True
         )
         executor = None
         try:
