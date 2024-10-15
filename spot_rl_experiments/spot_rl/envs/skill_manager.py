@@ -619,6 +619,7 @@ class SpotSkillManager:
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
 
+        # This is used for Nexus app visualization
         if is_local:
             # Set place target location for viz
             global_x, global_y, global_z = convert_point_in_body_to_place_waypoint(
