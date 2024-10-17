@@ -436,7 +436,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif arm_ee_action is not None:
-                if base_action is None:
+                if self._max_lin_dist_scale==0:
                     self.spot.set_arm_ee_pos(
                         arm_ee_action,
                         travel_time=self.config.ARM_TRAJECTORY_TIME_IN_SECONDS,
