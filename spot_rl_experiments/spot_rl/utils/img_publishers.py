@@ -530,6 +530,18 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return point_in_3d
 
+    def convert_2d_pixel_to_3d(self, pixel_uv, depth_raw, camera_intrinsics, patch_size=10):
+        Z = float(sample_patch_around_point(int(pixel_uv[0]), int(pixel_uv[1]), depth_raw, patch_size) * 1.0)
+        if np.isnan(Z):
+            print(f"Affordance Prediction : Z is NaN = {Z}")
+            return None
+        elif Z > MAX_HAND_DEPTH:
+            print(f"Affordance Prediction : Z is out of bounds = {Z}")
+            return None
+
+        point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
+        return point_in_3d
+
     def _publish(self):
         stopwatch = Stopwatch()
         header = Header(stamp=rospy.Time.now())  # self.img_msg.header
@@ -628,8 +640,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 continue
 
         # publish data
-        # self.publish_new_detection(";".join(object_info))
-        # self.publish_viz_img(viz_img, header)
+        self.publish_new_detection(";".join(object_info))
+        self.publish_viz_img(viz_img, header)
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
