@@ -13,6 +13,7 @@ import quaternion
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
+from spot_rl.utils.search_table_location import convert_point_in_body_to_place_waypoint
 from spot_wrapper.spot import Spot
 from spot_wrapper.utils import angle_between_quat
 
@@ -102,7 +103,6 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
     def decide_init_arm_joint(self, ee_orientation_at_grasping):
         """Decide the place location"""
-
         # User does not set the gripper orientation
         if ee_orientation_at_grasping is None:
             self.initial_arm_joint_angles = np.deg2rad(
@@ -140,7 +140,32 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # We wait for a second to let the arm in the placing
         # ready location
+        rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
+        rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
         time.sleep(1.0)
+
+        # This is used for Nexus app visualization
+        self.spot.close_gripper()
+        # rospy.set_param("/skill_name_input", f"{str(time.time())},place,cup")
+        place_x, place_y, place_z = place_target
+        if target_is_local:
+            # Set place target location for viz
+            global_x, global_y, global_z = convert_point_in_body_to_place_waypoint(
+                mn.Vector3(place_x, place_y, place_z), self.spot
+            )
+            rospy.set_param("place_target_xyz", f"{global_x},{global_y},{global_z}|")
+            print("place_target_xyz in global frame:", global_x, global_y, global_z)
+        else:
+            rospy.set_param("place_target_xyz", f"{place_x},{place_y},{place_z}|")
+            print("place_target_xyz in global frame:", place_x, place_y, place_z)
+        _, _ee_orientation = self.spot.get_ee_pos_in_body_frame()
+        _ee_orientation = [np.rad2deg(v) for v in _ee_orientation]
+        rospy.set_param(
+            "robot_target_ee_rpy",
+            f"{_ee_orientation[0]},{_ee_orientation[1]},{_ee_orientation[2]}",
+        )
+        # rospy.set_param("robot_target_ee_rpy", f"{-90},{0},{0}")
+        print(f"robot_target_ee_rpy: {_ee_orientation}")
         # Sometimes, there will be a bit of mistchmatch of joints after resetting
         # So we can reset the arm again here using the following
         # ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()
