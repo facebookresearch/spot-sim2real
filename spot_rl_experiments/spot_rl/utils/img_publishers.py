@@ -550,16 +550,28 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         point_in_gripper = get_3d_point(camera_intrinsics, center_pixel, Z)
         return point_in_gripper
 
+    def convert_2d_pixel_to_3d(self, pixel_uv, depth_raw, camera_intrinsics, patch_size=10):
+        Z = float(sample_patch_around_point(int(pixel_uv[0]), int(pixel_uv[1]), depth_raw, patch_size) * 1.0)
+        if np.isnan(Z):
+            print(f"Affordance Prediction : Z is NaN = {Z}")
+            return None
+        elif Z > MAX_HAND_DEPTH:
+            print(f"Affordance Prediction : Z is out of bounds = {Z}")
+            return None
+
+        point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
+        return point_in_3d
+
     def _publish(self):
         stopwatch = Stopwatch()
         header = self.img_msg.header
         timestamp = header.stamp
         hand_rgb = self.msg_to_cv2(self.img_msg)
         arm_depth = self.msg_to_cv2(self.img_msg_depth)
-        arm_depth = arm_depth[:, LEFT_CROP:-RIGHT_CROP]
-        arm_depth = cv2.resize(
-            arm_depth, (NEW_WIDTH, NEW_HEIGHT), interpolation=cv2.INTER_AREA
-        )
+        # arm_depth = arm_depth[:, LEFT_CROP:-RIGHT_CROP]
+        # arm_depth = cv2.resize(
+        #     arm_depth, (NEW_WIDTH, NEW_HEIGHT), interpolation=cv2.INTER_AREA
+        # )
 
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
@@ -573,6 +585,9 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         try:
             vision_T_hand_image: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
                 "vision", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
+            )
+            body_T_hand : mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
+                "body", "hand_color_image_sensor", imgs[0].shot.transforms_snapshot
             )
         except Exception as e:
             print("ee:", imgs[0].shot.transforms_snapshot is None)
@@ -599,49 +614,57 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             pixel_x = int(np.mean([x1, x2]))
             pixel_y = int(np.mean([y1, y2]))
             # Get the distance between arm and the object
-            x1_distance = max(int(float(x1 - LEFT_CROP) * WIDTH_SCALE), 0)
-            x2_distance = max(int(float(x2 - LEFT_CROP) * WIDTH_SCALE), 0)
-            y1_distance = int(float(y1) * HEIGHT_SCALE)
-            y2_distance = int(float(y2) * HEIGHT_SCALE)
-            arm_depth_bbox = np.zeros_like(arm_depth, dtype=np.float32)
-            arm_depth_bbox[y1_distance:y2_distance, x1_distance:x2_distance] = 1.0
-            # Estimate distance from the gripper to the object
-            depth_box = arm_depth[y1_distance:y2_distance, x1_distance:x2_distance]
-            if depth_box.size == 0:
-                continue
+            # x1_distance = max(int(float(x1 - LEFT_CROP) * WIDTH_SCALE), 0)
+            # x2_distance = max(int(float(x2 - LEFT_CROP) * WIDTH_SCALE), 0)
+            # y1_distance = int(float(y1) * HEIGHT_SCALE)
+            # y2_distance = int(float(y2) * HEIGHT_SCALE)
+            # arm_depth_bbox = np.zeros_like(arm_depth, dtype=np.float32)
+            # arm_depth_bbox[y1_distance:y2_distance, x1_distance:x2_distance] = 1.0
+            # # Estimate distance from the gripper to the object
+            # depth_box = arm_depth[y1_distance:y2_distance, x1_distance:x2_distance]
+            # if depth_box.size == 0:
+            #     continue
 
             try:
-                point_in_gripper = self.affordance_prediction(
-                    depth_raw=arm_depth / 1000.0,
-                    mask=arm_depth_bbox,
-                    camera_intrinsics=cam_intrinsics,
-                    center_pixel=np.array([pixel_x, pixel_y]),
-                )
-
+                # point_in_gripper = self.affordance_prediction(
+                #     depth_raw=arm_depth / 1000.0,
+                #     mask=arm_depth_bbox,
+                #     camera_intrinsics=cam_intrinsics,
+                #     center_pixel=np.array([pixel_x, pixel_y]),
+                # )
+                depth_raw = arm_depth / 1000.0
+                point_in_gripper = self.convert_2d_pixel_to_3d([pixel_x, pixel_y], depth_raw, cam_intrinsics)
                 if point_in_gripper is None:
                     print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
+                left_top_in_3d = self.convert_2d_pixel_to_3d([x1, y1], depth_raw, cam_intrinsics)
+                right_bottom_in_3d = self.convert_2d_pixel_to_3d([x2, y2], depth_raw, cam_intrinsics)
+            
+
+                if np.isnan(point_in_gripper).any():
+                    continue
+                
+                curr_x, curr_y, curr_yaw = self.spot.get_xy_yaw()
+                home_T_body:mn.Matrix4 = mn.Matrix4.from_(
+                    mn.Matrix4.rotation_z(mn.Rad(curr_yaw)).rotation(),
+                    mn.Vector3(curr_x, curr_y, 0.5),
+                )
+                point_in_global_3d = np.array(home_T_body.transform_point(body_T_hand.transform_point(mn.Vector3(*point_in_gripper))))
+                points_in_global_3d = [np.array(home_T_body.transform_point(body_T_hand.transform_point(mn.Vector3(*point_in_3d))))[:2].tolist() for point_in_3d in [left_top_in_3d, right_bottom_in_3d]]
+                points_in_global_3d_str = ",".join([ f"{p[0]},{p[1]}" for p in points_in_global_3d])
+                object_info.append(
+                    f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score},{points_in_global_3d_str}"
+                )
+                print(
+                    f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
+                )
             except Exception as e:
                 print(f"Issue of predicting location for {class_label} : {e}")
                 continue
 
-            if np.isnan(point_in_gripper).any():
-                continue
-
-            point_in_global_3d = vision_T_hand_image.transform_point(
-                mn.Vector3(*point_in_gripper)
-            )
-
-            object_info.append(
-                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score}"
-            )
-            print(
-                f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
-            )
-
         # publish data
-        # self.publish_new_detection(";".join(object_info))
-        # self.publish_viz_img(viz_img, header)
+        self.publish_new_detection(";".join(object_info))
+        self.publish_viz_img(viz_img, header)
 
         stopwatch.print_stats()
 
@@ -784,7 +807,7 @@ if __name__ == "__main__":
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
         rospy.set_param(
             "multi_class_object_target",
-            "pineapple plush toy, can of food, donut plush toy, catterpillar plush toy, bottle, bulldozer toy car, frog plush toy, avocado plush toy, tajin bottle, can of soda, cup, ball, pillow, lamp",
+            "pineapple plush toy,ball",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
