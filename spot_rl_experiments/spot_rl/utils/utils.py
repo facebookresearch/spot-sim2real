@@ -209,7 +209,7 @@ def calculate_height(object_tag):
                         bbox_center = object_node["bbox_center"]
                         bbox_extent = object_node["bbox_extent"]
                         # Calculate the height
-                        height = bbox_center[2] + bbox_extent[2]
+                        height = bbox_center[2] + bbox_extent[2] / 2 + 0.24
                         return height
                     else:
                         print(

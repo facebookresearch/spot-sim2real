@@ -7,7 +7,11 @@ import os.path as osp
 
 import cv2
 from deblur_gan.predictor import DeblurGANv2
-from mask_rcnn_detectron2.inference import MaskRcnnInference
+
+try:
+    from mask_rcnn_detectron2.inference import MaskRcnnInference
+except Exception:
+    ModuleNotFoundError
 
 
 def generate_mrcnn_detections(
