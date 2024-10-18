@@ -35,6 +35,10 @@ class SpotRosSkillExecutor:
         thread = threading.Thread(target=self.read_cancel_msg)
         thread.start()
 
+        # Reset
+        rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
+        rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
+
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
         This is useful for returning the message (e.g., if skill fails or not) from spot-sim2real to high-level planner.
@@ -44,6 +48,8 @@ class SpotRosSkillExecutor:
     def reset_skill_name_input(self, skill_name, succeded, msg):
         """Reset skill name and input, and publish the message"""
         rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
+        rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
+        rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
         rospy.set_param(
@@ -290,6 +296,8 @@ def main():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
     rospy.set_param("/cancel", False)
+    rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
+    rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
 
     while True:
         # Call the skill manager
