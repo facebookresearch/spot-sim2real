@@ -146,7 +146,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 
         # This is used for Nexus app visualization
         self.spot.close_gripper()
-        # rospy.set_param("/skill_name_input", f"{str(time.time())},place,cup")
+
         place_x, place_y, place_z = place_target
         if target_is_local:
             # Set place target location for viz
@@ -158,14 +158,16 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
         else:
             rospy.set_param("place_target_xyz", f"{place_x},{place_y},{place_z}|")
             print("place_target_xyz in global frame:", place_x, place_y, place_z)
+
         _, _ee_orientation = self.spot.get_ee_pos_in_body_frame()
         _ee_orientation = [np.rad2deg(v) for v in _ee_orientation]
+
         rospy.set_param(
             "robot_target_ee_rpy",
             f"{_ee_orientation[0]},{_ee_orientation[1]},{_ee_orientation[2]}",
         )
-        # rospy.set_param("robot_target_ee_rpy", f"{-90},{0},{0}")
         print(f"robot_target_ee_rpy: {_ee_orientation}")
+
         # Sometimes, there will be a bit of mistchmatch of joints after resetting
         # So we can reset the arm again here using the following
         # ee_position, ee_orientation = self.spot.get_ee_pos_in_body_frame()

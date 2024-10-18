@@ -296,8 +296,6 @@ def main():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
     rospy.set_param("/cancel", False)
-    rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
-    rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
 
     while True:
         # Call the skill manager
