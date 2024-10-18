@@ -12,17 +12,27 @@ from scipy.interpolate import interp1d
 from scipy.spatial.distance import euclidean
 
 
-def wrap_angle_deg(angle_deg) -> float:
+def wrap_angle_deg(angle_deg, wrapping_360=True) -> float:
     """
     Wrap an angle in degrees between 0 and 360.
 
     Args:
         angle_deg (float): The input angle in degrees.
+        wrapping_360 (bool): If True, wraps between 0 to 360 , else -180 to 180
 
     Returns:
         wrapped_angle (float): The wrapped angle in degrees between 0 and 360.
     """
     wrapped_angle = angle_deg % 360
+
+    # Return as is if wrapping between 0 and 360
+    if wrapping_360:
+        return wrapped_angle
+
+    # If wrapping between -180 and 180, and current angle is greater than 180 then adjust it
+    if wrapped_angle > 180:
+        wrapped_angle -= 360
+
     return wrapped_angle
 
 
