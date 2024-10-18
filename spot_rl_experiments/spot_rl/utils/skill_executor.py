@@ -315,7 +315,6 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = pick_msg
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
             skill_log = self.spotskillmanager.gaze_controller.skill_result_log
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0
@@ -346,8 +345,6 @@ class SpotRosSkillExecutor:
                 succeded, msg = self.spotskillmanager.place(
                     0.6, 0.0, 0.4, is_local=True
                 )
-            if succeded:
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
             skill_log = self.spotskillmanager.place_controller.skill_result_log
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0

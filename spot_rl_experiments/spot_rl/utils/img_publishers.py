@@ -215,7 +215,7 @@ class SpotProcessedImagesPublisher(SpotImagePublisher):
         self.img_msg = None
         rospy.Subscriber(
             self.subscriber_topic, self.subscriber_msg_type, self.cb, queue_size=1
-        )
+        ) if self.subscriber_topic is not None else None
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
         while self.img_msg is None and self.subscriber_topic is not None:
             pass
@@ -223,7 +223,7 @@ class SpotProcessedImagesPublisher(SpotImagePublisher):
         self.updated = True
 
     def publish(self):
-        if not self.updated:
+        if not self.updated and self.subscriber_topic is not None:
             return
         super().publish()
         self.updated = False
@@ -637,6 +637,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 )
             except Exception as e:
                 print(f"Issue of predicting location for {class_label} : {e}")
+                print(traceback.format_exc())
                 continue
 
         # publish data
