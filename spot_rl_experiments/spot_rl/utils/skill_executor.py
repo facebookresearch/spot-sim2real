@@ -104,7 +104,8 @@ class SpotRosSkillExecutor:
         else:
             return True, ""
 
-    def execute_skills(self):
+    # type: ignore
+    def execute_skills(self):  # noqa: C901
         """Execute skills."""
 
         # Get the current skill name
@@ -128,6 +129,9 @@ class SpotRosSkillExecutor:
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
                 rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+            else:
+                rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
+
             # Reset the skill message
             self.reset_skill_msg()
             # For navigation target
@@ -162,14 +166,14 @@ class SpotRosSkillExecutor:
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
             )
             if succeded and not robot_holding:
-                pass
-                #rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
-                #time.sleep(1)
-                #print("Scanning area with arm")
-                #scan_arm(self.spotskillmanager.spot, publisher=self.detection_publisher)
+                # pass
+                # rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+                time.sleep(1)
+                print("Scanning area with arm")
+                scan_arm(self.spotskillmanager.spot, publisher=self.detection_publisher)
             else:
                 print("Will not scan arm")
-            #rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
+            # rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message
             skill_log = self.spotskillmanager.nav_controller.skill_result_log
@@ -186,6 +190,8 @@ class SpotRosSkillExecutor:
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
                 rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+            else:
+                rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
             # Get the bbox center and bbox extent
             bbox_info = skill_input.split(";")  # in the format of x,y,z
             assert (
@@ -254,14 +260,14 @@ class SpotRosSkillExecutor:
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
             )
             if succeded and not robot_holding:
-                pass
-                #rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
-                #time.sleep(1)
-                #print("Scanning area with arm")
-                #scan_arm(self.spotskillmanager.spot, publisher=self.detection_publisher)
+                # pass
+                # rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
+                time.sleep(1)
+                print("Scanning area with arm")
+                scan_arm(self.spotskillmanager.spot, publisher=self.detection_publisher)
             else:
                 print("Will not scan arm")
-            #rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
+            # rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
@@ -280,12 +286,12 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = pick_msg
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
             skill_log = self.spotskillmanager.gaze_controller.skill_result_log
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0
             self.episode_log["actions"].append({"pick": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
             rospy.set_param("/viz_object", "None")
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -308,14 +314,13 @@ class SpotRosSkillExecutor:
                 succeded, msg = self.spotskillmanager.place(
                     0.6, 0.0, 0.4, is_local=True
                 )
-            if succeded:
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
             skill_log = self.spotskillmanager.place_controller.skill_result_log
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0
             self.episode_log["actions"].append({"place": skill_log})
 
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
@@ -361,7 +366,7 @@ def main():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
     rospy.set_param("/cancel", False)
-    rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
+    rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
 
     while True:
         # Call the skill manager

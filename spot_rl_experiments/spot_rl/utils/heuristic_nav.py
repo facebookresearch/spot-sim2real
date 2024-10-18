@@ -470,15 +470,17 @@ class ImageSearch:
 
             if np.isnan(point_in_gripper).any():
                 continue
-            
+
             curr_x, curr_y, curr_yaw = spot.get_xy_yaw()
             transform_to_convert_base_to_home = mn.Matrix4.from_(
                 mn.Matrix4.rotation_z(mn.Rad(curr_yaw)).rotation(),
                 mn.Vector3(curr_x, curr_y, 0.5),
             )
-            point_in_global_3d = np.array(transform_to_convert_base_to_home.transform_point(body_T_hand.transform_point(
-                mn.Vector3(*point_in_gripper)
-            )))
+            point_in_global_3d = np.array(
+                transform_to_convert_base_to_home.transform_point(
+                    body_T_hand.transform_point(mn.Vector3(*point_in_gripper))
+                )
+            )
 
             object_info.append(
                 f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score}"
@@ -600,12 +602,12 @@ def scan_arm(
     gaze_arm_angles=None,
 ):
     # Create image search object
-    image_search = ImageSearch(
-        corner_static_offset=0.5, use_yolov8=False, visualize=False, multi_class=True
-    )
+    image_search = None  # ImageSearch(
+    #     corner_static_offset=0.5, use_yolov8=False, visualize=False, multi_class=True
+    # )
     multi_classes = [
-        #"ball"
-        "pineapple plush toy",
+        # "ball"
+        "caterpillar plush toy",
     ]
     # Read gaze arm angles from config if None is passed
     if gaze_arm_angles is None:
@@ -634,7 +636,7 @@ def scan_arm(
         gaze_arm_angles[0] = angle
         spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
         time.sleep(1.5)
-        img_search_args = get_arguments_for_image_search(spot)
+        img_search_args = None  # get_arguments_for_image_search(spot)
         if img_search_args is not None:
             (
                 object_info_list,
