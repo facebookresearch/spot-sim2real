@@ -42,7 +42,7 @@ except ModuleNotFoundError:
     pass
 
 # owlvit
-from spot_rl.models import OwlVit
+from spot_rl.models import OwlVit, YOLOWorld
 from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     sample_patch_around_point,
@@ -325,7 +325,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = get_deblurgan_model(config)
+        self.deblur_gan = None #get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -471,14 +471,18 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         self.model = model
         self.spot = spot
         self.detection_topic = rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC
+        self.orig_detection_topic = rt.DETECTIONS_TOPIC
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = get_deblurgan_model(config)
+        self.deblur_gan = None #get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        )
+        self.pubs[self.orig_detection_topic] = rospy.Publisher(
+            self.orig_detection_topic, String, queue_size=1, tcp_nodelay=True
         )
 
         # For the depth images
@@ -544,6 +548,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     def _publish(self):
         stopwatch = Stopwatch()
+        start_time = time.time()
         header = Header(stamp=rospy.Time.now())  # self.img_msg.header
         timestamp = header.stamp
 
@@ -577,9 +582,16 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         new_detection, viz_img = self.model.inference(
             hand_rgb_preprocessed, timestamp, stopwatch
         )
-        # Split the detection
-        timestamp, new_detections = new_detection.split("|")
-        new_detections = new_detections.split(";")
+        
+        is_pick_active = getattr(self.model, "is_pick_active", False)
+        if is_pick_active: 
+            self.publish_bbox_data(new_detection)
+            new_detections = []
+        else:
+            # Split the detection
+            timestamp, new_detections = new_detection.split("|")
+            new_detections = new_detections.split(";")
+        
         object_info = []
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
@@ -632,9 +644,9 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 object_info.append(
                     f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score},{points_in_global_3d_str}"
                 )
-                print(
-                    f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
-                )
+                # print(
+                #     f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
+                # )
             except Exception as e:
                 print(f"Issue of predicting location for {class_label} : {e}")
                 print(traceback.format_exc())
@@ -686,6 +698,7 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
         # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
+        start_time = time.time()
         multi_classes = rospy.get_param("/multi_class_object_target").split(",")
         multi_classes = [str(class_name).strip() for class_name in multi_classes]
         self.owlvit.update_label([multi_classes])
@@ -703,9 +716,44 @@ class OWLVITModelMultiClasses(OWLVITModel):
         else:
             bbox_xy_string = "None"
         detections_str = f"{str(timestamp)}|{bbox_xy_string}"
-
+        print(f"FPS {1./(time.time() - start_time)}")
         return detections_str, viz_img
 
+class YOLOWorldModel:
+    def __init__(self, score_threshold=0.1, show_img=False):
+        self.config = config = construct_config()
+        self.yoloworld = YOLOWorld()
+        self.image_scale = config.IMAGE_SCALE
+        self.is_pick_active = False
+        rospy.loginfo("[Yoloworld]: Models loaded.")
+
+    def inference(self, hand_rgb, timestamp, stopwatch):
+        # print("Running inference on Owlvit")
+        start_time = time.time()
+        is_pick_active = rospy.get_param("/skill_input", "")
+        if "pick" in is_pick_active:
+            self.is_pick_active = True 
+            multi_classes = rospy.get_param("/object_target").split(",")
+        else:
+            self.is_pick_active = False
+            multi_classes = rospy.get_param("/multi_class_object_target").split(",")
+
+        multi_classes = [str(class_name).strip() for class_name in multi_classes]
+        self.yoloworld.update_label([multi_classes])
+        bbox_xy, viz_img = self.yoloworld.run_inference_and_return_img(hand_rgb)
+
+        if bbox_xy is not None and bbox_xy != []:
+            detections = []
+            for detection in bbox_xy:
+                str_det = f'{detection[0]},{detection[1]},{",".join([str(i) for i in detection[2]])}'
+                detections.append(str_det)
+            bbox_xy_string = ";".join(detections)
+        else:
+            bbox_xy_string = "None"
+        detections_str = f"{str(timestamp)}|{bbox_xy_string}"
+        detections_str = f"{str(timestamp)}|{bbox_xy_string}"
+        print(f"Time taken for 1 frame {1.0/(time.time() - start_time)}")
+        return detections_str, viz_img
 
 class MRCNNModel:
     def __init__(self):
@@ -774,19 +822,24 @@ if __name__ == "__main__":
         node = SpotBoundingBoxPublisher(model)
     elif owlvit:
         # TODO dynamic label
+        spot = Spot("SpotOpenVocObjectDetectorPublisher")
         rospy.set_param("object_target", "ball")
         rospy.set_param("enable_tracking", False)
-        model = OWLVITModel()
-        node = SpotBoundingBoxPublisher(model)
+        rospy.set_param(
+            "multi_class_object_target",
+            "blue ball,bulldozer toy car,red soda can,food can,tajin bottle,bottle,green avocado plush toy,pink donut plush toy,pineapple plush toy,green caterpillar plush toy,penguin plush toy",
+        )
+        model = YOLOWorldModel()
+        node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif open_voc:
         # Add open voc object detector here
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "can of food,creamer bottle",
+            "blue ball,bulldozer toy car,red soda can,food can,tajin bottle,bottle,green avocado plush toy,pink donut plush toy,pineapple plush toy,green caterpillar plush toy,penguin plush toy",
         )
-        model = OWLVITModelMultiClasses()
+        model = YOLOWorldModel() #OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()
@@ -813,7 +866,7 @@ if __name__ == "__main__":
                 flags.append("--decompress")
             elif local:
                 flags.append("--raw")
-                flags.append("--open-voc")
+                #flags.append("--open-voc")
             else:
                 raise RuntimeError("This should be impossible.")
         cmds = [f"python {osp.abspath(__file__)} {flag}" for flag in flags]

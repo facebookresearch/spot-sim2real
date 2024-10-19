@@ -183,7 +183,7 @@ GRAYSCALE_MASK_RCNN: False
 USE_MRCNN: True
 USE_FPN_R50: False
 USE_DEBLURGAN: True
-IMAGE_SCALE: 0.7
+IMAGE_SCALE: 1.0 #0.7
 # After this many time steps of not seeing the current target object, we become open to looking for new ones
 FORGET_TARGET_OBJECT_STEPS: 15
 

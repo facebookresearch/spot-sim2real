@@ -17,22 +17,18 @@ while True:
     model.set_classes(query_classes)
     if visualize:
         visualization_img = img.copy()
-    results = model.predict(img, device="cuda", stream=False)
-    bboxes, probs = [], []
-    if len(results) > 0:
-        for i, r in enumerate(results):
-            # Plot results image
-            if visualize:
-                visualization_img = r.plot(img=visualization_img)
-            if r.boxes.xyxy.shape[0] > 0:
-                conf = r.boxes.conf.cpu().numpy().tolist()[0]
-                if True:
-                    try:
-                        bboxes.append(r.boxes.xyxy.cpu().numpy().tolist()[0])
-                        probs.append(conf)
-                    except Exception as e:
-                        print(e)
-                        breakpoint()
+    results = model.predict(img, device="cuda:1", stream=False, conf=0.1)
+    bboxes, probs, labels = [], [], []
+    if len(results) == 1: #since we only send 1 image
+        r = results[0]
+        bboxes = r.boxes.xyxy.cpu().numpy().tolist()
+        probs = r.boxes.conf.cpu().numpy().astype(float).tolist()
+        clss = r.boxes.cls.cpu().numpy().astype(int).tolist()
+        labels = [model.names[clsi] for clsi in clss]
+        # Plot results image
+        if visualize:
+            visualization_img = r.plot(img=visualization_img)
+            
     if not visualize:
         visualization_img = None
-    socket.send_pyobj((bboxes, probs, visualization_img))
+    socket.send_pyobj((bboxes, probs, labels, visualization_img))
