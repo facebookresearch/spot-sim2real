@@ -168,6 +168,7 @@ class SpotNavEnv(SpotBaseEnv):
     def step(self, *args, **kwargs):
         observations, reward, done, info = super().step(*args, **kwargs)
 
+        # Check if we need to dock the robot
         if kwargs["action_dict"].get("should_dock", False):
             try:
                 self.spot.dock(dock_id=DOCK_ID, home_robot=True)
