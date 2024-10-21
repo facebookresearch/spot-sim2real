@@ -600,11 +600,19 @@ def scan_arm(
     angle_end=90,
     angle_interval=30,
     gaze_arm_angles=None,
+    comment_out_inside_search=True,
 ):
     # Create image search object
-    image_search = None  # ImageSearch(
-    #     corner_static_offset=0.5, use_yolov8=False, visualize=False, multi_class=True
-    # )
+    image_search = (
+        None
+        if comment_out_inside_search
+        else ImageSearch(
+            corner_static_offset=0.5,
+            use_yolov8=False,
+            visualize=False,
+            multi_class=True,
+        )
+    )
     multi_classes = [
         # "ball"
         "caterpillar plush toy",
@@ -636,7 +644,9 @@ def scan_arm(
         gaze_arm_angles[0] = angle
         spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
         time.sleep(1.5)
-        img_search_args = None  # get_arguments_for_image_search(spot)
+        img_search_args = (
+            None if image_search is None else get_arguments_for_image_search(spot)
+        )
         if img_search_args is not None:
             (
                 object_info_list,
