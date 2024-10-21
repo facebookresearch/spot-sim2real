@@ -325,7 +325,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = None #get_deblurgan_model(config)
+        self.deblur_gan = None  # get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -475,7 +475,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = None #get_deblurgan_model(config)
+        self.deblur_gan = None  # get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -548,9 +548,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     def _publish(self):
         stopwatch = Stopwatch()
-        start_time = time.time()
-        header = Header(stamp=rospy.Time.now())  # self.img_msg.header
-        timestamp = header.stamp
+        # start_time = time.time()
 
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
@@ -561,6 +559,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
         hand_rgb, arm_depth = [image_response_to_cv2(img) for img in imgs]
 
+        header = Header(stamp=rospy.Time.now())  # self.img_msg.header
+        timestamp = header.stamp
         # Get the vision to hand
         try:
             body_T_hand: mn.Matrix4 = self.spot.get_magnum_Matrix4_spot_a_T_b(
@@ -582,16 +582,17 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         new_detection, viz_img = self.model.inference(
             hand_rgb_preprocessed, timestamp, stopwatch
         )
-        
+
         is_pick_active = getattr(self.model, "is_pick_active", False)
-        if is_pick_active: 
+        if is_pick_active:
             self.publish_bbox_data(new_detection)
             new_detections = []
         else:
             # Split the detection
+            self.publish_bbox_data(f"{str(timestamp)}|None")
             timestamp, new_detections = new_detection.split("|")
             new_detections = new_detections.split(";")
-        
+
         object_info = []
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
@@ -698,7 +699,7 @@ class OWLVITModelMultiClasses(OWLVITModel):
         # We decide to hardcode these classes first as this will be more robust
         # and gives us the way to control the detection
         # multi_classes = [["ball", "cup", "table", "cabinet", "chair", "sofa"]]
-        start_time = time.time()
+        # start_time = time.time()
         multi_classes = rospy.get_param("/multi_class_object_target").split(",")
         multi_classes = [str(class_name).strip() for class_name in multi_classes]
         self.owlvit.update_label([multi_classes])
@@ -716,8 +717,9 @@ class OWLVITModelMultiClasses(OWLVITModel):
         else:
             bbox_xy_string = "None"
         detections_str = f"{str(timestamp)}|{bbox_xy_string}"
-        print(f"FPS {1./(time.time() - start_time)}")
+        # print(f"FPS {1./(time.time() - start_time)}")
         return detections_str, viz_img
+
 
 class YOLOWorldModel:
     def __init__(self, score_threshold=0.1, show_img=False):
@@ -729,10 +731,10 @@ class YOLOWorldModel:
 
     def inference(self, hand_rgb, timestamp, stopwatch):
         # print("Running inference on Owlvit")
-        start_time = time.time()
-        is_pick_active = rospy.get_param("/skill_input", "")
+        # start_time = time.time()
+        is_pick_active = rospy.get_param("/skill_name_input", "")
         if "pick" in is_pick_active:
-            self.is_pick_active = True 
+            self.is_pick_active = True
             multi_classes = rospy.get_param("/object_target").split(",")
         else:
             self.is_pick_active = False
@@ -752,8 +754,9 @@ class YOLOWorldModel:
             bbox_xy_string = "None"
         detections_str = f"{str(timestamp)}|{bbox_xy_string}"
         detections_str = f"{str(timestamp)}|{bbox_xy_string}"
-        print(f"Time taken for 1 frame {1.0/(time.time() - start_time)}")
+        # print(f"Time taken for 1 frame {1.0/(time.time() - start_time)}")
         return detections_str, viz_img
+
 
 class MRCNNModel:
     def __init__(self):
@@ -837,9 +840,9 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "blue ball,bulldozer toy car,red soda can,food can,tajin bottle,bottle,green avocado plush toy,pink donut plush toy,pineapple plush toy,green caterpillar plush toy,penguin plush toy",
+            "blue ball,bulldozer toy car,soda can,food can,bottle,green avocado plush toy,pink donut plush toy,pineapple plush toy,green caterpillar plush toy,penguin plush toy",
         )
-        model = YOLOWorldModel() #OWLVITModelMultiClasses()
+        model = YOLOWorldModel()  # OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:
         node = SpotDecompressingRawImagesPublisher()
@@ -866,7 +869,7 @@ if __name__ == "__main__":
                 flags.append("--decompress")
             elif local:
                 flags.append("--raw")
-                #flags.append("--open-voc")
+                # flags.append("--open-voc")
             else:
                 raise RuntimeError("This should be impossible.")
         cmds = [f"python {osp.abspath(__file__)} {flag}" for flag in flags]
