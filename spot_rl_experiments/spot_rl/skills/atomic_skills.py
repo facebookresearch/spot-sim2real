@@ -162,6 +162,8 @@ class Skill:
         while not done:
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
+            if "should_dock" in goal_dict:
+                action_dict["should_dock"] = goal_dict["should_dock"]
             prev_pose = [
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
