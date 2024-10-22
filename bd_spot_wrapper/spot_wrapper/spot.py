@@ -1734,6 +1734,7 @@ def draw_crosshair(img):
 
 
 def wrap_heading(heading, wrap_angle=180):
-    """Ensures input heading is between -180 an 180; can be float or np.ndarray"""
+    """Ensures input heading is between -180 an 180; can be float or np.ndarray.
+    For the new place policy, the wrap angle is used for turning the wrist before opening the gripper for placing"""
     wrap_angle_rad = np.deg2rad(wrap_angle)
     return (heading + wrap_angle_rad) % (2 * wrap_angle_rad) - wrap_angle_rad

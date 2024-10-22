@@ -187,7 +187,6 @@ def get_arguments_for_image_search(spot: Spot):
         )
     except Exception as e:
         print(e)
-        breakpoint()
 
     if any(
         x is None
@@ -241,7 +240,7 @@ class ImageSearch:
         self.owlvit = OwlVit([["ball"]], 0.05, False, 2) if not use_yolov8 else None
         self.yolov8predictor: YOLOV8Predictor = (
             YOLOV8Predictor(
-                "/home/tusharsangam/Desktop/spot-sim2real/spot_rl_experiments/weights/torchscript/yolov8x.torchscript"
+                "./spot_rl_experiments/weights/torchscript/yolov8x.torchscript"
             )
             if use_yolov8
             else None
@@ -600,12 +599,12 @@ def scan_arm(
     angle_end=90,
     angle_interval=30,
     gaze_arm_angles=None,
-    comment_out_inside_search=True,
+    enable_object_detector_during_movement=False,
 ):
     # Create image search object
     image_search = (
         None
-        if comment_out_inside_search
+        if not enable_object_detector_during_movement
         else ImageSearch(
             corner_static_offset=0.5,
             use_yolov8=False,
@@ -637,10 +636,9 @@ def scan_arm(
             np.arange(angle_end, 0, -angle_interval),
         ]
     )
-    # rate = angle_interval
     for _, angle in enumerate(semicircle_range):
         print(f"Scanning in {angle} cone")
-        angle_time = 1.0  # int(np.abs(gaze_arm_angles[0] - angle) / rate)
+        angle_time = 1.0
         gaze_arm_angles[0] = angle
         spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
         time.sleep(1.5)

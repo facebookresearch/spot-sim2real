@@ -71,10 +71,10 @@ def astar(grid, start, goal):
             )
 
             if is_area_free and is_area_within_bounds:
-                local_top = neighbor_center[0] - expand_range//2
-                local_bottom = neighbor_center[0] + expand_range//2
-                local_left = neighbor_center[1] - expand_range//2
-                local_right = neighbor_center[1] + expand_range//2
+                local_top = neighbor_center[0] - expand_range
+                local_bottom = neighbor_center[0] + expand_range
+                local_left = neighbor_center[1] - expand_range
+                local_right = neighbor_center[1] + expand_range
                 is_local_area_within_bounds = (
                     0 <= local_top < grid.shape[0]
                     and 0 <= local_bottom < grid.shape[0]

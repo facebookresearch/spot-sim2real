@@ -69,7 +69,6 @@ class OwlVit:
         img: an open cv image in (H, W, C) format
         """
         # Process inputs
-        # img = img.to(self.device)
         inputs = self.processor(text=self.labels, images=img, return_tensors="pt")
 
         # Target image sizes (height, width) to rescale box predictions [batch_size, 2]
@@ -90,7 +89,6 @@ class OwlVit:
             results = self.processor.post_process_object_detection(
                 outputs=outputs, target_sizes=target_sizes
             )
-        # img = img.to('cpu')
 
         if self.show_img:
             self.show_img_with_overlaid_bounding_boxes(img, results)

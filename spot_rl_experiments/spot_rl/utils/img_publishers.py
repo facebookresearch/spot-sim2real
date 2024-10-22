@@ -215,7 +215,7 @@ class SpotProcessedImagesPublisher(SpotImagePublisher):
         self.img_msg = None
         rospy.Subscriber(
             self.subscriber_topic, self.subscriber_msg_type, self.cb, queue_size=1
-        ) if self.subscriber_topic is not None else None
+        )
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
         while self.img_msg is None and self.subscriber_topic is not None:
             pass
@@ -223,7 +223,7 @@ class SpotProcessedImagesPublisher(SpotImagePublisher):
         self.updated = True
 
     def publish(self):
-        if not self.updated and self.subscriber_topic is not None:
+        if not self.updated:
             return
         super().publish()
         self.updated = False
@@ -460,10 +460,9 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
 
-class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
+class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     name = "spot_open_voc_object_detector_publisher"
-    subscriber_topic = None  # rt.HAND_RGB
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
     publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
 
@@ -588,6 +587,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
                 if point_in_gripper is None:
                     print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
+                # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
+                # & then use these in hab-llm to calculate iou in global space
                 left_top_in_3d = self.convert_2d_pixel_to_3d(
                     [x1, y1], depth_raw, cam_intrinsics
                 )
@@ -630,8 +631,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         # publish data
         self.publish_new_detection(";".join(object_info))
         self.publish_viz_img(viz_img, header)
-
-        # stopwatch.print_stats()
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
