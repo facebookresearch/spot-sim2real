@@ -46,6 +46,10 @@ class SpotRosSkillExecutor:
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
         self.detection_topic = "/dwg_obj_pub"
+        # which behaviour do you want, continuous dwg additions + scan arm or only do dwg additions in scan_arm
+        self._use_continuos_dwg_or_stop_add = "continous"  # "stopnadd"
+        flag = self._use_continuos_dwg_or_stop_add == "continous"
+        rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},{flag}")
         # Creating a publisher for Multiclass owlvit detecetions
         self.detection_publisher = rospy.Publisher(
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
@@ -122,8 +126,9 @@ class SpotRosSkillExecutor:
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
                 )
             else:
                 rospy.set_param(
@@ -166,10 +171,18 @@ class SpotRosSkillExecutor:
             if succeded and not robot_holding:
                 time.sleep(1)
                 print("Scanning area with arm")
+                # we need to keep it on for both cases continous & stopnadd
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                )
                 scan_arm(
                     self.spotskillmanager.spot,
                     publisher=self.detection_publisher,
                     enable_object_detector_during_movement=False,
+                )
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
                 )
             else:
                 print("Will not scan arm")
@@ -188,8 +201,9 @@ class SpotRosSkillExecutor:
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
                 )
             else:
                 rospy.set_param(
@@ -265,10 +279,17 @@ class SpotRosSkillExecutor:
             if succeded and not robot_holding:
                 time.sleep(1)
                 print("Scanning area with arm")
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                )
                 scan_arm(
                     self.spotskillmanager.spot,
                     publisher=self.detection_publisher,
                     enable_object_detector_during_movement=False,
+                )
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
                 )
             else:
                 print("Will not scan arm")
@@ -297,7 +318,7 @@ class SpotRosSkillExecutor:
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param(
                 "/enable_dwg_object_addition", f"{str(time.time())},True"
-            ) if not succeded else None
+            ) if not succeded and self._use_continuos_dwg_or_stop_add == "continous" else None
             rospy.set_param("/viz_object", "None")
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -325,7 +346,9 @@ class SpotRosSkillExecutor:
             self.episode_log["actions"].append({"place": skill_log})
 
             self.reset_skill_name_input(skill_name, succeded, msg)
-            rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},True")
+            rospy.set_param(
+                "/enable_dwg_object_addition", f"{str(time.time())},True"
+            ) if self._use_continuos_dwg_or_stop_add == "continous" else None
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()

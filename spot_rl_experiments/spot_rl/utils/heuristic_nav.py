@@ -398,6 +398,21 @@ class ImageSearch:
 
         return False, rgb_img_vis
 
+    def convert_2d_pixel_to_3d(
+        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=10
+    ):
+        Z = float(
+            sample_patch_around_point(
+                int(pixel_uv[0]), int(pixel_uv[1]), depth_raw, patch_size
+            )
+            * 1.0
+        )
+        if np.isnan(Z):
+            print(f"Affordance Prediction : Z is NaN = {Z}")
+            return None
+        point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
+        return point_in_3d
+
     def detect3d_object_locations(
         self,
         object_targets: List[str],
@@ -417,6 +432,13 @@ class ImageSearch:
             vis_img_required=True,
             multi_objects_per_label=self.multi_class,
         )
+
+        curr_x, curr_y, curr_yaw = spot.get_xy_yaw()
+        home_T_body: mn.Matrix4 = mn.Matrix4.from_(
+            mn.Matrix4.rotation_z(mn.Rad(curr_yaw)).rotation(),
+            mn.Vector3(curr_x, curr_y, 0.5),
+        )
+        home_T_hand = home_T_body @ body_T_hand
 
         # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
         if bbox_xy is not None and bbox_xy != []:
@@ -443,48 +465,50 @@ class ImageSearch:
                 int(float(i) / self.image_scale)
                 for i in [x1_str, y1_str, x2_str, y2_str]
             ]
+            pixel_x = int(np.mean([x1, x2]))
+            pixel_y = int(np.mean([y1, y2]))
 
-            try:
-                depth_raw = unscaled_depth / 1000.0
-
-                cx, cy = (x1 + x2) / 2.0, (y1 + y2) / 2.0
-                Z = float(sample_patch_around_point(int(cx), int(cy), depth_raw) * 1.0)
-                if np.isnan(Z):
-                    print(f"Affordance Prediction : Z is NaN for {class_label} = {Z}")
-                    continue
-                elif Z > MAX_HAND_DEPTH:
-                    print(
-                        f"Affordance Prediction : Z is out of bounds for {class_label} = {Z}"
-                    )
-                    continue
-
-                point_in_gripper = get_3d_point(cam_intrinsics, (cx, cy), Z)
-                assert (
-                    point_in_gripper is not None
-                ), f"Unpossible Affordance Point is NaN for {class_label}, skipping"
-
-            except Exception as e:
-                print(f"Issue of predicting location: {e}")
+            depth_raw = unscaled_depth / 1000.0
+            point_in_gripper = self.convert_2d_pixel_to_3d(
+                [pixel_x, pixel_y], depth_raw, cam_intrinsics
+            )
+            if point_in_gripper is None:
+                print(f"Affordance Point is NaN for {class_label}, skipping")
                 continue
+            # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
+            # & then use these in hab-llm to calculate iou in global space
+            left_top_in_3d = self.convert_2d_pixel_to_3d(
+                [x1, y1], depth_raw, cam_intrinsics
+            )
+            right_bottom_in_3d = self.convert_2d_pixel_to_3d(
+                [x2, y2], depth_raw, cam_intrinsics
+            )
 
             if np.isnan(point_in_gripper).any():
                 continue
 
-            curr_x, curr_y, curr_yaw = spot.get_xy_yaw()
-            transform_to_convert_base_to_home = mn.Matrix4.from_(
-                mn.Matrix4.rotation_z(mn.Rad(curr_yaw)).rotation(),
-                mn.Vector3(curr_x, curr_y, 0.5),
-            )
             point_in_global_3d = np.array(
-                transform_to_convert_base_to_home.transform_point(
-                    body_T_hand.transform_point(mn.Vector3(*point_in_gripper))
-                )
+                home_T_hand.transform_point(mn.Vector3(*point_in_gripper))
             )
-
+            linear_dist = np.linalg.norm(
+                point_in_global_3d[:2] - np.array([curr_x, curr_y])
+            )
+            if linear_dist > 3.0:
+                print(f"Detected object quite out of range {linear_dist}")
+                continue
+            points_in_global_3d = [
+                np.array(home_T_hand.transform_point(mn.Vector3(*point_in_3d)))[
+                    :2
+                ].tolist()
+                for point_in_3d in [left_top_in_3d, right_bottom_in_3d]
+            ]
+            points_in_global_3d_str = ",".join(
+                [f"{p[0]},{p[1]}" for p in points_in_global_3d]
+            )
             object_info.append(
-                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score}"
+                f"{class_label},{point_in_global_3d[0]},{point_in_global_3d[1]},{point_in_global_3d[2]},{score},{points_in_global_3d_str}"
             )
-            print(f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2}")
+        print(f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2}")
 
         return object_info, rgb_img_vis
 
