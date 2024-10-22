@@ -20,7 +20,7 @@ WEIGHTS_TORCHSCRIPT:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_static_contacttest_pen_EEPoseSensor_reset_arm_high_y_0.7_rand_ee_ori_ckpt.50.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -45,7 +45,7 @@ WEIGHTS:
   SEMANTIC_PLACE: "weights/semantic_place/sp12lhb6v10_12_ckpt.199.torchscript"
 
   # Semantic place EE
-  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_mobile_0.1_30_ee_0.1_rot_drop_no_term_250_steps_EEPoseSensor_kinematic_ee_dist_emb_unocc_snap_seed1_ckpt.35.pth.torchscript"
+  SEMANTIC_PLACE_EE: "weights/semantic_place_ee/sp_55k_static_contacttest_pen_EEPoseSensor_reset_arm_high_y_0.7_rand_ee_ori_ckpt.50.pth.torchscript"
 
   # Open close drawer
   OPEN_CLOSE_DRAWER: "weights/open_close_drawer/od15lr_56_ckpt.59.combined_net.torchscript"
@@ -155,6 +155,7 @@ INITIAL_ARM_JOINT_ANGLES: [0, -170, 120, 0, 75, 0]
 INITIAL_ARM_JOINT_ANGLES_GRIPPERCAM_LOGGER: [0, -91, 33, 0, 100, 0]
 INITIAL_ARM_JOINT_ANGLES_INTELCAM_LOGGER: [0, -100, 33, 0, 89, 0]
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE: [0, -180, 180, 0, 0, 90] # The initial orientation of the arm for side grasping (gripper is in object's right hand side)
+INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE: [0, -120, 60, 0, 88, 0]
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # The initial orientation of the arm for side grasping (gripper is in object's left hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]

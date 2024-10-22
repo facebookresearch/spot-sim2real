@@ -519,6 +519,33 @@ class SpotSkillManager:
         else:
             return self.place_config.GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES
 
+    # estimating waypoint
+    def waypoint_estimator(self, percentile, visualize, height_adjustment_threshold):
+        try:
+            (
+                place_target_location,
+                place_target_in_gripper_camera,
+                edge_point_in_base,
+                _,
+            ) = detect_place_point_by_pcd_method(
+                self.spot,
+                self.arm_joint_angles,
+                percentile=percentile,
+                visualize=visualize,
+                height_adjustment_offset=height_adjustment_threshold,
+            )
+            print(f"Estimate Place xyz: {place_target_location}")
+            if visualize:
+                plot_place_point_in_gripper_image(
+                    self.spot, place_target_in_gripper_camera
+                )
+            return place_target_location, edge_point_in_base
+        except Exception as e:
+            message = f"Failed to estimate place way point due to {str(e)}"
+            conditional_print(message=message, verbose=self.verbose)
+            print(message)
+            return None, None
+
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
@@ -573,58 +600,48 @@ class SpotSkillManager:
             else:
                 height_adjustment_threshold = 0.23
             # estimate waypoint
-            try:
-                (
-                    place_target_location,
-                    place_target_in_gripper_camera,
-                    edge_point_in_base,
-                    _,
-                ) = detect_place_point_by_pcd_method(
-                    self.spot,
-                    self.arm_joint_angles,
-                    percentile=percentile,
-                    visualize=visualize,
-                    height_adjustment_offset=height_adjustment_threshold,
-                )
-                print(f"Estimate Place xyz: {place_target_location}")
-                if visualize:
-                    plot_place_point_in_gripper_image(
-                        self.spot, place_target_in_gripper_camera
+            place_target_location, edge_point_in_base = self.waypoint_estimator(
+                percentile, visualize, height_adjustment_threshold
+            )
+
+        edge_x = float(edge_point_in_base[0])
+
+        # Move the base if the robot is too far away from the place target
+        start_walking_distance_threshold = self.place_config.get(
+            "MIN_DISTANCE_TO_PLACE_TARGET", 0.7
+        )  # in meters
+        travel_time_for_walking_to_target = 2  # in seconds
+        if edge_x > start_walking_distance_threshold:
+            walk_distance = edge_x - start_walking_distance_threshold
+            (
+                before_walking_x,
+                before_walking_y,
+                before_walking_yaw,
+            ) = self.spot.get_xy_yaw()
+            # Walk to the place target
+            self.spot.set_base_position(
+                walk_distance, 0, 0, travel_time_for_walking_to_target, True
+            )
+            # Wait for the robot to finish walking
+            time.sleep(travel_time_for_walking_to_target)
+            after_walking_x, after_walking_y, after_walking_yaw = self.spot.get_xy_yaw()
+            walk_distance = after_walking_x - before_walking_x
+            # Offset the place target location
+            place_target_location[0] -= walk_distance
+            # For EE place policy, we are re-estimating waypoint after the base is moved since the arm start to place from higher angle
+            if self.use_place_ee:
+                print("Re-estimating waypoint ....")
+                rospy.set_param("is_gripper_blocked", 0)
+                previous_place_target_location = place_target_location.copy()
+                try:
+                    place_target_location, edge_point_in_base = self.waypoint_estimator(
+                        percentile, visualize, height_adjustment_threshold
                     )
-            except Exception as e:
-                message = f"Failed to estimate place way point due to {str(e)}"
-                conditional_print(message=message, verbose=self.verbose)
-                print(message)
-                return False, message
-
-            edge_x = float(edge_point_in_base[0])
-
-            # Move the base if the robot is too far away from the place target
-            start_walking_distance_threshold = self.place_config.get(
-                "MIN_DISTANCE_TO_PLACE_TARGET", 0.7
-            )  # in meters
-            travel_time_for_walking_to_target = 2  # in seconds
-            if edge_x > start_walking_distance_threshold:
-                walk_distance = edge_x - start_walking_distance_threshold
-                (
-                    before_walking_x,
-                    before_walking_y,
-                    before_walking_yaw,
-                ) = self.spot.get_xy_yaw()
-                # Walk to the place target
-                self.spot.set_base_position(
-                    walk_distance, 0, 0, travel_time_for_walking_to_target, True
-                )
-                # Wait for the robot to finish walking
-                time.sleep(travel_time_for_walking_to_target)
-                (
-                    after_walking_x,
-                    after_walking_y,
-                    after_walking_yaw,
-                ) = self.spot.get_xy_yaw()
-                walk_distance = after_walking_x - before_walking_x
-                # Offset the place target location
-                place_target_location[0] -= walk_distance
+                except Exception as e:
+                    print(
+                        f"Error during waypoint re-estimation: {str(e)}. Using previous point."
+                    )
+                    place_target_location = previous_place_target_location
 
         place_x, place_y, place_z = place_target_location.astype(np.float64).tolist()
         status, message = self.place(

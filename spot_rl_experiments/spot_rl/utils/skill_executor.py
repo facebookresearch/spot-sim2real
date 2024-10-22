@@ -3,6 +3,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import argparse
+import json
 import os
 import os.path as osp
 import threading
@@ -12,13 +13,16 @@ import traceback
 import numpy as np
 import rospy
 from spot_rl.envs.skill_manager import SpotSkillManager
-from spot_rl.utils.heuristic_nav import scan_arm
+from spot_rl.utils.heuristic_nav import scan_arm, scan_base
 from spot_rl.utils.retrieve_robot_poses_from_cg import get_view_poses
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 from spot_rl.utils.utils import ros_topics as rt
 from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
     get_navigation_points,
 )
+from std_msgs.msg import String
+
+LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
 
 
 class SpotRosSkillExecutor:
@@ -29,6 +33,9 @@ class SpotRosSkillExecutor:
         self._cur_skill_name_input = None
         self._is_robot_on_dock = False
         self.reset_image_viz_params()
+        self.episode_log = {"actions": []}
+        self.total_steps = 0
+        self.total_time = 0
 
         # Listen to cancel msg
         self.end = False
@@ -38,6 +45,15 @@ class SpotRosSkillExecutor:
         # Reset
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
+        self.detection_topic = "/dwg_obj_pub"
+        # which behaviour do you want, continuous dwg additions + scan arm or only do dwg additions in scan_arm
+        self._use_continuos_dwg_or_stop_add = "continous"  # "stopnadd"
+        flag = self._use_continuos_dwg_or_stop_add == "continous"
+        rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},{flag}")
+        # Creating a publisher for Multiclass owlvit detecetions
+        self.detection_publisher = rospy.Publisher(
+            self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        )
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -88,12 +104,15 @@ class SpotRosSkillExecutor:
         else:
             return True, ""
 
-    def execute_skills(self):
+    # type: ignore
+    def execute_skills(self):  # noqa: C901
         """Execute skills."""
 
         # Get the current skill name
+        skill_log = {"success": False, "num_steps": 0}
         skill_name, skill_input = get_skill_name_and_input_from_ros()
-
+        final_success = True
+        metric_list = []
         # Power on the robot if the robot was in the dock
         if self._is_robot_on_dock:
             self.spotskillmanager.spot.power_robot()
@@ -105,6 +124,17 @@ class SpotRosSkillExecutor:
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            if not robot_holding:
+                self.spotskillmanager.spot.open_gripper()
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+                )
+            else:
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},False"
+                )
+
             # Reset the skill message
             self.reset_skill_msg()
             # For navigation target
@@ -139,15 +169,29 @@ class SpotRosSkillExecutor:
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
             )
             if succeded and not robot_holding:
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
                 time.sleep(1)
                 print("Scanning area with arm")
-                scan_arm(self.spotskillmanager.spot)
+                # we need to keep it on for both cases continous & stopnadd
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                )
+                scan_arm(
+                    self.spotskillmanager.spot,
+                    publisher=self.detection_publisher,
+                    enable_object_detector_during_movement=False,
+                )
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+                )
             else:
                 print("Will not scan arm")
-            rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message
+            skill_log = self.spotskillmanager.nav_controller.skill_result_log
+            if "num_steps" not in skill_log:
+                skill_log["num_steps"] = 0
+            self.episode_log["actions"].append({"nav": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
             # Reset the navigation target
             rospy.set_param("nav_target_xyz", "None,None,None|")
@@ -155,6 +199,16 @@ class SpotRosSkillExecutor:
             rospy.set_param("/viz_place", "None")
         elif skill_name == "nav_path_planning_with_view_poses":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            if not robot_holding:
+                self.spotskillmanager.spot.open_gripper()
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+                )
+            else:
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},False"
+                )
             # Get the bbox center and bbox extent
             bbox_info = skill_input.split(";")  # in the format of x,y,z
             assert (
@@ -170,7 +224,7 @@ class SpotRosSkillExecutor:
                 rospy.set_param("/viz_pick", query_class_names[0])
             # Get the view poses
             view_poses, category_tag = get_view_poses(
-                bbox_center, bbox_extent, query_class_names, False
+                bbox_center, bbox_extent, query_class_names, True
             )
 
             # Get the robot x, y, yaw
@@ -209,6 +263,11 @@ class SpotRosSkillExecutor:
                     else:
                         # Do dynamic point yaw here for the intermediate points
                         succeded, msg = self.spotskillmanager.nav(x, y)
+                    skill_log = self.spotskillmanager.nav_controller.skill_result_log
+                    if "num_steps" not in skill_log:
+                        skill_log["num_steps"] = 0
+                    self.episode_log["actions"].append({"nav_viewpose": skill_log})
+
             else:
                 succeded = False
                 msg = "Cannot navigate to the point"
@@ -218,13 +277,22 @@ class SpotRosSkillExecutor:
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
             )
             if succeded and not robot_holding:
-                rospy.set_param("/is_arm_scanning", f"{str(time.time())},True")
                 time.sleep(1)
                 print("Scanning area with arm")
-                scan_arm(self.spotskillmanager.spot)
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                )
+                scan_arm(
+                    self.spotskillmanager.spot,
+                    publisher=self.detection_publisher,
+                    enable_object_detector_during_movement=False,
+                )
+                flag = self._use_continuos_dwg_or_stop_add == "continous"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+                )
             else:
                 print("Will not scan arm")
-            rospy.set_param("/is_arm_scanning", f"{str(time.time())},False")
 
             # Reset skill name and input and publish message
             self.reset_skill_name_input(skill_name, succeded, msg)
@@ -232,6 +300,7 @@ class SpotRosSkillExecutor:
             rospy.set_param("/viz_place", "None")
         elif skill_name == "pick":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             rospy.set_param("/viz_object", skill_input)
             # Set the multi class object target
             rospy.set_param("multi_class_object_target", skill_input)
@@ -242,14 +311,22 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = pick_msg
+            skill_log = self.spotskillmanager.gaze_controller.skill_result_log
+            if "num_steps" not in skill_log:
+                skill_log["num_steps"] = 0
+            self.episode_log["actions"].append({"pick": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param(
+                "/enable_dwg_object_addition", f"{str(time.time())},True"
+            ) if not succeded and self._use_continuos_dwg_or_stop_add == "continous" else None
             rospy.set_param("/viz_object", "None")
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            rospy.set_param("is_gripper_blocked", 0)
+            rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             self.reset_skill_msg()
             if self.spotskillmanager.allow_semantic_place:
                 # Call semantic place skills
-                rospy.set_param("is_gripper_blocked", 0)
                 succeded, msg = self.spotskillmanager.place(
                     skill_input,
                     is_local=True,
@@ -263,7 +340,15 @@ class SpotRosSkillExecutor:
                 succeded, msg = self.spotskillmanager.place(
                     0.6, 0.0, 0.4, is_local=True
                 )
+            skill_log = self.spotskillmanager.place_controller.skill_result_log
+            if "num_steps" not in skill_log:
+                skill_log["num_steps"] = 0
+            self.episode_log["actions"].append({"place": skill_log})
+
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param(
+                "/enable_dwg_object_addition", f"{str(time.time())},True"
+            ) if self._use_continuos_dwg_or_stop_add == "continous" else None
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
@@ -286,6 +371,19 @@ class SpotRosSkillExecutor:
             self._is_robot_on_dock = True
             rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
 
+        self.total_steps += len(metric_list)
+        self.total_time += sum(
+            metric["time_taken"] for metric in metric_list if "time_taken" in metric
+        )
+        self.episode_log["total_time"] = self.total_time
+        self.episode_log["final_success"] = final_success and skill_log["success"]
+        self.episode_log["total_steps"] = self.total_steps
+
+    def save_logs_as_json(self):
+        file_path = osp.join(LOG_PATH, "test.json")
+        with open(file_path, "w") as file:
+            json.dump(self.episode_log, file, indent=4)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -296,11 +394,12 @@ def main():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
     rospy.set_param("/cancel", False)
+    rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},True")
 
     while True:
         # Call the skill manager
         spotskillmanager = SpotSkillManager(
-            use_mobile_pick=True, use_semantic_place=True
+            use_mobile_pick=True, use_semantic_place=True, use_place_ee=True
         )
         executor = None
         try:

@@ -436,6 +436,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     disable_obstacle_avoidance=disable_oa,
                 )
             elif arm_ee_action is not None:
+                # To prevent marching at same place for semantic place EE
+                # TODO : Refactor in a better way to ensure base marching is diabled given base velocity
+                if self._max_lin_dist_scale == 0:
+                    base_action = None
                 if base_action is None:
                     self.spot.set_arm_ee_pos(
                         arm_ee_action,
