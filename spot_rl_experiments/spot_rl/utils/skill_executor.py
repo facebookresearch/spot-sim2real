@@ -380,7 +380,7 @@ class SpotRosSkillExecutor:
         self.episode_log["total_steps"] = self.total_steps
 
     def save_logs_as_json(self):
-        file_path = osp.join(LOG_PATH, "E2E_L3_NP_IR102_tajinn.json")
+        file_path = osp.join(LOG_PATH, "test.json")
         with open(file_path, "w") as file:
             json.dump(self.episode_log, file, indent=4)
 
