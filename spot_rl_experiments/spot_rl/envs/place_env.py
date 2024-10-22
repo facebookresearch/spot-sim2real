@@ -14,7 +14,6 @@ import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_rl.utils.search_table_location import convert_point_in_body_to_place_waypoint
-from spot_wrapper.spot import Spot
 from spot_wrapper.spot import Spot, wrap_heading
 from spot_wrapper.utils import angle_between_quat
 
