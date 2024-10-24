@@ -5,19 +5,25 @@
 
 import logging
 import os
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
+
 from perception_and_utils.perception.detector_wrappers.generic_detector_interface import (
     GenericDetector,
 )
-from perception_and_utils.utils.image_utils import label_img, decorate_img_with_fps
 from perception_and_utils.utils.data_frame import DataFrame
+from perception_and_utils.utils.image_utils import decorate_img_with_fps, label_img
+
 
 class HumanMotionDetector(GenericDetector):
-    """
-    """
+    """ """
 
     def __init__(self):
         super().__init__()
@@ -26,8 +32,9 @@ class HumanMotionDetector(GenericDetector):
     def _init_human_motion_detector(
         self,
         # velocity_threshold=1.2,
-        velocity_threshold=0.4, # hacking this
-        time_horizon_ns=1000000000):
+        velocity_threshold=0.4,  # hacking this
+        time_horizon_ns=1000000000,
+    ):
         """
         Initialize the human motion detector
 
@@ -39,16 +46,15 @@ class HumanMotionDetector(GenericDetector):
         self.enable_detector()
         self._velocity_threshold = velocity_threshold
 
-        self._time_horizon_ns = time_horizon_ns # 1 second
-        self._previous_frames = [] # type: List[Tuple[np.ndarray, float]]
-        self._len_prev_frame_cache = 100 # Keep this value larger than fps
+        self._time_horizon_ns = time_horizon_ns  # 1 second
+        self._previous_frames = []  # type: List[Tuple[np.ndarray, float]]
+        self._len_prev_frame_cache = 100  # Keep this value larger than fps
 
-
-        self._human_motion_history = [] # type: List[Tuple[float, str]]
+        self._human_motion_history = []  # type: List[Tuple[float, str]]
 
     def process_frame(
         self,
-        frame: DataFrame, # new data frame
+        frame: DataFrame,  # new data frame
     ) -> Tuple[str, float]:
         # Do nothing if detector is not enabled
         if self.is_enabled is False:
@@ -64,8 +70,8 @@ class HumanMotionDetector(GenericDetector):
         self._previous_frames.append((current_position, frame._timestamp_s))
 
         # If the cache is just 1 element or less, return "Standing"
-        lookback_index=10
-        if len(self._previous_frames) < lookback_index+1:
+        lookback_index = 10
+        if len(self._previous_frames) < lookback_index + 1:
             return "Standing", None
 
         # If the cache is full, remove the oldest frame
@@ -73,9 +79,15 @@ class HumanMotionDetector(GenericDetector):
             self._previous_frames.pop(0)
 
         # Calculate the Euclidean distance between now & then
-        print(f"Current position: {current_position}   |   Previous position: {self._previous_frames[lookback_index][0]}")
-        distance = np.linalg.norm(current_position - self._previous_frames[lookback_index][0])
-        time = frame._timestamp_s - self._previous_frames[lookback_index][1] # as we are considering x frames per second so our window is 1 sec
+        print(
+            f"Current position: {current_position}   |   Previous position: {self._previous_frames[lookback_index][0]}"
+        )
+        distance = np.linalg.norm(
+            current_position - self._previous_frames[lookback_index][0]
+        )
+        time = (
+            frame._timestamp_s - self._previous_frames[lookback_index][1]
+        )  # as we are considering x frames per second so our window is 1 sec
         print(f"Distance: {distance} m   |   Time: {time} sec")
         avg_velocity = distance / time
 
@@ -93,8 +105,7 @@ class HumanMotionDetector(GenericDetector):
         img_frame: np.ndarray,
         outputs: Dict,
     ) -> Tuple[np.ndarray, Dict]:
-        """
-        """
+        """ """
         viz_img = img_frame.copy()
         # Decorate image with text for visualization
         label_img(
@@ -107,12 +118,15 @@ class HumanMotionDetector(GenericDetector):
             text=f"Velocity: {outputs['velocity']}",
             org=(50, 250),
         )
-        decorate_img_with_fps(viz_img, outputs["data_frame_fps"],pos=(50, 400))
+        decorate_img_with_fps(viz_img, outputs["data_frame_fps"], pos=(50, 400))
         return viz_img, outputs
 
     def update_human_motion_history(self, state, timestamp):
         # If current state of human is different from last state in history list, only then update history
-        if len(self._human_motion_history) == 0 or self._human_motion_history[-1][1] != state:
+        if (
+            len(self._human_motion_history) == 0
+            or self._human_motion_history[-1][1] != state
+        ):
             self._human_motion_history.append((timestamp, state))
 
     def get_human_motion_history(self):

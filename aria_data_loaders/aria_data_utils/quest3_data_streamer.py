@@ -19,6 +19,7 @@ except ImportError:
 
 import logging
 import time
+import traceback
 from typing import Any, Dict, List, Optional, Tuple
 
 import click
@@ -26,7 +27,12 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import rospy
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 from perception_and_utils.utils.conversions import (
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
@@ -47,7 +53,10 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
-        self.frame_rate_counter = FrameRateCounter()
+        self.frc_all = FrameRateCounter()
+        self.frc_qrd = FrameRateCounter()
+        self.frc_hmd = FrameRateCounter()
+        self.frc_od = FrameRateCounter()
 
         self.unified_quest3_camera = UnifiedQuestCamera()
         self.rgb_cam_params: CameraParams = None
@@ -60,14 +69,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         Connect to Device
         """
         self._is_connected = True
-        self.logger("Quest3DataStreamer :: Connected")
+        self.logger.info("Quest3DataStreamer :: Connected")
 
     def disconnect(self):
         """
         Disconnects from Device cleanly
         """
         self._is_connected = False
-        self.logger("Quest3DataStreamer :: Disconnected")
+        self.logger.info("Quest3DataStreamer :: Disconnected")
 
     def is_connected(self) -> bool:
         return (
@@ -167,10 +176,11 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         data_frame._aligned_depth_frame = None  # TODO: Add this logic
 
         # Update frame rate counter
-        self.frame_rate_counter.update()
+        # self.frame_rate_counter.update()
         data_frame._avg_rgb_fps = self.unified_quest3_camera.get_avg_fps_rgb()
         data_frame._avg_depth_fps = self.unified_quest3_camera.get_avg_fps_depth()
-        data_frame._avg_data_frame_fps = self.frame_rate_counter.avg_value()
+        # data_frame._avg_data_frame_fps = self.frame_rate_counter.avg_value()
+        data_frame._avg_data_frame_fps = 0.0
 
         return data_frame
 
@@ -183,15 +193,32 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         detect_human_motion: bool = False,
         object_label="milk bottle",
     ) -> Tuple[np.ndarray, dict]:
+        rate_all = 0.0
+        rate_qrd = 0.0
+        rate_hmd = 0.0
+        rate_od = 0.0
+
+        self.frc_all.start()
+
         # Initialize object_scores to empty dict for current image frame
         # object_scores = {}  # type: Dict[str, Any]
 
         # Get rgb image from frame
         viz_img = data_frame._rgb_frame
         if viz_img is None:
-            rospy.logwarn("No image found in frame")
+            rospy.logwarn("No image found in frame")  # This gets over-written.. WASTE!
+
+        if detect_objects:
+            self.frc_od.start()
+            viz_img, object_scores = self.object_detector.process_frame(data_frame)
+            # if object_label in object_scores.keys():
+            #     if self.verbose:
+            #         plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
+            #     self.publish_pose_of_interest(frame.get("ros_pose"))
+            rate_od = self.frc_od.stop()
 
         if detect_qr:
+            self.frc_qrd.start()
             (viz_img, camera_T_marker) = self.april_tag_detector.process_frame(frame=data_frame)  # type: ignore
 
             deviceWorld_T_camera = data_frame._deviceWorld_T_camera_rgb
@@ -213,9 +240,9 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                     self.marker_quaternion_list,
                     self.avg_deviceWorld_T_marker,
                 ) = get_running_avg_a_T_b(
-                    current_avg_a_T_b=self.avg_deviceWorld_T_marker,
-                    a_T_b_position_list=self.marker_positions_list,
-                    a_T_b_quaternion_list=self.marker_quaternion_list,
+                    current_avg_a_T_b=self.avg_deviceWorld_T_marker,  # type: ignore
+                    a_T_b_position_list=self.marker_positions_list,  # type: ignore
+                    a_T_b_quaternion_list=self.marker_quaternion_list,  # type: ignore
                     a_T_intermediate=deviceWorld_T_camera,
                     intermediate_T_b=camera_T_marker,
                 )
@@ -240,7 +267,10 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                     viz_img=viz_img,
                 )
 
+            rate_qrd = self.frc_qrd.stop()
+
         if detect_human_motion:
+            self.frc_hmd.start()
             activity_str, avg_velocity = self.human_motion_detector.process_frame(
                 frame=data_frame
             )
@@ -253,14 +283,24 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             self.publish_human_activity_history(
                 self.human_motion_detector.get_human_motion_history()
             )
+            rate_hmd = self.frc_hmd.stop()
 
         if detect_objects:
+            self.frc_od.start()
             viz_img, object_scores = self.object_detector.process_frame(viz_img)
             if object_label in object_scores.keys():
                 if self.verbose:
                     plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
                 # self.publish_pose_of_interest(frame.get("ros_pose"))
 
+            rate_od = self.frc_od.stop()
+
+        rate_all = self.frc_all.stop()
+
+        outputs["process_all"] = rate_all
+        outputs["process_qr"] = rate_qrd
+        outputs["process_od"] = rate_od
+        outputs["process_hmd"] = rate_hmd
         return viz_img, outputs
 
     def initialize_april_tag_detector(self, outputs: dict = {}):
@@ -345,11 +385,20 @@ def main(do_update_iptables: bool, debug: bool, hz: int):
     rospy.init_node("quest3_data_streamer", log_level=_log_level)
     rospy.loginfo("Starting quest3_data_streamer node")
 
+    # Logger for profiling
+    loggerp = logging.getLogger("Profiler-Quest3ProcessFrame")
+    loggerp.setLevel(logging.INFO)
+    csv_handlerp = logging.FileHandler("quest3_time_profiles_sec.txt")
+    formatterp = logging.Formatter("%(asctime)s, %(message)s")
+    csv_handlerp.setFormatter(formatterp)
+    loggerp.addHandler(csv_handlerp)
+
     if do_update_iptables:
         update_iptables_quest3()
     else:
         rospy.logwarn("Not updating iptables")
 
+    outer_frc = FrameRateCounter()
     # rate = rospy.Rate(hz)
     outputs: Dict[str, Any] = {}
     data_streamer = None
@@ -364,6 +413,7 @@ def main(do_update_iptables: bool, debug: bool, hz: int):
         data_streamer.initialize_human_motion_detector()
         # data_streamer.connect()
         while not rospy.is_shutdown():
+            outer_frc.start()
             data_frame = data_streamer.get_latest_data_frame()
             if data_frame is not None:
                 if debug:
@@ -380,9 +430,15 @@ def main(do_update_iptables: bool, debug: bool, hz: int):
                 cv2.waitKey(1)
             else:
                 print("No data frame received.")
-    except Exception as e:
+
+            outer_rate = outer_frc.stop()
+            msg_str = f"Fetch+AllDetection:{outer_rate},All_detectors={outputs.get('process_all',0.0)},QR={outputs.get('process_qr',0.0)},OD={outputs.get('process_od',0.0)},HMD={outputs.get('process_hmd',0.0)}"
+            loggerp.info(msg_str)
+            print(msg_str)
+
+    except Exception:
         print("Ending script.")
-        rospy.logwarn(f"Exception: {e}")
+        rospy.logwarn(f"Exception: {traceback.format_exc()}")
         if data_streamer is not None:
             data_streamer.disconnect()
 

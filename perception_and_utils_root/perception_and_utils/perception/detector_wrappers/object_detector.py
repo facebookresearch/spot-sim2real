@@ -10,11 +10,11 @@ import numpy as np
 from perception_and_utils.perception.detector_wrappers.generic_detector_interface import (
     GenericDetector,
 )
+from perception_and_utils.utils.data_frame import DataFrame
 from perception_and_utils.utils.image_utils import (
     centered_object_detection_heuristic,
     check_bbox_intersection,
 )
-from perception_and_utils.utils.data_frame import DataFrame
 from spot_rl.models.owlvit import OwlVit
 
 
@@ -226,7 +226,9 @@ class ObjectDetectorWrapper(GenericDetector):
         )
         return updated_img_frame, object_scores
 
-    def process_frame_offline(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
+    def process_frame_offline(
+        self, frame: DataFrame
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Process image frame to detect object instances and score them based on heuristics
 
@@ -239,6 +241,8 @@ class ObjectDetectorWrapper(GenericDetector):
             updated_img_frame (np.ndarray) : Image frame with detections and text for visualization
             object_scores (Dict[str, float]) : Dictionary of scores for each object in the image frame
         """
+        img_frame = frame._rgb_frame
+
         # Do nothing if detector is not enabled
         if self.is_enabled is False:
             self._logger.warning(

@@ -3,7 +3,12 @@
 # LICENSE file in the root directory of this source tree.
 
 from typing import Optional, Tuple
-import sophus as sp
+
+try:
+    import sophuspy as sp
+except Exception as e:
+    print(f"Cannot import sophuspy due to {e}. Import sophus instead")
+    import sophus as sp
 import numpy as np
 
 """
@@ -51,9 +56,9 @@ class UnifiedQuest3CameraInterface:
 
     def get_avg_fps_rgb(self):
         raise NotImplementedError
-    
+
     def get_avg_fps_depth(self):
         raise NotImplementedError
 
-    def is_connected():
+    def is_connected(self):
         raise NotImplementedError
