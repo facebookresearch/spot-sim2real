@@ -17,6 +17,7 @@ except ImportError:
     print("Could not import Quest3 camera wrapper")
 
 
+import json
 import logging
 import time
 import traceback
@@ -44,8 +45,8 @@ FILTER_DIST = 0.6  # in metres, the QR registration on Quest3 is REALLY bad beyo
 
 
 class Quest3DataStreamer(HumanSensorDataStreamerInterface):
-    def __init__(self, verbose: bool = False) -> None:
-        super().__init__(verbose)
+    def __init__(self, verbose: bool = False, *args, **kwargs) -> None:
+        super().__init__(verbose, *args, **kwargs)
 
         # Init Logging
         self.logger = logging.getLogger("Quest3DataStreamer")
@@ -193,6 +194,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         detect_qr: bool = False,
         detect_objects: bool = False,
         detect_human_motion: bool = False,
+        detect_human_action: bool = False,
         object_label="milk bottle",
     ) -> Tuple[np.ndarray, dict]:
         rate_all = 0.0
@@ -210,6 +212,27 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         if viz_img is None:
             rospy.logwarn("No image found in frame")  # This gets over-written.. WASTE!
 
+        if detect_human_action:
+            viz_img, output_dict = self.har_model.process_frame(data_frame)
+            if "action_trigger" in output_dict:
+                action_string = output_dict["action_trigger"]
+                action = {
+                    "action": action_string,
+                    "location": [
+                        0.0,
+                        0.0,
+                        0.0,
+                    ],  # TODO: get current human pose wrt Spot
+                }
+                if action_string == "pick":
+                    viz_img, object_scores = self.object_detector.process_frame(
+                        data_frame
+                    )
+                    # TODO: logic to gather what object is in the frame
+                    action["object"] = ""
+                action_json_string = json.dumps(action)
+                self.human_activity_current_pub.publish(action_json_string)
+
         if detect_objects:
             self.frc_od.start()
             viz_img, object_scores = self.object_detector.process_frame(data_frame)
@@ -221,7 +244,9 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 
         if detect_qr:
             self.frc_qrd.start()
-            (viz_img, camera_T_marker) = self.april_tag_detector.process_frame(frame=data_frame)  # type: ignore
+            (viz_img, camera_T_marker) = self.april_tag_detector.process_frame(
+                frame=data_frame
+            )  # type: ignore
 
             deviceWorld_T_camera = data_frame._deviceWorld_T_camera_rgb
             # Broadcast camera frame wrt deviceWorld
