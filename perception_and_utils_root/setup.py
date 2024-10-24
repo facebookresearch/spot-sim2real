@@ -10,7 +10,7 @@ setuptools.setup(
     version="0.0",
     author="Kavit Shah",
     author_email="kavits98@gmail.com",
-    description="SIRo friendly perception and utils for Aria and Spot",
+    description="SIRo friendly perception and utils for Aria+Quest3 and Spot",
     packages=setuptools.find_packages(),
     install_requires=[
         "click",
