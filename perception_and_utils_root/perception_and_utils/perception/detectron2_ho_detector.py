@@ -37,6 +37,7 @@ class Detectron2HODetector(GenericDetector):
         FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
         logging.basicConfig(format=FORMAT)
         self._logger.setLevel(logging.DEBUG)
+        self._logger.info("Initialized")
 
     def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
         out_image = np.zero(256, 256, 3)

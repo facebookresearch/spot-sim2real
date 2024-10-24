@@ -17,7 +17,7 @@ OBJECT_CATEGORY = 2
 
 
 class HARStateMachine(GenericDetector):
-    def __init__(self, model_path, model_config_path):
+    def __init__(self, model_path, model_config_path, verbose: bool = False):
         super().__init__()
         self.hand_object_detector = Detectron2HODetector(model_path, model_config_path)
 
