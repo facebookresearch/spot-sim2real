@@ -1,4 +1,4 @@
-CG_ROOT_PATH: "/home/achuthan/Desktop/spot-sim2real/data/2024-10-03--13-20-53-new_large_object_fre_preprocessed"
+CG_ROOT_PATH: "data/2024-10-03--13-20-53-new_large_object_fre_preprocessed"
 # FRE: 2024-09-17--19-06-02_fre_apartment_shortscan_preprocessed / 2024-09-23--16-18-51-object_scan_fre_preprocessed
 # NYC: 2024-09-17--19-06-02_nyc_lab_preprocessed
 SCAN_TYPE: "r3d"
@@ -10,4 +10,4 @@ FILL_UP_GRID_LOCATION: [[0, 0, 0, 0]]
 DILATION_SIZE: 1
 OCCUPANCY_SCALE: 10
 DISTANCE_THRESHOLD_TO_ADD_POINT: 1.0 # The distance threshold to add waypoints in the navigation waypoints
-PLANNER_TYPE: "RRT_I" #OR RRT_I
+PLANNER_TYPE: "A_STAR" #OR RRT_I
