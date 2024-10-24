@@ -1,3 +1,6 @@
+import logging
+from typing import Dict, Any, Tuple
+
 import torch
 import detectron2
 import numpy as np
@@ -13,7 +16,7 @@ from perception_and_utils.utils.data_frame import DataFrame
 # import some common detectron2 utilities
 from detectron2.engine import DefaultPredictor
 from detectron2.config import get_cfg
-from detectron2.utils.visualizer import Visualizer
+from detectron2.utils.visualizer import Visualizer, ColorMode
 
 
 class Detectron2HODetector(GenericDetector):
@@ -30,6 +33,26 @@ class Detectron2HODetector(GenericDetector):
             "thing_classes": ["lhand", "rhand", "object"],
             "thing_colors": [[220, 20, 60], [119, 11, 32], [0, 0, 142]],
         }
+        self._logger = logging.getLogger(__name__)
+        FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
+        logging.basicConfig(format=FORMAT)
+        self._logger.setLevel(logging.DEBUG)
 
     def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
-        pass
+        out_image = np.zero(256, 256, 3)
+        output_dict = {}
+        if not self.is_enabled:
+            self._logger.warning(
+                "Detector has not been enabled. Returning empty output. Run enable_detector() before trying to process the frame."
+            )
+            return out_image, output_dict
+        input_image = frame._rgb_frame
+        output_dict = self._predictor(input_image)
+        v = Visualizer(
+            input_image[:, :, ::-1],
+            self.hod_metadata,
+            scale=1.2,
+            instance_mode=ColorMode.SEGMENTATION,
+        )
+        out_image = v.draw_instance_predictions(output_dict["instances"].to("cpu"))
+        return out_image, output_dict
