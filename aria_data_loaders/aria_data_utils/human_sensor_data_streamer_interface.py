@@ -29,6 +29,9 @@ from perception_and_utils.perception.detector_wrappers.human_motion_detector imp
 from perception_and_utils.perception.detector_wrappers.object_detector import (
     ObjectDetectorWrapper,
 )
+from perception_and_utils.perception.human_action_recognition_state_machine import (
+    HARStateMachine,
+)
 from perception_and_utils.utils.data_frame import DataFrame
 from spot_rl.utils.utils import ros_frames as rf
 from std_msgs.msg import String
@@ -50,7 +53,7 @@ class CameraParams:
 
 
 class HumanSensorDataStreamerInterface:
-    def __init__(self, verbose: bool = False) -> None:
+    def __init__(self, verbose: bool = False, *args, **kwargs) -> None:
         self.verbose = verbose
 
         self._is_connected = False  # TODO : Maybe not needed
@@ -60,6 +63,13 @@ class HumanSensorDataStreamerInterface:
         self.april_tag_detector = AprilTagDetectorWrapper()
         self.object_detector = ObjectDetectorWrapper()
         self.human_motion_detector = HumanMotionDetector()
+        model_path = kwargs.get("har_model_path", None)
+        model_config_path = kwargs.get("har_config_path", None)
+        if model_path is None or model_config_path is None:
+            raise ValueError(
+                "Expected HAR model details to be passed as har_model_path and har_config_path kwargs"
+            )
+        self.har_model = HARStateMachine(model_path, model_config_path, verbose=verbose)
 
         # ROS publishers & broadcaster
         self.static_tf_broadcaster = StaticTransformBroadcaster()
@@ -67,19 +77,18 @@ class HumanSensorDataStreamerInterface:
         self.human_activity_history_pub = rospy.Publisher(
             "/human_activity_history", String, queue_size=10
         )
+        self.human_activity_current_pub = rospy.Publisher(
+            "/human_activity_current", String, queue_size=10
+        )
 
         # TODO: Define DEVICE FRAME as a visual frame of reference i.e. front facing frame of reference
-        self.device_T_camera: Optional[
-            sp.SE3
-        ] = None  # TODO: Should be initialized by implementations of this class
+        self.device_T_camera: Optional[sp.SE3] = (
+            None  # TODO: Should be initialized by implementations of this class
+        )
 
         # Maintain a list of all poses where qr code is detected (w.r.t deviceWorld)
-        self.marker_positions_list = (
-            []
-        )  # type: List[np.ndarray] # List of  position as np.ndarray (x, y, z)
-        self.marker_quaternion_list = (
-            []
-        )  # type: List[np.ndarray] # List of quaternions as np.ndarray (x, y, z, w)
+        self.marker_positions_list = []  # type: List[np.ndarray] # List of  position as np.ndarray (x, y, z)
+        self.marker_quaternion_list = []  # type: List[np.ndarray] # List of quaternions as np.ndarray (x, y, z, w)
         self.avg_deviceWorld_T_marker = None  # type: Optional[sp.SE3]
 
     def connect(self):
