@@ -17,6 +17,7 @@ from spot_rl.utils.occupancy_grid import (
     map_y_from_cg_to_grid,
     pkl,
 )
+from spot_rl.utils.rrtsconnect import rrt_connect_informed
 
 PATH_TO_CONFIG_FILE = osp.join(
     osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))),
@@ -42,6 +43,8 @@ CG_PCD_PATH = osp.join(ROOT_PATH, "rgb_cloud", "pointcloud.pcd")
 OCCUPANCY_SCALE = cg_config["OCCUPANCY_SCALE"]
 
 DISTANCE_THRESHOLD_TO_ADD_POINT = cg_config["DISTANCE_THRESHOLD_TO_ADD_POINT"]
+
+PLANNER_TYPE = cg_config["PLANNER_TYPE"]
 
 
 def pick_points(pcd):
@@ -311,11 +314,18 @@ def path_planning_using_a_star(
     )
     goal_in_grid = np.array(goal_in_grid)
     print(f"start pos {start_in_grid}, goal in grid {goal_in_grid}")
-    path = astar(
-        dilated_occupancy_grid,
-        (start_in_grid[0], start_in_grid[1]),
-        (goal_in_grid[0], goal_in_grid[1]),
-    )
+    if PLANNER_TYPE == "A_STAR":
+        path = astar(
+            dilated_occupancy_grid,
+            (start_in_grid[0], start_in_grid[1]),
+            (goal_in_grid[0], goal_in_grid[1]),
+        )
+    elif PLANNER_TYPE == "RRT_I":
+        path, start_tree, goal_tree = rrt_connect_informed(
+            dilated_occupancy_grid,
+            (start_in_grid[0], start_in_grid[1]),
+            (goal_in_grid[0], goal_in_grid[1]),
+        )
 
     occupancy_grid_visualization = cv2.circle(
         occupancy_grid_visualization,
@@ -351,27 +361,55 @@ def path_planning_using_a_star(
         (238, 211, 14),
         1,
     )
-    if len(path) > 2:
-        filter_path = convert_path_to_real_waypoints(
-            path, occupancy_min_x, occupancy_min_y
-        )
-        for iter, waypoint in enumerate(filter_path):
-            x = floor(
-                map_x_from_cg_to_grid(waypoint[0], occupancy_min_x, occupancy_max_x)
-                * occupancy_scale
+    if PLANNER_TYPE == "A_STAR":
+        if len(path) > 2:
+            filter_path = convert_path_to_real_waypoints(
+                path, occupancy_min_x, occupancy_min_y
             )
-            y = floor(
-                map_y_from_cg_to_grid(waypoint[1], occupancy_min_y, occupancy_max_y)
-                * occupancy_scale
+            for iter, waypoint in enumerate(filter_path):
+                x = floor(
+                    map_x_from_cg_to_grid(waypoint[0], occupancy_min_x, occupancy_max_x)
+                    * occupancy_scale
+                )
+                y = floor(
+                    map_y_from_cg_to_grid(waypoint[1], occupancy_min_y, occupancy_max_y)
+                    * occupancy_scale
+                )
+                occupancy_grid_visualization = cv2.circle(
+                    occupancy_grid_visualization,
+                    (y, x),
+                    0,
+                    (0, 255, 0),
+                    -1,
+                )
+                bestpath = path
+    else:
+        if len(path) > 0:
+            filter_path = convert_path_to_real_waypoints(
+                path, occupancy_min_x, occupancy_min_y
             )
-            occupancy_grid_visualization = cv2.circle(
-                occupancy_grid_visualization,
-                (y, x),
-                0,
-                (0, 255, 0),
-                -1,
-            )
-            bestpath = path
+            # Prepare points for polylines
+            points = []
+            for waypoint in filter_path:
+                x = floor(
+                    map_x_from_cg_to_grid(waypoint[0], occupancy_min_x, occupancy_max_x)
+                    * occupancy_scale
+                )
+                y = floor(
+                    map_y_from_cg_to_grid(waypoint[1], occupancy_min_y, occupancy_max_y)
+                    * occupancy_scale
+                )
+                bestpath = path
+                points.append((y, x))  # Store in (y, x) format for OpenCV
+
+            for waypoint in points:
+                occupancy_grid_visualization = cv2.circle(
+                    occupancy_grid_visualization,
+                    waypoint,
+                    1,
+                    (0, 255, 0),
+                    -1,
+                )
     if other_view_poses:
         for view_pose in other_view_poses:
             x = floor(
