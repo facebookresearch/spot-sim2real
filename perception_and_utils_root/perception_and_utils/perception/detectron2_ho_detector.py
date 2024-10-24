@@ -48,6 +48,7 @@ class Detectron2HODetector(GenericDetector):
             return out_image, output_dict
         input_image = frame._rgb_frame
         output_dict = self._predictor(input_image)
+        output_dict["instances"].detach().cpu()
         v = Visualizer(
             input_image[:, :, ::-1],
             self.hod_metadata,
