@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import quaternion
+import rospy
 from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
@@ -160,6 +161,12 @@ class Skill:
         ]
         # Execution Loop
         while not done:
+            human_action = rospy.get_param(
+                "/human_action", f"{str(time.time())},None,None"
+            )
+            if "None" not in human_action:
+                done = True
+
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
             if "should_dock" in goal_dict:
