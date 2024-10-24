@@ -529,7 +529,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             * 1.0
         )
         if np.isnan(Z):
-            print(f"Affordance Prediction : Z is NaN = {Z}")
+            # print(f"Affordance Prediction : Z is NaN = {Z}")
             return None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return point_in_3d
@@ -610,7 +610,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                     [pixel_x, pixel_y], depth_raw, cam_intrinsics
                 )
                 if point_in_gripper is None:
-                    print(f"Affordance Point is NaN for {class_label}, skipping")
+                    # print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
                 # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
                 # & then use these in hab-llm to calculate iou in global space
@@ -648,9 +648,9 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 # print(
                 #     f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
                 # )
-            except Exception as e:
-                print(f"Issue of predicting location for {class_label} : {e}")
-                print(traceback.format_exc())
+            except Exception:
+                # print(f"Issue of predicting location for {class_label} : {e}")
+                # print(traceback.format_exc())
                 continue
 
         # publish data
@@ -828,10 +828,19 @@ if __name__ == "__main__":
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
         rospy.set_param("object_target", "ball")
         rospy.set_param("enable_tracking", False)
-        rospy.set_param(
-            "multi_class_object_target",
-            "blue ball,bulldozer toy car,red soda can,food can,tajin bottle,bottle,green avocado plush toy,pink donut plush toy,pineapple plush toy,green caterpillar plush toy,penguin plush toy",
-        )
+        classes = [
+            "blue ball",
+            "bulldozer toy car",
+            "can",
+            "bottle",
+            "avocado plush toy",
+            "green frog plush toy",
+            "pink donut plush toy",
+            "yellow pineapple plush toy",
+            "green caterpillar plush toy",
+            "black penguin plush toy",
+        ]
+        rospy.set_param("multi_class_object_target", ",".join(classes))
         model = YOLOWorldModel()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif open_voc:
