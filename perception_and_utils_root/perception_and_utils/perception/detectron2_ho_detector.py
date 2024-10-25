@@ -1,27 +1,33 @@
+import json
 import logging
-from typing import Dict, Any, Tuple
+import os
+import random
+from typing import Any, Dict, Tuple
 
-import torch
+import cv2
 import detectron2
 import numpy as np
-import os
-import json
-import cv2
-import random
-
-from perception_and_utils.detector_wrappers.generic_detector import GenericDetector
-from perception_and_utils.utils.data_frame import DataFrame
-
+import torch
+from detectron2.config import get_cfg
 
 # import some common detectron2 utilities
 from detectron2.engine import DefaultPredictor
-from detectron2.config import get_cfg
-from detectron2.utils.visualizer import Visualizer, ColorMode
+from detectron2.utils.visualizer import ColorMode, Visualizer
+from perception_and_utils.perception.detector_wrappers.generic_detector_interface import (
+    GenericDetector,
+)
+from perception_and_utils.utils.data_frame import DataFrame
+
+
+class HODMetadata:
+    things_colors = [[220, 20, 60], [119, 11, 32], [0, 0, 142]]
+    things_classes = ["lhand", "rhand", "object"]
 
 
 class Detectron2HODetector(GenericDetector):
     def __init__(self, model_path, model_config_path) -> None:
         super().__init__()
+        print("[DETECTRON2] Initializing")
         self.cfg = get_cfg()
         # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
         self.cfg.merge_from_file(model_config_path)
@@ -37,19 +43,23 @@ class Detectron2HODetector(GenericDetector):
         FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
         logging.basicConfig(format=FORMAT)
         self._logger.setLevel(logging.DEBUG)
-        self._logger.info("Initialized")
+        self._logger.info("Detectron2 Initialized")
+        print("[DETECTRON2] Initialized")
+        self.enable_detector()
 
     def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
-        out_image = np.zero(256, 256, 3)
+        out_image = np.zeros([256, 256, 3])
         output_dict = {}
         if not self.is_enabled:
+            print(
+                "Detector has not been enabled. Returning empty output. Run enable_detector() before trying to process the frame."
+            )
             self._logger.warning(
                 "Detector has not been enabled. Returning empty output. Run enable_detector() before trying to process the frame."
             )
             return out_image, output_dict
         input_image = frame._rgb_frame
-        output_dict = self._predictor(input_image)
-        output_dict["instances"].detach().cpu()
+        output_dict = self.predictor(input_image)
         v = Visualizer(
             input_image[:, :, ::-1],
             self.hod_metadata,
@@ -57,4 +67,4 @@ class Detectron2HODetector(GenericDetector):
             instance_mode=ColorMode.SEGMENTATION,
         )
         out_image = v.draw_instance_predictions(output_dict["instances"].to("cpu"))
-        return out_image, output_dict
+        return out_image.get_image()[:, :, ::-1], output_dict
