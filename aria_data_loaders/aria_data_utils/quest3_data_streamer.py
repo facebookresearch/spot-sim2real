@@ -214,7 +214,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 
         if detect_human_action:
             har_output_img, output_dict = self.har_model.process_frame(data_frame)
-            if "action_trigger" in output_dict:
+
+            if output_dict.get("action_trigger", None) is not None:
                 action_string = output_dict["action_trigger"]
                 action = {
                     "action": action_string,
@@ -225,22 +226,31 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                     ],  # TODO: get current human pose wrt Spot
                 }
                 if action_string == "pick":
+                    print(
+                        "\n\n******************** YAY PICKED OBJECT ********************\n\n"
+                    )
                     viz_img, object_scores = self.object_detector.process_frame(
                         data_frame
                     )
-                    # TODO: logic to gather what object is in the frame
-                    action["object"] = ""
+                    print(f"{object_scores=}\n\n")
+
+                    # TODO: logic to gather what object is in the frame (WIP .. improve this V0)
+                    if object_scores is not None and object_scores != {}:
+                        best_object, best_score = max(
+                            object_scores.items(), key=lambda item: item[1]
+                        )
+                        action["object"] = best_object
                 action_json_string = json.dumps(action)
                 self.human_activity_current_pub.publish(action_json_string)
 
-        if detect_objects:
-            self.frc_od.start()
-            viz_img, object_scores = self.object_detector.process_frame(data_frame)
-            # if object_label in object_scores.keys():
-            #     if self.verbose:
-            #         plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
-            #     self.publish_pose_of_interest(frame.get("ros_pose"))
-            rate_od = self.frc_od.stop()
+        # if detect_objects:
+        #     self.frc_od.start()
+        #     viz_img, object_scores = self.object_detector.process_frame(data_frame)
+        #     # if object_label in object_scores.keys():
+        #     #     if self.verbose:
+        #     #         plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
+        #     #     self.publish_pose_of_interest(frame.get("ros_pose"))
+        #     rate_od = self.frc_od.stop()
 
         if detect_qr:
             self.frc_qrd.start()
@@ -313,15 +323,15 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             )
             rate_hmd = self.frc_hmd.stop()
 
-        if detect_objects:
-            self.frc_od.start()
-            viz_img, object_scores = self.object_detector.process_frame(viz_img)
-            if object_label in object_scores.keys():
-                if self.verbose:
-                    plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
-                # self.publish_pose_of_interest(frame.get("ros_pose"))
+        # if detect_objects:
+        #     self.frc_od.start()
+        #     viz_img, object_scores = self.object_detector.process_frame(viz_img)
+        #     if object_label in object_scores.keys():
+        #         if self.verbose:
+        #             plt.imsave(f"frame_{self.frame_number}.jpg", viz_img)
+        #         # self.publish_pose_of_interest(frame.get("ros_pose"))
 
-            rate_od = self.frc_od.stop()
+        #     rate_od = self.frc_od.stop()
 
         rate_all = self.frc_all.stop()
 
@@ -447,7 +457,14 @@ def main(
 
         outputs = data_streamer.initialize_april_tag_detector(outputs=outputs)
         outputs = data_streamer.initialize_object_detector(
-            outputs=outputs, object_labels=["milk bottle"]
+            outputs=outputs,
+            object_labels=[
+                "bottle",
+                "can",
+                "pineapple plush toy",
+                "ball",
+                "donut plush toy",
+            ],  # TODO: Expand this list
         )
         data_streamer.initialize_human_motion_detector()
         # data_streamer.connect()
@@ -460,9 +477,9 @@ def main(
                 viz_img, outputs = data_streamer.process_frame(
                     data_frame=data_frame,
                     outputs=outputs,
-                    detect_qr=True,
-                    detect_objects=False,
-                    detect_human_motion=True,
+                    detect_qr=False,
+                    detect_objects=True,
+                    detect_human_motion=False,
                     detect_human_action=True,
                 )
                 # data_streamer.publish_human_pose(data_frame=data_frame)
