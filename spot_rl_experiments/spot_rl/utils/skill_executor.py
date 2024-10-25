@@ -66,6 +66,8 @@ class SpotRosSkillExecutor:
         rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
+
+        # Check if the human action is not None
         if "None" not in rospy.get_param("/human_action", "None"):
             human_action_str = rospy.get_param("/human_action")
             human_action_str = human_action_str.split(",")
@@ -76,6 +78,9 @@ class SpotRosSkillExecutor:
             object_name = " ".join(object_name)
             msg = f"Human has {action}ed up the {object_name}, agent 0 should not intervene human actions and should move onto next object"
             succeded = False
+            # Reset the human action
+            rospy.set_param("/human_action", f"{str(time.time())},None,None")
+
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
         rospy.set_param(
