@@ -60,7 +60,9 @@ def execute_skills():
         "pick",
         "place",
         "opendrawer",
+        "explore",
     ]:
+        print("=======================")
         print(f"current skill_name {skill_name} skill_input {skill_input}")
         if skill_name == "nav_path_planning_with_view_poses":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -89,11 +91,14 @@ def execute_skills():
                 "simpathplanning.png",
             )
         reset_skill_msg()
-        time.sleep(10)
+        time.sleep(5)
         succeded = True
-        msg = "Successful execution!"
+        # msg = "Successful execution!"
+        msg = input("Successful execution! or something" + ": ").strip()
         print("finished!!")
+        print("=======================")
         reset_skill_name_input(skill_name, succeded, msg)
+        rospy.set_param("/human_action", f"{0},None,None,None")
 
 
 print("listen to skills...")

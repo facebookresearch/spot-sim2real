@@ -83,11 +83,11 @@ class SpotRosSkillExecutor:
 
             # Determine the msg to return
             if action == "pick":
-                msg = f"Human has picked up the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+                msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move onto next object"
             elif action == "place":
-                msg = f"Human has placed the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+                msg = f"Human has placed the {object_name}, you should not intervene human actions and should move onto next object"
             else:
-                msg = f"Human has done something to the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+                msg = f"Human has done something to the {object_name}, you should not intervene human actions and should move onto next object"
 
             succeded = False
 
