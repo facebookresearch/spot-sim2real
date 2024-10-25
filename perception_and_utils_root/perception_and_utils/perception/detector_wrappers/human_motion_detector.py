@@ -79,19 +79,19 @@ class HumanMotionDetector(GenericDetector):
             self._previous_frames.pop(0)
 
         # Calculate the Euclidean distance between now & then
-        print(
-            f"Current position: {current_position} |Previous position: {self._previous_frames[lookback_index][0]}"
-        )
+        # print(
+        #     f"Current position: {current_position} |Previous position: {self._previous_frames[lookback_index][0]}"
+        # )
         distance = np.linalg.norm(
             current_position - self._previous_frames[lookback_index][0]
         )
         time = (
             frame._timestamp_s - self._previous_frames[lookback_index][1]
         )  # as we are considering x frames per second so our window is 1 sec
-        print(f"Distance: {distance} m |Time: {time} sec")
+        # print(f"Distance: {distance} m |Time: {time} sec")
         avg_velocity = distance / time
 
-        print(f"Avg velocity: {avg_velocity} m/s")
+        # print(f"Avg velocity: {avg_velocity} m/s")
         state = "Standing"
         # Determine the activity based on the velocity threshold
         if avg_velocity > self._velocity_threshold:
