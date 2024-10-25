@@ -70,14 +70,27 @@ class SpotRosSkillExecutor:
         # Check if the human action is not None
         if "None" not in rospy.get_param("/human_action", "None"):
             human_action_str = rospy.get_param("/human_action")
+            print(f"Received human action string {human_action_str}")
             human_action_str = human_action_str.split(",")
             human_action_str = [s.strip() for s in human_action_str]
             _, action, object_name = human_action_str
-            object_name = object_name.split("_")
-            object_name = object_name[1:]
-            object_name = " ".join(object_name)
-            msg = f"Human has {action}ed up the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+            action = action.lower()
+
+            # Process the object name
+            if "_" in object_name:
+                object_name = object_name.split("_")
+                object_name = " ".join(object_name)
+
+            # Determine the msg to return
+            if action == "pick":
+                msg = f"Human has picked up the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+            elif action == "place":
+                msg = f"Human has placed the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+            else:
+                msg = f"Human has done something to the {object_name}, agent 0 should not intervene human actions and should move onto next object"
+
             succeded = False
+
             # Reset the human action
             rospy.set_param("/human_action", f"{str(time.time())},None,None")
 
