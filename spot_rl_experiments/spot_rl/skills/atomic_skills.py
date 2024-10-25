@@ -164,8 +164,6 @@ class Skill:
             human_action = rospy.get_param(
                 "/human_action", f"{str(time.time())},None,None"
             )
-            if "None" not in human_action:
-                done = True
 
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
@@ -176,6 +174,11 @@ class Skill:
                 self.env.y,  # type: ignore
             ]
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
+            print(f"Human action :: {human_action}")
+            if "None" not in human_action:
+                rospy.set_param("send_human_action_interruption", True)
+                done = True
+
             curr_pose = [
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
