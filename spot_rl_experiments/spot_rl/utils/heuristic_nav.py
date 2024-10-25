@@ -650,7 +650,6 @@ def scan_arm(
         config = construct_config()
 
         if height < config.HEIGHT_THRESHOLD:
-            print("SHORT_RECEP")
             gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES)
         else:
             gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES)
