@@ -2,14 +2,12 @@ from os import device_encoding
 from typing import Any, Dict, Tuple
 
 import numpy as np
-
 from perception_and_utils.perception import detectron2_ho_detector
 from perception_and_utils.perception.detector_wrappers.generic_detector_interface import (
     GenericDetector,
 )
-from perception_and_utils.utils.data_frame import DataFrame
 from perception_and_utils.perception.detectron2_ho_detector import Detectron2HODetector
-
+from perception_and_utils.utils.data_frame import DataFrame
 
 LHAND_CATEGORY = 0
 RHAND_CATEGORY = 1
@@ -39,17 +37,21 @@ class HARStateMachine(GenericDetector):
         In the holding state, if we see N consecutive frames of only-hand, then we trigger
         state-change to not-holding state. Otherwise we stay in this state.
         """
-        if OBJECT_CATEGORY not in detection_dict.pred_classes and (
-            LHAND_CATEGORY in detection_dict.pred_classes
-            or RHAND_CATEGORY in detection_dict.pred_classes
+        if "instances" not in detection_dict:
+            return {}
+        instances = detection_dict["instances"]
+        if OBJECT_CATEGORY not in instances.pred_classes and (
+            LHAND_CATEGORY in instances.pred_classes
+            or RHAND_CATEGORY in instances.pred_classes
         ):
             self._num_hand_frames += 1
-        if OBJECT_CATEGORY in detection_dict.pred_classes:
+        if OBJECT_CATEGORY in instances.pred_classes:
             self.reset_hand_count()
         if self._num_hand_frames == self.FRAME_THRESHOLD:
             self.toggle_state()
             detection_dict["action_trigger"] = "place"
             detection_dict["state"] = self.current_state
+            print(f"Switched state to {self.current_state}")
         return detection_dict
 
     def not_holding_state_tick(self, detection_dict) -> Dict[str, Any]:
@@ -57,20 +59,24 @@ class HARStateMachine(GenericDetector):
         In the not-holding state, if we see N consecutive frames of hand and object, then
         we trigger state-change to holding state. Otherwise we stay in this state.
         """
+        if "instances" not in detection_dict:
+            return {}
+        instances = detection_dict["instances"]
         if (
-            LHAND_CATEGORY in detection_dict.pred_classes
-            and OBJECT_CATEGORY in detection_dict.pred_classes
+            LHAND_CATEGORY in instances.pred_classes
+            and OBJECT_CATEGORY in instances.pred_classes
         ) or (
-            RHAND_CATEGORY in detection_dict.pred_classes
-            and OBJECT_CATEGORY in detection_dict.pred_classes
+            RHAND_CATEGORY in instances.pred_classes
+            and OBJECT_CATEGORY in instances.pred_classes
         ):
             self._num_object_frames += 1
-        if OBJECT_CATEGORY not in detection_dict.pred_classes:
+        if OBJECT_CATEGORY not in instances.pred_classes:
             self.reset_object_count()
         if self._num_object_frames == self.FRAME_THRESHOLD:
             self.toggle_state()
             detection_dict["action_trigger"] = "pick"
             detection_dict["state"] = self.current_state
+            print(f"Switched state to {self.current_state}")
         return detection_dict
 
     def reset_hand_count(self):
