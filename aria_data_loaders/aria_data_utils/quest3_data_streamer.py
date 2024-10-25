@@ -213,7 +213,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             rospy.logwarn("No image found in frame")  # This gets over-written.. WASTE!
 
         if detect_human_action:
-            viz_img, output_dict = self.har_model.process_frame(data_frame)
+            har_output_img, output_dict = self.har_model.process_frame(data_frame)
             if "action_trigger" in output_dict:
                 action_string = output_dict["action_trigger"]
                 action = {
@@ -329,7 +329,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         outputs["process_qr"] = rate_qrd
         outputs["process_od"] = rate_od
         outputs["process_hmd"] = rate_hmd
-        return viz_img, outputs
+        return har_output_img, outputs
 
     def initialize_april_tag_detector(self, outputs: dict = {}):
         """
@@ -404,7 +404,15 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 @click.option("--do-update-iptables", is_flag=True, type=bool, default=False)
 @click.option("--debug", is_flag=True, default=False)
 @click.option("--hz", type=int, default=100)
-def main(do_update_iptables: bool, debug: bool, hz: int):
+@click.option("--har-model-path")
+@click.option("--har-config-path")
+def main(
+    do_update_iptables: bool,
+    debug: bool,
+    hz: int,
+    har_model_path: str,
+    har_config_path: str,
+):
     if debug:
         _log_level = rospy.DEBUG
     else:
@@ -432,7 +440,10 @@ def main(do_update_iptables: bool, debug: bool, hz: int):
     data_streamer = None
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
     try:
-        data_streamer = Quest3DataStreamer()
+        data_streamer = Quest3DataStreamer(
+            har_model_path=har_model_path, har_config_path=har_config_path
+        )
+        time.sleep(5.0)
 
         outputs = data_streamer.initialize_april_tag_detector(outputs=outputs)
         outputs = data_streamer.initialize_object_detector(
@@ -452,6 +463,7 @@ def main(do_update_iptables: bool, debug: bool, hz: int):
                     detect_qr=True,
                     detect_objects=False,
                     detect_human_motion=True,
+                    detect_human_action=True,
                 )
                 # data_streamer.publish_human_pose(data_frame=data_frame)
                 cv2.imshow("Image", viz_img)
@@ -461,8 +473,8 @@ def main(do_update_iptables: bool, debug: bool, hz: int):
 
             outer_rate = outer_frc.stop()
             msg_str = f"Fetch+AllDetection:{outer_rate},All_detectors={outputs.get('process_all',0.0)},QR={outputs.get('process_qr',0.0)},OD={outputs.get('process_od',0.0)},HMD={outputs.get('process_hmd',0.0)}"
-            loggerp.info(msg_str)
-            print(msg_str)
+            loggerp.debug(msg_str)
+            # print(msg_str)
 
     except Exception:
         print("Ending script.")
