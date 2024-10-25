@@ -641,10 +641,9 @@ def scan_arm(
         # "ball"
         "caterpillar plush toy",
     ]
-    receptacle_name = str(receptacle_name.split(";")[-1:]).strip("[]'\"")
-    receptacle_name = receptacle_name.replace("_", " ")
-    print(receptacle_name)
-    height = calculate_height(receptacle_name)
+    receptacle_height = str(receptacle_name.split(";")[-1:]).strip("[]'\"")
+    receptacle_height = receptacle_name.replace("_", " ")
+    height = calculate_height(receptacle_height)
     # Read gaze arm angles from config if None is passed
     if gaze_arm_angles is None:
         config = construct_config()

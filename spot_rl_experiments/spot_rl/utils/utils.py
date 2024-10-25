@@ -192,6 +192,7 @@ def calculate_height(object_tag):
     if "_" in object_tag:
         try:
             _, object_tag = object_tag.split("_", 1)
+            object_tag = object_tag.replace("_", " ")
         except Exception as e:
             print(f"Invalid object_tag format: {object_tag} due to {e}")
             return default_height
