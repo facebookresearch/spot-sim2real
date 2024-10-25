@@ -179,6 +179,7 @@ class SpotRosSkillExecutor:
                     self.spotskillmanager.spot,
                     publisher=self.detection_publisher,
                     enable_object_detector_during_movement=False,
+                    receptacle_name=skill_input,
                 )
                 flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(
@@ -286,6 +287,7 @@ class SpotRosSkillExecutor:
                     self.spotskillmanager.spot,
                     publisher=self.detection_publisher,
                     enable_object_detector_during_movement=False,
+                    receptacle_name=skill_input,
                 )
                 flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(

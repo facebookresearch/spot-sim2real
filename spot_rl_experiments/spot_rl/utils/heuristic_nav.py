@@ -27,7 +27,7 @@ from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_best_uvz_from_detection,
     sample_patch_around_point,
 )
-from spot_rl.utils.utils import construct_config
+from spot_rl.utils.utils import calculate_height, construct_config
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
 from std_msgs.msg import String
 
@@ -624,6 +624,7 @@ def scan_arm(
     angle_interval=30,
     gaze_arm_angles=None,
     enable_object_detector_during_movement=False,
+    receptacle_name=None,
 ):
     # Create image search object
     image_search = (
@@ -640,12 +641,20 @@ def scan_arm(
         # "ball"
         "caterpillar plush toy",
     ]
+    receptacle_name = str(receptacle_name.split(";")[-1:]).strip("[]'\"")
+    receptacle_name = receptacle_name.replace("_", " ")
+    print(receptacle_name)
+    height = calculate_height(receptacle_name)
     # Read gaze arm angles from config if None is passed
     if gaze_arm_angles is None:
         config = construct_config()
-        gaze_arm_angles = deepcopy(
-            config.GAZE_ARM_JOINT_ANGLES
-        )  # TODO: Toggle between short and tall receptacles
+
+        if height < config.HEIGHT_THRESHOLD:
+            print("SHORT_RECEP")
+            gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES)
+        else:
+            gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES)
+        # TODO: Toggle between short and tall receptacles
     else:
         assert (
             len(gaze_arm_angles) == 6
