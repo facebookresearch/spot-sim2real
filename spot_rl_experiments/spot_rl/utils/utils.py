@@ -178,7 +178,7 @@ def arr2str(arr):
 
 def calculate_height(object_tag):
     default_config = construct_config_for_semantic_place()
-    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations.json"
+    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations_cleaned.json"
     default_height = default_config.HEIGHT_THRESHOLD
 
     if osp.isfile(json_file_path):
@@ -189,20 +189,19 @@ def calculate_height(object_tag):
             f"Concept Graph File does not exist. Using default height: {default_height}"
         )
         return default_height
-    try:
-        object_id_str, object_tag = object_tag.split("_", 1)
-        object_id = int(object_id_str)
-    except Exception as e:
-        print(f"Invalid object_tag format: {object_tag} due to {e}")
-        return default_height
-
+    if "_" in object_tag:
+        try:
+            _, object_tag = object_tag.split("_", 1)
+        except Exception as e:
+            print(f"Invalid object_tag format: {object_tag} due to {e}")
+            return default_height
+    else:
+        # flake8: noqa
+        object_id = -1
     for rel in world_graph:
         for key, value in rel.items():
             if isinstance(value, dict):
-                if (
-                    value.get("id") == object_id
-                    and value.get("object_tag") == object_tag
-                ):
+                if value.get("object_tag") == object_tag:
                     object_node = value
                     # Extract the height
                     if "bbox_center" in object_node and "bbox_extent" in object_node:
@@ -218,13 +217,11 @@ def calculate_height(object_tag):
                         return height
                     else:
                         print(
-                            f"Object with ID '{object_id}' and tag '{object_tag}' missing bbox properties! Returning Default Height"
+                            f"Object with ID and tag '{object_tag}' missing bbox properties! Returning Default Height"
                         )
                         return default_height
     # If the object tag is empty, we return the threhold height
-    print(
-        f"Object with ID '{object_id}' and tag '{object_tag}' not found in world_graph"
-    )
+    print(f"Object with ID and tag '{object_tag}' not found in world_graph")
     return default_height
 
 
