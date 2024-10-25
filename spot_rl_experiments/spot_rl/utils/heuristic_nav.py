@@ -653,7 +653,7 @@ def scan_arm(
             gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES)
         else:
             gaze_arm_angles = deepcopy(config.GAZE_ARM_JOINT_ANGLES)
-        # TODO: Toggle between short and tall receptacles
+
     else:
         assert (
             len(gaze_arm_angles) == 6
