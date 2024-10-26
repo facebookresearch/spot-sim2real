@@ -56,12 +56,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
+        self.verbose = verbose
+
         self.frc_all = FrameRateCounter()
         self.frc_qrd = FrameRateCounter()
         self.frc_hmd = FrameRateCounter()
         self.frc_od = FrameRateCounter()
 
-        self.unified_quest3_camera = UnifiedQuestCamera()
+        self.unified_quest3_camera = UnifiedQuestCamera(verbose=self.verbose)
         self.rgb_cam_params: CameraParams = None
         self.depth_cam_params: CameraParams = None
         self._frame_number = -1
@@ -145,9 +147,11 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         deviceWorld_T_rgbCam = self.unified_quest3_camera.get_deviceWorld_T_rgbCamera()
         device_T_rgbCam = self.unified_quest3_camera.get_device_T_rgbCamera()
         if rgb_frame is None or deviceWorld_T_rgbCam is None or device_T_rgbCam is None:
-            rospy.logwarn(
-                "Returning None, as rgb_frame or deviceWorld_T_rgbCam or device_T_rgbCam is None."
-            )
+
+            if self.verbose:
+                rospy.logwarn(
+                    "Returning None, as rgb_frame or deviceWorld_T_rgbCam or device_T_rgbCam is None."
+                )
             return None
         else:
             data_frame._rgb_frame = rgb_frame
@@ -161,9 +165,10 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         )
         device_T_depthCam = self.unified_quest3_camera.get_device_T_depthCamera()
         if depth_frame is None or deviceWorld_T_depthCam is None:
-            rospy.logwarn(
-                "Returning None as depth_frame or deviceWorld_T_depthCam or device_T_depthCam is None."
-            )
+            if self.verbose:
+                rospy.logwarn(
+                    "Returning None as depth_frame or deviceWorld_T_depthCam or device_T_depthCam is None."
+                )
             return None
         else:
             data_frame._depth_frame = depth_frame
@@ -217,14 +222,31 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 
             if output_dict.get("action_trigger", None) is not None:
                 action_string = output_dict["action_trigger"]
+
                 action = {
                     "action": action_string,
                     "location": [
                         0.0,
                         0.0,
                         0.0,
-                    ],  # TODO: get current human pose wrt Spot
+                    ],
                 }
+                human_place_xyz = None
+                try:
+                    human_place_xyz = self.get_nav_xyz_to_wearer(
+                        self.get_handoff_to_human_pose(
+                            source=rf.QUEST3_CAMERA, target=rf.SPOT_WORLD
+                        ),
+                        shift_offset=0.3,
+                    )
+                except RuntimeError:
+                    rospy.logwarn("Error in finding place point in front of human")
+                action["location"] = [
+                    human_place_xyz[0],
+                    human_place_xyz[1],
+                    human_place_xyz[2],
+                ]
+
                 if action_string == "pick":
                     print(
                         "\n\n******************** YAY PICKED OBJECT ********************\n\n"
@@ -240,6 +262,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                             object_scores.items(), key=lambda item: item[1]
                         )
                         action["object"] = best_object
+
+                # Broadcast action string data
                 action_json_string = json.dumps(action)
                 self.human_activity_current_pub.publish(action_json_string)
 
@@ -477,7 +501,7 @@ def main(
                 viz_img, outputs = data_streamer.process_frame(
                     data_frame=data_frame,
                     outputs=outputs,
-                    detect_qr=False,
+                    detect_qr=True,
                     detect_objects=True,
                     detect_human_motion=False,
                     detect_human_action=True,
@@ -486,7 +510,7 @@ def main(
                 cv2.imshow("Image", viz_img)
                 cv2.waitKey(1)
             else:
-                print("No data frame received.")
+                rospy.logdebug("No data frame received.")
 
             outer_rate = outer_frc.stop()
             msg_str = f"Fetch+AllDetection:{outer_rate},All_detectors={outputs.get('process_all',0.0)},QR={outputs.get('process_qr',0.0)},OD={outputs.get('process_od',0.0)},HMD={outputs.get('process_hmd',0.0)}"
