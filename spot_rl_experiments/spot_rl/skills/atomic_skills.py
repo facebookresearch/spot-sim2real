@@ -161,8 +161,13 @@ class Skill:
         ]
         # Execution Loop
         while not done:
+
+            # TODO: This is a temporary solution to read the human action from the ros param
+            # In the coming PR, this will be replaced by a ros subscriber
+            # The current formate is timestamp, action, object_name, target_receptacle.
+            # Read the human action to interrupt the skill execution
             human_action = rospy.get_param(
-                "/human_action", f"{str(time.time())},None,None"
+                "/human_action", f"{str(time.time())},None,None,None"
             )
 
             action = self.policy.act(observations)  # type: ignore
@@ -174,9 +179,9 @@ class Skill:
                 self.env.y,  # type: ignore
             ]
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
+
             print(f"Human action :: {human_action}")
             if "None" not in human_action:
-                rospy.set_param("send_human_action_interruption", True)
                 done = True
 
             curr_pose = [
@@ -401,12 +406,16 @@ class Navigation(Skill):
         check_navigation_success = is_pose_within_bounds(
             current_pose,
             _nav_target_pose_deg,
-            self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
-            if self.env._enable_dynamic_yaw
-            else self.config.SUCCESS_DISTANCE,
-            self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
-            if self.env._enable_dynamic_yaw
-            else self.config.SUCCESS_ANGLE_DIST,
+            (
+                self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
+                if self.env._enable_dynamic_yaw
+                else self.config.SUCCESS_DISTANCE
+            ),
+            (
+                self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
+                if self.env._enable_dynamic_yaw
+                else self.config.SUCCESS_ANGLE_DIST
+            ),
         )
 
         # Update result log
