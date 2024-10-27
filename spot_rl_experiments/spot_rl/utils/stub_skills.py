@@ -63,9 +63,8 @@ def execute_skills():
         "explore",
     ]:
         print("=======================")
-        print(f"current skill_name {skill_name} skill_input {skill_input}")
+        print(f"Current skill_name {skill_name} skill_input {skill_input}")
         if skill_name == "nav_path_planning_with_view_poses":
-            print(f"current skill_name {skill_name} skill_input {skill_input}")
             # Get the bbox center and bbox extent
             bbox_info = skill_input.split(";")  # in the format of x,y,z
             assert (
@@ -92,16 +91,18 @@ def execute_skills():
             )
         reset_skill_msg()
         time.sleep(5)
-        succeded = True
-        # msg = "Successful execution!"
         msg = input("Successful execution! or something" + ": ").strip()
-        print("finished!!")
+        if "Successful" in msg:
+            succeded = True
+        else:
+            succeded = False
+        print(f"Msg: {msg}")
         print("=======================")
         reset_skill_name_input(skill_name, succeded, msg)
         rospy.set_param("/human_action", f"{0},None,None,None")
 
 
-print("listen to skills...")
+print("Listen to skills...")
 reset_ros()
 while True:
     execute_skills()
