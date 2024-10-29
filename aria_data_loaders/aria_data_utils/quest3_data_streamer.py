@@ -63,7 +63,12 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         self.frc_hmd = FrameRateCounter()
         self.frc_od = FrameRateCounter()
 
-        self.unified_quest3_camera = UnifiedQuestCamera(verbose=self.verbose)
+        # Backward compatibility
+        try:
+            self.unified_quest3_camera = UnifiedQuestCamera(verbose=self.verbose)
+        except Exception:
+            self.unified_quest3_camera = UnifiedQuestCamera()
+
         self.rgb_cam_params: CameraParams = None
         self.depth_cam_params: CameraParams = None
         self._frame_number = -1

@@ -98,5 +98,9 @@ class HARStateMachine(GenericDetector):
 
     def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
         out_img, outputs = self.hand_object_detector.process_frame(frame)
+        # Assume that the hand and the object are both being detected by the model at the same frame.
+        # If the hand is not being detected, then the state machine will not change the state.
+        # If the hand is being detected but not object, then it is not-holding state;
+        # If the hand is being detected and also object, then it is holding state
         outputs = self.state_machine[self.current_state](outputs)
         return out_img, outputs
