@@ -49,7 +49,7 @@ class Detectron2HODetector(GenericDetector):
 
     def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
         out_image = np.zeros([256, 256, 3])
-        output_dict = {}
+        output_dict = {}  # type: ignore
         if not self.is_enabled:
             print(
                 "Detector has not been enabled. Returning empty output. Run enable_detector() before trying to process the frame."
