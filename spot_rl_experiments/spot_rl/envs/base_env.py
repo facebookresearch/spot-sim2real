@@ -3,6 +3,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
+import json
+
 # mypy: ignore-errors
 import os
 import os.path as osp
@@ -215,6 +217,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             assert self.filtered_head_depth is not None, "Depth msgs not found!"
             print("...msgs received.")
 
+        # Human action
+        self.human_activity_current: Dict[str, Any] = {}
+        if self.config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+            rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+        else:
+            rospy.Subscriber("/human_activity_current", String, self.har_callback)
+
     @property
     def filtered_hand_depth(self):
         return self.msgs[rt.FILTERED_HAND_DEPTH]
@@ -245,6 +254,19 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             self.detections_buffer["viz"][str(msg.header.stamp)] = msg
         elif topic == rt.FILTERED_HAND_DEPTH:
             self.detections_buffer["filtered_depth"][str(msg.header.stamp)] = msg
+
+    def har_callback(self, msg):
+        """
+        Read the string published from HAR and read it into a dict structure
+        """
+        har_string = msg
+        try:
+            self.human_activity_current = json.loads(har_string)
+        except json.JSONDecodeError:
+            print(
+                "HAR output is malformed! Can't deserialize it using JSON!\n",
+                har_string,
+            )
 
     def say(self, *args):
         text = " ".join(args)

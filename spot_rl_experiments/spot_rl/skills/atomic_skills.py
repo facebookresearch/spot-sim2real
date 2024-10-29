@@ -162,13 +162,21 @@ class Skill:
         # Execution Loop
         while not done:
 
-            # TODO: This is a temporary solution to read the human action from the ros param
-            # In the coming PR, this will be replaced by a ros subscriber
+            print(self.env.human_activity_current)  # type: ignore
             # The current formate is timestamp, action, object_name, target_receptacle.
             # Read the human action to interrupt the skill execution
-            human_action = rospy.get_param(
-                "/human_action", f"{str(time.time())},None,None,None"
-            )
+            human_action = "None"
+            if self.config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+                human_action = rospy.get_param(
+                    "/human_action", f"{str(time.time())},None,None,None"
+                )
+                print(f"Human action :: {human_action}")
+            else:
+                human_action = (
+                    "human_action_detected"
+                    if self.env.human_activity_current != {}  # type: ignore
+                    else "None"
+                )
 
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
@@ -180,7 +188,6 @@ class Skill:
             ]
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
-            print(f"Human action :: {human_action}")
             if "None" not in human_action:
                 done = True
 
