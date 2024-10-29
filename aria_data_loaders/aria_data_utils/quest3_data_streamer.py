@@ -483,11 +483,12 @@ def main(
         outputs = data_streamer.initialize_object_detector(
             outputs=outputs,
             object_labels=[
-                "bottle",
+                "creamer bottle",
                 "can",
                 "pineapple plush toy",
                 "ball",
                 "donut plush toy",
+                "frog plush toy",
             ],  # TODO: Expand this list
         )
         data_streamer.initialize_human_motion_detector()
