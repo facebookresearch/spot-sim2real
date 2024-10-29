@@ -29,10 +29,21 @@ from perception_and_utils.perception.detector_wrappers.human_motion_detector imp
 from perception_and_utils.perception.detector_wrappers.object_detector import (
     ObjectDetectorWrapper,
 )
+from perception_and_utils.perception.human_action_recognition_state_machine import (
+    HARStateMachine,
+)
+from perception_and_utils.utils.conversions import ros_TransformStamped_to_sophus_SE3
 from perception_and_utils.utils.data_frame import DataFrame
 from spot_rl.utils.utils import ros_frames as rf
 from std_msgs.msg import String
-from tf2_ros import StaticTransformBroadcaster
+from tf2_ros import (
+    ConnectivityException,
+    ExtrapolationException,
+    LookupException,
+    StaticTransformBroadcaster,
+)
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 from visualization_msgs.msg import Marker
 
 
@@ -50,7 +61,7 @@ class CameraParams:
 
 
 class HumanSensorDataStreamerInterface:
-    def __init__(self, verbose: bool = False) -> None:
+    def __init__(self, verbose: bool = False, *args, **kwargs) -> None:
         self.verbose = verbose
 
         self._is_connected = False  # TODO : Maybe not needed
@@ -60,12 +71,23 @@ class HumanSensorDataStreamerInterface:
         self.april_tag_detector = AprilTagDetectorWrapper()
         self.object_detector = ObjectDetectorWrapper()
         self.human_motion_detector = HumanMotionDetector()
+        model_path = kwargs.get("har_model_path", None)
+        model_config_path = kwargs.get("har_config_path", None)
+        if model_path is None or model_config_path is None:
+            raise ValueError(
+                "Expected HAR model details to be passed as har_model_path and har_config_path kwargs"
+            )
+        self.har_model = HARStateMachine(model_path, model_config_path, verbose=verbose)
 
         # ROS publishers & broadcaster
         self.static_tf_broadcaster = StaticTransformBroadcaster()
-
+        self.tf_buffer = Buffer()
+        self.static_tf_listener = TransformListener(self.tf_buffer)
         self.human_activity_history_pub = rospy.Publisher(
             "/human_activity_history", String, queue_size=10
+        )
+        self.human_activity_current_pub = rospy.Publisher(
+            "/human_activity_current", String, queue_size=10
         )
 
         # TODO: Define DEVICE FRAME as a visual frame of reference i.e. front facing frame of reference
@@ -244,3 +266,64 @@ class HumanSensorDataStreamerInterface:
 
         # Publish human activity history string
         self.human_activity_history_pub.publish(human_history_str)
+
+    def get_nav_xyz_to_wearer(
+        self, pose: sp.SE3, shift_offset: float = 0.6
+    ) -> Tuple[float, float, float]:
+        """
+        Converts Sophus SE3 aria current pose to Tuple of x, y, theta, then flips it by 180 degrees and shifts it by a given offset.
+        At the end, the final x, y,z ~theta~ is such that the pose is in front of human.
+
+        Args:
+            aria_pose (sp.SE3): Sophus SE3 object for aria's current pose (as cpf frame) w.r.t spotWorld frame
+
+        Returns:
+            Tuple[float, float, float]: Tuple of x,y,z~theta~ as floats representing nav target for robot
+        """
+        # ARROW STARTS FROM ORIGIN
+
+        # get position and rotation as x, y, theta
+        position = pose.translation()
+        # Find the angle made by CPF's z axis with spotWorld's x axis
+        # as robot should orient to the CPF's z axis. First 3 elements of
+        # column 3 from spotWorld_T_cpf represents cpf's z axis in spotWorld frame
+        cpf_z_axis_in_spotWorld = pose.matrix()[:3, 2]
+        x_component_of_z_axis = cpf_z_axis_in_spotWorld[0]
+        y_component_of_z_axis = cpf_z_axis_in_spotWorld[1]
+        rotation = float(
+            np.arctan2(
+                y_component_of_z_axis,
+                x_component_of_z_axis,
+            )
+        )  # tan^-1(y/x)
+        x, y, theta = position[0], position[1], rotation
+
+        # push fwd this point along theta
+        x += shift_offset * np.cos(theta)
+        y += shift_offset * np.sin(theta)
+        # rotate theta by pi
+        theta += np.pi
+
+        # We do not want theta. Return z as 1.16m
+        return (x, y, 1.16)
+
+    def get_handoff_to_human_pose(self, source: str, target: str) -> sp.SE3:
+        while not rospy.is_shutdown() and not self.tf_buffer.can_transform(
+            target_frame=target, source_frame=source, time=rospy.Time()
+        ):
+            rospy.logwarn_throttle(
+                5.0, f"Waiting for transform from {source} to {target}"
+            )
+            rospy.sleep(0.5)
+        try:
+            transform_stamped_spotWorld_T_camera = self.tf_buffer.lookup_transform(
+                target_frame=target,
+                source_frame=source,
+                time=rospy.Time(0),
+            )
+        except (LookupException, ConnectivityException, ExtrapolationException):
+            raise RuntimeError(f"Unable to lookup transform from {source} to {target}")
+        target_T_source = ros_TransformStamped_to_sophus_SE3(
+            ros_trf_stamped=transform_stamped_spotWorld_T_camera
+        )
+        return target_T_source
