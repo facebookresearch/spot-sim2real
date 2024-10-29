@@ -66,6 +66,38 @@ class SpotRosSkillExecutor:
         rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
+
+        # Check if we need to return the msg based on the human action
+        if "None" not in rospy.get_param(
+            "/human_action", f"{str(time.time())},None,None,None"
+        ):
+            human_action_str = rospy.get_param("/human_action")
+
+            print(f"Received human action string {human_action_str}")
+
+            human_action_str = human_action_str.split(",")
+            human_action_str = [s.strip() for s in human_action_str]
+            _, action, object_name, receptacle_name = human_action_str
+            action = action.lower()
+
+            # Process the object name if there are "_" in the name
+            if "_" in object_name:
+                object_name = object_name.split("_")
+                object_name = " ".join(object_name)
+
+            # Determine the msg to return
+            if action == "pick":
+                msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+            elif action == "place":
+                msg = f"Human has placed the {object_name}, you should not intervene human actions and should move to the next object"
+            else:
+                msg = f"Human has done something to the {object_name}, you should not intervene human actions and should move to the next object"
+
+            succeded = False
+
+            # Reset the human action
+            rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
         rospy.set_param(
@@ -316,9 +348,13 @@ class SpotRosSkillExecutor:
                 skill_log["num_steps"] = 0
             self.episode_log["actions"].append({"pick": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
-            rospy.set_param(
-                "/enable_dwg_object_addition", f"{str(time.time())},True"
-            ) if not succeded and self._use_continuos_dwg_or_stop_add == "continous" else None
+            (
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                )
+                if not succeded and self._use_continuos_dwg_or_stop_add == "continous"
+                else None
+            )
             rospy.set_param("/viz_object", "None")
         elif skill_name == "place":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -346,9 +382,13 @@ class SpotRosSkillExecutor:
             self.episode_log["actions"].append({"place": skill_log})
 
             self.reset_skill_name_input(skill_name, succeded, msg)
-            rospy.set_param(
-                "/enable_dwg_object_addition", f"{str(time.time())},True"
-            ) if self._use_continuos_dwg_or_stop_add == "continous" else None
+            (
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                )
+                if self._use_continuos_dwg_or_stop_add == "continous"
+                else None
+            )
         elif skill_name == "opendrawer":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()

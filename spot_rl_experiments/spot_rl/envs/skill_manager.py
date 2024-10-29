@@ -190,7 +190,7 @@ class SpotSkillManager:
 
         self.nav_config = construct_config_for_nav() if not nav_config else nav_config
         self.pick_config = (
-            construct_config_for_gaze(max_episode_steps=350)
+            construct_config_for_gaze(max_episode_steps=100)
             if not pick_config
             else pick_config
         )

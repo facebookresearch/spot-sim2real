@@ -200,3 +200,6 @@ VERBOSE: True
 BLOCK_VALUE_THRESHOLD: 0.1 # The value of the scaled depth image to be considered as being blocked by object
 BLOCK_PERCENTAGE_THRESHOLD: 0.0 # The percentage of the image that is being blocked to be considered as object is hold. Use zero for no check
 GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING: 3 # in percentage
+
+# Stub data for human action recognition
+STUB_FOR_HUMAN_ACTION_RECOGNITION: False

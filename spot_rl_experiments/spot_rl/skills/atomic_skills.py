@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import quaternion
+import rospy
 from perception_and_utils.utils.generic_utils import (
     conditional_print,
     map_user_input_to_boolean,
@@ -160,6 +161,22 @@ class Skill:
         ]
         # Execution Loop
         while not done:
+            # The current formate is timestamp, action, object_name, target_receptacle.
+            # Read the human action to interrupt the skill execution
+            human_action = "None"
+            if self.config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+                human_action = rospy.get_param(
+                    "/human_action", f"{str(time.time())},None,None,None"
+                )
+                print(f"Human action :: {human_action}")
+            else:
+                print(f"human_action: {self.env.human_activity_current}")  # type: ignore
+                human_action = (
+                    "human_action_detected"
+                    if self.env.human_activity_current != {}  # type: ignore
+                    else "None"
+                )
+
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
             if "should_dock" in goal_dict:
@@ -169,6 +186,10 @@ class Skill:
                 self.env.y,  # type: ignore
             ]
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
+
+            if "None" not in human_action:
+                done = True
+
             curr_pose = [
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
@@ -391,12 +412,16 @@ class Navigation(Skill):
         check_navigation_success = is_pose_within_bounds(
             current_pose,
             _nav_target_pose_deg,
-            self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
-            if self.env._enable_dynamic_yaw
-            else self.config.SUCCESS_DISTANCE,
-            self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
-            if self.env._enable_dynamic_yaw
-            else self.config.SUCCESS_ANGLE_DIST,
+            (
+                self.config.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
+                if self.env._enable_dynamic_yaw
+                else self.config.SUCCESS_DISTANCE
+            ),
+            (
+                self.config.SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV
+                if self.env._enable_dynamic_yaw
+                else self.config.SUCCESS_ANGLE_DIST
+            ),
         )
 
         # Update result log
