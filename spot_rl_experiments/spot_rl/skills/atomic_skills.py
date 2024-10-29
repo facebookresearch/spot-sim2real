@@ -161,8 +161,6 @@ class Skill:
         ]
         # Execution Loop
         while not done:
-
-            print(self.env.human_activity_current)  # type: ignore
             # The current formate is timestamp, action, object_name, target_receptacle.
             # Read the human action to interrupt the skill execution
             human_action = "None"
@@ -172,6 +170,7 @@ class Skill:
                 )
                 print(f"Human action :: {human_action}")
             else:
+                print(f"human_action: {self.env.human_activity_current}")  # type: ignore
                 human_action = (
                     "human_action_detected"
                     if self.env.human_activity_current != {}  # type: ignore
