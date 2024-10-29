@@ -63,7 +63,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         self.frc_hmd = FrameRateCounter()
         self.frc_od = FrameRateCounter()
 
-        self.unified_quest3_camera = UnifiedQuestCamera(verbose=self.verbose)
+        self.unified_quest3_camera = UnifiedQuestCamera()  # verbose=self.verbose)
         self.rgb_cam_params: CameraParams = None
         self.depth_cam_params: CameraParams = None
         self._frame_number = -1
@@ -434,6 +434,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         self.human_motion_detector._init_human_motion_detector()
 
 
+# python aria_data_loaders/aria_data_utils/quest3_data_streamer.py --har-model-path /home/jmmy/Downloads/output_nonfreeze_lvis2_rcandidate_model_0479999.pth --har-config-path /home/jmmy/research/spot-sim2real/third_party/mask_rcnn_detectron2/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml
 @click.command()
 @click.option("--do-update-iptables", is_flag=True, type=bool, default=False)
 @click.option("--debug", is_flag=True, default=False)
