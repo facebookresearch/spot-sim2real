@@ -259,7 +259,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         """
         Read the string published from HAR and read it into a dict structure
         """
-        har_string = msg
+        har_string = msg.data
         try:
             self.human_activity_current = json.loads(har_string)
         except json.JSONDecodeError:
