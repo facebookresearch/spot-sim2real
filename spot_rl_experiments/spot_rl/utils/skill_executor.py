@@ -175,7 +175,7 @@ class SpotRosSkillExecutor:
             # For navigation target
             nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
             additional_scale = rospy.get_param("nav_velocity_scaling", 1.0)
-            is_exploring = additional_scale == 0.5
+            is_exploring = additional_scale == 0.99
             # Call the skill
             if "None" not in nav_target_xyz:
                 if robot_holding:
@@ -192,6 +192,15 @@ class SpotRosSkillExecutor:
                     )
                     print(f"nav to {x} {y}, {nav_i+1}/{len(nav_target_xyz)}")
                     succeded, msg = self.spotskillmanager.nav(x, y)
+
+                    # Nav -> scan behavior
+                    if is_exploring:
+                        scan_arm(
+                            self.spotskillmanager.spot,
+                            publisher=self.detection_publisher,
+                            enable_object_detector_during_movement=False
+                        )
+
                     if not succeded and not is_exploring:
                         break
                 succeded = True if is_exploring else succeded
