@@ -157,6 +157,7 @@ class SpotRosSkillExecutor:
         rospy.set_param("robot_holding", robot_holding)
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
@@ -234,7 +235,9 @@ class SpotRosSkillExecutor:
             rospy.set_param("nav_target_xyz", "None,None,None|")
             rospy.set_param("/viz_pick", "None")
             rospy.set_param("/viz_place", "None")
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "nav_path_planning_with_view_poses":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
@@ -335,7 +338,9 @@ class SpotRosSkillExecutor:
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_pick", "None")
             rospy.set_param("/viz_place", "None")
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "pick":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             rospy.set_param("/viz_object", skill_input)
@@ -362,7 +367,9 @@ class SpotRosSkillExecutor:
                 else None
             )
             rospy.set_param("/viz_object", "None")
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "place":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             rospy.set_param("is_gripper_blocked", 0)
             rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
@@ -396,21 +403,28 @@ class SpotRosSkillExecutor:
                 if self._use_continuos_dwg_or_stop_add == "continous"
                 else None
             )
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "opendrawer":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.opendrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "closedrawer":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = self.spotskillmanager.closedrawer()
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "findagentaction":
+            rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
             succeded, msg = True, rospy.get_param("human_state", "standing")
             self.reset_skill_name_input(skill_name, succeded, msg)
+            rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "dock":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
@@ -450,6 +464,7 @@ def main():
         )
         executor = None
         try:
+            rospy.set_param("skill_in_execution_lock", False)
             executor = SpotRosSkillExecutor(spotskillmanager)
             # While loop to run in the background
             while not rospy.is_shutdown() and not executor.end:
