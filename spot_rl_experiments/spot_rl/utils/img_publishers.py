@@ -516,7 +516,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         return img
 
     def convert_2d_pixel_to_3d(
-        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=10
+        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=20
     ):
         Z = float(
             sample_patch_around_point(
@@ -525,7 +525,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             * 1.0
         )
         if np.isnan(Z):
-            print(f"Affordance Prediction : Z is NaN = {Z}")
+            # print(f"Affordance Prediction : Z is NaN = {Z}")
             return None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return point_in_3d
@@ -569,6 +569,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
+        print(f"Raw detection STR {new_detections}")
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
@@ -585,7 +586,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                     [pixel_x, pixel_y], depth_raw, cam_intrinsics
                 )
                 if point_in_gripper is None:
-                    print(f"Affordance Point is NaN for {class_label}, skipping")
+                    # print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
                 # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
                 # & then use these in hab-llm to calculate iou in global space
@@ -597,6 +598,15 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 )
 
                 if np.isnan(point_in_gripper).any():
+                    # print("Point in gripper is None after conversion")
+                    continue
+
+                if left_top_in_3d is None:
+                    # print("left top in 3d None")
+                    continue
+
+                if right_bottom_in_3d is None:
+                    # print("right bottom in 3d None")
                     continue
 
                 point_in_global_3d = np.array(
@@ -642,7 +652,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.1, show_img=False):
+    def __init__(self, score_threshold=0.2, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE

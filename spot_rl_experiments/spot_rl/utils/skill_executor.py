@@ -128,6 +128,7 @@ class SpotRosSkillExecutor:
         robot_holding = (
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
+        rospy.set_param("robot_holding", robot_holding)
         if robot_holding:
             return (
                 False,
@@ -153,6 +154,7 @@ class SpotRosSkillExecutor:
         robot_holding = (
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
+        rospy.set_param("robot_holding", robot_holding)
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -343,6 +345,7 @@ class SpotRosSkillExecutor:
             else:
                 succeded = False
                 msg = pick_msg
+            self.check_pick_condition()
             skill_log = self.spotskillmanager.gaze_controller.skill_result_log
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0
@@ -376,6 +379,7 @@ class SpotRosSkillExecutor:
                 succeded, msg = self.spotskillmanager.place(
                     0.6, 0.0, 0.4, is_local=True
                 )
+            self.check_pick_condition()
             skill_log = self.spotskillmanager.place_controller.skill_result_log
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0

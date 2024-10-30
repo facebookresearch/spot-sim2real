@@ -133,8 +133,8 @@ RECEPTACLES:
   white_table: "any"
 
 # Base action params
-MAX_LIN_DIST: 0.25  # meters
-MAX_ANG_DIST: 15.0  # degrees
+MAX_LIN_DIST: 0.13 #0.25  # meters
+MAX_ANG_DIST: 7.5 #15.0  # degrees
 
 # Base action params for sem place EE
 MAX_LIN_DIST_SEMANTIC_PLACE: 0.0  # meters

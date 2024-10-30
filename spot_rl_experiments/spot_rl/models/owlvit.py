@@ -121,7 +121,9 @@ class OwlVit:
             )
         else:
             results = self.processor.post_process_object_detection(
-                outputs=outputs, target_sizes=target_sizes
+                outputs=outputs,
+                target_sizes=target_sizes,
+                threshold=self.score_threshold,
             )
 
         return (
