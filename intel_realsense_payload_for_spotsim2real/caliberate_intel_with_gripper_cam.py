@@ -9,6 +9,7 @@ except Exception as e:
     import sophus as sp
 from perception_and_utils.perception.detector_wrappers.april_tag_detector import (
     AprilTagDetectorWrapper,
+    DataFrame
 )
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2
 
@@ -64,15 +65,19 @@ if __name__ == "__main__":
     )
     prev_diff = np.zeros((4, 4), dtype=np.float32)
     while True:
+        intel_df = DataFrame()
+        gripper_df = DataFrame()
         intel_image = get_intel_image(spot)
         gripper_image = get_gripper_image(spot)
         intel_image = image_response_to_cv2(intel_image.result()[0])
         gripper_image = image_response_to_cv2(gripper_image.result()[0])
+        intel_df._rgb_frame = intel_image
+        gripper_df._rgb_frame = gripper_image
         intel_image, intel_T_marker = aprilposeestimator_intel.process_frame(
-            intel_image
+            intel_df
         )
         gripper_image, gripper_T_marker = aprilposeestimator_gripper.process_frame(
-            gripper_image
+            gripper_df
         )
 
         if intel_T_marker is None or gripper_T_marker is None:

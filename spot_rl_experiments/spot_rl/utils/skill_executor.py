@@ -173,6 +173,8 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             # For navigation target
             nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
+            additional_scale = rospy.get_param("nav_velocity_scaling", 1.0)
+            is_exploring = additional_scale == 0.5
             # Call the skill
             if "None" not in nav_target_xyz:
                 if robot_holding:
@@ -189,8 +191,9 @@ class SpotRosSkillExecutor:
                     )
                     print(f"nav to {x} {y}, {nav_i+1}/{len(nav_target_xyz)}")
                     succeded, msg = self.spotskillmanager.nav(x, y)
-                    if not succeded:
+                    if not succeded and not is_exploring:
                         break
+                succeded = True if is_exploring else succeded
             else:
                 if robot_holding:
                     rospy.set_param("/viz_place", skill_input)
@@ -209,11 +212,11 @@ class SpotRosSkillExecutor:
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},True"
                 )
-                scan_arm(
-                    self.spotskillmanager.spot,
-                    publisher=self.detection_publisher,
-                    enable_object_detector_during_movement=False,
-                )
+                # scan_arm(
+                #     self.spotskillmanager.spot,
+                #     publisher=self.detection_publisher,
+                #     enable_object_detector_during_movement=False,
+                # )
                 flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
@@ -316,11 +319,11 @@ class SpotRosSkillExecutor:
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},True"
                 )
-                scan_arm(
-                    self.spotskillmanager.spot,
-                    publisher=self.detection_publisher,
-                    enable_object_detector_during_movement=False,
-                )
+                # scan_arm(
+                #     self.spotskillmanager.spot,
+                #     publisher=self.detection_publisher,
+                #     enable_object_detector_during_movement=False,
+                # )
                 flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},{flag}"

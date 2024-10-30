@@ -70,8 +70,8 @@ MAX_EPISODE_STEPS: 100
 # Nav env
 SUCCESS_DISTANCE: 0.5
 SUCCESS_ANGLE_DIST: 10
-SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV: 1.10
-SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV: 180
+SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV: 0.5
+SUCCESS_ANGLE_DIST_FOR_DYNAMIC_YAW_NAV: 10
 DISABLE_OBSTACLE_AVOIDANCE: False
 USE_OA_FOR_NAV: True
 USE_HEAD_CAMERA: True
@@ -133,8 +133,8 @@ RECEPTACLES:
   white_table: "any"
 
 # Base action params
-MAX_LIN_DIST: 0.13 #0.25  # meters
-MAX_ANG_DIST: 7.5 #15.0  # degrees
+MAX_LIN_DIST: 0.25 #0.25  # meters
+MAX_ANG_DIST: 15.0 #15.0  # degrees
 
 # Base action params for sem place EE
 MAX_LIN_DIST_SEMANTIC_PLACE: 0.0  # meters
@@ -159,7 +159,7 @@ INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_EE: [0, -120, 60, 0, 88, 0]
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # The initial orientation of the arm for side grasping (gripper is in object's left hand side)
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
-GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 75, 0] # you might want to fine-tuned this when doing LSC demo in different sites
+GAZE_ARM_JOINT_ANGLES: [0, -120, 60, 0, 88, 0] #[0, -160, 100, 0, 75, 0] # you might want to fine-tuned this when doing LSC demo in different sites
 GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES: [0, -160, 100, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES: [0, -120, 60, 0, 88, 0]
 HEIGHT_THRESHOLD : 0.8128

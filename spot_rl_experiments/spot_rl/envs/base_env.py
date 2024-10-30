@@ -403,8 +403,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 lin_dist, ang_dist = base_action
 
                 # Scale the linear and angular velocities
-                lin_dist *= self._max_lin_dist_scale
-                ang_dist *= np.deg2rad(self._max_ang_dist_scale)
+                additional_scale = rospy.get_param("nav_velocity_scaling", 1.0)
+                print(f"Additional Scale {additional_scale}")
+                lin_dist *= self._max_lin_dist_scale * additional_scale
+                ang_dist *= np.deg2rad(self._max_ang_dist_scale * additional_scale)
 
                 target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity

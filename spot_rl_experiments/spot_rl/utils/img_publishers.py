@@ -516,7 +516,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         return img
 
     def convert_2d_pixel_to_3d(
-        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=20
+        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=20, default_z:float=None, return_z=False
     ):
         Z = float(
             sample_patch_around_point(
@@ -524,11 +524,14 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             )
             * 1.0
         )
+        if default_z is not None:
+            Z = default_z
         if np.isnan(Z):
             # print(f"Affordance Prediction : Z is NaN = {Z}")
-            return None
+            #else:
+            return (None, None) if return_z else None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
-        return point_in_3d
+        return (point_in_3d, Z) if return_z else point_in_3d
 
     def _publish(self):
         stopwatch = Stopwatch()
@@ -569,7 +572,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
-        print(f"Raw detection STR {new_detections}")
+        print(f"Raw detection STR {new_detections}") if "None" not in new_detections else None
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
@@ -582,8 +585,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             pixel_y = int(np.mean([y1, y2]))
             try:
                 depth_raw = arm_depth / 1000.0
-                point_in_gripper = self.convert_2d_pixel_to_3d(
-                    [pixel_x, pixel_y], depth_raw, cam_intrinsics
+                point_in_gripper, default_z = self.convert_2d_pixel_to_3d(
+                    [pixel_x, pixel_y], depth_raw, cam_intrinsics, return_z=True
                 )
                 if point_in_gripper is None:
                     # print(f"Affordance Point is NaN for {class_label}, skipping")
@@ -591,23 +594,23 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
                 # & then use these in hab-llm to calculate iou in global space
                 left_top_in_3d = self.convert_2d_pixel_to_3d(
-                    [x1, y1], depth_raw, cam_intrinsics
+                    [x1, y1], depth_raw, cam_intrinsics, default_z=default_z
                 )
                 right_bottom_in_3d = self.convert_2d_pixel_to_3d(
-                    [x2, y2], depth_raw, cam_intrinsics
+                    [x2, y2], depth_raw, cam_intrinsics, default_z=default_z
                 )
 
                 if np.isnan(point_in_gripper).any():
                     # print("Point in gripper is None after conversion")
                     continue
 
-                if left_top_in_3d is None:
-                    # print("left top in 3d None")
-                    continue
+                # if left_top_in_3d is None:
+                #     print("left top in 3d None")
+                #     continue
 
-                if right_bottom_in_3d is None:
-                    # print("right bottom in 3d None")
-                    continue
+                # if right_bottom_in_3d is None:
+                #     print("right bottom in 3d None")
+                #     continue
 
                 point_in_global_3d = np.array(
                     home_T_hand.transform_point(mn.Vector3(*point_in_gripper))
@@ -652,7 +655,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.2, show_img=False):
+    def __init__(self, score_threshold=0.15, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
