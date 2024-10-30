@@ -1,4 +1,4 @@
-CG_ROOT_PATH: "/home/tushar/Desktop/spot-sim2real/data/2024-10-03--13-20-53-new_large_object_fre_preprocessed"
+CG_ROOT_PATH: "/home/jmmy/research/Datasets/Record3D/2024-10-03--13-20-53-new_large_object_fre_preprocessed"
 # FRE: 2024-09-17--19-06-02_fre_apartment_shortscan_preprocessed / 2024-09-23--16-18-51-object_scan_fre_preprocessed
 # NYC: 2024-09-17--19-06-02_nyc_lab_preprocessed / "/home/jmmy/research/Datasets/Record3D/2024-10-03--13-20-53-new_large_object_fre_preprocessed"
 SCAN_TYPE: "r3d"
