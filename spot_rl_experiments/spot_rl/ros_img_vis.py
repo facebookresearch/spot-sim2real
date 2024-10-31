@@ -17,12 +17,13 @@ from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import resize_to_tallest
 
-RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
+RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB, rt.HAND_RGB]
 
 PROCESSED_IMG_TOPICS = [
     rt.FILTERED_HEAD_DEPTH,
     rt.FILTERED_HAND_DEPTH,
     rt.MASK_RCNN_VIZ_TOPIC,
+    rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC,
 ]
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")

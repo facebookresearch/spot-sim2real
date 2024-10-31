@@ -47,10 +47,10 @@ from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     sample_patch_around_point,
 )
+from spot_rl.utils.segmentation_service import segment_with_socket
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
-from spot_rl.utils.segmentation_service import segment_with_socket
 
 MAX_PUBLISH_FREQ = 20
 MAX_DEPTH = 3.5
@@ -326,7 +326,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = None #get_deblurgan_model(config)
+        self.deblur_gan = None  # get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -465,7 +465,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
-    publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
+    publisher_topics = [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
 
     def __init__(self, model, spot):
         super().__init__()
@@ -475,7 +475,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = None #get_deblurgan_model(config)
+        self.deblur_gan = None  # get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -487,7 +487,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         # rospy.Subscriber(rt.HAND_DEPTH_UNSCALED, Image, self.depth_cb, queue_size=1)
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
 
-        self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        self.viz_topic = rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC
 
         # while self.img_msg_depth is None:
         #     pass
@@ -517,7 +517,13 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         return img
 
     def convert_2d_pixel_to_3d(
-        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=40, default_z:float=None, return_z=False
+        self,
+        pixel_uv,
+        depth_raw,
+        camera_intrinsics,
+        patch_size=40,
+        default_z: float = None,
+        return_z=False,
     ):
         Z = float(
             sample_patch_around_point(
@@ -529,7 +535,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         #     Z = default_z
         if np.isnan(Z):
             # print(f"Affordance Prediction : Z is NaN = {Z}")
-            #else:
+            # else:
             return (None, None) if return_z else None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return (point_in_3d, Z) if return_z else point_in_3d
@@ -573,15 +579,17 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
-        print(f"Raw detection STR {new_detections}") if "None" not in new_detections else None
+        print(
+            f"Raw detection STR {new_detections}"
+        ) if "None" not in new_detections else None
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
-            mask = segment_with_socket(hand_rgb_preprocessed, [float(x1), float(y1), float(x2), float(y2)])
-            non_zero_indices = np.nonzero(mask)
-            y1, y2 = non_zero_indices[0].min(), non_zero_indices[0].max()
-            x1, x2 = non_zero_indices[1].min(), non_zero_indices[1].max()
+            # mask = segment_with_socket(hand_rgb_preprocessed, [float(x1), float(y1), float(x2), float(y2)])
+            # non_zero_indices = np.nonzero(mask)
+            # y1, y2 = non_zero_indices[0].min(), non_zero_indices[0].max()
+            # x1, x2 = non_zero_indices[1].min(), non_zero_indices[1].max()
             # Compute the center pixel
             x1, y1, x2, y2 = [
                 int(float(i) / self.image_scale) for i in [x1, y1, x2, y2]
