@@ -507,7 +507,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     target_yaw = None
         elif not (grasp or place):
             self.say("!!!! NO ACTIONS CALLED: moving to next step !!!!")
-            self.num_steps -= 1
+            #self.num_steps -= 1
 
         self.stopwatch.record("run_actions")
         if base_action is not None:

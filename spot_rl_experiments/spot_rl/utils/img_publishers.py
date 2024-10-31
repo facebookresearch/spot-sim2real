@@ -50,6 +50,7 @@ from spot_rl.utils.pixel_to_3d_conversion_utils import (
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
+from spot_rl.utils.segmentation_service import segment_with_socket
 
 MAX_PUBLISH_FREQ = 20
 MAX_DEPTH = 3.5
@@ -325,7 +326,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = get_deblurgan_model(config)
+        self.deblur_gan = None #get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -474,7 +475,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = get_deblurgan_model(config)
+        self.deblur_gan = None #get_deblurgan_model(config)
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -516,7 +517,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         return img
 
     def convert_2d_pixel_to_3d(
-        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=20, default_z:float=None, return_z=False
+        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=40, default_z:float=None, return_z=False
     ):
         Z = float(
             sample_patch_around_point(
@@ -524,8 +525,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             )
             * 1.0
         )
-        if default_z is not None:
-            Z = default_z
+        # if default_z is not None:
+        #     Z = default_z
         if np.isnan(Z):
             # print(f"Affordance Prediction : Z is NaN = {Z}")
             #else:
@@ -577,6 +578,10 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
+            mask = segment_with_socket(hand_rgb_preprocessed, [float(x1), float(y1), float(x2), float(y2)])
+            non_zero_indices = np.nonzero(mask)
+            y1, y2 = non_zero_indices[0].min(), non_zero_indices[0].max()
+            x1, x2 = non_zero_indices[1].min(), non_zero_indices[1].max()
             # Compute the center pixel
             x1, y1, x2, y2 = [
                 int(float(i) / self.image_scale) for i in [x1, y1, x2, y2]
@@ -604,13 +609,13 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                     # print("Point in gripper is None after conversion")
                     continue
 
-                # if left_top_in_3d is None:
-                #     print("left top in 3d None")
-                #     continue
+                if left_top_in_3d is None:
+                    print("left top in 3d None")
+                    continue
 
-                # if right_bottom_in_3d is None:
-                #     print("right bottom in 3d None")
-                #     continue
+                if right_bottom_in_3d is None:
+                    print("right bottom in 3d None")
+                    continue
 
                 point_in_global_3d = np.array(
                     home_T_hand.transform_point(mn.Vector3(*point_in_gripper))
@@ -655,7 +660,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.15, show_img=False):
+    def __init__(self, score_threshold=0.3, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -785,7 +790,7 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "cup,bottle",
+            "cup,bottle,bowl",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)

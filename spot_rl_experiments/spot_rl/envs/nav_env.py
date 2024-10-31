@@ -25,8 +25,8 @@ class SpotNavEnv(SpotBaseEnv):
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
-
-        self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
+    
+        self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES_EXPLORE)
 
     def enable_nav_by_hand(self):
         if not self._enable_nav_by_hand:

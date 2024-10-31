@@ -91,7 +91,7 @@ def segment(image, boxes, size, device):
     )
     return masks
 
-
+socket = None
 def connect_socket(port):
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
@@ -101,7 +101,8 @@ def connect_socket(port):
 
 
 def segment_with_socket(rgb_image, bbox, port=21001):
-    socket = connect_socket(port)
+    global socket
+    socket = connect_socket(port) if socket is None else socket
     socket.send_pyobj((rgb_image, bbox))
     return socket.recv_pyobj()
 

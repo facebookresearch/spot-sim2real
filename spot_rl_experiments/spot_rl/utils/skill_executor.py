@@ -174,8 +174,7 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             # For navigation target
             nav_target_xyz = rospy.get_param("nav_target_xyz", "None,None,None|")
-            additional_scale = rospy.get_param("nav_velocity_scaling", 1.0)
-            is_exploring = additional_scale == 0.99
+            is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
             # Call the skill
             if "None" not in nav_target_xyz:
                 if robot_holding:
@@ -258,96 +257,102 @@ class SpotRosSkillExecutor:
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},False"
                 )
-            # Get the bbox center and bbox extent
-            bbox_info = skill_input.split(";")  # in the format of x,y,z
-            assert (
-                len(bbox_info) >= 6
-            ), f"Wrong size of the bbox info, it should be 6, but got {len(bbox_info)}"
-            bbox_center = np.array([float(v) for v in bbox_info[0:3]])
-            bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
-            query_class_names = bbox_info[6:]
-            query_class_names[0] = query_class_names[0].replace("_", " ")
-            if robot_holding:
-                rospy.set_param("/viz_place", query_class_names[0])
-            else:
-                rospy.set_param("/viz_pick", query_class_names[0])
-            # Get the view poses
-            view_poses, category_tag = get_view_poses(
-                bbox_center, bbox_extent, query_class_names, True
-            )
+            
+            skill_input_per_nav = skill_input.split("|")
+            for skill_input in skill_input_per_nav[:-1]:
+                # Get the bbox center and bbox extent
+                bbox_info = skill_input.split(";")  # in the format of x,y,z
+                assert (
+                    len(bbox_info) >= 6
+                ), f"Wrong size of the bbox info, it should be 6, but got {len(bbox_info)}"
+                bbox_center = np.array([float(v) for v in bbox_info[0:3]])
+                bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
+                query_class_names = bbox_info[6:]
+                query_class_names[0] = query_class_names[0].replace("_", " ")
+                if robot_holding:
+                    rospy.set_param("/viz_place", query_class_names[0])
+                else:
+                    rospy.set_param("/viz_pick", query_class_names[0])
+                # Get the view poses
+                view_poses, category_tag = get_view_poses(
+                    bbox_center, bbox_extent, query_class_names, True
+                )
 
-            # Get the robot x, y, yaw
-            x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
-            # Get the navigation points
-            nav_pts = get_navigation_points(
-                view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
-            )
+                # Get the robot x, y, yaw
+                x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
+                # Get the navigation points
+                nav_pts = get_navigation_points(
+                    view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
+                )
 
-            # Sequentially give the point
-            if len(nav_pts) > 0:
-                final_pt_i = len(nav_pts) - 1
-                for pt_i, pt in enumerate(nav_pts):
-                    x, y, yaw = pt
-                    if pt_i == final_pt_i:
-                        # Do normal point nav with yaw for the final location
-                        if category_tag is not None and "object" in category_tag:
-                            # increse nav error threshold for final nav
-                            # take a backup of prev error margins
-                            navconfig = self.spotskillmanager.nav_controller.env.config
-                            backup_success_distance, backup_success_angle = (
-                                navconfig.SUCCESS_DISTANCE,
-                                navconfig.SUCCESS_ANGLE_DIST,
-                            )
-                            navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
-                                backup_success_distance * 2.0,
-                                backup_success_angle * 2.0,
-                            )
-                            succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
-                            navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
-                                backup_success_distance,
-                                backup_success_angle,
-                            )
+                # Sequentially give the point
+                if len(nav_pts) > 0:
+                    final_pt_i = len(nav_pts) - 1
+                    for pt_i, pt in enumerate(nav_pts):
+                        x, y, yaw = pt
+                        if pt_i == final_pt_i:
+                            # Do normal point nav with yaw for the final location
+                            if category_tag is not None and "object" in category_tag:
+                                # increse nav error threshold for final nav
+                                # take a backup of prev error margins
+                                navconfig = self.spotskillmanager.nav_controller.env.config
+                                backup_success_distance, backup_success_angle = (
+                                    navconfig.SUCCESS_DISTANCE,
+                                    navconfig.SUCCESS_ANGLE_DIST,
+                                )
+                                navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
+                                    backup_success_distance * 2.0,
+                                    backup_success_angle * 2.0,
+                                )
+                                succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
+                                navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
+                                    backup_success_distance,
+                                    backup_success_angle,
+                                )
+                            else:
+                                succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
                         else:
-                            succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
-                    else:
-                        # Do dynamic point yaw here for the intermediate points
-                        succeded, msg = self.spotskillmanager.nav(x, y)
-                    skill_log = self.spotskillmanager.nav_controller.skill_result_log
-                    if "num_steps" not in skill_log:
-                        skill_log["num_steps"] = 0
-                    self.episode_log["actions"].append({"nav_viewpose": skill_log})
+                            # Do dynamic point yaw here for the intermediate points
+                            succeded, msg = self.spotskillmanager.nav(x, y)
+                        skill_log = self.spotskillmanager.nav_controller.skill_result_log
+                        if "num_steps" not in skill_log:
+                            skill_log["num_steps"] = 0
+                        self.episode_log["actions"].append({"nav_viewpose": skill_log})
 
-            else:
-                succeded = False
-                msg = "Cannot navigate to the point"
+                else:
+                    succeded = False
+                    msg = "Cannot navigate to the point"
 
-            # Run scan arm if gripper is NOT holding any item
-            print(
-                f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
-            )
-            if succeded and not robot_holding:
-                time.sleep(1)
-                print("Scanning area with arm")
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},True"
+                # Run scan arm if gripper is NOT holding any item
+                print(
+                    f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
                 )
-                # scan_arm(
-                #     self.spotskillmanager.spot,
-                #     publisher=self.detection_publisher,
-                #     enable_object_detector_during_movement=False,
-                # )
-                flag = self._use_continuos_dwg_or_stop_add == "continous"
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
-                )
-            else:
-                print("Will not scan arm")
+                is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
+                if not robot_holding and is_exploring:
+                    time.sleep(1)
+                    print("Scanning area with arm")
+                    rospy.set_param(
+                        "/enable_dwg_object_addition", f"{str(time.time())},True"
+                    )
+                    scan_arm(
+                        self.spotskillmanager.spot,
+                        publisher=self.detection_publisher,
+                        enable_object_detector_during_movement=False,
+                    )
+                    flag = self._use_continuos_dwg_or_stop_add == "continous"
+                    rospy.set_param(
+                        "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+                    )
+                else:
+                    print("Will not scan arm")
 
             # Reset skill name and input and publish message
+            if is_exploring: succeded, msg = True, "Successful execution!"
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_pick", "None")
             rospy.set_param("/viz_place", "None")
             rospy.set_param("skill_in_execution_lock", False)
+        
         elif skill_name == "pick":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
