@@ -197,13 +197,18 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
                 imgs[1] = imgs[1][:, 124:-60]
-
-        img = np.vstack(
-            [
-                resize_to_tallest(bgrify_grayscale_imgs(i), hstack=True)
-                for i in [raw_imgs, processed_imgs]
-            ]
-        )
+        try:
+            img = np.vstack(
+                [
+                    resize_to_tallest(bgrify_grayscale_imgs(i), hstack=True)
+                    for i in [raw_imgs, processed_imgs]
+                ]
+            )
+            # (480, 2279, 3)
+            # (480, 2279, 3)
+        except Exception:
+            print("cannot np.vstack image")
+            return
 
         # Add Pick receptacle, Object, Place receptacle information on the side
         pck = rospy.get_param("/viz_pick", "None")
