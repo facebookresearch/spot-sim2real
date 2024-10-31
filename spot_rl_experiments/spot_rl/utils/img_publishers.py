@@ -668,7 +668,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.3, show_img=False):
+    def __init__(self, score_threshold=0.15, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -798,7 +798,7 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "cup,bottle,bowl",
+            "pineapple plush toy,donut plush toy,avocado plush toy,ball,can,cup,bottle,bowl",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
