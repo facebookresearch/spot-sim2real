@@ -24,6 +24,8 @@ from std_msgs.msg import String
 
 LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
 
+ENABLE_ARM_SCAN = True
+
 
 class SpotRosSkillExecutor:
     """This class reads the ros buffer to execute skills"""
@@ -193,11 +195,11 @@ class SpotRosSkillExecutor:
                     succeded, msg = self.spotskillmanager.nav(x, y)
 
                     # Nav -> scan behavior
-                    if is_exploring:
+                    if is_exploring and ENABLE_ARM_SCAN:
                         scan_arm(
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
-                            enable_object_detector_during_movement=False
+                            enable_object_detector_during_movement=False,
                         )
 
                     if not succeded and not is_exploring:
@@ -221,6 +223,7 @@ class SpotRosSkillExecutor:
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},True"
                 )
+                # if ENABLE_ARM_SCAN:
                 # scan_arm(
                 #     self.spotskillmanager.spot,
                 #     publisher=self.detection_publisher,
@@ -257,7 +260,7 @@ class SpotRosSkillExecutor:
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},False"
                 )
-            
+
             skill_input_per_nav = skill_input.split("|")
             for skill_input in skill_input_per_nav[:-1]:
                 # Get the bbox center and bbox extent
@@ -282,7 +285,12 @@ class SpotRosSkillExecutor:
                 x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
                 # Get the navigation points
                 nav_pts = get_navigation_points(
-                    view_poses, bbox_center, bbox_extent, [x, y], True, "pathplanning.png"
+                    view_poses,
+                    bbox_center,
+                    bbox_extent,
+                    [x, y],
+                    True,
+                    "pathplanning.png",
                 )
 
                 # Sequentially give the point
@@ -295,26 +303,40 @@ class SpotRosSkillExecutor:
                             if category_tag is not None and "object" in category_tag:
                                 # increse nav error threshold for final nav
                                 # take a backup of prev error margins
-                                navconfig = self.spotskillmanager.nav_controller.env.config
+                                navconfig = (
+                                    self.spotskillmanager.nav_controller.env.config
+                                )
                                 backup_success_distance, backup_success_angle = (
                                     navconfig.SUCCESS_DISTANCE,
                                     navconfig.SUCCESS_ANGLE_DIST,
                                 )
-                                navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
+                                (
+                                    navconfig.SUCCESS_DISTANCE,
+                                    navconfig.SUCCESS_ANGLE_DIST,
+                                ) = (
                                     backup_success_distance * 2.0,
                                     backup_success_angle * 2.0,
                                 )
-                                succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
-                                navconfig.SUCCESS_DISTANCE, navconfig.SUCCESS_ANGLE_DIST = (
+                                succeded, msg = self.spotskillmanager.nav(
+                                    x, y, yaw, False
+                                )
+                                (
+                                    navconfig.SUCCESS_DISTANCE,
+                                    navconfig.SUCCESS_ANGLE_DIST,
+                                ) = (
                                     backup_success_distance,
                                     backup_success_angle,
                                 )
                             else:
-                                succeded, msg = self.spotskillmanager.nav(x, y, yaw, False)
+                                succeded, msg = self.spotskillmanager.nav(
+                                    x, y, yaw, False
+                                )
                         else:
                             # Do dynamic point yaw here for the intermediate points
                             succeded, msg = self.spotskillmanager.nav(x, y)
-                        skill_log = self.spotskillmanager.nav_controller.skill_result_log
+                        skill_log = (
+                            self.spotskillmanager.nav_controller.skill_result_log
+                        )
                         if "num_steps" not in skill_log:
                             skill_log["num_steps"] = 0
                         self.episode_log["actions"].append({"nav_viewpose": skill_log})
@@ -334,11 +356,12 @@ class SpotRosSkillExecutor:
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},True"
                     )
-                    scan_arm(
-                        self.spotskillmanager.spot,
-                        publisher=self.detection_publisher,
-                        enable_object_detector_during_movement=False,
-                    )
+                    if ENABLE_ARM_SCAN:
+                        scan_arm(
+                            self.spotskillmanager.spot,
+                            publisher=self.detection_publisher,
+                            enable_object_detector_during_movement=False,
+                        )
                     flag = self._use_continuos_dwg_or_stop_add == "continous"
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
@@ -347,12 +370,13 @@ class SpotRosSkillExecutor:
                     print("Will not scan arm")
 
             # Reset skill name and input and publish message
-            if is_exploring: succeded, msg = True, "Successful execution!"
+            if is_exploring:
+                succeded, msg = True, "Successful execution!"
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_pick", "None")
             rospy.set_param("/viz_place", "None")
             rospy.set_param("skill_in_execution_lock", False)
-        
+
         elif skill_name == "pick":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
