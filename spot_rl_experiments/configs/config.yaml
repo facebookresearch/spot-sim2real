@@ -160,7 +160,7 @@ INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_LEFT_HAND: [0, -180, 180, 0, 0, -90] # T
 INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE_TOP_DOWN: [-0.91, -92.87, 91.21, 0, 90.01, 0] # The initial orientation of the arm for top down grasping
 # The old gaze ready angle: [0, -170, 120, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES: [0, -160, 100, 0, 75, 0] #[0, -160, 100, 0, 75, 0] # you might want to fine-tuned this when doing LSC demo in different sites
-GAZE_ARM_JOINT_ANGLES_EXPLORE: [0, -120, 60, 0, 88, 0]
+GAZE_ARM_JOINT_ANGLES_EXPLORE: [0, -120, 60, 0, 100, 0]
 GAZE_ARM_JOINT_ANGLES_LOW_RECEPTACLES: [0, -160, 100, 0, 75, 0]
 GAZE_ARM_JOINT_ANGLES_HIGH_RECEPTACLES: [0, -120, 60, 0, 88, 0]
 HEIGHT_THRESHOLD : 0.8128

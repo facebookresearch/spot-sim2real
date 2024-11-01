@@ -11,6 +11,7 @@ from typing import List
 import cv2
 import torch
 from PIL import Image
+from torchvision.ops import box_area, box_iou
 
 
 class OwlVit:
@@ -87,7 +88,9 @@ class OwlVit:
             )
         else:
             results = self.processor.post_process_object_detection(
-                outputs=outputs, target_sizes=target_sizes, threshold=self.score_threshold
+                outputs=outputs,
+                target_sizes=target_sizes,
+                threshold=self.score_threshold,
             )
 
         if self.show_img:
@@ -130,7 +133,9 @@ class OwlVit:
             self.get_confident_bounding_box_per_label(results)
             if multi_objects_per_label
             else self.get_most_confident_bounding_box_per_label(results),
-            self.create_img_with_bounding_box_no_ranking(img, results, multi_objects_per_label)
+            self.create_img_with_bounding_box_no_ranking(
+                img, results, multi_objects_per_label
+            )
             if vis_img_required
             else None,
         )
@@ -225,7 +230,7 @@ class OwlVit:
 
         # Format the output
         result = []
-        for label, box in target_boxes.items(): #zip(labels, boxes, scores)
+        for label, box in target_boxes.items():  # zip(labels, boxes, scores)
             x1 = int(box[0])
             y1 = int(box[1])
             x2 = int(box[2])
@@ -239,7 +244,7 @@ class OwlVit:
 
         return result
 
-    def get_confident_bounding_box_per_label(self, results):
+    def get_confident_bounding_box_per_label(self, results, merge_thresh=1.0):
         """
         Returns the confident bounding box for each label above the threshold.
         Each label could have multiple detections.
@@ -252,6 +257,23 @@ class OwlVit:
         boxes = boxes.to("cpu")
         labels = labels.to("cpu")
         scores = scores.to("cpu")
+
+        # nms logic goes here
+        areas = box_area(boxes)
+        ious = box_iou(boxes, boxes).fill_diagonal_(0.0)
+        iou_gtr_than_thresh = torch.argwhere(torch.triu(ious) > merge_thresh)
+        # print(iou_gtr_than_thresh)
+        merge_record = {}
+        for index_pair in iou_gtr_than_thresh:
+            i, j = index_pair
+            i, j = i.item(), j.item()
+            if areas[i] > areas[j]:  # i has more area, thus suppress j
+                scores[j] = -1
+                merge_record[j] = i if i not in merge_record else merge_record[i]
+
+            if areas[j] > areas[i]:  # j has more area, thus suppress i
+                scores[i] = -1
+                merge_record[i] = j if j not in merge_record else merge_record[j]
 
         # Initialize dictionaries to store most confident bounding boxes and scores per label
         target_boxes = {}
@@ -365,13 +387,19 @@ class OwlVit:
 
         return img
 
-    def create_img_with_bounding_box_no_ranking(self, img, results, multi_objects_per_label=False):
+    def create_img_with_bounding_box_no_ranking(
+        self, img, results, multi_objects_per_label=False
+    ):
         """
         Returns an image with all bounding boxes above the threshold overlaid.
         Each class has only one bounding box.
         """
 
-        results = self.get_most_confident_bounding_box_per_label(results) if not multi_objects_per_label else self.get_confident_bounding_box_per_label(results)
+        results = (
+            self.get_most_confident_bounding_box_per_label(results)
+            if not multi_objects_per_label
+            else self.get_confident_bounding_box_per_label(results)
+        )
         font = cv2.FONT_HERSHEY_SIMPLEX
 
         for label, score, box in results:
