@@ -35,7 +35,10 @@ from spot_rl.utils.heuristic_nav import (
     ImageSearch,
     heurisitic_object_search_and_navigation,
 )
+from spot_rl.utils.robopoint_utils import vlm_predict_3d_waypoint, load_vlm_model
+
 from spot_rl.utils.pose_estimation import OrientationSolver
+from spot_rl.utils.robot_utils import predict_waypoint
 from spot_rl.utils.search_table_location import (
     contrained_place_point_estimation,
     convert_point_in_body_to_place_waypoint,
@@ -244,6 +247,8 @@ class SpotSkillManager:
                     config=self.place_config,
                     use_semantic_place=self.allow_semantic_place,  # TODO: Mostly not needed
                 )
+                self.vlm_tokenizer, self.vlm_model, self.vlm_image_processor, _ = load_vlm_model()
+
             else:
                 self.place_controller = SemanticPlace(
                     spot=self.spot,
@@ -546,6 +551,11 @@ class SpotSkillManager:
             print(message)
             return None, None
 
+    def waypoint_estimator_vlm(self, percentile, visualize, height_adjustment_threshold):
+        place_target_location, edge_point_in_base = self.waypoint_estimator(percentile, visualize, height_adjustment_threshold)
+        place_target_location = vlm_predict_3d_waypoint(self.spot, self.arm_joint_angles, self.vlm_tokenizer, self.vlm_model, self.vlm_image_processor)
+        return place_target_location, edge_point_in_base
+
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
         """
@@ -600,9 +610,15 @@ class SpotSkillManager:
             else:
                 height_adjustment_threshold = 0.23
             # estimate waypoint
-            place_target_location, edge_point_in_base = self.waypoint_estimator(
-                percentile, visualize, height_adjustment_threshold
-            )
+
+            if self.use_place_ee:
+                place_target_location, edge_point_in_base = self.waypoint_estimator_vlm(
+                    percentile, visualize, height_adjustment_threshold
+                )
+            else:
+                place_target_location, edge_point_in_base = self.waypoint_estimator(
+                    percentile, visualize, height_adjustment_threshold
+                )
 
         edge_x = float(edge_point_in_base[0])
 
