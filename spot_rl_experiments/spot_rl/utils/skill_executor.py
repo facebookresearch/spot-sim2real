@@ -293,6 +293,10 @@ class SpotRosSkillExecutor:
                     "pathplanning.png",
                 )
 
+                # Do not follow path planning if the distance to target is small
+                if np.linalg.norm(np.array([x, y]) - np.array(nav_pts[-1][0:2])) < 3:
+                    nav_pts = [nav_pts[-1]]
+
                 # Sequentially give the point
                 if len(nav_pts) > 0:
                     final_pt_i = len(nav_pts) - 1
