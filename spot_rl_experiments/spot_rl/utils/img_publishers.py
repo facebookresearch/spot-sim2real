@@ -531,8 +531,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             )
             * 1.0
         )
-        # if default_z is not None:
-        #     Z = default_z
+        if default_z is not None:
+            Z = default_z
         if np.isnan(Z):
             # print(f"Affordance Prediction : Z is NaN = {Z}")
             # else:
@@ -668,7 +668,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.15, show_img=False):
+    def __init__(self, score_threshold=0.2, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -798,7 +798,7 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "pineapple plush toy,donut plush toy,avocado plush toy,ball,can,cup,bottle,bowl",
+            "pineapple plush toy,donut plush toy,avocado plush toy,frog plush toy,ball",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
