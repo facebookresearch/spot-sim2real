@@ -31,7 +31,7 @@ def get_skill_name_and_input_from_ros():
 def reset_ros():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
-    rospy.set_param("skill_in_execution_lock", True)
+    rospy.set_param("skill_in_execution_lock", False)
 
 
 def reset_skill_msg():
