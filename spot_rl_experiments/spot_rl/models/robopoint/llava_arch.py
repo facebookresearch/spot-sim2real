@@ -21,7 +21,7 @@ import torch.nn as nn
 from .multimodal_encoder.builder import build_vision_tower
 from .multimodal_projector.builder import build_vision_projector
 
-from spot_rl.utils.robopoint_utils import get_anyres_image_grid_shape
+from spot_rl.models.robopoint.mm_utils import get_anyres_image_grid_shape
 
 
 # Model Constants

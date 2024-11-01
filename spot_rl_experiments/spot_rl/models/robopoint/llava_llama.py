@@ -27,7 +27,7 @@ from transformers import (
 from transformers.generation.utils import GenerateOutput
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
-from robopoint.model.robopoint.llava_arch import LlavaMetaForCausalLM, LlavaMetaModel
+from spot_rl.models.robopoint.llava_arch import LlavaMetaForCausalLM, LlavaMetaModel
 
 
 class LlavaConfig(LlamaConfig):
