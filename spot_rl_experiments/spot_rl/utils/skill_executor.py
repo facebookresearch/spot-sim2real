@@ -376,6 +376,9 @@ class SpotRosSkillExecutor:
             # Reset skill name and input and publish message
             if is_exploring:
                 succeded, msg = True, "Successful execution!"
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},False"
+                )
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_pick", "None")
             rospy.set_param("/viz_place", "None")
@@ -401,13 +404,13 @@ class SpotRosSkillExecutor:
                 skill_log["num_steps"] = 0
             self.episode_log["actions"].append({"pick": skill_log})
             self.reset_skill_name_input(skill_name, succeded, msg)
-            (
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},True"
-                )
-                if not succeded and self._use_continuos_dwg_or_stop_add == "continous"
-                else None
-            )
+            # (
+            #     rospy.set_param(
+            #         "/enable_dwg_object_addition", f"{str(time.time())},True"
+            #     )
+            #     if not succeded and self._use_continuos_dwg_or_stop_add == "continous"
+            #     else None
+            # )
             rospy.set_param("/viz_object", "None")
             rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "place":
@@ -438,13 +441,13 @@ class SpotRosSkillExecutor:
             self.episode_log["actions"].append({"place": skill_log})
 
             self.reset_skill_name_input(skill_name, succeded, msg)
-            (
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},True"
-                )
-                if self._use_continuos_dwg_or_stop_add == "continous"
-                else None
-            )
+            # (
+            #     rospy.set_param(
+            #         "/enable_dwg_object_addition", f"{str(time.time())},True"
+            #     )
+            #     if self._use_continuos_dwg_or_stop_add == "continous"
+            #     else None
+            # )
             rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "opendrawer":
             rospy.set_param("skill_in_execution_lock", True)
