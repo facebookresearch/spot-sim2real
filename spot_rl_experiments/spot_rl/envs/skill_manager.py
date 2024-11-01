@@ -650,9 +650,14 @@ class SpotSkillManager:
                 rospy.set_param("is_gripper_blocked", 0)
                 previous_place_target_location = place_target_location.copy()
                 try:
-                    place_target_location, edge_point_in_base = self.waypoint_estimator(
-                        percentile, visualize, height_adjustment_threshold
-                    )
+                    if self.use_place_ee:
+                        place_target_location, edge_point_in_base = self.waypoint_estimator_vlm(
+                            percentile, visualize, height_adjustment_threshold
+                        )
+                    else:
+                        place_target_location, edge_point_in_base = self.waypoint_estimator(
+                            percentile, visualize, height_adjustment_threshold
+                        )
                 except Exception as e:
                     print(
                         f"Error during waypoint re-estimation: {str(e)}. Using previous point."
