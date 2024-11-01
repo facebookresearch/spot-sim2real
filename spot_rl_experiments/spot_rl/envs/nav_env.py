@@ -25,7 +25,7 @@ class SpotNavEnv(SpotBaseEnv):
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
-    
+
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES_EXPLORE)
 
     def enable_nav_by_hand(self):
@@ -184,5 +184,12 @@ class SpotNavEnv(SpotBaseEnv):
                 self.slowdown_base = 0.5
             else:
                 self.slowdown_base = -1
+
+        # Slow down the base for exploration
+        is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
+        if dist_to_goal < 1.0 and abs_good_heading < np.rad2deg(45) and is_exploring:
+            self.slowdown_base = 0.5
+        else:
+            self.slowdown_base = -1
 
         return observations, reward, done, info
