@@ -17,6 +17,7 @@ except ImportError:
     print("Could not import Quest3 camera wrapper")
 
 
+import copy
 import json
 import logging
 import time
@@ -34,6 +35,7 @@ try:
 except Exception as e:
     print(f"Cannot import sophuspy due to {e}. Import sophus instead")
     import sophus as sp
+
 from perception_and_utils.utils.conversions import (
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
@@ -206,6 +208,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         detect_human_motion: bool = False,
         detect_human_action: bool = False,
         object_label="milk bottle",
+        return_owlvit_img=False,
     ) -> Tuple[np.ndarray, dict]:
         rate_all = 0.0
         rate_qrd = 0.0
@@ -218,7 +221,13 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         # object_scores = {}  # type: Dict[str, Any]
 
         # Get rgb image from frame
+        # TODO: to hack the owlvit viz
         viz_img = data_frame._rgb_frame
+
+        owlvit_viz_img, object_scores = self.object_detector.process_frame(
+            copy.deepcopy(data_frame)
+        )
+
         if viz_img is None:
             rospy.logwarn("No image found in frame")  # This gets over-written.. WASTE!
 
@@ -256,9 +265,9 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                     print(
                         "\n\n******************** YAY PICKED OBJECT ********************\n\n"
                     )
-                    viz_img, object_scores = self.object_detector.process_frame(
-                        data_frame
-                    )
+                    # viz_img, object_scores = self.object_detector.process_frame(
+                    #     data_frame
+                    # )
                     print(f"{object_scores=}\n\n")
 
                     # TODO: logic to gather what object is in the frame (WIP .. improve this V0)
@@ -368,7 +377,11 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         outputs["process_qr"] = rate_qrd
         outputs["process_od"] = rate_od
         outputs["process_hmd"] = rate_hmd
-        return har_output_img, outputs
+
+        if return_owlvit_img:
+            return (har_output_img, owlvit_viz_img), outputs
+        else:
+            return har_output_img, outputs
 
     def initialize_april_tag_detector(self, outputs: dict = {}):
         """
@@ -478,6 +491,7 @@ def main(
     outputs: Dict[str, Any] = {}
     data_streamer = None
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("Owlvit", cv2.WINDOW_NORMAL)
     try:
         data_streamer = Quest3DataStreamer(
             har_model_path=har_model_path, har_config_path=har_config_path
@@ -511,9 +525,11 @@ def main(
                     detect_objects=True,
                     detect_human_motion=False,
                     detect_human_action=True,
+                    return_owlvit_img=True,
                 )
                 # data_streamer.publish_human_pose(data_frame=data_frame)
-                cv2.imshow("Image", viz_img)
+                cv2.imshow("Image", viz_img[0])
+                cv2.imshow("Owlvit", viz_img[1])
                 cv2.waitKey(1)
             else:
                 rospy.logdebug("No data frame received.")
