@@ -250,6 +250,14 @@ class SpotRosSkillExecutor:
         elif skill_name == "nav_path_planning_with_view_poses":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+
+            is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
+
+            if not is_exploring:
+                rospy.set_param(
+                    "/enable_dwg_object_addition", f"{str(time.time())},False"
+                )
+
             if not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
                 flag = self._use_continuos_dwg_or_stop_add == "continous"
