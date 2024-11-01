@@ -31,6 +31,7 @@ def get_skill_name_and_input_from_ros():
 def reset_ros():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
+    rospy.set_param("skill_in_execution_lock", True)
 
 
 def reset_skill_msg():
@@ -62,6 +63,7 @@ def execute_skills():
         "opendrawer",
         "explore",
     ]:
+        rospy.set_param("skill_in_execution_lock", True)
         print("=======================")
         print(f"Current skill_name {skill_name} skill_input {skill_input}")
         if skill_name == "nav_path_planning_with_view_poses":
@@ -100,6 +102,7 @@ def execute_skills():
         print("=======================")
         reset_skill_name_input(skill_name, succeded, msg)
         rospy.set_param("/human_action", f"{0},None,None,None")
+        rospy.set_param("skill_in_execution_lock", False)
 
 
 print("Listen to skills...")
