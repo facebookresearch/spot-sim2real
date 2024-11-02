@@ -244,7 +244,7 @@ class OwlVit:
 
         return result
 
-    def get_confident_bounding_box_per_label(self, results, merge_thresh=1.0):
+    def get_confident_bounding_box_per_label(self, results, merge_thresh=2.0):
         """
         Returns the confident bounding box for each label above the threshold.
         Each label could have multiple detections.
@@ -259,21 +259,21 @@ class OwlVit:
         scores = scores.to("cpu")
 
         # nms logic goes here
-        areas = box_area(boxes)
-        ious = box_iou(boxes, boxes).fill_diagonal_(0.0)
-        iou_gtr_than_thresh = torch.argwhere(torch.triu(ious) > merge_thresh)
-        # print(iou_gtr_than_thresh)
-        merge_record = {}
-        for index_pair in iou_gtr_than_thresh:
-            i, j = index_pair
-            i, j = i.item(), j.item()
-            if areas[i] > areas[j]:  # i has more area, thus suppress j
-                scores[j] = -1
-                merge_record[j] = i if i not in merge_record else merge_record[i]
+        # areas = box_area(boxes)
+        # ious = box_iou(boxes, boxes).fill_diagonal_(0.0)
+        # iou_gtr_than_thresh = torch.argwhere(torch.triu(ious) > merge_thresh)
+        # # print(iou_gtr_than_thresh)
+        # merge_record = {}
+        # for index_pair in iou_gtr_than_thresh:
+        #     i, j = index_pair
+        #     i, j = i.item(), j.item()
+        #     if areas[i] > areas[j]:  # i has more area, thus suppress j
+        #         scores[j] = -1
+        #         merge_record[j] = i if i not in merge_record else merge_record[i]
 
-            if areas[j] > areas[i]:  # j has more area, thus suppress i
-                scores[i] = -1
-                merge_record[i] = j if j not in merge_record else merge_record[j]
+        #     if areas[j] > areas[i]:  # j has more area, thus suppress i
+        #         scores[i] = -1
+        #         merge_record[i] = j if j not in merge_record else merge_record[j]
 
         # Initialize dictionaries to store most confident bounding boxes and scores per label
         target_boxes = {}
@@ -459,7 +459,7 @@ if __name__ == "__main__":
     file = args.file
     img = cv2.imread(file)
 
-    V = OwlVit(args.labels, args.score_threshold, args.show_img)
+    V = OwlVit(args.labels, args.score_threshold, args.show_img, version=2)
     results = V.run_inference(img)
     # Keep the window open for 10 seconds
     time.sleep(10)
