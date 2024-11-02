@@ -398,7 +398,6 @@ class SpotRosSkillExecutor:
             rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             rospy.set_param("/viz_object", skill_input)
             # Set the multi class object target
-            rospy.set_param("multi_class_object_target", skill_input)
             self.reset_skill_msg()
             pick_pass, pick_msg = self.check_pick_condition()
             if pick_pass:
