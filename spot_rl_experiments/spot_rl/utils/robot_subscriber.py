@@ -15,6 +15,7 @@ from std_msgs.msg import Float32MultiArray
 
 IMG_TOPICS = [
     rt.MASK_RCNN_VIZ_TOPIC,
+    rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC,
     rt.HEAD_DEPTH,
     rt.HAND_DEPTH,
     rt.HAND_RGB,
@@ -23,6 +24,7 @@ IMG_TOPICS = [
 ]
 NO_RAW_IMG_TOPICS = [
     rt.MASK_RCNN_VIZ_TOPIC,
+    rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC,
     rt.HAND_RGB,
     rt.FILTERED_HEAD_DEPTH,
     rt.FILTERED_HAND_DEPTH,

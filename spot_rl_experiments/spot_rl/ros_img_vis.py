@@ -17,12 +17,13 @@ from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import ros_topics as rt
 from spot_wrapper.utils import resize_to_tallest
 
-RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB]
+RAW_IMG_TOPICS = [rt.HEAD_DEPTH, rt.HAND_DEPTH, rt.HAND_RGB, rt.HAND_RGB]
 
 PROCESSED_IMG_TOPICS = [
     rt.FILTERED_HEAD_DEPTH,
     rt.FILTERED_HAND_DEPTH,
     rt.MASK_RCNN_VIZ_TOPIC,
+    rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC,
 ]
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
@@ -196,13 +197,17 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
                 imgs[1] = imgs[1][:, 124:-60]
-
-        img = np.vstack(
-            [
-                resize_to_tallest(bgrify_grayscale_imgs(i), hstack=True)
-                for i in [raw_imgs, processed_imgs]
-            ]
-        )
+        try:
+            img = np.vstack(
+                [
+                    resize_to_tallest(bgrify_grayscale_imgs(i), hstack=True)
+                    for i in [raw_imgs, processed_imgs]
+                ]
+            )
+            # The normal size of the images is 480x2279x3.
+        except Exception:
+            print("Cannot np.vstack image, skipping...")
+            return
 
         # Add Pick receptacle, Object, Place receptacle information on the side
         pck = rospy.get_param("/viz_pick", "None")
