@@ -47,6 +47,7 @@ from spot_rl.utils.pixel_to_3d_conversion_utils import (
     get_3d_point,
     sample_patch_around_point,
 )
+from spot_rl.utils.segmentation_service import segment_with_socket
 from spot_rl.utils.stopwatch import Stopwatch
 from spot_rl.utils.utils import construct_config
 from spot_rl.utils.utils import ros_topics as rt
@@ -63,6 +64,8 @@ ORIG_WIDTH = 640
 ORIG_HEIGHT = 480
 WIDTH_SCALE = 0.5
 HEIGHT_SCALE = 0.5
+USE_SEGMENTATION = False
+USE_DEBLUR_GAN = False
 
 
 class SpotImagePublisher:
@@ -325,7 +328,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = get_deblurgan_model(config)
+        self.deblur_gan = get_deblurgan_model(config) if USE_DEBLUR_GAN else None
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -464,7 +467,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
-    publisher_topics = [rt.MASK_RCNN_VIZ_TOPIC]
+    publisher_topics = [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
 
     def __init__(self, model, spot):
         super().__init__()
@@ -474,7 +477,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = get_deblurgan_model(config)
+        self.deblur_gan = get_deblurgan_model(config) if USE_DEBLUR_GAN else None
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -486,7 +489,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         # rospy.Subscriber(rt.HAND_DEPTH_UNSCALED, Image, self.depth_cb, queue_size=1)
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
 
-        self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
+        self.viz_topic = rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC
 
         # while self.img_msg_depth is None:
         #     pass
@@ -516,7 +519,13 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         return img
 
     def convert_2d_pixel_to_3d(
-        self, pixel_uv, depth_raw, camera_intrinsics, patch_size=10
+        self,
+        pixel_uv,
+        depth_raw,
+        camera_intrinsics,
+        patch_size=40,
+        default_z: float = None,
+        return_z=False,
     ):
         Z = float(
             sample_patch_around_point(
@@ -524,11 +533,14 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             )
             * 1.0
         )
+
         if np.isnan(Z):
-            print(f"Affordance Prediction : Z is NaN = {Z}")
-            return None
+            if default_z is not None:
+                Z = default_z
+            else:
+                return (None, None) if return_z else None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
-        return point_in_3d
+        return (point_in_3d, Z) if return_z else point_in_3d
 
     def _publish(self):
         stopwatch = Stopwatch()
@@ -569,10 +581,22 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
+        print(
+            f"Raw detection: {new_detections}"
+        ) if "None" not in new_detections else None
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
+
+            if USE_SEGMENTATION:
+                mask = segment_with_socket(
+                    hand_rgb_preprocessed, [float(x1), float(y1), float(x2), float(y2)]
+                )
+                non_zero_indices = np.nonzero(mask)
+                y1, y2 = non_zero_indices[0].min(), non_zero_indices[0].max()
+                x1, x2 = non_zero_indices[1].min(), non_zero_indices[1].max()
+
             # Compute the center pixel
             x1, y1, x2, y2 = [
                 int(float(i) / self.image_scale) for i in [x1, y1, x2, y2]
@@ -581,22 +605,29 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             pixel_y = int(np.mean([y1, y2]))
             try:
                 depth_raw = arm_depth / 1000.0
-                point_in_gripper = self.convert_2d_pixel_to_3d(
-                    [pixel_x, pixel_y], depth_raw, cam_intrinsics
+                point_in_gripper, default_z = self.convert_2d_pixel_to_3d(
+                    [pixel_x, pixel_y], depth_raw, cam_intrinsics, return_z=True
                 )
                 if point_in_gripper is None:
-                    print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
                 # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
                 # & then use these in hab-llm to calculate iou in global space
                 left_top_in_3d = self.convert_2d_pixel_to_3d(
-                    [x1, y1], depth_raw, cam_intrinsics
+                    [x1, y1], depth_raw, cam_intrinsics, default_z=default_z
                 )
                 right_bottom_in_3d = self.convert_2d_pixel_to_3d(
-                    [x2, y2], depth_raw, cam_intrinsics
+                    [x2, y2], depth_raw, cam_intrinsics, default_z=default_z
                 )
 
                 if np.isnan(point_in_gripper).any():
+                    continue
+
+                if left_top_in_3d is None:
+                    print("left top in 3d None")
+                    continue
+
+                if right_bottom_in_3d is None:
+                    print("right bottom in 3d None")
                     continue
 
                 point_in_global_3d = np.array(
@@ -642,7 +673,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.1, show_img=False):
+    def __init__(self, score_threshold=0.3, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -772,7 +803,7 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "cup,bottle",
+            "pineapple plush toy,pink donut plush toy,avocado plush toy,frog plush toy,ball",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
