@@ -1222,9 +1222,11 @@ class Spot:
         if osp.isfile(HOME_TXT):
             with open(HOME_TXT) as f:
                 data = f.read()
-            global_T_home = np.array([float(d) for d in data.split(", ")[:9]])
-            global_T_home = global_T_home.reshape([3, 3])
-            robot_recenter_yaw = float(data.split(", ")[-1])
+
+            if data != "":
+                global_T_home = np.array([float(d) for d in data.split(", ")[:9]])
+                global_T_home = global_T_home.reshape([3, 3])
+                robot_recenter_yaw = float(data.split(", ")[-1])
 
         return (global_T_home, robot_recenter_yaw)
 
