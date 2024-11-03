@@ -91,7 +91,10 @@ def segment(image, boxes, size, device):
     )
     return masks
 
+
 socket = None
+
+
 def connect_socket(port):
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
