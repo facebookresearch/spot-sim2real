@@ -204,10 +204,9 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                     for i in [raw_imgs, processed_imgs]
                 ]
             )
-            # (480, 2279, 3)
-            # (480, 2279, 3)
+            # The normal size of the images is 480x2279x3.
         except Exception:
-            print("cannot np.vstack image")
+            print("Cannot np.vstack image, skipping...")
             return
 
         # Add Pick receptacle, Object, Place receptacle information on the side

@@ -13,6 +13,8 @@ import torch
 from PIL import Image
 from torchvision.ops import box_area, box_iou
 
+MEGRE_BBOX = False
+
 
 class OwlVit:
     def __init__(
@@ -230,7 +232,7 @@ class OwlVit:
 
         # Format the output
         result = []
-        for label, box in target_boxes.items():  # zip(labels, boxes, scores)
+        for label, box in target_boxes.items():
             x1 = int(box[0])
             y1 = int(box[1])
             x2 = int(box[2])
@@ -258,22 +260,23 @@ class OwlVit:
         labels = labels.to("cpu")
         scores = scores.to("cpu")
 
-        # nms logic goes here
-        # areas = box_area(boxes)
-        # ious = box_iou(boxes, boxes).fill_diagonal_(0.0)
-        # iou_gtr_than_thresh = torch.argwhere(torch.triu(ious) > merge_thresh)
-        # # print(iou_gtr_than_thresh)
-        # merge_record = {}
-        # for index_pair in iou_gtr_than_thresh:
-        #     i, j = index_pair
-        #     i, j = i.item(), j.item()
-        #     if areas[i] > areas[j]:  # i has more area, thus suppress j
-        #         scores[j] = -1
-        #         merge_record[j] = i if i not in merge_record else merge_record[i]
+        # Merging bounding boxes logic goes here
+        if MEGRE_BBOX:
+            areas = box_area(boxes)
+            ious = box_iou(boxes, boxes).fill_diagonal_(0.0)
+            iou_gtr_than_thresh = torch.argwhere(torch.triu(ious) > merge_thresh)
+            print(iou_gtr_than_thresh)
+            merge_record = {}
+            for index_pair in iou_gtr_than_thresh:
+                i, j = index_pair
+                i, j = i.item(), j.item()
+                if areas[i] > areas[j]:  # i has more area, thus suppress j
+                    scores[j] = -1
+                    merge_record[j] = i if i not in merge_record else merge_record[i]
 
-        #     if areas[j] > areas[i]:  # j has more area, thus suppress i
-        #         scores[i] = -1
-        #         merge_record[i] = j if j not in merge_record else merge_record[j]
+                if areas[j] > areas[i]:  # j has more area, thus suppress i
+                    scores[i] = -1
+                    merge_record[i] = j if j not in merge_record else merge_record[j]
 
         # Initialize dictionaries to store most confident bounding boxes and scores per label
         target_boxes = {}

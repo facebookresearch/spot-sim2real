@@ -403,10 +403,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                 lin_dist, ang_dist = base_action
 
                 # Scale the linear and angular velocities
-                additional_scale = rospy.get_param("nav_velocity_scaling", 1.0)
-                print(f"Additional Scale {additional_scale}")
-                lin_dist *= self._max_lin_dist_scale * additional_scale
-                ang_dist *= np.deg2rad(self._max_ang_dist_scale * additional_scale)
+                nav_velocity_scaling = rospy.get_param("nav_velocity_scaling", 1.0)
+                lin_dist *= self._max_lin_dist_scale * nav_velocity_scaling
+                ang_dist *= np.deg2rad(self._max_ang_dist_scale * nav_velocity_scaling)
 
                 target_yaw = wrap_heading(self.yaw + ang_dist)
                 # No horizontal velocity
@@ -507,7 +506,6 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
                     target_yaw = None
         elif not (grasp or place):
             self.say("!!!! NO ACTIONS CALLED: moving to next step !!!!")
-            #self.num_steps -= 1
 
         self.stopwatch.record("run_actions")
         if base_action is not None:

@@ -64,6 +64,8 @@ ORIG_WIDTH = 640
 ORIG_HEIGHT = 480
 WIDTH_SCALE = 0.5
 HEIGHT_SCALE = 0.5
+USE_SEGMENTATION = False
+USE_DEBLUR_GAN = False
 
 
 class SpotImagePublisher:
@@ -326,7 +328,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = None  # get_deblurgan_model(config)
+        self.deblur_gan = get_deblurgan_model(config) if USE_DEBLUR_GAN else None
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -475,7 +477,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
-        self.deblur_gan = None  # get_deblurgan_model(config)
+        self.deblur_gan = get_deblurgan_model(config) if USE_DEBLUR_GAN else None
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
         self.pubs[self.detection_topic] = rospy.Publisher(
@@ -533,7 +535,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         )
 
         if np.isnan(Z):
-            # print(f"Affordance Prediction : Z is NaN = {Z}")
             if default_z is not None:
                 Z = default_z
             else:
@@ -581,16 +582,21 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         new_detections = new_detections.split(";")
         object_info = []
         print(
-            f"Raw detection STR {new_detections}"
+            f"Raw detection: {new_detections}"
         ) if "None" not in new_detections else None
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
-            # mask = segment_with_socket(hand_rgb_preprocessed, [float(x1), float(y1), float(x2), float(y2)])
-            # non_zero_indices = np.nonzero(mask)
-            # y1, y2 = non_zero_indices[0].min(), non_zero_indices[0].max()
-            # x1, x2 = non_zero_indices[1].min(), non_zero_indices[1].max()
+
+            if USE_SEGMENTATION:
+                mask = segment_with_socket(
+                    hand_rgb_preprocessed, [float(x1), float(y1), float(x2), float(y2)]
+                )
+                non_zero_indices = np.nonzero(mask)
+                y1, y2 = non_zero_indices[0].min(), non_zero_indices[0].max()
+                x1, x2 = non_zero_indices[1].min(), non_zero_indices[1].max()
+
             # Compute the center pixel
             x1, y1, x2, y2 = [
                 int(float(i) / self.image_scale) for i in [x1, y1, x2, y2]
@@ -603,7 +609,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                     [pixel_x, pixel_y], depth_raw, cam_intrinsics, return_z=True
                 )
                 if point_in_gripper is None:
-                    # print(f"Affordance Point is NaN for {class_label}, skipping")
                     continue
                 # left top & bottom right are x1, y1 & x2, y2 are endpoints of detected bbox we convert those to HOME frame
                 # & then use these in hab-llm to calculate iou in global space
@@ -615,7 +620,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 )
 
                 if np.isnan(point_in_gripper).any():
-                    # print("Point in gripper is None after conversion")
                     continue
 
                 if left_top_in_3d is None:
