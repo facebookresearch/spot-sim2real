@@ -89,7 +89,7 @@ class ObjectDetectorWrapper(GenericDetector):
 
     def _get_scored_object_detections(
         self, img: np.ndarray, heuristic=None
-    ) -> Tuple[bool, Dict[str, Any], Dict[str, bool], np.ndarray]:
+    ) -> Tuple[np.ndarray, dict]:
         """
         Detect object instances in the img frame. score them based on heuristics
         and return a tuple of (valid, score, result_image)
@@ -255,14 +255,12 @@ class ObjectDetectorWrapper(GenericDetector):
             )
             return img_frame, {}
 
-        (
-            valid,
-            object_scores,
-            stop,
-            updated_img_frame,
-        ) = self._get_scored_object_detections(
+        (updated_img_frame, detection_output) = self._get_scored_object_detections(
             img_frame, heuristic=self._aria_fetch_demo_heuristics
         )
+        valid = detection_output["_valid"]
+        object_scores = detection_output["_score"]
+        stop = detection_output["_stop"]
         if stop != {}:
             # object-detection + checking for intersection b/w all objects and hand
             # is a computationally expensive operation (happens inside

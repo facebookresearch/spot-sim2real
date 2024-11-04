@@ -34,6 +34,7 @@ try:
 except Exception as e:
     print(f"Cannot import sophuspy due to {e}. Import sophus instead")
     import sophus as sp
+
 from perception_and_utils.utils.conversions import (
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
@@ -76,7 +77,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 
         # state-machine for HAR
         self.finding_object_stage = False
-        self._partial_action = {}
+        self._partial_action: dict = {}
 
     def connect(self):
         """
@@ -298,7 +299,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 max_iou = 0.0
                 arg_max_indx = -1
                 for det_indx, det in enumerate(detections):
-                    print(det)
+                    print("Object-name:", det[0], "; Score:", det[1], "; Bbox:", det[2])
                     iou = self._get_iou(har_object_bbox[0], det[-1])
                     print("IOU = ", iou)
                     if iou > max_iou:
@@ -306,6 +307,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                         arg_max_indx = det_indx
                 if arg_max_indx != -1 and max_iou > 0.5:
                     self._partial_action["object"] = detections[arg_max_indx][0]
+                    print("Object being held: ", detections[arg_max_indx][0])
                     self.finding_object_stage = False
                     action = self._partial_action
                     self._partial_action = {}
