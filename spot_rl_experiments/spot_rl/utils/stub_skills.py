@@ -32,7 +32,7 @@ def reset_ros():
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
     rospy.set_param("skill_in_execution_lock", False)
-    rospy.get_param("/enable_dwg_object_addition", f"{str(time.time())},True")
+    rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},True")
 
 
 def reset_skill_msg():
