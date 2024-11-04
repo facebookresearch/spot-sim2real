@@ -161,16 +161,7 @@ class SpotRosSkillExecutor:
         if skill_name == "nav":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
-            if not robot_holding:
-                self.spotskillmanager.spot.open_gripper()
-                flag = self._use_continuos_dwg_or_stop_add == "continous"
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
-                )
-            else:
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},False"
-                )
+            rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
 
             # Reset the skill message
             self.reset_skill_msg()
@@ -216,26 +207,6 @@ class SpotRosSkillExecutor:
             print(
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
             )
-            if succeded and not robot_holding:
-                time.sleep(1)
-                print("Scanning area with arm")
-                # we need to keep it on for both cases continous & stopnadd
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},True"
-                )
-                # if ENABLE_ARM_SCAN:
-                # scan_arm(
-                #     self.spotskillmanager.spot,
-                #     publisher=self.detection_publisher,
-                #     enable_object_detector_during_movement=False,
-                # )
-                flag = self._use_continuos_dwg_or_stop_add == "continous"
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
-                )
-            else:
-                print("Will not scan arm")
-
             # Reset skill name and input and publish message
             skill_log = self.spotskillmanager.nav_controller.skill_result_log
             if "num_steps" not in skill_log:
