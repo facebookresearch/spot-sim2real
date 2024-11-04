@@ -9,10 +9,6 @@ from perception_and_utils.perception.detector_wrappers.generic_detector_interfac
 from perception_and_utils.perception.detectron2_ho_detector import Detectron2HODetector
 from perception_and_utils.utils.data_frame import DataFrame
 
-LHAND_CATEGORY = 0
-RHAND_CATEGORY = 1
-OBJECT_CATEGORY = 2
-
 
 class HARStateMachine(GenericDetector):
     def __init__(self, model_path, model_config_path, verbose: bool = False):
@@ -21,7 +17,7 @@ class HARStateMachine(GenericDetector):
 
         # state-machine setup
         self.ALL_STATES = ["holding", "not_holding"]
-        self.FRAME_THRESHOLD = 10  # roughly equal to 1 second
+        self.FRAME_THRESHOLD = 5  # roughly equal to 1 second with OWL-ViT
         self._num_hand_frames = 0
         self._num_object_frames = 0
         self.state_machine = {
@@ -31,6 +27,9 @@ class HARStateMachine(GenericDetector):
 
         # initialize
         self.current_state = "not_holding"
+        self.LHAND_CATEGORY = 0
+        self.RHAND_CATEGORY = 1
+        self.OBJECT_CATEGORY = 2
 
     def holding_state_tick(self, detection_dict) -> Dict[str, Any]:
         """
@@ -40,12 +39,12 @@ class HARStateMachine(GenericDetector):
         if "instances" not in detection_dict:
             return {}
         instances = detection_dict["instances"]
-        if OBJECT_CATEGORY not in instances.pred_classes and (
-            LHAND_CATEGORY in instances.pred_classes
-            or RHAND_CATEGORY in instances.pred_classes
+        if self.OBJECT_CATEGORY not in instances.pred_classes and (
+            self.LHAND_CATEGORY in instances.pred_classes
+            or self.RHAND_CATEGORY in instances.pred_classes
         ):
             self._num_hand_frames += 1
-        if OBJECT_CATEGORY in instances.pred_classes:
+        if self.OBJECT_CATEGORY in instances.pred_classes:
             self.reset_hand_count()
         if self._num_hand_frames == self.FRAME_THRESHOLD:
             self.toggle_state()
@@ -62,15 +61,16 @@ class HARStateMachine(GenericDetector):
         if "instances" not in detection_dict:
             return {}
         instances = detection_dict["instances"]
-        if (
-            LHAND_CATEGORY in instances.pred_classes
-            and OBJECT_CATEGORY in instances.pred_classes
-        ) or (
-            RHAND_CATEGORY in instances.pred_classes
-            and OBJECT_CATEGORY in instances.pred_classes
-        ):
+        # if (
+        #     self.LHAND_CATEGORY in instances.pred_classes
+        #     and self.OBJECT_CATEGORY in instances.pred_classes
+        # ) or (
+        #     self.RHAND_CATEGORY in instances.pred_classes
+        #     and self.OBJECT_CATEGORY in instances.pred_classes
+        # ):
+        if self.OBJECT_CATEGORY in instances.pred_classes:
             self._num_object_frames += 1
-        if OBJECT_CATEGORY not in instances.pred_classes:
+        if self.OBJECT_CATEGORY not in instances.pred_classes:
             self.reset_object_count()
         if self._num_object_frames == self.FRAME_THRESHOLD:
             self.toggle_state()
