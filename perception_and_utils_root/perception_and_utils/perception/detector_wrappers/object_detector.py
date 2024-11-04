@@ -111,8 +111,11 @@ class ObjectDetectorWrapper(GenericDetector):
 
         if heuristic is not None:
             valid, score, stop = heuristic(detections)
+            detections["_valid"] = valid
+            detections["_score"] = score
+            detections["_stop"] = stop
 
-        return valid, score, stop, result_image
+        return result_image, detections
 
     def _aria_online_heuristic(
         self, detections, img_size=(512, 512), score_thresh=0.35
@@ -199,7 +202,9 @@ class ObjectDetectorWrapper(GenericDetector):
 
         return valid, score, stop
 
-    def process_frame(self, frame: DataFrame) -> Tuple[np.ndarray, Dict[str, Any]]:
+    def process_frame(
+        self, frame: DataFrame, heuristic=None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
         Process image frame to detect object instances and score them based on heuristics
 
@@ -221,10 +226,10 @@ class ObjectDetectorWrapper(GenericDetector):
             )
             return img_frame, {}
 
-        (_, object_scores, _, updated_img_frame,) = self._get_scored_object_detections(
-            img_frame, heuristic=self._aria_online_heuristic
+        updated_img_frame, detections = self._get_scored_object_detections(
+            img_frame, heuristic=heuristic
         )
-        return updated_img_frame, object_scores
+        return updated_img_frame, detections
 
     def process_frame_offline(
         self, frame: DataFrame
