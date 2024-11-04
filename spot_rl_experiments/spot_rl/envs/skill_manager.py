@@ -559,7 +559,10 @@ class SpotSkillManager:
     def waypoint_estimator_vlm(
         self, percentile, visualize, height_adjustment_threshold
     ):
-        # place_target_location, edge_point_in_base = self.waypoint_estimator(percentile, visualize, height_adjustment_threshold)
+        place_target_location, edge_point_in_base = self.waypoint_estimator(
+            percentile, visualize, height_adjustment_threshold
+        )
+        rospy.set_param("/is_gripper_blocked", 0)
         place_target_location = vlm_predict_3d_waypoint(
             self.spot,
             self.arm_joint_angles,
@@ -568,7 +571,7 @@ class SpotSkillManager:
             self.vlm_image_processor,
             height_adjustment_threshold,
         )
-        return place_target_location, None
+        return place_target_location, edge_point_in_base
 
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
@@ -633,7 +636,6 @@ class SpotSkillManager:
                 place_target_location, edge_point_in_base = self.waypoint_estimator(
                     percentile, visualize, height_adjustment_threshold
                 )
-        # TO-DO : Find edge_x for new waypoint estimator
         edge_x = float(edge_point_in_base[0])
 
         # Move the base if the robot is too far away from the place target
