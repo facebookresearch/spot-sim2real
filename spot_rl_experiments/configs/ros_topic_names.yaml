@@ -9,6 +9,7 @@ FILTERED_HEAD_DEPTH: "/filtered_head_depth"
 FILTERED_HAND_DEPTH: "/filtered_hand_depth"
 
 MASK_RCNN_VIZ_TOPIC: "/mask_rcnn_visualizations"
+MULTI_OBJECT_DETECTION_VIZ_TOPIC: "/multi_object_detection_viz_topic"
 DETECTIONS_TOPIC: "/mask_rcnn_detections"
 IMAGE_SCALE: "/image_scale"
 

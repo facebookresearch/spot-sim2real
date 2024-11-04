@@ -644,7 +644,7 @@ def scan_arm(
     if gaze_arm_angles is None:
         config = construct_config()
         gaze_arm_angles = deepcopy(
-            config.GAZE_ARM_JOINT_ANGLES
+            config.GAZE_ARM_JOINT_ANGLES_EXPLORE
         )  # TODO: Toggle between short and tall receptacles
     else:
         assert (
@@ -653,16 +653,12 @@ def scan_arm(
 
     spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), travel_time=5)
     spot.open_gripper()
-    semicircle_range = np.concatenate(
-        [
-            np.arange(0, angle_start, -angle_interval),
-            np.arange(angle_start, angle_end, angle_interval),
-            np.arange(angle_end, 0, -angle_interval),
-        ]
+    semicircle_range = np.arange(
+        angle_start, angle_end + angle_interval, angle_interval
     )
     for _, angle in enumerate(semicircle_range):
         print(f"Scanning in {angle} cone")
-        angle_time = 1.0
+        angle_time = 1.5
         gaze_arm_angles[0] = angle
         spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), angle_time)
         time.sleep(1.5)
