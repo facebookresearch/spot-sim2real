@@ -34,6 +34,7 @@ try:
 except Exception as e:
     print(f"Cannot import sophuspy due to {e}. Import sophus instead")
     import sophus as sp
+
 from perception_and_utils.utils.conversions import (
     sophus_SE3_to_ros_PoseStamped,
     sophus_SE3_to_ros_TransformStamped,
@@ -73,6 +74,10 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         self.depth_cam_params: CameraParams = None
         self._frame_number = -1
         self._setup_device()
+
+        # state-machine for HAR
+        self.finding_object_stage = False
+        self._partial_action: dict = {}
 
     def connect(self):
         """
@@ -197,6 +202,25 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 
         return data_frame
 
+    def _get_iou(self, boxA, boxB):
+        # determine the (x, y)-coordinates of the intersection rectangle
+        xA = max(boxA[0], boxB[0])
+        yA = max(boxA[1], boxB[1])
+        xB = min(boxA[2], boxB[2])
+        yB = min(boxA[3], boxB[3])
+        # compute the area of intersection rectangle
+        interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+        # compute the area of both the prediction and ground-truth
+        # rectangles
+        boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
+        boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
+        # compute the intersection over union by taking the intersection
+        # area and dividing it by the sum of prediction + ground-truth
+        # areas - the interesection area
+        iou = interArea / float(boxAArea + boxBArea - interArea)
+        # return the intersection over union value
+        return iou
+
     def process_frame(
         self,
         data_frame: DataFrame,
@@ -206,6 +230,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         detect_human_motion: bool = False,
         detect_human_action: bool = False,
         object_label="milk bottle",
+        test_without_registration: bool = False,
     ) -> Tuple[np.ndarray, dict]:
         rate_all = 0.0
         rate_qrd = 0.0
@@ -223,10 +248,21 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             rospy.logwarn("No image found in frame")  # This gets over-written.. WASTE!
 
         if detect_human_action:
-            har_output_img, output_dict = self.har_model.process_frame(data_frame)
+            action = {}
+            har_output_img, har_output_dict = self.har_model.process_frame(data_frame)
+            har_instances = har_output_dict["instances"]
+            har_object_bbox = (
+                har_instances.pred_boxes[
+                    har_instances.pred_classes == self.har_model.OBJECT_CATEGORY
+                ]
+                .tensor.cpu()
+                .numpy()
+                .tolist()
+            )
+            viz_img, detections = self.object_detector.process_frame(data_frame)
 
-            if output_dict.get("action_trigger", None) is not None:
-                action_string = output_dict["action_trigger"]
+            if har_output_dict.get("action_trigger", None) is not None:
+                action_string = har_output_dict["action_trigger"]
 
                 action = {
                     "action": action_string,
@@ -236,38 +272,49 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                         0.0,
                     ],
                 }
-                human_place_xyz = None
-                try:
-                    human_place_xyz = self.get_nav_xyz_to_wearer(
-                        self.get_handoff_to_human_pose(
-                            source=rf.QUEST3_CAMERA, target=rf.SPOT_WORLD
-                        ),
-                        shift_offset=0.3,
-                    )
-                except RuntimeError:
-                    rospy.logwarn("Error in finding place point in front of human")
-                action["location"] = [
-                    human_place_xyz[0],
-                    human_place_xyz[1],
-                    human_place_xyz[2],
-                ]
+                if not test_without_registration:
+                    human_place_xyz = None
+                    try:
+                        human_place_xyz = self.get_nav_xyz_to_wearer(
+                            self.get_handoff_to_human_pose(
+                                source=rf.QUEST3_CAMERA, target=rf.SPOT_WORLD
+                            ),
+                            shift_offset=0.3,
+                        )
+                    except RuntimeError:
+                        rospy.logwarn("Error in finding place point in front of human")
+                    action["location"] = [
+                        human_place_xyz[0],
+                        human_place_xyz[1],
+                        human_place_xyz[2],
+                    ]
 
                 if action_string == "pick":
+                    self.finding_object_stage = True
                     print(
                         "\n\n******************** YAY PICKED OBJECT ********************\n\n"
                     )
-                    viz_img, object_scores = self.object_detector.process_frame(
-                        data_frame
-                    )
-                    print(f"{object_scores=}\n\n")
+                    self._partial_action = action
+            if self.finding_object_stage:
+                max_iou = 0.0
+                arg_max_indx = -1
+                for det_indx, det in enumerate(detections):
+                    print("Object-name:", det[0], "; Score:", det[1], "; Bbox:", det[2])
+                    iou = self._get_iou(har_object_bbox[0], det[-1])
+                    print("IOU = ", iou)
+                    if iou > max_iou:
+                        max_iou = iou
+                        arg_max_indx = det_indx
+                if arg_max_indx != -1 and max_iou > 0.5:
+                    self._partial_action["object"] = detections[arg_max_indx][0]
+                    print("Object being held: ", detections[arg_max_indx][0])
+                    self.finding_object_stage = False
+                    action = self._partial_action
+                    self._partial_action = {}
+                else:
+                    action = {}
 
-                    # TODO: logic to gather what object is in the frame (WIP .. improve this V0)
-                    if object_scores is not None and object_scores != {}:
-                        best_object, best_score = max(
-                            object_scores.items(), key=lambda item: item[1]
-                        )
-                        action["object"] = best_object
-
+            if action:
                 # Broadcast action string data
                 action_json_string = json.dumps(action)
                 self.human_activity_current_pub.publish(action_json_string)
@@ -368,7 +415,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         outputs["process_qr"] = rate_qrd
         outputs["process_od"] = rate_od
         outputs["process_hmd"] = rate_hmd
-        return har_output_img, outputs
+        return [har_output_img, viz_img], outputs
 
     def initialize_april_tag_detector(self, outputs: dict = {}):
         """
@@ -428,6 +475,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 object_labels + meta_objects,
                 verbose=self.verbose,
                 version=2,
+                score_threshold=0.2,
             )
         )
         self.object_detector._core_objects = object_labels
@@ -445,12 +493,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
 @click.option("--hz", type=int, default=100)
 @click.option("--har-model-path")
 @click.option("--har-config-path")
+@click.option("--test-without-registration", default=False, is_flag=True)
 def main(
     do_update_iptables: bool,
     debug: bool,
     hz: int,
     har_model_path: str,
     har_config_path: str,
+    test_without_registration: bool,
 ):
     if debug:
         _log_level = rospy.DEBUG
@@ -478,6 +528,7 @@ def main(
     outputs: Dict[str, Any] = {}
     data_streamer = None
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("OWL-ViT", cv2.WINDOW_NORMAL)
     try:
         data_streamer = Quest3DataStreamer(
             har_model_path=har_model_path, har_config_path=har_config_path
@@ -488,13 +539,12 @@ def main(
         outputs = data_streamer.initialize_object_detector(
             outputs=outputs,
             object_labels=[
-                "creamer bottle",
-                "can",
                 "pineapple plush toy",
-                "ball",
                 "donut plush toy",
+                "avocado plush toy",
                 "frog plush toy",
-            ],  # TODO: Expand this list
+                "ball",
+            ],
         )
         data_streamer.initialize_human_motion_detector()
         # data_streamer.connect()
@@ -511,9 +561,11 @@ def main(
                     detect_objects=True,
                     detect_human_motion=False,
                     detect_human_action=True,
+                    test_without_registration=test_without_registration,
                 )
                 # data_streamer.publish_human_pose(data_frame=data_frame)
-                cv2.imshow("Image", viz_img)
+                cv2.imshow("Image", viz_img[0])
+                cv2.imshow("OWL-ViT", viz_img[1])
                 cv2.waitKey(1)
             else:
                 rospy.logdebug("No data frame received.")
