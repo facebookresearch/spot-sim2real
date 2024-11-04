@@ -11,11 +11,12 @@ import torch
 from PIL import Image
 from spot_rl.models.robopoint.llava_llama import LlavaLlamaForCausalLM
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
-from spot_rl.utils.search_table_location import get_arguments
+from spot_rl.utils.pixel_to_3d_conversion_utils import get_3d_point
+from spot_rl.utils.search_table_location import get_arguments, project_3d_to_pixel_uv
 from transformers import AutoTokenizer
 
 IMAGE_TOKEN_INDEX = -200
-from spot_rl.utils.pixel_to_3d_conversion_utils import get_3d_point
+
 
 def expand2square(pil_img, background_color):
     width, height = pil_img.size
@@ -160,7 +161,7 @@ def load_vlm_model():
     setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
     setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
     model_path = os.path.expanduser(
-        "/opt/hpcaas/.mounts/fs-03ee9f8c6dddfba21/jtruong/repos/RoboPoint/data/robopoint-v1-vicuna-v1.5-13b"
+        "/spot-sim2real/spot_rl_experiments/weights/semantic_place_ee/robopoint-v1-vicuna-v1.5-13b"
     )
     tokenizer, model, image_processor, context_len = load_pretrained_model(model_path)
     return tokenizer, model, image_processor, context_len
@@ -170,6 +171,7 @@ def predict_waypoint(
     img_cv2, tokenizer, model, image_processor, temperature=1.0, top_p=0.7
 ):
     custom_prompt = "Find a few spots within the vacant area on the closest table top surface, away from the edge."
+    # custom_prompt = "Find a few spots within the vacant area on the closest table top surface, away from the edge and to the left of the soda can."
     prompt = f"A chat between a curious human and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the human's questions. USER: <image> {custom_prompt}. Your answer should be formatted as a list of tuples, i.e. [(x1, y1), (x2, y2), ...], where each tuple contains the x and y coordinates of a point satisfying the conditions above. The coordinates should be between 0 and 1, indicating the normalized pixel locations of the points in the image. ASSISTANT: "
     print("prompt: ", prompt)
 
@@ -219,35 +221,78 @@ def get_robot_data(spot, GAZE_ARM_JOINT_ANGLES):
         gripper_T_intel,
     ) = get_arguments(spot, gripper_T_intel)
 
-    return img, depth_raw, camera_intrinsics_intel
+    return (
+        img,
+        depth_raw,
+        camera_intrinsics_intel,
+        camera_intrinsics_gripper,
+        body_T_hand,
+        gripper_T_intel,
+    )
 
 
-def draw_wpt(image, x_norm, y_norm, color=(0, 255, 0), radius=5, thickness=2):
-    # Make a copy of the image to avoid modifying the original
-    img_draw = image.copy()
-
+def convert_to_pixel_coordinates(img, wpt):
     # Get image dimensions
-    height, width = img_draw.shape[:2]
+    height, width = img.shape[:2]
 
     # Convert normalized coordinates to pixel coordinates
-    x_pixel = int(x_norm * (width - 1))
-    y_pixel = int(y_norm * (height - 1))
+    x_pixel = int(wpt[0] * (width - 1))
+    y_pixel = int(wpt[1] * (height - 1))
+    return x_pixel, y_pixel
 
+
+def draw_wpt(image, wpt, color=(0, 255, 0), radius=5, thickness=2):
+    # Make a copy of the image to avoid modifying the original
+    img_draw = image.copy()
+    x_pixel, y_pixel = convert_to_pixel_coordinates(img_draw, wpt)
     # Draw a circle at the point
     cv2.circle(img_draw, (x_pixel, y_pixel), radius, color, thickness)
     cv2.imwrite(f"table_detection_vlm_{time.time()*1000}.png", img_draw)
 
 
-def vlm_predict_3d_waypoint(spot, GAZE_ARM_JOINT_ANGLES, tokenizer, model, image_processor, visualize=False):
+def vlm_predict_3d_waypoint(
+    spot,
+    GAZE_ARM_JOINT_ANGLES,
+    tokenizer,
+    model,
+    image_processor,
+    height_adjustment_offset,
+    visualize=True,
+):
     # tokenizer, model, image_processor, _ = load_vlm_model()
-    img_cv2, depth_raw, camera_intrinsics_intel = get_robot_data(
-        spot, GAZE_ARM_JOINT_ANGLES
-    )
+    (
+        img_cv2,
+        depth_raw,
+        camera_intrinsics_intel,
+        camera_intrinsics_gripper,
+        body_T_hand,
+        gripper_T_intel,
+    ) = get_robot_data(spot, GAZE_ARM_JOINT_ANGLES)
     if visualize:
         cv2.imwrite(f"table_detection_vlm_before_{time.time() * 1000}.png", img_cv2)
+    start_time = time.time()
     avg_wpt = predict_waypoint(img_cv2, tokenizer, model, image_processor)
+    print("inference time: ", time.time() - start_time)
     if visualize:
-        draw_wpt(img_cv2, avg_wpt[0], avg_wpt[1])
+        draw_wpt(img_cv2, avg_wpt)
     h, w = img_cv2.shape[:2]
-    z = depth_raw[int(avg_wpt[1] * h), int(avg_wpt[0] * w)]
-    return get_3d_point(camera_intrinsics_intel, avg_wpt, z)
+    z = depth_raw[int(avg_wpt[1] * h), int(avg_wpt[0] * w)] / 1000
+    x_pixel, y_pixel = convert_to_pixel_coordinates(img_cv2, avg_wpt)
+    print("x_pixel: ", x_pixel, "y_pixel: ", y_pixel, "z: ", z)
+    selected_point = get_3d_point(camera_intrinsics_intel, [x_pixel, y_pixel], z)
+    selected_point_in_gripper = np.array(gripper_T_intel * selected_point)
+    selected_xy = project_3d_to_pixel_uv(
+        selected_point.reshape(1, 3), camera_intrinsics_intel
+    )[0]
+    reproj_img = img_cv2.copy()
+    reproj_img = cv2.circle(
+        img_cv2, (int(selected_xy[0]), int(selected_xy[1])), 2, (0, 0, 255)
+    )
+    cv2.imwrite(f"table_detection_vlm_after_v2_{time.time() * 1000}.png", reproj_img)
+    point_in_body = body_T_hand * selected_point_in_gripper
+    placexyz = np.array(point_in_body)
+    # This is useful if we want the place target to be in global frame:
+    # convert_point_in_body_to_place_waypoint(point_in_body, spot)
+    # Static Offset adjustment
+    placexyz[2] += height_adjustment_offset
+    return placexyz
