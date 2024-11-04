@@ -108,7 +108,6 @@ def execute_skills():
         # The candidate response
         # Can't explore while robot is holding the object, please place first.
         # Unexpected failure! - Failed to pick! Not close enough to the object.
-        # Unexpected failure! - Failed to pick! Not close enough to the object.
         # Unexpected failure! - Failed to place! Not close enough to {target_object_receptacle} or occluded.
 
 
