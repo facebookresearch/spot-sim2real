@@ -228,17 +228,22 @@ class SpotRosSkillExecutor:
                 rospy.set_param(
                     "/enable_dwg_object_addition", f"{str(time.time())},False"
                 )
-
-            if not robot_holding:
+            elif not robot_holding:
                 self.spotskillmanager.spot.open_gripper()
-                flag = self._use_continuos_dwg_or_stop_add == "continous"
                 rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+                    "/enable_dwg_object_addition", f"{str(time.time())},True"
                 )
-            else:
-                rospy.set_param(
-                    "/enable_dwg_object_addition", f"{str(time.time())},False"
-                )
+
+            # if :
+
+            #     flag = self._use_continuos_dwg_or_stop_add == "continous"
+            #     rospy.set_param(
+            #         "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
+            #     )
+            # else:
+            #     rospy.set_param(
+            #         "/enable_dwg_object_addition", f"{str(time.time())},False"
+            #     )
 
             skill_input_per_nav = skill_input.split("|")
             for skill_input in skill_input_per_nav[:-1]:

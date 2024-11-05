@@ -535,10 +535,10 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         )
 
         if np.isnan(Z):
-            if default_z is not None:
-                Z = default_z
-            else:
-                return (None, None) if return_z else None
+            # if default_z is not None:
+            #     Z = default_z
+            # else:
+            return (None, None) if return_z else None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return (point_in_3d, Z) if return_z else point_in_3d
 
@@ -803,7 +803,7 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "pineapple plush toy,pink donut plush toy,avocado plush toy,frog plush toy,ball",
+            "pineapple plush toy,pink donut plush toy,avocado plush toy,frog plush toy,cup,bottle,can",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
