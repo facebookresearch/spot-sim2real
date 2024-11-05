@@ -234,17 +234,6 @@ class SpotRosSkillExecutor:
                     "/enable_dwg_object_addition", f"{str(time.time())},True"
                 )
 
-            # if :
-
-            #     flag = self._use_continuos_dwg_or_stop_add == "continous"
-            #     rospy.set_param(
-            #         "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
-            #     )
-            # else:
-            #     rospy.set_param(
-            #         "/enable_dwg_object_addition", f"{str(time.time())},False"
-            #     )
-
             skill_input_per_nav = skill_input.split("|")
             for skill_input in skill_input_per_nav[:-1]:
                 # Get the bbox center and bbox extent

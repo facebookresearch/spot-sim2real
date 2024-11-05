@@ -535,6 +535,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         )
 
         if np.isnan(Z):
+            # Useful if we set the z to be the center of z to prevent
+            # from high rate of nan
             # if default_z is not None:
             #     Z = default_z
             # else:
