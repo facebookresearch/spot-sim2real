@@ -159,6 +159,9 @@ class Skill:
         self.ee_point_before_starting_the_skill = self.spot.get_ee_pos_in_body_frame()[
             0
         ]
+
+        current_human_action = self.env.human_activity_current.copy()  # type: ignore
+
         # Execution Loop
         while not done:
             # The current formate is timestamp, action, object_name, target_receptacle.
@@ -170,12 +173,14 @@ class Skill:
                 )
                 print(f"Human action :: {human_action}")
             else:
-                print(f"human_action: {self.env.human_activity_current}")  # type: ignore
-                human_action = (
-                    "human_action_detected"
-                    if self.env.human_activity_current != {}  # type: ignore
-                    else "None"
-                )
+                human_action = self.env.human_activity_current.copy()  # type: ignore
+                print(f"human_action: {human_action}")
+
+                if current_human_action != human_action:
+                    current_human_action = human_action.copy()  # type: ignore
+                    human_action = "human_action_detected"
+                else:
+                    human_action = "None"
 
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)

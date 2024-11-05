@@ -56,6 +56,10 @@ class SpotRosSkillExecutor:
         self.detection_publisher = rospy.Publisher(
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
+        # A flag for keeping track of human state
+        self._human_action = (
+            self.spotskillmanager.get_env().human_activity_current.copy()
+        )
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -69,36 +73,58 @@ class SpotRosSkillExecutor:
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
 
-        # Check if we need to return the msg based on the human action
-        if "None" not in rospy.get_param(
-            "/human_action", f"{str(time.time())},None,None,None"
-        ):
-            human_action_str = rospy.get_param("/human_action")
+        if self.spotskillmanager.nav_config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+            # Check if we need to return the msg based on the human action
+            if "None" not in rospy.get_param(
+                "/human_action", f"{str(time.time())},None,None,None"
+            ):
+                human_action_str = rospy.get_param("/human_action")
 
-            print(f"Received human action string {human_action_str}")
+                print(f"Received human action string {human_action_str}")
 
-            human_action_str = human_action_str.split(",")
-            human_action_str = [s.strip() for s in human_action_str]
-            _, action, object_name, receptacle_name = human_action_str
-            action = action.lower()
+                human_action_str = human_action_str.split(",")
+                human_action_str = [s.strip() for s in human_action_str]
+                _, action, object_name, receptacle_name = human_action_str
+                action = action.lower()
 
-            # Process the object name if there are "_" in the name
-            if "_" in object_name:
-                object_name = object_name.split("_")
-                object_name = " ".join(object_name)
+                # Process the object name if there are "_" in the name
+                if "_" in object_name:
+                    object_name = object_name.split("_")
+                    object_name = " ".join(object_name)
 
-            # Determine the msg to return
-            if action == "pick":
-                msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
-            elif action == "place":
-                msg = f"Human has placed the {object_name}, you should not intervene human actions and should move to the next object"
-            else:
-                msg = f"Human has done something to the {object_name}, you should not intervene human actions and should move to the next object"
+                # Determine the msg to return
+                if action == "pick":
+                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+                elif action == "place":
+                    msg = f"Human has placed the {object_name}, you should not intervene human actions and should move to the next object"
+                else:
+                    msg = f"Human has done something to the {object_name}, you should not intervene human actions and should move to the next object"
 
-            succeded = False
+                succeded = False
 
-            # Reset the human action
-            rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+                # Reset the human action
+                rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+        else:
+            human_activity_current = (
+                self.spotskillmanager.get_env().human_activity_current.copy()
+            )
+            print(
+                f"human_activity_current: {human_activity_current}; self._human_action: {self._human_action}"
+            )
+            # format is {'action': 'pick', 'location': [0.4895333819878285, -1.9357397461459, 1.16], 'object': 'can'}
+            # format is {'action': 'place', 'location': [0.4416179387523302, -1.975948667869565, 1.16]}
+            if self._human_action != human_activity_current:
+                action = human_activity_current["action"]
+                if action == "pick":
+                    object_name = human_activity_current["object"]
+                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+                elif action == "place":
+                    msg = "Human has placed the object, you should not intervene human actions and should move to the next object"
+                else:
+                    msg = "Human has done something, you should not intervene human actions and should move to the next object"
+                # Update the action
+                print(f"humna action msg: {msg}")
+                self._human_action = human_activity_current.copy()
 
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
