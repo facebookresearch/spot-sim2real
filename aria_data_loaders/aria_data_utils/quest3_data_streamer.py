@@ -300,11 +300,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 arg_max_indx = -1
                 for det_indx, det in enumerate(detections):
                     print("Object-name:", det[0], "; Score:", det[1], "; Bbox:", det[2])
-                    iou = self._get_iou(har_object_bbox[0], det[-1])
-                    print("IOU = ", iou)
-                    if iou > max_iou:
-                        max_iou = iou
-                        arg_max_indx = det_indx
+                    try:
+                        iou = self._get_iou(har_object_bbox[0], det[-1])
+                        print("IOU = ", iou)
+                        if iou > max_iou:
+                            max_iou = iou
+                            arg_max_indx = det_indx
+                    except Exception:
+                        print("skip due to har_object_bbox is empty")
                 if arg_max_indx != -1 and max_iou > 0.5:
                     self._partial_action["object"] = detections[arg_max_indx][0]
                     print("Object being held: ", detections[arg_max_indx][0])
@@ -540,10 +543,12 @@ def main(
             outputs=outputs,
             object_labels=[
                 "pineapple plush toy",
-                "donut plush toy",
+                "pink donut plush toy",
                 "avocado plush toy",
                 "frog plush toy",
-                "ball",
+                "cup",
+                "bottle",
+                "can",
             ],
         )
         data_streamer.initialize_human_motion_detector()
