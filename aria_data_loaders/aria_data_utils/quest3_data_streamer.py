@@ -543,12 +543,11 @@ def main(
             outputs=outputs,
             object_labels=[
                 "pineapple plush toy",
-                "donut plush toy",
+                "pink donut plush toy",
                 "avocado plush toy",
                 "frog plush toy",
-                "ball",
-                "bottle",
                 "cup",
+                "bottle",
                 "can",
             ],
         )
