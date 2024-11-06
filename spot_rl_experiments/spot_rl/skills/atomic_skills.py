@@ -173,11 +173,10 @@ class Skill:
                 )
                 print(f"Human action :: {human_action}")
             else:
-                human_action = self.env.human_activity_current.copy()  # type: ignore
+                current_human_action = self.env.human_activity_current.copy()  # type: ignore
                 print(f"human_action: {human_action}")
-
-                if current_human_action != human_action:
-                    current_human_action = human_action.copy()  # type: ignore
+                previous_human_action = getattr(self, "previous_human_activity", None)
+                if previous_human_action != current_human_action:
                     human_action = "human_action_detected"
                 else:
                     human_action = "None"
@@ -225,7 +224,7 @@ class Skill:
                 or cur_skill_input != begin_skill_input
             ):
                 done = True
-
+            self.previous_human_activity = current_human_action
         # Update logged data after finishing execution and get feedback (status & msg)
         return self.update_and_check_status(goal_dict)
 
