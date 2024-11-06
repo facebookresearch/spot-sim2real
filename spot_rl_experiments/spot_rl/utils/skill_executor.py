@@ -77,7 +77,7 @@ class SpotRosSkillExecutor:
             # Check if we need to return the msg based on the human action
             if "None" not in rospy.get_param(
                 "/human_action", f"{str(time.time())},None,None,None"
-            ):
+            ) and skill_name not in ["pick", "place"]:
                 human_action_str = rospy.get_param("/human_action")
 
                 print(f"Received human action string {human_action_str}")
@@ -125,6 +125,13 @@ class SpotRosSkillExecutor:
                 # Update the action
                 print(f"humna action msg: {msg}")
                 self._human_action = human_activity_current.copy()
+
+        # Double check the human action to reset it
+        if "None" not in rospy.get_param(
+            "/human_action", f"{str(time.time())},None,None,None"
+        ):
+            # Reset the human action
+            rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
 
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
