@@ -40,15 +40,18 @@ def main(spot: Spot):
         # SpotCamIds.HAND_DEPTH,
         SpotCamIds.HAND_COLOR,
     ]
+    frame_width, frame_height = None, None
+    fps = 10  # Define frames per second for your video
+    video_writer = None
     try:
-        all_imgs = []
+        # all_imgs = []
         k = 0
         while True:
             start_time = time.time()
 
             # Get Spot camera image
             image_responses = spot.get_image_responses(sources, quality=args.quality)
-            imgs = []
+            # imgs = []
             for image_response, source in zip(image_responses, sources):
                 img = image_response_to_cv2(image_response, reorient=True)
                 if "depth" in source:
@@ -60,19 +63,29 @@ def main(spot: Spot):
                         x, y, w, h = color_bbox(img, just_get_bbox=True)
                         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
-                imgs.append(img)
-                all_imgs.append(img)
+                # imgs.append(img)
+                # all_imgs.append(img)
                 w, h = img.shape[:2]
 
+            if video_writer is None:
+                frame_height, frame_width = img.shape[:2]
+                video_writer = cv2.VideoWriter(
+                    "output.mp4",
+                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    fps,
+                    (frame_width, frame_height),
+                )
+
+            video_writer.write(img)
             # Make sure all imgs are same height
-            img = resize_to_tallest(imgs, hstack=True)
+            img = img  # resize_to_tallest(imgs, hstack=True)
 
             if not args.no_display:
                 cv2.imshow(window_name, img)
                 cv2.waitKey(1)
 
-            if k % 10 == 0:
-                cv2.imwrite(f"videos_april/img_{k}.jpg", img)
+            # if k % 10 == 0:
+            #     cv2.imwrite(f"videos_april/img_{k}.jpg", img)
 
             # if k % 50 == 0 and k > 0:
             #    new_video = cv2.VideoWriter(
@@ -91,9 +104,16 @@ def main(spot: Spot):
             k += 1
             time_buffer.append(time.time() - start_time)
             print("Avg FPS:", 1 / np.mean(time_buffer))
+    except KeyboardInterrupt:
+        print("Interrupted, closing video writer.")
     finally:
         if not args.no_display:
             cv2.destroyWindow(window_name)
+
+        # Release the video writer to finalize the video file
+        if video_writer is not None:
+            video_writer.release()
+        print("Video saved as 'output.mp4'.")
 
 
 if __name__ == "__main__":
