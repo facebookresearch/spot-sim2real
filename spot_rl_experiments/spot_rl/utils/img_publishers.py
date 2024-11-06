@@ -805,7 +805,7 @@ if __name__ == "__main__":
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
         rospy.set_param(
             "multi_class_object_target",
-            "pineapple plush toy,pink donut plush toy,avocado plush toy,frog plush toy,cup,bottle,can",
+            "pineapple plush toy,pink donut plush toy,avocado plush toy,cup,bottle,can",
         )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)

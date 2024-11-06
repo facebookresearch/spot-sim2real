@@ -284,7 +284,9 @@ class OwlVit:
 
         for box, score, label in zip(boxes, scores, labels):
             box = [round(i, 2) for i in box.tolist()]
-            if score >= self.score_threshold:
+            w, h = box[0] - box[2], box[1] - box[3]
+            min_dim = min(w, h)
+            if score >= self.score_threshold and min_dim <= 20.0:
                 if label.item() not in target_scores:
                     target_scores[label.item()] = [score.item()]
                     target_boxes[label.item()] = [box]
@@ -303,6 +305,10 @@ class OwlVit:
 
                 # Strip the prefix from the label
                 label_without_prefix = self.labels[0][label][len(self.prefix) + 1 :]
+                # w = x2 -x1 + 1
+                # h = y2 - y1+ 1
+                # area = w*h
+                # print(f"Class {label_without_prefix}, score {target_scores[label][i]}, area : {area}, w {w}, h {h}")
                 result.append(
                     [label_without_prefix, target_scores[label][i], [x1, y1, x2, y2]]
                 )
