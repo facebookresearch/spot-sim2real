@@ -167,7 +167,7 @@ class Skill:
             # The current formate is timestamp, action, object_name, target_receptacle.
             # Read the human action to interrupt the skill execution
             human_action = "None"
-            if self.config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+            if self.config.READ_HUMAN_ACTION_FROM_ROS_PARAM:
                 human_action = rospy.get_param(
                     "/human_action", f"{str(time.time())},None,None,None"
                 )
