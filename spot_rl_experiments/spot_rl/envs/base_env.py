@@ -219,7 +219,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # Human action
         self.human_activity_current: Dict[str, Any] = {}
-        if self.config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+        if self.config.READ_HUMAN_ACTION_FROM_ROS_PARAM:
             rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
         else:
             rospy.Subscriber("/human_activity_current", String, self.har_callback)
