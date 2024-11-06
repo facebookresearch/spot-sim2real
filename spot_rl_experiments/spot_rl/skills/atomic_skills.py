@@ -191,10 +191,9 @@ class Skill:
             ]
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
-            if "None" not in human_action:
-                # Do not interrupt pick and place skills when human does something
-                if begin_skill_name not in ["pick", "place"]:
-                    done = True
+            # Do not interrupt pick and place skills when human does something
+            if "None" not in human_action and begin_skill_name not in ["pick", "place"]:
+                done = True
 
             curr_pose = [
                 self.env.x,  # type: ignore
