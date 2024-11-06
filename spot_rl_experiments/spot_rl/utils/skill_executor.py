@@ -73,7 +73,7 @@ class SpotRosSkillExecutor:
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
 
-        if self.spotskillmanager.nav_config.STUB_FOR_HUMAN_ACTION_RECOGNITION:
+        if self.spotskillmanager.nav_config.READ_HUMAN_ACTION_FROM_ROS_PARAM:
             # Check if we need to return the msg based on the human action
             if "None" not in rospy.get_param(
                 "/human_action", f"{str(time.time())},None,None,None"

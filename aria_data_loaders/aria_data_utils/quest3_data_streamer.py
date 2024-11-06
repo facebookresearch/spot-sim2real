@@ -320,6 +320,14 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
             if action:
                 # Broadcast action string data
                 action_json_string = json.dumps(action)
+                print(f"Action to publish {action}")
+                if action.get("action", "None") == "pick":
+                    setattr(self, "picked_object", action.get("object", "None"))
+                location_str = "unknown"
+                rospy.set_param(
+                    "/human_action",
+                    f"{str(time.time())},{action.get('action', 'None')},{action.get('object', getattr(self, 'picked_object', 'None'))},[{location_str}]",
+                )
                 self.human_activity_current_pub.publish(action_json_string)
 
         # if detect_objects:
@@ -478,7 +486,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 object_labels + meta_objects,
                 verbose=self.verbose,
                 version=2,
-                score_threshold=0.2,
+                score_threshold=0.4,
             )
         )
         self.object_detector._core_objects = object_labels
