@@ -314,7 +314,9 @@ class SpotRosSkillExecutor:
                         x, y, yaw = pt
                         if pt_i == final_pt_i:
                             # Do normal point nav with yaw for the final location
-                            if category_tag is not None and "object" in category_tag:
+                            if (
+                                category_tag is not None and "object" in category_tag
+                            ) or is_exploring:
                                 # increse nav error threshold for final nav
                                 # take a backup of prev error margins
                                 navconfig = (
