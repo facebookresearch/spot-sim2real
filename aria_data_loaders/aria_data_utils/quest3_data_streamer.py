@@ -297,43 +297,26 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                         "\n\n******************** YAY PICKED OBJECT ********************\n\n"
                     )
                     self._partial_action = action
+
             if self.finding_object_stage:
                 max_iou = 0.0
                 arg_max_indx = -1
                 for det_indx, det in enumerate(detections):
-                    # print("Object-name:", det[0], "; Score:", det[1], "; Bbox:", det[2])
+                    print("Object-name:", det[0], "; Score:", det[1], "; Bbox:", det[2])
                     try:
                         iou = self._get_iou(har_object_bbox[0], det[-1])
-                        # print("IOU = ", iou)
+                        print("IOU = ", iou)
                         if iou > max_iou:
                             max_iou = iou
                             arg_max_indx = det_indx
                     except Exception:
-                        self._object_detected = []
                         print("skip due to har_object_bbox is empty")
-
                 if arg_max_indx != -1 and max_iou > 0.5:
                     self._partial_action["object"] = detections[arg_max_indx][0]
-
-                    if self._object_detected == []:
-                        self._object_detected.append(detections[arg_max_indx][0])
-                    elif detections[arg_max_indx][0] not in self._object_detected:
-                        self._object_detected = []
-                    else:
-                        self._object_detected.append(detections[arg_max_indx][0])
-
-                    print(
-                        "# of time the object being detected",
-                        len(self._object_detected),
-                    )
-                    if len(self._object_detected) >= NUM_OF_CONSECUTIVE_DETECTION:
-                        print("Object being held: ", detections[arg_max_indx][0])
-                        self.finding_object_stage = False
-                        action = self._partial_action
-                        self._partial_action = {}
-                        self._object_detected = []
-                    else:
-                        action = {}
+                    print("Object being held: ", detections[arg_max_indx][0])
+                    self.finding_object_stage = False
+                    action = self._partial_action
+                    self._partial_action = {}
                 else:
                     action = {}
 
@@ -573,7 +556,7 @@ def main(
                 "pineapple plush toy",
                 "pink donut plush toy",
                 "avocado plush toy",
-                "frog plush toy",
+                "toad plush toy",
                 "cup",
                 "bottle",
                 "can",

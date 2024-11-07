@@ -544,7 +544,7 @@ class SpotSkillManager:
             message = f"Failed to estimate place way point due to {str(e)}"
             conditional_print(message=message, verbose=self.verbose)
             print(message)
-            return None, None
+            return np.array([0.7, 0.0, 0.4]), np.array([0.5, 0.0, 0.4])
 
     @multimethod  # type: ignore
     def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore

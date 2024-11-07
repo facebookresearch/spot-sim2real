@@ -94,11 +94,11 @@ class SpotRosSkillExecutor:
 
                 # Determine the msg to return
                 if action == "pick":
-                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move on to the next object"
                 elif action == "place":
-                    msg = f"Human has placed the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = f"Human has placed the {object_name}, you should not intervene human actions and should move on to the next object"
                 else:
-                    msg = f"Human has done something to the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = " "
 
                 succeded = False
 
@@ -117,11 +117,11 @@ class SpotRosSkillExecutor:
                 action = human_activity_current["action"]
                 if action == "pick":
                     object_name = human_activity_current["object"]
-                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move on to the next object"
                 elif action == "place":
-                    msg = "Human has placed the object, you should not intervene human actions and should move to the next object"
+                    msg = "Human has placed the object, you should not intervene human actions and should move on to the next object"
                 else:
-                    msg = "Human has done something, you should not intervene human actions and should move to the next object"
+                    msg = " "
                 # Update the action
                 print(f"humna action msg: {msg}")
                 self._human_action = human_activity_current.copy()
