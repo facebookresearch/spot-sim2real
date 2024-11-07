@@ -544,6 +544,7 @@ class SpotSkillManager:
             message = f"Failed to estimate place way point due to {str(e)}"
             conditional_print(message=message, verbose=self.verbose)
             print(message)
+            # Just return some default value when the waypoint estimation is wrong
             return np.array([0.7, 0.0, 0.4]), np.array([0.5, 0.0, 0.4])
 
     @multimethod  # type: ignore

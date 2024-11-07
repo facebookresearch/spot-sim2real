@@ -305,10 +305,13 @@ class OwlVit:
 
                 # Strip the prefix from the label
                 label_without_prefix = self.labels[0][label][len(self.prefix) + 1 :]
+
+                # For computing area
                 # w = x2 -x1 + 1
                 # h = y2 - y1+ 1
                 # area = w*h
                 # print(f"Class {label_without_prefix}, score {target_scores[label][i]}, area : {area}, w {w}, h {h}")
+
                 result.append(
                     [label_without_prefix, target_scores[label][i], [x1, y1, x2, y2]]
                 )

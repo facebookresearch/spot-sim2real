@@ -24,7 +24,7 @@ tmux new -s pose_estimation_service -d 'cd third_party/FoundationPoseForSpotSim2
 sleep 3
 tmux new -s ros_bridge_server -d 'roslaunch rosbridge_server rosbridge_tcp.launch'
 sleep 3
-tmux new -s HAR -d 'bash run_hand_object_detector.sh'
+tmux new -s HAR -d 'bash scripts/run_hand_object_detector.sh'
 tmux ls
 
 # This for running mask rcnn in img_publishers, which needs input images to be in grayscale

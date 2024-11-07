@@ -45,7 +45,6 @@ from perception_and_utils.utils.conversions import (
 from spot_rl.utils.utils import ros_frames as rf
 
 FILTER_DIST = 0.6  # in metres, the QR registration on Quest3 is REALLY bad beyond 0.6m
-NUM_OF_CONSECUTIVE_DETECTION = 3
 
 
 class Quest3DataStreamer(HumanSensorDataStreamerInterface):
@@ -81,7 +80,6 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         # state-machine for HAR
         self.finding_object_stage = False
         self._partial_action: dict = {}
-        self._object_detected = []  # type: ignore
 
     def connect(self):
         """
