@@ -582,7 +582,6 @@ def main(
                 "pineapple plush toy",
                 "pink donut plush toy",
                 "avocado plush toy",
-                "toad plush toy",
                 "cup",
                 "bottle",
                 "can",
