@@ -1,3 +1,5 @@
+import os
+
 from aria_data_utils.aria_sdk_utils import update_iptables_quest3
 from aria_data_utils.human_sensor_data_streamer_interface import (
     CameraParams,
@@ -43,6 +45,7 @@ from perception_and_utils.utils.conversions import (
 from spot_rl.utils.utils import ros_frames as rf
 
 FILTER_DIST = 0.6  # in metres, the QR registration on Quest3 is REALLY bad beyond 0.6m
+NUM_OF_FRAME_OBJECT_DETECTED = 2
 
 
 class Quest3DataStreamer(HumanSensorDataStreamerInterface):
@@ -78,6 +81,9 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         # state-machine for HAR
         self.finding_object_stage = False
         self._partial_action: dict = {}
+
+        # check the consecutive frame that is the correct detection
+        self._object_detected = []  # type: ignore
 
     def connect(self):
         """
@@ -242,6 +248,13 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
         # Initialize object_scores to empty dict for current image frame
         # object_scores = {}  # type: Dict[str, Any]
 
+        # Reset the state machine if needed
+        if rospy.get_param("reset_har", False):
+            self.finding_object_stage = False
+            self._partial_action = {}
+            self.har_model.current_state = "not_holding"
+            rospy.set_param("reset_har", False)
+
         # Get rgb image from frame
         viz_img = data_frame._rgb_frame
         if viz_img is None:
@@ -295,6 +308,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                         "\n\n******************** YAY PICKED OBJECT ********************\n\n"
                     )
                     self._partial_action = action
+
             if self.finding_object_stage:
                 max_iou = 0.0
                 arg_max_indx = -1
@@ -309,11 +323,26 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                     except Exception:
                         print("skip due to har_object_bbox is empty")
                 if arg_max_indx != -1 and max_iou > 0.5:
-                    self._partial_action["object"] = detections[arg_max_indx][0]
-                    print("Object being held: ", detections[arg_max_indx][0])
-                    self.finding_object_stage = False
-                    action = self._partial_action
-                    self._partial_action = {}
+
+                    # Check the consecutive detection
+                    obj_class = detections[arg_max_indx][0]
+                    if self._object_detected == []:
+                        self._object_detected.append(obj_class)
+                    elif obj_class not in self._object_detected:
+                        self._object_detected = []  # reset
+                    else:
+                        self._object_detected.append(obj_class)
+
+                    print(f"number of times being held: {len(self._object_detected)}")
+                    if len(self._object_detected) >= NUM_OF_FRAME_OBJECT_DETECTED:
+                        self._partial_action["object"] = obj_class
+                        print("Object being held: ", obj_class)
+                        self.finding_object_stage = False
+                        action = self._partial_action
+                        self._partial_action = {}
+                        self._object_detected = []
+                    else:
+                        action = {}
                 else:
                     action = {}
 
@@ -553,7 +582,6 @@ def main(
                 "pineapple plush toy",
                 "pink donut plush toy",
                 "avocado plush toy",
-                "frog plush toy",
                 "cup",
                 "bottle",
                 "can",
@@ -596,6 +624,7 @@ def main(
 
     cv2.destroyAllWindows()
     rospy.logwarn("Disconnecting and shutting down the node")
+    os._exit(1)  # Exits disgracefully
 
 
 if __name__ == "__main__":

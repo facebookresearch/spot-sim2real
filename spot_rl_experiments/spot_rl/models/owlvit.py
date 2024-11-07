@@ -65,6 +65,7 @@ class OwlVit:
         self.prefix = "an image of a"
         self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.score_threshold = score_threshold
+        self.min_width_bbox_threshold = 20
         self.show_img = show_img
 
     def run_inference(self, img):
@@ -284,7 +285,12 @@ class OwlVit:
 
         for box, score, label in zip(boxes, scores, labels):
             box = [round(i, 2) for i in box.tolist()]
-            if score >= self.score_threshold:
+            w, h = box[0] - box[2], box[1] - box[3]
+            min_dim = min(w, h)
+            if (
+                score >= self.score_threshold
+                and min_dim <= self.min_width_bbox_threshold
+            ):
                 if label.item() not in target_scores:
                     target_scores[label.item()] = [score.item()]
                     target_boxes[label.item()] = [box]
@@ -303,6 +309,13 @@ class OwlVit:
 
                 # Strip the prefix from the label
                 label_without_prefix = self.labels[0][label][len(self.prefix) + 1 :]
+
+                # For computing area
+                # w = x2 -x1 + 1
+                # h = y2 - y1+ 1
+                # area = w*h
+                # print(f"Class {label_without_prefix}, score {target_scores[label][i]}, area : {area}, w {w}, h {h}")
+
                 result.append(
                     [label_without_prefix, target_scores[label][i], [x1, y1, x2, y2]]
                 )
