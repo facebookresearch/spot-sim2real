@@ -9,6 +9,7 @@ tmux kill-session -t pose_estimation_service
 tmux kill-session -t ros_bridge_server
 tmux kill-session -t spotWorld_static_tf2_pub_to_spot_world
 tmux kill-session -t spotWorld_static_tf2_pub_to_spot_world_to_marker
+tmux kill-session -t HAR
 
 sleep 1
 echo "Starting roscore tmux..."
@@ -22,6 +23,8 @@ tmux new -s spotWorld_static_tf2_pub_to_spot_world_to_marker -d 'rosrun tf2_ros 
 tmux new -s pose_estimation_service -d 'cd third_party/FoundationPoseForSpotSim2Real/ && sh run_pose_estimation_service.sh'
 sleep 3
 tmux new -s ros_bridge_server -d 'roslaunch rosbridge_server rosbridge_tcp.launch'
+sleep 3
+tmux new -s HAR -d 'bash run_hand_object_detector.sh'
 tmux ls
 
 # This for running mask rcnn in img_publishers, which needs input images to be in grayscale
