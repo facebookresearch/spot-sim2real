@@ -73,11 +73,18 @@ class SpotRosSkillExecutor:
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
 
+        is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
+
         if self.spotskillmanager.nav_config.READ_HUMAN_ACTION_FROM_ROS_PARAM:
             # Check if we need to return the msg based on the human action
-            if "None" not in rospy.get_param(
-                "/human_action", f"{str(time.time())},None,None,None"
-            ) and skill_name not in ["pick", "place"]:
+            if (
+                "None"
+                not in rospy.get_param(
+                    "/human_action", f"{str(time.time())},None,None,None"
+                )
+                and skill_name not in ["pick", "place"]
+                and not is_exploring
+            ):
                 human_action_str = rospy.get_param("/human_action")
 
                 print(f"Received human action string {human_action_str}")

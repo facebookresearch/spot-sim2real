@@ -161,6 +161,7 @@ class Skill:
         ]
 
         current_human_action = self.env.human_activity_current.copy()  # type: ignore
+        is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
 
         # Execution Loop
         while not done:
@@ -192,7 +193,11 @@ class Skill:
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
             # Do not interrupt pick and place skills when human does something
-            if "None" not in human_action and begin_skill_name not in ["pick", "place"]:
+            if (
+                "None" not in human_action
+                and begin_skill_name not in ["pick", "place"]
+                and not is_exploring
+            ):
                 done = True
 
             curr_pose = [
