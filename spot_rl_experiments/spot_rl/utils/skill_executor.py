@@ -73,10 +73,17 @@ class SpotRosSkillExecutor:
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
 
+        is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
+
         if self.spotskillmanager.nav_config.READ_HUMAN_ACTION_FROM_ROS_PARAM:
             # Check if we need to return the msg based on the human action
-            if "None" not in rospy.get_param(
-                "/human_action", f"{str(time.time())},None,None,None"
+            if (
+                "None"
+                not in rospy.get_param(
+                    "/human_action", f"{str(time.time())},None,None,None"
+                )
+                and skill_name not in ["pick", "place"]
+                and not is_exploring
             ):
                 human_action_str = rospy.get_param("/human_action")
 
@@ -94,11 +101,9 @@ class SpotRosSkillExecutor:
 
                 # Determine the msg to return
                 if action == "pick":
-                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move on to the next object"
                 elif action == "place":
-                    msg = f"Human has placed the {object_name}, you should not intervene human actions and should move to the next object"
-                else:
-                    msg = f"Human has done something to the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = f"Human has placed the {object_name}, you should not intervene human actions and should move on to the next object"
 
                 succeded = False
 
@@ -117,14 +122,20 @@ class SpotRosSkillExecutor:
                 action = human_activity_current["action"]
                 if action == "pick":
                     object_name = human_activity_current["object"]
-                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move to the next object"
+                    msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move on to the next object"
                 elif action == "place":
-                    msg = "Human has placed the object, you should not intervene human actions and should move to the next object"
-                else:
-                    msg = "Human has done something, you should not intervene human actions and should move to the next object"
+                    msg = "Human has placed the object, you should not intervene human actions and should move on to the next object"
+
                 # Update the action
                 print(f"humna action msg: {msg}")
                 self._human_action = human_activity_current.copy()
+
+        # Double check the human action to reset it
+        if "None" not in rospy.get_param(
+            "/human_action", f"{str(time.time())},None,None,None"
+        ):
+            # Reset the human action
+            rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
 
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
@@ -303,7 +314,9 @@ class SpotRosSkillExecutor:
                         x, y, yaw = pt
                         if pt_i == final_pt_i:
                             # Do normal point nav with yaw for the final location
-                            if category_tag is not None and "object" in category_tag:
+                            if (
+                                category_tag is not None and "object" in category_tag
+                            ) or is_exploring:
                                 # increse nav error threshold for final nav
                                 # take a backup of prev error margins
                                 navconfig = (
