@@ -65,6 +65,7 @@ class OwlVit:
         self.prefix = "an image of a"
         self.labels = [[f"{self.prefix} {label}" for label in labels[0]]]
         self.score_threshold = score_threshold
+        self.min_width_bbox_threshold = 20
         self.show_img = show_img
 
     def run_inference(self, img):
@@ -286,7 +287,10 @@ class OwlVit:
             box = [round(i, 2) for i in box.tolist()]
             w, h = box[0] - box[2], box[1] - box[3]
             min_dim = min(w, h)
-            if score >= self.score_threshold and min_dim <= 20.0:
+            if (
+                score >= self.score_threshold
+                and min_dim <= self.min_width_bbox_threshold
+            ):
                 if label.item() not in target_scores:
                     target_scores[label.item()] = [score.item()]
                     target_boxes[label.item()] = [box]
