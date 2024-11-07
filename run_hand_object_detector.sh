@@ -1,0 +1,1 @@
+python aria_data_loaders/aria_data_utils/quest3_data_streamer.py --har-model-path /home/tushar/Desktop/spot-sim2real/spot_rl_experiments/weights/output_nonfreeze_lvis2_rcandidate_model_0479999.pth --har-config-path /home/tushar/Desktop/spot-sim2real/third_party/mask_rcnn_detectron2/detectron2/configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml

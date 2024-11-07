@@ -1,3 +1,5 @@
+import os
+
 from aria_data_utils.aria_sdk_utils import update_iptables_quest3
 from aria_data_utils.human_sensor_data_streamer_interface import (
     CameraParams,
@@ -599,6 +601,7 @@ def main(
 
     cv2.destroyAllWindows()
     rospy.logwarn("Disconnecting and shutting down the node")
+    os._exit(1)  # Exits disgracefully
 
 
 if __name__ == "__main__":
