@@ -103,7 +103,7 @@ class SpotRosSkillExecutor:
                 if action == "pick":
                     msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move on to the next object"
                 elif action == "place":
-                    msg = f"Human has placed the {object_name}, you should not intervene human actions and should move on to the next object"
+                    msg = f"Human has placed the {object_name}, please make sure the placement location is correct"
 
                 succeded = False
 
@@ -124,7 +124,7 @@ class SpotRosSkillExecutor:
                     object_name = human_activity_current["object"]
                     msg = f"Human has picked up the {object_name}, you should not intervene human actions and should move on to the next object"
                 elif action == "place":
-                    msg = "Human has placed the object, you should not intervene human actions and should move on to the next object"
+                    msg = "Human has placed the object, please make sure the placement location is correct"
 
                 # Update the action
                 print(f"humna action msg: {msg}")
