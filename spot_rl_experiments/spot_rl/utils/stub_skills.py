@@ -68,7 +68,7 @@ def execute_skills():
         rospy.set_param("skill_in_execution_lock", True)
         print("=======================")
         print(f"Current skill_name {skill_name} skill_input {skill_input}")
-        if skill_name == "nav_path_planning_with_view_poses":
+        if skill_name == "nav_path_planning_with_view_poses" or skill_name == "explore":
             # Get the bbox center and bbox extent
             bbox_info = skill_input.split(";")  # in the format of x,y,z
             assert (
