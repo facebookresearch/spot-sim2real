@@ -261,7 +261,10 @@ def get_navigation_points(
     reachable_paths = []
     for waypoint_i, waypoint_edge in enumerate(four_waypoint_edges):
         # Do a* path planning from current robot location to the edge point
-        path_edge = path_planning_using_a_star(cur_robot_xy, waypoint_edge[:2])
+        if np.linalg.norm(np.array(cur_robot_xy) - np.array(waypoint_edge[:2])) > 0.5:
+            path_edge = path_planning_using_a_star(cur_robot_xy, waypoint_edge[:2])
+        else:
+            path_edge = [waypoint_edge[:2]]
         if not len(path_edge):
             # Do not find the path, mark the edge as non reachable (the edge in inside the clutter)
             nonreachable_edges_indices.append(waypoint_i)
