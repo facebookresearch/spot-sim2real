@@ -446,13 +446,20 @@ class SpotRosSkillExecutor:
         elif skill_name == "place":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            skill_input_list = skill_input.split(";")
+            receptacle = skill_input
+            if len(skill_input_list) == 3:
+                receptacle = skill_input_list[
+                    2
+                ]  # "skill_input=1_pink donut plush toy, on, 117_sofa"
+
             rospy.set_param("is_gripper_blocked", 0)
             rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             self.reset_skill_msg()
             if self.spotskillmanager.allow_semantic_place:
                 # Call semantic place skills
                 succeded, msg = self.spotskillmanager.place(
-                    skill_input,
+                    receptacle,
                     is_local=True,
                     visualize=False,
                     enable_waypoint_estimation=True,
