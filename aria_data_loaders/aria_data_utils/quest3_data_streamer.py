@@ -568,7 +568,6 @@ def main(
     outputs: Dict[str, Any] = {}
     data_streamer = None
     cv2.namedWindow("HAR", cv2.WINDOW_NORMAL)
-    # cv2.namedWindow("OWL-ViT", cv2.WINDOW_NORMAL)
     try:
         data_streamer = Quest3DataStreamer(
             har_model_path=har_model_path, har_config_path=har_config_path
@@ -625,7 +624,6 @@ def main(
                     cv2.LINE_AA,
                 )
                 cv2.imshow("HAR", vis_image)
-                # cv2.imshow("OWL-ViT", viz_img[1])
                 cv2.waitKey(1)
             else:
                 rospy.logdebug("No data frame received.")

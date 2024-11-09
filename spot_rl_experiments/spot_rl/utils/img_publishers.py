@@ -560,7 +560,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     def _text_sim(self, text1, text2):
         text1_substrs = [t1.strip() for t1 in text1.split(" ")]
-        text2_substrs = [t2.stript() for t2 in text2.split(" ")]
+        text2_substrs = [t2.strip() for t2 in text2.split(" ")]
         nt1, nt2 = 0, 0
         for t1 in text1_substrs:
             if t1 in text2_substrs:
@@ -627,6 +627,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 self.pubs[self.detection_topic_pick].publish(
                     f"{str(timestamp)}|{bbox_xy_string}"
                 )
+                # TODO: check if this is a bug as we are going to skip the rest of the detections
                 continue
 
             if USE_SEGMENTATION:
