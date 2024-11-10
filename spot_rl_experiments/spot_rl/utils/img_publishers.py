@@ -473,7 +473,11 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
-    publisher_topics = [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
+    publisher_topics = (
+        [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC, rt.MASK_RCNN_VIZ_TOPIC]
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK
+        else [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
+    )
 
     def __init__(self, model, spot):
         super().__init__()
@@ -504,6 +508,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
 
         self.viz_topic = rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+            self.viz_topic_for_pick = rt.MASK_RCNN_VIZ_TOPIC
 
         # while self.img_msg_depth is None:
         #     pass
@@ -713,6 +719,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             self.pubs[self.detection_topic_pick].publish(
                 f"{str(timestamp)}|{most_similar_text}"
             )
+            self.publish_viz_img_for_pick(viz_img, header)
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
@@ -721,6 +728,11 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
         viz_img_msg.header = header
         self.pubs[self.viz_topic].publish(viz_img_msg)
+
+    def publish_viz_img_for_pick(self, viz_img, header):
+        viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
+        viz_img_msg.header = header
+        self.pubs[self.viz_topic_for_pick].publish(viz_img_msg)
 
 
 class OWLVITModel:
@@ -877,8 +889,9 @@ if __name__ == "__main__":
             flags = [
                 "--filter-head-depth",
                 "--filter-hand-depth",
-                f"--{bounding_box_detector}",
             ]
+            if not USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+                flags.append(f"--{bounding_box_detector}")
             if listen:
                 flags.append("--decompress")
             elif local:
