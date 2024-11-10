@@ -182,6 +182,13 @@ class Skill:
                 else:
                     human_action = "None"
 
+            # Human types something to interrupt the skill directly
+            human_type_msg = rospy.get_param(
+                "/human_type_msg", f"{str(time.time())},None"
+            )
+            if "None" not in human_type_msg:
+                done = True
+
             action = self.policy.act(observations)  # type: ignore
             action_dict = self.split_action(action)
             if "should_dock" in goal_dict:
