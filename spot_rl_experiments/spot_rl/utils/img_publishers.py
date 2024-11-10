@@ -559,6 +559,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         return (point_in_3d, Z) if return_z else point_in_3d
 
     def _text_sim(self, text1, text2):
+        """Compute the string similarity"""
         text1_substrs = [t1.strip() for t1 in text1.split(" ")]
         text2_substrs = [t2.strip() for t2 in text2.split(" ")]
         nt1, nt2 = 0, 0
@@ -570,7 +571,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
                 nt2 += 1
         simt1t2 = nt1 / len(text1_substrs)
         simt2t1 = nt2 / len(text2_substrs)
-        return max(simt1t2, simt2t1) >= 0.6
+        return max(simt1t2, simt2t1)
 
     def _publish(self):
         stopwatch = Stopwatch()
@@ -614,21 +615,25 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         print(
             f"Raw detection: {new_detections}"
         ) if "None" not in new_detections else None
+
+        # Define the list for getting the most similar text string among detection
+        most_similar_text = ""
+        max_similar_score = -float("inf")
+
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
 
-            if USE_MULTI_OBJECT_DETECTOR_FOR_PICK and self._text_sim(
-                class_label, rospy.get_param("/object_target")
-            ):
+            if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+                cur_sim_score = self._text_sim(
+                    class_label, rospy.get_param("/object_target")
+                )
                 str_det = f'{class_label},{score},{",".join([str(i) for i in [x1, y1, x2, y2]])}'
                 bbox_xy_string = ";".join([str_det])
-                self.pubs[self.detection_topic_pick].publish(
-                    f"{str(timestamp)}|{bbox_xy_string}"
-                )
-                # TODO: check if this is a bug as we are going to skip the rest of the detections
-                continue
+                if cur_sim_score > max_similar_score:
+                    max_similar_score = cur_sim_score
+                    most_similar_text = bbox_xy_string
 
             if USE_SEGMENTATION:
                 mask = segment_with_socket(
@@ -703,6 +708,11 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         # publish data
         self.publish_new_detection(";".join(object_info))
         self.publish_viz_img(viz_img, header)
+
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+            self.pubs[self.detection_topic_pick].publish(
+                f"{str(timestamp)}|{most_similar_text}"
+            )
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
