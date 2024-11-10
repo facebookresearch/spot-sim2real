@@ -713,13 +713,16 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         # publish data
         self.publish_new_detection(";".join(object_info))
-        self.publish_viz_img(viz_img, header)
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+            self.publish_viz_img(viz_img[0], header)
+        else:
+            self.publish_viz_img(viz_img, header)
 
         if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
             self.pubs[self.detection_topic_pick].publish(
                 f"{str(timestamp)}|{most_similar_text}"
             )
-            self.publish_viz_img_for_pick(viz_img, header)
+            self.publish_viz_img_for_pick(viz_img[1], header)
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
@@ -773,7 +776,9 @@ class OWLVITModelMultiClasses(OWLVITModel):
         self.owlvit.update_label([multi_classes])
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(
-            hand_rgb, multi_objects_per_label=True
+            hand_rgb,
+            multi_objects_per_label=True,
+            return_two_image=USE_MULTI_OBJECT_DETECTOR_FOR_PICK,
         )
         # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
         if bbox_xy is not None and bbox_xy != []:

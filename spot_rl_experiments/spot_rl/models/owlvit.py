@@ -9,6 +9,7 @@ import time
 from typing import List
 
 import cv2
+import rospy
 import torch
 from PIL import Image
 from torchvision.ops import box_area, box_iou
@@ -102,7 +103,11 @@ class OwlVit:
         return self.get_most_confident_bounding_box_per_label(results)
 
     def run_inference_and_return_img(
-        self, img, vis_img_required=True, multi_objects_per_label=False
+        self,
+        img,
+        vis_img_required=True,
+        multi_objects_per_label=False,
+        return_two_image=False,
     ):
         """
         img: an open cv image in (H, W, C) format
@@ -137,7 +142,7 @@ class OwlVit:
             if multi_objects_per_label
             else self.get_most_confident_bounding_box_per_label(results),
             self.create_img_with_bounding_box_no_ranking(
-                img, results, multi_objects_per_label
+                img, results, multi_objects_per_label, return_two_image
             )
             if vis_img_required
             else None,
@@ -404,7 +409,7 @@ class OwlVit:
         return img
 
     def create_img_with_bounding_box_no_ranking(
-        self, img, results, multi_objects_per_label=False
+        self, img, results, multi_objects_per_label=False, return_two_images=False
     ):
         """
         Returns an image with all bounding boxes above the threshold overlaid.
@@ -418,6 +423,9 @@ class OwlVit:
         )
         font = cv2.FONT_HERSHEY_SIMPLEX
 
+        if return_two_images:
+            img_single_obj_for_pick = img.copy()
+
         for label, score, box in results:
             img = cv2.rectangle(img, box[:2], box[2:], (255, 0, 0), 5)
             if box[3] + 25 > 768:
@@ -428,7 +436,29 @@ class OwlVit:
                 img, label, (box[0], y), font, 1, (255, 0, 0), 2, cv2.LINE_AA
             )
 
-        return img
+            if return_two_images and label == rospy.get_param("object_target", "None"):
+                img_single_obj_for_pick = cv2.rectangle(
+                    img_single_obj_for_pick, box[:2], box[2:], (255, 0, 0), 5
+                )
+                if box[3] + 25 > 768:
+                    y = box[3] - 10
+                else:
+                    y = box[3] + 25
+                img_single_obj_for_pick = cv2.putText(
+                    img_single_obj_for_pick,
+                    label,
+                    (box[0], y),
+                    font,
+                    1,
+                    (255, 0, 0),
+                    2,
+                    cv2.LINE_AA,
+                )
+
+        if return_two_images:
+            return (img, img_single_obj_for_pick)
+        else:
+            return img
 
     def update_label(self, labels: List[List[str]]):
         """Update labels that need to be detected
