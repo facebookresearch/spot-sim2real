@@ -144,7 +144,7 @@ class SpotRosSkillExecutor:
         human_type_msg = rospy.get_param("/human_type_msg", f"{str(time.time())},None")
         if "None" not in human_type_msg:
             succeded = False
-            msg = human_type_msg
+            msg = human_type_msg.split(",")[1]
             # Reset the human type msg
             rospy.set_param("/human_type_msg", f"{str(time.time())},None")
 
@@ -232,7 +232,11 @@ class SpotRosSkillExecutor:
                     succeded, msg = self.spotskillmanager.nav(x, y)
 
                     # Nav -> scan behavior
-                    if is_exploring and ENABLE_ARM_SCAN:
+                    human_type_msg = rospy.get_param(
+                        "/human_type_msg", f"{str(time.time())},None"
+                    )
+                    human_type_msg = human_type_msg.split(",")[1]
+                    if is_exploring and ENABLE_ARM_SCAN and human_type_msg == "None":
                         scan_arm(
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
@@ -381,7 +385,11 @@ class SpotRosSkillExecutor:
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},True"
                     )
-                    if ENABLE_ARM_SCAN:
+                    human_type_msg = rospy.get_param(
+                        "/human_type_msg", f"{str(time.time())},None"
+                    )
+                    human_type_msg = human_type_msg.split(",")[1]
+                    if ENABLE_ARM_SCAN and human_type_msg == "None":
                         scan_arm(
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
