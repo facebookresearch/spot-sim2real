@@ -582,7 +582,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
     def _publish(self):
         stopwatch = Stopwatch()
-        # header = Header(stamp=rospy.Time.now())  # self.img_msg.header
         header = self.img_msg.header
         timestamp = header.stamp
 
