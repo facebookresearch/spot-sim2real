@@ -108,6 +108,7 @@ class OwlVit:
         vis_img_required=True,
         multi_objects_per_label=False,
         return_two_image=False,
+        filter_class=None,
     ):
         """
         img: an open cv image in (H, W, C) format
@@ -138,11 +139,19 @@ class OwlVit:
             )
 
         return (
-            self.get_confident_bounding_box_per_label(results)
+            self.get_confident_bounding_box_per_label(
+                results, filter_class=filter_class
+            )
             if multi_objects_per_label
-            else self.get_most_confident_bounding_box_per_label(results),
+            else self.get_most_confident_bounding_box_per_label(
+                results, filter_class=filter_class
+            ),
             self.create_img_with_bounding_box_no_ranking(
-                img, results, multi_objects_per_label, return_two_image
+                img,
+                results,
+                multi_objects_per_label,
+                return_two_image,
+                filter_class=filter_class,
             )
             if vis_img_required
             else None,
@@ -208,7 +217,7 @@ class OwlVit:
             print("location:", x1, y1, x2, y2)
             return x1, y1, x2, y2
 
-    def get_most_confident_bounding_box_per_label(self, results):
+    def get_most_confident_bounding_box_per_label(self, results, filter_class=None):
         """
         Returns the most confident bounding box for each label above the threshold
         """
@@ -227,14 +236,19 @@ class OwlVit:
 
         for box, score, label in zip(boxes, scores, labels):
             box = [round(i, 2) for i in box.tolist()]
+            label_without_prefix = self.labels[0][label.item()][len(self.prefix) + 1 :]
             if score >= self.score_threshold:
                 # If the current score is higher than the stored score for this label, update the target box and score
                 if (
                     label.item() not in target_scores
                     or score > target_scores[label.item()]
                 ):
-                    target_scores[label.item()] = score.item()
-                    target_boxes[label.item()] = box
+                    if (
+                        filter_class is not None
+                        and label_without_prefix == filter_class
+                    ):
+                        target_scores[label.item()] = score.item()
+                        target_boxes[label.item()] = box
 
         # Format the output
         result = []
@@ -252,7 +266,9 @@ class OwlVit:
 
         return result
 
-    def get_confident_bounding_box_per_label(self, results, merge_thresh=2.0):
+    def get_confident_bounding_box_per_label(
+        self, results, merge_thresh=2.0, filter_class=None
+    ):
         """
         Returns the confident bounding box for each label above the threshold.
         Each label could have multiple detections.
@@ -292,16 +308,20 @@ class OwlVit:
             box = [round(i, 2) for i in box.tolist()]
             w, h = box[0] - box[2], box[1] - box[3]
             min_dim = min(w, h)
+            label_without_prefix = self.labels[0][label.item()][len(self.prefix) + 1 :]
             if (
                 score >= self.score_threshold
                 and min_dim <= self.min_width_bbox_threshold
             ):
-                if label.item() not in target_scores:
-                    target_scores[label.item()] = [score.item()]
-                    target_boxes[label.item()] = [box]
-                else:
-                    target_scores[label.item()].append(score.item())
-                    target_boxes[label.item()].append(box)
+                if (
+                    filter_class is not None and label_without_prefix == filter_class
+                ) or filter_class is None:
+                    if label.item() not in target_scores:
+                        target_scores[label.item()] = [score.item()]
+                        target_boxes[label.item()] = [box]
+                    else:
+                        target_scores[label.item()].append(score.item())
+                        target_boxes[label.item()].append(box)
 
         # Format the output
         result = []
@@ -409,7 +429,12 @@ class OwlVit:
         return img
 
     def create_img_with_bounding_box_no_ranking(
-        self, img, results, multi_objects_per_label=False, return_two_images=False
+        self,
+        img,
+        results,
+        multi_objects_per_label=False,
+        return_two_images=False,
+        filter_class=None,
     ):
         """
         Returns an image with all bounding boxes above the threshold overlaid.
@@ -417,9 +442,13 @@ class OwlVit:
         """
 
         results = (
-            self.get_most_confident_bounding_box_per_label(results)
+            self.get_most_confident_bounding_box_per_label(
+                results, filter_class=filter_class
+            )
             if not multi_objects_per_label
-            else self.get_confident_bounding_box_per_label(results)
+            else self.get_confident_bounding_box_per_label(
+                results, filter_class=filter_class
+            )
         )
         font = cv2.FONT_HERSHEY_SIMPLEX
 
