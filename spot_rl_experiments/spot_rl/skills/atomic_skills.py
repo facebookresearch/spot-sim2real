@@ -2,6 +2,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import time
+import traceback
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -261,6 +262,7 @@ class Skill:
         except Exception as e:
             message = f"Error encountered in skill execution - {e}"
             conditional_print(message=message, verbose=self.verbose)
+            print(traceback.format_exc())
 
         return status, message
 

@@ -469,7 +469,7 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
 
-class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
+class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
@@ -478,6 +478,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         if USE_MULTI_OBJECT_DETECTOR_FOR_PICK
         else [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
     )
+    subscriber_topic = rt.HAND_RGB
 
     def __init__(self, model, spot):
         super().__init__()
@@ -581,7 +582,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
     def _publish(self):
         stopwatch = Stopwatch()
-        header = Header(stamp=rospy.Time.now())  # self.img_msg.header
+        # header = Header(stamp=rospy.Time.now())  # self.img_msg.header
+        header = self.img_msg.header
         timestamp = header.stamp
 
         # Get camera pose of view and the location of the robot
@@ -618,13 +620,13 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
+
         print(
             f"Raw detection: {new_detections}"
         ) if "None" not in new_detections else None
 
         # Define the list for getting the most similar text string among detection
-        most_similar_text = ""
-        max_similar_score = -float("inf")
+        most_similar_text = "None"
 
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
@@ -632,13 +634,9 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
 
             if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
-                cur_sim_score = self._text_sim(
-                    class_label, rospy.get_param("/object_target")
-                )
                 str_det = f'{class_label},{score},{",".join([str(i) for i in [x1, y1, x2, y2]])}'
                 bbox_xy_string = ";".join([str_det])
-                if cur_sim_score > max_similar_score:
-                    max_similar_score = cur_sim_score
+                if class_label == rospy.get_param("/object_target", "None"):
                     most_similar_text = bbox_xy_string
 
             if USE_SEGMENTATION:
