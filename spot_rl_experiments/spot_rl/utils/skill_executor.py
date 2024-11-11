@@ -47,6 +47,7 @@ class SpotRosSkillExecutor:
         # Reset
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
+        rospy.set_param("/nexus_nav_highlight", "None;None;None;None")
         self.detection_topic = "/dwg_obj_pub"
         # which behaviour do you want, continuous dwg additions + scan arm or only do dwg additions in scan_arm
         self._use_continuos_dwg_or_stop_add = "continous"  # "stopnadd"
@@ -72,6 +73,7 @@ class SpotRosSkillExecutor:
         rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
         rospy.set_param("place_target_xyz", f"{None},{None},{None}|")
         rospy.set_param("robot_target_ee_rpy", f"{None},{None},{None}|")
+        rospy.set_param("/nexus_nav_highlight", "None;None;None;None")
 
         is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
 
@@ -226,9 +228,12 @@ class SpotRosSkillExecutor:
                     # This z and y are flipped due to hab convention
                     x, y = (
                         float(_nav_target[0]),
-                        float(_nav_target[2]),
+                        float(_nav_target[1]),
                     )
                     print(f"nav to {x} {y}, {nav_i+1}/{len(nav_target_xyz)}")
+                    rospy.set_param(
+                        "/nexus_nav_highlight", f"{x};{y};{1.0};{skill_input}"
+                    )
                     succeded, msg = self.spotskillmanager.nav(x, y)
 
                     # Nav -> scan behavior
@@ -268,7 +273,9 @@ class SpotRosSkillExecutor:
             rospy.set_param("/viz_pick", "None")
             rospy.set_param("/viz_place", "None")
             rospy.set_param("skill_in_execution_lock", False)
-        elif skill_name == "nav_path_planning_with_view_poses":
+        elif (
+            skill_name == "nav_path_planning_with_view_poses" or skill_name == "explore"
+        ):
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
 
@@ -286,6 +293,9 @@ class SpotRosSkillExecutor:
 
             skill_input_per_nav = skill_input.split("|")
             for skill_input in skill_input_per_nav[:-1]:
+                # Reset Nexus nav UI
+                rospy.set_param("/nexus_nav_highlight", "None;None;None;None")
+
                 # Get the bbox center and bbox extent
                 bbox_info = skill_input.split(";")  # in the format of x,y,z
                 assert (
@@ -293,8 +303,18 @@ class SpotRosSkillExecutor:
                 ), f"Wrong size of the bbox info, it should be 6, but got {len(bbox_info)}"
                 bbox_center = np.array([float(v) for v in bbox_info[0:3]])
                 bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
-                query_class_names = bbox_info[6:]
-                query_class_names[0] = query_class_names[0].replace("_", " ")
+
+                if ":" in bbox_info[6]:
+                    query_class_names = bbox_info[6].split(":")[1]
+                    query_class_names = query_class_names.split("_")
+                    if query_class_names[0].isdigit():
+                        query_class_names = ["_".join(query_class_names[1:])]
+                    else:
+                        query_class_names = ["_".join(query_class_names)]
+                else:
+                    query_class_names = bbox_info[6:]
+                    query_class_names[0] = query_class_names[0].replace("_", " ")
+
                 if robot_holding:
                     rospy.set_param("/viz_place", query_class_names[0])
                 else:
@@ -314,6 +334,12 @@ class SpotRosSkillExecutor:
                     [x, y],
                     True,
                     "pathplanning.png",
+                )
+
+                # Publish data for Nexus UI
+                rospy.set_param(
+                    "/nexus_nav_highlight",
+                    f"{bbox_center[0]};{bbox_center[1]};{bbox_center[2]};{query_class_names[0]}",
                 )
 
                 # Do not follow path planning if the distance to target is small
@@ -437,13 +463,20 @@ class SpotRosSkillExecutor:
         elif skill_name == "place":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
+            skill_input_list = skill_input.split(";")
+            receptacle = skill_input
+            if len(skill_input_list) == 3:
+                receptacle = skill_input_list[
+                    2
+                ]  # "skill_input=1_pink donut plush toy, on, 117_sofa"
+
             rospy.set_param("is_gripper_blocked", 0)
             rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},False")
             self.reset_skill_msg()
             if self.spotskillmanager.allow_semantic_place:
                 # Call semantic place skills
                 succeded, msg = self.spotskillmanager.place(
-                    skill_input,
+                    receptacle,
                     is_local=True,
                     visualize=False,
                     enable_waypoint_estimation=True,
