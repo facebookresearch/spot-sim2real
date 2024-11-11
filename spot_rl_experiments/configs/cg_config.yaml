@@ -5,7 +5,7 @@ SCAN_TYPE: "r3d"
 USE_YOLO: False
 #Fill up empty areas in point cloud for nav planning: 
 #mention in array format: [y1:y2, x1:x2].
-FILL_UP_GRID_LOCATION: [[0, 0, 0, 0]] 
+FILL_UP_GRID_LOCATION: [[69, 71, 67, 72], [69,73, 67, 68], [2, 38, 96, 104]] 
 #[[86, 87, 94, 100], [75, 80, 99, 100], [2, 10, 18, 39], [26, 28, 4, 9], [85, 87,  30, 69]]
 DILATION_SIZE: 1
 OCCUPANCY_SCALE: 10
