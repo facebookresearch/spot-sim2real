@@ -2,6 +2,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import time
+import traceback
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -231,6 +232,19 @@ class Skill:
             ):
                 done = True
             self.previous_human_activity = current_human_action
+
+            # Human types something to interrupt the skill directly
+            human_type_msg = rospy.get_param(
+                "/human_type_msg", f"{str(time.time())},None"
+            )
+            try:
+                human_type_msg = human_type_msg.split(",")[1]
+                if "None" not in human_type_msg:
+                    print(f"human_type_msg: {human_type_msg}")
+                    done = True
+            except Exception:
+                print("Cannot read from human_type_msg")
+
         # Update logged data after finishing execution and get feedback (status & msg)
         return self.update_and_check_status(goal_dict)
 
@@ -254,6 +268,7 @@ class Skill:
         except Exception as e:
             message = f"Error encountered in skill execution - {e}"
             conditional_print(message=message, verbose=self.verbose)
+            print(traceback.format_exc())
 
         return status, message
 

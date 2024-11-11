@@ -66,6 +66,7 @@ WIDTH_SCALE = 0.5
 HEIGHT_SCALE = 0.5
 USE_SEGMENTATION = False
 USE_DEBLUR_GAN = False
+USE_MULTI_OBJECT_DETECTOR_FOR_PICK = False
 
 
 class SpotImagePublisher:
@@ -331,8 +332,12 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.deblur_gan = get_deblurgan_model(config) if USE_DEBLUR_GAN else None
         self.grayscale = self.config.GRAYSCALE_MASK_RCNN
 
-        self.pubs[self.detection_topic] = rospy.Publisher(
-            self.detection_topic, String, queue_size=1, tcp_nodelay=True
+        self.pubs[self.detection_topic] = (
+            rospy.Publisher(
+                self.detection_topic, String, queue_size=1, tcp_nodelay=True
+            )
+            if not USE_MULTI_OBJECT_DETECTOR_FOR_PICK
+            else None
         )
         self.viz_topic = rt.MASK_RCNN_VIZ_TOPIC
         self._reset_tracking_params()
@@ -455,7 +460,8 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         # stopwatch.print_stats()
 
     def publish_bbox_data(self, bbox_data):
-        self.pubs[self.detection_topic].publish(bbox_data)
+        if self.pubs[self.detection_topic] is not None:
+            self.pubs[self.detection_topic].publish(bbox_data)
 
     def publish_viz_img(self, viz_img, header):
         viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
@@ -463,17 +469,23 @@ class SpotBoundingBoxPublisher(SpotProcessedImagesPublisher):
         self.pubs[self.viz_topic].publish(viz_img_msg)
 
 
-class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
+class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
     name = "spot_open_voc_object_detector_publisher"
     # TODO: spot-sim2real: this is a hack since it publishes images in SpotProcessedImagesPublisher
-    publisher_topics = [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
+    publisher_topics = (
+        [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC, rt.MASK_RCNN_VIZ_TOPIC]
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK
+        else [rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC]
+    )
+    subscriber_topic = rt.HAND_RGB
 
     def __init__(self, model, spot):
         super().__init__()
         self.model = model
         self.spot = spot
         self.detection_topic = rt.OPEN_VOC_OBJECT_DETECTOR_TOPIC
+        self.detection_topic_pick = rt.DETECTIONS_TOPIC
 
         self.config = config = construct_config()
         self.image_scale = config.IMAGE_SCALE
@@ -483,6 +495,13 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         self.pubs[self.detection_topic] = rospy.Publisher(
             self.detection_topic, String, queue_size=1, tcp_nodelay=True
         )
+        self.pubs[self.detection_topic_pick] = (
+            rospy.Publisher(
+                self.detection_topic_pick, String, queue_size=1, tcp_nodelay=True
+            )
+            if USE_MULTI_OBJECT_DETECTOR_FOR_PICK
+            else None
+        )
 
         # For the depth images
         self.img_msg_depth = None
@@ -490,6 +509,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         rospy.loginfo(f"[{self.name}]: is waiting for images...")
 
         self.viz_topic = rt.MULTI_OBJECT_DETECTION_VIZ_TOPIC
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+            self.viz_topic_for_pick = rt.MASK_RCNN_VIZ_TOPIC
 
         # while self.img_msg_depth is None:
         #     pass
@@ -544,9 +565,24 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return (point_in_3d, Z) if return_z else point_in_3d
 
+    def _text_sim(self, text1, text2):
+        """Compute the string similarity"""
+        text1_substrs = [t1.strip() for t1 in text1.split(" ")]
+        text2_substrs = [t2.strip() for t2 in text2.split(" ")]
+        nt1, nt2 = 0, 0
+        for t1 in text1_substrs:
+            if t1 in text2_substrs:
+                nt1 += 1
+        for t2 in text2_substrs:
+            if t2 in text1_substrs:
+                nt2 += 1
+        simt1t2 = nt1 / len(text1_substrs)
+        simt2t1 = nt2 / len(text2_substrs)
+        return max(simt1t2, simt2t1)
+
     def _publish(self):
         stopwatch = Stopwatch()
-        header = Header(stamp=rospy.Time.now())  # self.img_msg.header
+        header = self.img_msg.header
         timestamp = header.stamp
 
         # Get camera pose of view and the location of the robot
@@ -583,13 +619,24 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         timestamp, new_detections = new_detection.split("|")
         new_detections = new_detections.split(";")
         object_info = []
+
         print(
             f"Raw detection: {new_detections}"
         ) if "None" not in new_detections else None
+
+        # Define the list for getting the most similar text string among detection
+        most_similar_text = "None"
+
         for det_i, detection_str in enumerate(new_detections):
             if detection_str == "None":
                 continue
             class_label, score, x1, y1, x2, y2 = detection_str.split(",")
+
+            if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+                str_det = f'{class_label},{score},{",".join([str(i) for i in [x1, y1, x2, y2]])}'
+                bbox_xy_string = ";".join([str_det])
+                if class_label == rospy.get_param("/object_target", "None"):
+                    most_similar_text = bbox_xy_string
 
             if USE_SEGMENTATION:
                 mask = segment_with_socket(
@@ -663,7 +710,16 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
 
         # publish data
         self.publish_new_detection(";".join(object_info))
-        self.publish_viz_img(viz_img, header)
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+            self.publish_viz_img(viz_img[0], header)
+        else:
+            self.publish_viz_img(viz_img, header)
+
+        if USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+            self.pubs[self.detection_topic_pick].publish(
+                f"{str(timestamp)}|{most_similar_text}"
+            )
+            self.publish_viz_img_for_pick(viz_img[1], header)
 
     def publish_new_detection(self, new_object):
         self.pubs[self.detection_topic].publish(new_object)
@@ -672,6 +728,11 @@ class SpotOpenVocObjectDetectorPublisher(SpotImagePublisher):
         viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
         viz_img_msg.header = header
         self.pubs[self.viz_topic].publish(viz_img_msg)
+
+    def publish_viz_img_for_pick(self, viz_img, header):
+        viz_img_msg = self.cv2_to_msg(viz_img, "bgr8")
+        viz_img_msg.header = header
+        self.pubs[self.viz_topic_for_pick].publish(viz_img_msg)
 
 
 class OWLVITModel:
@@ -712,7 +773,9 @@ class OWLVITModelMultiClasses(OWLVITModel):
         self.owlvit.update_label([multi_classes])
         # TODO: spot-sim2real: right now for each class, we only return the most confident detection
         bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(
-            hand_rgb, multi_objects_per_label=True
+            hand_rgb,
+            multi_objects_per_label=True,
+            return_two_image=USE_MULTI_OBJECT_DETECTOR_FOR_PICK,
         )
         # bbox_xy is a list of [label_without_prefix, target_scores[label], [x1, y1, x2, y2]]
         if bbox_xy is not None and bbox_xy != []:
@@ -828,8 +891,9 @@ if __name__ == "__main__":
             flags = [
                 "--filter-head-depth",
                 "--filter-hand-depth",
-                f"--{bounding_box_detector}",
             ]
+            if not USE_MULTI_OBJECT_DETECTOR_FOR_PICK:
+                flags.append(f"--{bounding_box_detector}")
             if listen:
                 flags.append("--decompress")
             elif local:

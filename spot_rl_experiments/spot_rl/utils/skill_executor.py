@@ -141,6 +141,15 @@ class SpotRosSkillExecutor:
 
         if succeded:
             msg = "Successful execution!"  # This is to make sure habitat-llm use the correct success msg
+
+        # Final check if human types something to interrupt the skill directly
+        human_type_msg = rospy.get_param("/human_type_msg", f"{str(time.time())},None")
+        if "None" not in human_type_msg:
+            succeded = False
+            msg = human_type_msg.split(",")[1]
+            # Reset the human type msg
+            rospy.set_param("/human_type_msg", f"{str(time.time())},None")
+
         rospy.set_param(
             "/skill_name_suc_msg", f"{str(time.time())},{skill_name},{succeded},{msg}"
         )
@@ -228,7 +237,11 @@ class SpotRosSkillExecutor:
                     succeded, msg = self.spotskillmanager.nav(x, y)
 
                     # Nav -> scan behavior
-                    if is_exploring and ENABLE_ARM_SCAN:
+                    human_type_msg = rospy.get_param(
+                        "/human_type_msg", f"{str(time.time())},None"
+                    )
+                    human_type_msg = human_type_msg.split(",")[1]
+                    if is_exploring and ENABLE_ARM_SCAN and human_type_msg == "None":
                         scan_arm(
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
@@ -398,7 +411,11 @@ class SpotRosSkillExecutor:
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},True"
                     )
-                    if ENABLE_ARM_SCAN:
+                    human_type_msg = rospy.get_param(
+                        "/human_type_msg", f"{str(time.time())},None"
+                    )
+                    human_type_msg = human_type_msg.split(",")[1]
+                    if ENABLE_ARM_SCAN and human_type_msg == "None":
                         scan_arm(
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
@@ -521,18 +538,23 @@ class SpotRosSkillExecutor:
             json.dump(self.episode_log, file, indent=4)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--useful_parameters", action="store_true")
-    _ = parser.parse_args()
-
+def reset_ros_param():
     # Clean up the ros parameters
     rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
     rospy.set_param("/skill_name_suc_msg", f"{str(time.time())},None,None,None")
     rospy.set_param("/cancel", False)
     rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},True")
+    rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+    rospy.set_param("/human_type_msg", f"{str(time.time())},None")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--useful_parameters", action="store_true")
+    _ = parser.parse_args()
 
     while True:
+        reset_ros_param()
         # Call the skill manager
         spotskillmanager = SpotSkillManager(
             use_mobile_pick=True, use_semantic_place=True, use_place_ee=True

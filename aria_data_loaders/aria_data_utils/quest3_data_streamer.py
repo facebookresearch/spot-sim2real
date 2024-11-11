@@ -567,8 +567,7 @@ def main(
     # rate = rospy.Rate(hz)
     outputs: Dict[str, Any] = {}
     data_streamer = None
-    cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
-    cv2.namedWindow("OWL-ViT", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("HAR", cv2.WINDOW_NORMAL)
     try:
         data_streamer = Quest3DataStreamer(
             har_model_path=har_model_path, har_config_path=har_config_path
@@ -605,8 +604,26 @@ def main(
                     test_without_registration=test_without_registration,
                 )
                 # data_streamer.publish_human_pose(data_frame=data_frame)
-                cv2.imshow("Image", viz_img[0])
-                cv2.imshow("OWL-ViT", viz_img[1])
+                viz_img[0] = cv2.resize(viz_img[0], viz_img[1].shape[:2][::-1])
+                vis_image = np.hstack(viz_img[:2])
+                human_action = rospy.get_param("human_action", "0,None,None,None")
+                human_action = (
+                    "None"
+                    if "None" in human_action
+                    else ",".join(human_action.split(",")[1:])
+                )
+                human_action_display = f"Human Action : {human_action}"
+                vis_image = cv2.putText(
+                    vis_image,
+                    human_action_display,
+                    (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 0, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
+                cv2.imshow("HAR", vis_image)
                 cv2.waitKey(1)
             else:
                 rospy.logdebug("No data frame received.")
