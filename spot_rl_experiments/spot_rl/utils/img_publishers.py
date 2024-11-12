@@ -736,7 +736,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
 
 class OWLVITModel:
-    def __init__(self, score_threshold=0.2, show_img=False):
+    def __init__(self, score_threshold=0.3, show_img=False):
         self.config = config = construct_config()
         self.owlvit = OwlVit([["ball"]], score_threshold, show_img, 2)
         self.image_scale = config.IMAGE_SCALE
@@ -830,7 +830,9 @@ if __name__ == "__main__":
         default="owlvit",
         help="bounding box detector model to use (owlvit or maskrcnn)",
     )
-    multi_object_prompts = "pink donut plush toy,pineapple plush toy,cup,bottle,can,cereal box,bulldozer toy car,tissue roll,baseball bat"
+    multi_object_prompts = (
+        "pink donut plush toy,pineapple plush toy,avocado plush toy,cup,bottle,can"
+    )
 
     # "pink donut plush toy,pineapple plush toy,cup,bottle,can,cereal box,bulldozer toy car" 0.2 (7)
     # "pink donut plush toy,pineapple plush toy,avocado plush toy,cup,bottle,can" 0.3 (6)
