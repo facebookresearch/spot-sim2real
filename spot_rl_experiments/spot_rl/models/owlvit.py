@@ -246,7 +246,7 @@ class OwlVit:
                     if (
                         filter_class is not None
                         and label_without_prefix == filter_class
-                    ):
+                    ) or filter_class is None:
                         target_scores[label.item()] = score.item()
                         target_boxes[label.item()] = box
 
