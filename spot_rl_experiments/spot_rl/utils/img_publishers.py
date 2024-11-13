@@ -744,9 +744,11 @@ class OWLVITModel:
 
     def inference(self, hand_rgb, timestamp, stopwatch):
         # print("Running inference on Owlvit")
-        params = rospy.get_param("/object_target").split(",")
+        params = rospy.get_param("/multi_class_object_target").split(",")
         self.owlvit.update_label([params])
-        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(hand_rgb)
+        bbox_xy, viz_img = self.owlvit.run_inference_and_return_img(
+            hand_rgb, filter_class=rospy.get_param("/object_target", "ball")
+        )
 
         if bbox_xy is not None and bbox_xy != []:
             detections = []
@@ -828,7 +830,14 @@ if __name__ == "__main__":
         default="owlvit",
         help="bounding box detector model to use (owlvit or maskrcnn)",
     )
+    multi_object_prompts = (
+        "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup"
+    )
 
+    rospy.set_param(
+        "multi_class_object_target",
+        f"{multi_object_prompts}",
+    )
     args = parser.parse_args()
     # assert (
     #    len([i[1] for i in args._get_kwargs() if i[1]]) == 1
@@ -866,10 +875,6 @@ if __name__ == "__main__":
         # Add open voc object detector here
         spot = Spot("SpotOpenVocObjectDetectorPublisher")
         # ball,donut plush toy,can of food,bottle,caterpillar plush toy,bulldozer toy ca
-        rospy.set_param(
-            "multi_class_object_target",
-            "pineapple plush toy,pink donut plush toy,avocado plush toy,cup,bottle,can",
-        )
         model = OWLVITModelMultiClasses()
         node = SpotOpenVocObjectDetectorPublisher(model, spot)
     elif decompress:

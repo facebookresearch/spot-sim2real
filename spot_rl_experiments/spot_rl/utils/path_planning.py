@@ -311,7 +311,7 @@ def path_planning_using_a_star(
     )
     goal_in_grid = np.array(goal_in_grid)
     print(f"start pos {start_in_grid}, goal in grid {goal_in_grid}")
-    path = astar(
+    path, recursion_depth = astar(
         dilated_occupancy_grid,
         (start_in_grid[0], start_in_grid[1]),
         (goal_in_grid[0], goal_in_grid[1]),
@@ -412,18 +412,25 @@ def path_planning_using_a_star(
         plt.title(osp.basename(save_fig_name).split(".")[0])
         plt.savefig(save_fig_name)
         plt.show()
-
+    # is the final destination not excatly reachable then find the closest rechable point
+    is_path_psuedo_rechable = recursion_depth > 0
     if bestpath is not None:
-        return convert_path_to_real_waypoints(
+        best_converted_path = convert_path_to_real_waypoints(
             bestpath, occupancy_min_x, occupancy_min_y
         )
+        distance_to_target = np.linalg.norm(
+            best_converted_path[-1][:2] - np.array(goal_xy)
+        )
+        return best_converted_path, is_path_psuedo_rechable, distance_to_target
     print(f"No solution for start: {xy_position_robot_in_cg}, goal {goal_xy}")
-    return []
+    return [], False, float("inf")
 
 
 if __name__ == "__main__":
-    bbox_extents = np.array([0.9, 0.7, 0.5])
-    bbox_centers = np.array([4.0, -1.9, 0.5])
-    robot_pose = [0.0, 0.0]
+    bbox_extents = np.array([0.9, 0.8, 0.2])
+    bbox_centers = np.array([9.6, 2.3, 0.3])
+    robot_pose = [1.0, 0.0]
+    goal_xy = bbox_centers[:2] + bbox_extents[:2]
     print(f"Current robot pose {robot_pose}")
-    print(path_planning_using_a_star(np.array(robot_pose), bbox_centers, bbox_extents))
+    print(f"Goal {goal_xy}")
+    print(path_planning_using_a_star(np.array(robot_pose), goal_xy))
