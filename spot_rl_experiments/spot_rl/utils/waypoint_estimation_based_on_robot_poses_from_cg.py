@@ -290,7 +290,6 @@ def get_navigation_points(
 
     if len(nonreachable_edges_indices) == 4:
         # either raise error or consider it path planning failure & continue
-        # nonreachable_edges_indices = []
         if psuedo_target_index > -1:
             waypoint = four_waypoint_edges[psuedo_target_index]
             path = psuedo_path

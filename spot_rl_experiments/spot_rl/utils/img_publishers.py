@@ -834,10 +834,6 @@ if __name__ == "__main__":
         "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup"
     )
 
-    # "pink donut plush toy,pineapple plush toy,cup,bottle,can,cereal box,bulldozer toy car" 0.2 (7)
-    # "pink donut plush toy,pineapple plush toy,avocado plush toy,cup,bottle,can" 0.3 (6)
-    # "ppink donut plush toy,pineapple plush toy,cup,bottle,can,cereal box,bulldozer toy car,tissue roll,baseball bat" 0.2 (9)
-
     rospy.set_param(
         "multi_class_object_target",
         f"{multi_object_prompts}",

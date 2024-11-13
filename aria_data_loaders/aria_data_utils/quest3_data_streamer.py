@@ -586,24 +586,6 @@ def main(
                 "can",
             ],
         )
-
-        # "pineapple plush toy",
-        # "pink donut plush toy",
-        # "avocado plush toy",
-        # "cup",
-        # "bottle",
-        # "can",
-
-        # "pink donut plush toy",
-        # "pineapple plush toy",
-        # "cup",
-        # "bottle",
-        # "can",
-        # "cereal box",
-        # "bulldozer toy car",
-        # "tissue roll",
-        # "baseball bat"
-
         data_streamer.initialize_human_motion_detector()
         # data_streamer.connect()
         while not rospy.is_shutdown():
