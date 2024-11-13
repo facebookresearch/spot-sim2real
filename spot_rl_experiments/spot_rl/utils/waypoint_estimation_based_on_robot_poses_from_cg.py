@@ -333,8 +333,6 @@ def get_navigation_points(
     else:
         path[-1][-1] = waypoint[-1]
 
-    breakpoint()
-
     print(f"Final path x y yaw: {path}")
 
     return path
