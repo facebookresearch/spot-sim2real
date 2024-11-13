@@ -5,6 +5,7 @@
 # Reference code Boston Dynamics Spot-sdk: https://github.com/boston-dynamics/spot-sdk/tree/master/python/examples/web_cam_image_service
 
 import logging
+import os
 import time
 from typing import Any, List
 
@@ -157,7 +158,7 @@ class IntelRealSenseCameraInterface(CameraInterface):
             if not self.mode:
 
                 # Align the depth frame to color frame
-                aligned_frames = self.align.process(self.pipeline.wait_for_frames())
+                aligned_frames = self.align.process(self.pipeline.wait_for_frames(100))
                 capture_time = time.time()  # frames.get_timestamp()
 
                 # Get aligned frames
@@ -221,16 +222,20 @@ class IntelRealSenseCameraInterface(CameraInterface):
             print(
                 f"Unsuccessful in getting frames from self.pipeline.wait_for_frames() due to {str(e)}"
             )
-            exit(0)
+            os._exit(1)
 
     def image_decode(self, image_data, image_proto, image_req):
         pixel_format = image_req.pixel_format
         image_format = image_req.image_format
-        print(
-            f"In Decode Method, Stream Mode: {self.mode}, Pixel_format : {pixel_format}, Image_format: {image_format}"
-        )
+        # print(
+        #     f"In Decode Method, Stream Mode: {self.mode}, Pixel_format : {pixel_format}, Image_format: {image_format}"
+        # )
         converted_image_data = image_data
-
+        current_time = time.time()
+        capture_time = IntelRealSenseCameraInterface.CAPTURE_TIME
+        if current_time - capture_time > 1.0:
+            print("Getting Stale data older than 1 secs")
+            os._exit(1)
         # Determine the pixel format for the data.
         if converted_image_data.shape[-1] == 3:
             # RGB image.

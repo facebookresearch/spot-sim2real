@@ -1289,6 +1289,10 @@ class Spot:
         else:
             print("Exception occured, will NOT update self.global_T_home")
 
+    def update_home_robot(self):
+        """This function updates global_T_home and robot_recenter_yaw based on the home robot txt"""
+        self.global_T_home, self.robot_recenter_yaw = self.read_home_robot()
+
     def shutdown(self, should_dock: bool = False, home_robot=True) -> None:
         """
         Stops the robot and docks it if should_dock is True else sits the robot down

@@ -585,6 +585,10 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         header = self.img_msg.header
         timestamp = header.stamp
 
+        # Update the home robot
+        # this takes about 0.00015 sec
+        self.spot.update_home_robot()
+
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
         imgs = self.spot.get_hand_image(
