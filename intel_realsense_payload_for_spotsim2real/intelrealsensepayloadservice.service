@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 ExecStart=/home/spot/Desktop/intel_realsense_payload_for_spotsim2real/startpayload.sh
 Restart=always
-RestartSec=3
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
