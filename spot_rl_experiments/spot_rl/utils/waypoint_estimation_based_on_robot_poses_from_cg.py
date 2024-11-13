@@ -259,26 +259,49 @@ def get_navigation_points(
     nonreachable_edges_indices = []
     reachable_indices = []
     reachable_paths = []
+    psuedo_path = None
+    psuedo_target_index = -1
+    psuedo_min_distance = float("inf")
     for waypoint_i, waypoint_edge in enumerate(four_waypoint_edges):
         # Do a* path planning from current robot location to the edge point if the distance
         # to the robot is greater than 0.5m
-        if np.linalg.norm(np.array(cur_robot_xy) - np.array(waypoint_edge[:2])) > 0.5:
-            path_edge = path_planning_using_a_star(cur_robot_xy, waypoint_edge[:2])
+        if np.linalg.norm(np.array(cur_robot_xy) - np.array(waypoint_edge[:2])) > 1.0:
+            (
+                path_edge,
+                is_path_psuedo_rechable,
+                distance_to_target,
+            ) = path_planning_using_a_star(cur_robot_xy, waypoint_edge[:2])
         else:
-            path_edge = [waypoint_edge[:2]]
-        if not len(path_edge):
-            # Do not find the path, mark the edge as non reachable (the edge in inside the clutter)
+            path_edge, is_path_psuedo_rechable = [waypoint_edge[:2]], False
+
+        if is_path_psuedo_rechable:
+            nonreachable_edges_indices.append(waypoint_i)
+            if distance_to_target < psuedo_min_distance:
+                psuedo_min_distance = distance_to_target
+                psuedo_target_index = waypoint_i
+                psuedo_path = path_edge
+        elif len(path_edge) == 0:
             nonreachable_edges_indices.append(waypoint_i)
         else:
             reachable_indices.append(waypoint_i)
             reachable_paths.append(path_edge)
+
     print(f"non reachable indices {nonreachable_edges_indices}")
 
     if len(nonreachable_edges_indices) == 4:
         # either raise error or consider it path planning failure & continue
-        nonreachable_edges_indices = []
+        # nonreachable_edges_indices = []
+        if psuedo_target_index > -1:
+            waypoint = four_waypoint_edges[psuedo_target_index]
+            path = psuedo_path
+            best_robot_view_pos = robot_view_poses[0]
+            nonreachable_edges_indices.pop(
+                nonreachable_edges_indices.index(psuedo_target_index)
+            )
+        else:
+            nonreachable_edges_indices = []
 
-    if len(nonreachable_edges_indices) == 3:
+    elif len(nonreachable_edges_indices) == 3:
         # no need to test robot view poses since only 1 edge is reachable
         waypoint = four_waypoint_edges[reachable_indices[0]]
         path = reachable_paths[0]
@@ -294,7 +317,7 @@ def get_navigation_points(
         )
 
     # Finally do the path planning from current robot location to the selected waypoint
-    path = path_planning_using_a_star(
+    path, is_path_psuedo_rechable, distance_to_target = path_planning_using_a_star(
         cur_robot_xy,
         waypoint[:2],
         savefigname,
@@ -304,7 +327,14 @@ def get_navigation_points(
         best_view_pose=best_robot_view_pos[0][:2] if visualize else None,
     )
     waypoint[-1] = np.deg2rad(waypoint[-1])
-    path.append(waypoint)
+
+    if not is_path_psuedo_rechable:
+        path.append(waypoint)
+    else:
+        path[-1][-1] = waypoint[-1]
+
+    breakpoint()
+
     print(f"Final path x y yaw: {path}")
 
     return path

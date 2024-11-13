@@ -831,7 +831,7 @@ if __name__ == "__main__":
         help="bounding box detector model to use (owlvit or maskrcnn)",
     )
     multi_object_prompts = (
-        "pink donut plush toy,pineapple plush toy,avocado plush toy,cup,bottle,can"
+        "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup"
     )
 
     # "pink donut plush toy,pineapple plush toy,cup,bottle,can,cereal box,bulldozer toy car" 0.2 (7)

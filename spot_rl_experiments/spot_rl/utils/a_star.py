@@ -26,13 +26,13 @@ def is_goal_within_local_range(current, goal, expand_range, height, width):
 
 
 # A* algorithm implementation
-def astar(grid, start, goal):
+def astar(grid, start, goal, recursion_depth: int = 0):
     # Priority queue
-    open_set = []
+    open_set = []  # type: ignore
     heapq.heappush(open_set, (0, start))
 
     # Dictionary to store the most efficient path to each node
-    came_from = {}
+    came_from = {}  # type: ignore
 
     # g_score stores the cost of getting to each node from the start
     g_score = {start: 0}
@@ -46,6 +46,7 @@ def astar(grid, start, goal):
     expand_range = (
         2  # almost 0.6 m length & width, donnot change works well emperically
     )
+    min_distance, min_distance_node = float("inf"), goal
     while open_set:
         current = heapq.heappop(open_set)[1]
 
@@ -56,7 +57,7 @@ def astar(grid, start, goal):
                 path.append(current)
                 current = came_from[current]
             path.append(start)
-            return path[::-1]  # Return reversed path
+            return path[::-1], recursion_depth  # Return reversed path
 
         # Explore neighbors
         for direction in directions:
@@ -102,10 +103,19 @@ def astar(grid, start, goal):
                 if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                     came_from[neighbor] = current
                     g_score[neighbor] = tentative_g_score
-                    f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
+                    distance = heuristic(neighbor, goal)
+                    if distance < min_distance:
+                        min_distance = distance
+                        min_distance_node = neighbor
+                    f_score[neighbor] = tentative_g_score + distance
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
-    return []  # Return empty path if no path found
+    if recursion_depth < 1:
+        return astar(
+            grid, start, min_distance_node, recursion_depth=recursion_depth + 1
+        )
+
+    return [], recursion_depth  # Return empty path if no path found
 
 
 if __name__ == "__main__":
