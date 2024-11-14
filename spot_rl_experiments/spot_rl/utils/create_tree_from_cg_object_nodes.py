@@ -144,6 +144,9 @@ def map_nodes_from_cache_to_json(nodes_in_cache):
 
     for node in nodes_in_cache:
         # print(json.dumps(node[-1], indent=4))
+        node[-1]["height"] = (
+            node[-1]["bbox_center"][-1] + (node[-1]["bbox_extent"][2] / 2.0) + 0.27
+        )
         pp(node[-1])
 
     return nodes_in_cache
@@ -161,5 +164,5 @@ if __name__ == "__main__":
     # This script is used to create a quad tree from the CG objects to load the objects in the
     # graph.
     start_time = time.time()
-    nodes = map_nodes_from_cache_to_json(query_quad_tree(0.5, -1.6, 1.0, tree, data))
+    nodes = map_nodes_from_cache_to_json(query_quad_tree(1.1, 3.3, 0.1, tree, data))
     print(f"Finished querying the quadtree map in {time.time() - start_time} secs")

@@ -447,8 +447,8 @@ class SpotSkillManager:
         place_target = place_target.split("_", 1)
         place_target[1] = place_target[1].replace("_", " ")
         place_target = "_".join(place_target)
-        _ = calculate_height(place_target)
-        if place_target == "67_kitchen counter":
+        height = calculate_height(place_target)
+        if height > 1.0:
             grasp_mode = "side"
 
         self.gaze_controller.set_grasp_type(grasp_mode)
