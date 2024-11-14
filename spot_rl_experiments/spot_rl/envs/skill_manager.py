@@ -37,7 +37,9 @@ from spot_rl.utils.heuristic_nav import (
     heurisitic_object_search_and_navigation,
 )
 from spot_rl.utils.pose_estimation import OrientationSolver
-from spot_rl.utils.robopoint_utils import load_vlm_model, vlm_predict_3d_waypoint
+from spot_rl.utils.robopoint_utils import load_robopoint_model
+from spot_rl.utils.molmo_utils import load_molmo_model
+from spot_rl.utils.vlm_wpt_est import vlm_predict_3d_waypoint
 from spot_rl.utils.search_table_location import (
     contrained_place_point_estimation,
     convert_point_in_body_to_place_waypoint,
@@ -247,12 +249,21 @@ class SpotSkillManager:
                     use_semantic_place=self.allow_semantic_place,  # TODO: Mostly not needed
                 )
                 start_time = time.time()
-                (
-                    self.vlm_tokenizer,
-                    self.vlm_model,
-                    self.vlm_image_processor,
-                    _,
-                ) = load_vlm_model()
+                vlm_model_path = self.place_config.WEIGHTS.WAYPOINT_ESTIMATION_MODEL
+                if "robopoint" in vlm_model_path.lower():
+                    (
+                        self.vlm_tokenizer,
+                        self.vlm_model,
+                        self.vlm_image_processor,
+                        _,
+                    ) = load_robopoint_model(vlm_model_path)
+                    print("LOAD_TIME", time.time() - start_time)
+                elif "molmo" in vlm_model_path.lower():
+                    self.vlm_tokenizer = None
+                    (
+                        self.vlm_model,
+                        self.vlm_image_processor,
+                    ) = load_molmo_model(vlm_model_path)
                 print("LOAD_TIME", time.time() - start_time)
             else:
                 self.place_controller = SemanticPlace(
@@ -565,6 +576,7 @@ class SpotSkillManager:
         rospy.set_param("/is_gripper_blocked", 0)
         place_target_location = vlm_predict_3d_waypoint(
             self.spot,
+            self.place_config,
             self.arm_joint_angles,
             self.vlm_tokenizer,
             self.vlm_model,

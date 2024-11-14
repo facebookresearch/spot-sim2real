@@ -58,6 +58,7 @@ WEIGHTS:
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
   DEBLURGAN: "weights/fpn_inception.h5"
   SAM: "weights/sam_vit_h_4b8939.pth"
+  WAYPOINT_ESTIMATION_MODEL: "weights/semantic_place_ee/robopoint-v1-vicuna-v1.5-13b"
 
 DEVICE: "cuda:0"
 USE_REMOTE_SPOT: False
