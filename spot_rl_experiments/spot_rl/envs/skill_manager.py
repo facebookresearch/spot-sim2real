@@ -36,10 +36,11 @@ from spot_rl.utils.heuristic_nav import (
     ImageSearch,
     heurisitic_object_search_and_navigation,
 )
+from spot_rl.utils.molmo_pointer import load_molmo_model
 from spot_rl.utils.pose_estimation import OrientationSolver
-from spot_rl.utils.robopoint_utils import load_robopoint_model
-from spot_rl.utils.molmo_utils import load_molmo_model
-from spot_rl.utils.vlm_wpt_est import vlm_predict_3d_waypoint
+from spot_rl.utils.robopoint_pointer import load_robopoint_model
+
+# from spot_rl.utils.robopoint_utils import load_vlm_model, vlm_predict_3d_waypoint #type:ignore
 from spot_rl.utils.search_table_location import (
     contrained_place_point_estimation,
     convert_point_in_body_to_place_waypoint,
@@ -52,6 +53,7 @@ from spot_rl.utils.utils import (
     nav_target_from_waypoint,
     place_target_from_waypoint,
 )
+from spot_rl.utils.vlm_wpt_est import vlm_predict_3d_waypoint
 from spot_wrapper.spot import Spot
 
 #
