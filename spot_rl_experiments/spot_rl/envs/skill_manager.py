@@ -441,6 +441,16 @@ class SpotSkillManager:
                     grasp_mode = grasp_type
                     break
 
+        # Determine the grasping type from ros
+        place_target = rospy.get_param("nav_target_for_pick", f"{time.time()},None")
+        place_target = place_target.split(",")[1]
+        place_target = place_target.split("_", 1)
+        place_target[1] = place_target[1].replace("_", " ")
+        place_target = "_".join(place_target)
+        _ = calculate_height(place_target)
+        if place_target == "67_kitchen counter":
+            grasp_mode = "side"
+
         self.gaze_controller.set_grasp_type(grasp_mode)
         goal_dict = {
             "target_object": target_obj_name,
