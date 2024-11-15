@@ -597,8 +597,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             # if default_z is not None:
             #     Z = default_z
             # else:
-            Z = default_z
-            # return (None, None) if return_z else None
+            # Z = default_z
+            return (None, None) if return_z else None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return (point_in_3d, Z) if return_z else point_in_3d
 

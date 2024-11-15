@@ -16,6 +16,7 @@ class RedisClient:
     def get_latest_hand_rgbd(self):
         """Retrieve the latest data from Redis and check if it is recent."""
         # Get the serialized data from Redis
+        return False
         latest_data = self.redis_client.get(f"{hand_rgbd_key_name_in_redis}")
         if not latest_data:
             return False  # No data available in Redis

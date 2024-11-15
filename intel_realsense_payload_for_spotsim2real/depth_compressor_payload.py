@@ -64,7 +64,7 @@ def main():
     encode_type = ".png"
     quality = 5
     encode_param = [int(cv2.IMWRITE_PNG_COMPRESSION), int(quality)]
-    port = "21998"
+    port = os.environ.get("FAST_DEPTH_PORT", 21998)
 
     context = zmq.Context()
 
