@@ -628,12 +628,14 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
+        start_time = time.time()
         imgs = self.spot.get_hand_image(
             force_get_gripper=True
         )  # for getting gripper intrinsics
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
         hand_rgb, arm_depth = [image_response_to_cv2(img) for img in imgs]
+        print(f"Time taken to get RGBD {time.time() - start_time}")
 
         # Get the vision to hand
         try:

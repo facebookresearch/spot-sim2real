@@ -85,6 +85,7 @@ from perception_and_utils.utils.conversions import (
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
 from spot_rl.utils.pixel_to_3d_conversion_utils import project_3d_to_pixel_uv
 from spot_rl.utils.utils import ros_frames as rf
+from spot_wrapper.redis_cache_getter import RedisClient
 from spot_wrapper.utils import (
     get_angle_between_forward_and_target,
     get_position_and_vel_values,
@@ -210,6 +211,7 @@ class Spot:
             RobotCommandClient.default_service_name
         )
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
+        self.redis_client = RedisClient()
 
         # Make our intel image client
         try:
@@ -761,7 +763,8 @@ class Spot:
             camera_model=image_response.source.pinhole,
             walk_gaze_mode=3,
         )
-
+        print(f"check top_down_grasp: {top_down_grasp}")
+        print(f"check horizontal_grasp: {horizontal_grasp}")
         if top_down_grasp or horizontal_grasp:
             if top_down_grasp:
                 # Add a constraint that requests that the x-axis of the gripper is
@@ -1216,7 +1219,7 @@ class Spot:
 
     def read_home_robot(self):
         """Returns - Tuple of global_T_home & robot_recenter_yaw. Both will be None if Home.txt file doesn't exist"""
-        print("Reading robot pose w.r.t home from home.txt")
+        # print("Reading robot pose w.r.t home from home.txt")
         global_T_home = None
         robot_recenter_yaw = None
         if osp.isfile(HOME_TXT):
@@ -1379,6 +1382,9 @@ class Spot:
         ):
             return self.select_hand_image(img_src=realsense_img_srcs)
         else:
+            cache_rgbd = self.redis_client.get_latest_hand_rgbd()
+            if cache_rgbd:
+                return cache_rgbd
             return self.select_hand_image(is_rgb=is_rgb)
 
     def get_camera_intrinsics(
