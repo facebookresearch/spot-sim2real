@@ -516,12 +516,6 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         #     pass
         rospy.loginfo(f"[{self.name}]: has received images!")
 
-        # Init the world graph
-        self.worldGraphEditsPub = rospy.Publisher(
-            "/world_graph_edits", String, queue_size=10
-        )
-        self.id = 0
-
     def depth_cb(self, msg: Image):
         self.img_msg_depth = msg
 
