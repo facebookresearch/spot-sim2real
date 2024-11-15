@@ -332,7 +332,7 @@ class SpotRosSkillExecutor:
                     bbox_center,
                     bbox_extent,
                     [x, y],
-                    True,
+                    False,
                     "pathplanning.png",
                 )
 
