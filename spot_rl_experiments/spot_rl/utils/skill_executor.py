@@ -546,6 +546,7 @@ def reset_ros_param():
     rospy.set_param("/enable_dwg_object_addition", f"{str(time.time())},True")
     rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
     rospy.set_param("/human_type_msg", f"{str(time.time())},None")
+    rospy.set_param("/nav_target_for_pick", f"{str(time.time())},None")
 
 
 def main():

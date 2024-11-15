@@ -144,6 +144,9 @@ def map_nodes_from_cache_to_json(nodes_in_cache):
 
     for node in nodes_in_cache:
         # print(json.dumps(node[-1], indent=4))
+        node[-1]["height"] = (
+            node[-1]["bbox_center"][-1] + (node[-1]["bbox_extent"][2] / 2.0) + 0.27
+        )
         pp(node[-1])
 
     return nodes_in_cache

@@ -205,7 +205,9 @@ def calculate_height(object_tag):
                 ):
                     object_node = value
                     # Extract the height
-                    if "bbox_center" in object_node and "bbox_extent" in object_node:
+                    if "height" in object_node:
+                        return object_node["height"]
+                    elif "bbox_center" in object_node and "bbox_extent" in object_node:
                         bbox_center = object_node["bbox_center"]
                         bbox_extent = object_node["bbox_extent"]
                         # Calculate the height
