@@ -8,6 +8,7 @@ import os
 import os.path as osp
 import time
 from collections import deque
+from typing import List
 
 import cv2
 import numpy as np
@@ -28,6 +29,7 @@ PROCESSED_IMG_TOPICS = [
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
 FPS = 30
+TEXT_FOR_LSC_DEMO = False
 
 
 class VisualizerMixin:
@@ -171,6 +173,54 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
         self.fps = {topic: deque(maxlen=10) for topic in self.msgs.keys()}
 
+    def pretty_parse_object_or_furniture_str(self, str_name: str):
+        target_str = "Default Name"
+        str_list = str_name.split("_")
+        if len(str_list) == 1:
+            target_str = str_list[0]
+        else:
+            # Check if first element of target_str_list is a number
+            target_str = (
+                " ".join(str_list[1:]) if str_list[0].isdigit() else " ".join(str_list)
+            )
+
+        return target_str
+
+    def beautify_next_action_str(self, msg_list: List[str]):
+        # Element0 if this list is always timestamp, Element1 is skill name and Element2 is skill target
+        assert (
+            len(msg_list) == 3
+        ), f"Invalid {msg_list=}. Cannot have more than 3 elements in this list"
+
+        # Get skill name
+        action_name = msg_list[1]
+        beautiful_str = ""
+
+        if "nav" in action_name or "Nav" in action_name:
+            beautiful_str += f"Navigating to {self.pretty_parse_object_or_furniture_str(msg_list[2])}"
+        elif "explore" in action_name:
+            beautiful_str += (
+                f"Exploring {self.pretty_parse_object_or_furniture_str(msg_list[2])}"
+            )
+        elif "pick" in action_name or "Pick" in action_name:
+            beautiful_str += (
+                f"Picking up {self.pretty_parse_object_or_furniture_str(msg_list[2])}"
+            )
+        elif "place" in action_name or "Place" in action_name:
+            place_inputs = msg_list[2].split(";")
+            object_name = self.pretty_parse_object_or_furniture_str(place_inputs[0])
+            relation = place_inputs[1]
+            receptacle_name = self.pretty_parse_object_or_furniture_str(
+                place_inputs[2].strip()
+            )
+            beautiful_str += f"Placing {object_name} {relation} {receptacle_name}"
+        elif "dock" in action_name or "Dock" in action_name:
+            beautiful_str += "Plan complete!!\n Going to dock"
+        else:
+            beautiful_str += f"{action_name} called for {msg_list[2]}"
+
+        return beautiful_str
+
     def generate_composite(self):
         if not any(self.updated.values()):
             # No imgs were refreshed. Skip.
@@ -209,25 +259,79 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             print("Cannot np.vstack image, skipping...")
             return
 
-        # Add Pick receptacle, Object, Place receptacle information on the side
-        pck = rospy.get_param("/viz_pick", "None")
-        obj = rospy.get_param("/viz_object", "None")
-        plc = rospy.get_param("/viz_place", "None")
-        information_string = (
-            "Pick from:\n"
-            + pck
-            + "\n\nObject Target:\n"
-            + obj
-            + "\n\nPlace to:\n"
-            + plc
-        )
-        display_img = 255 * np.ones(
-            (img.shape[0], int(img.shape[1] / 4), img.shape[2]), dtype=np.uint8
-        )
-        display_img = self.overlay_text(
-            display_img, information_string, color=(255, 0, 0), size=0.9, thickness=4
-        )
-        img = resize_to_tallest([img, display_img], hstack=True)
+        if TEXT_FOR_LSC_DEMO:
+            # Add Pick receptacle, Object, Place receptacle information on the side
+            pck = rospy.get_param("/viz_pick", "None")
+            obj = rospy.get_param("/viz_object", "None")
+            plc = rospy.get_param("/viz_place", "None")
+            information_string = (
+                "Pick from:\n"
+                + pck
+                + "\n\nObject Target:\n"
+                + obj
+                + "\n\nPlace to:\n"
+                + plc
+            )
+            display_img = 255 * np.ones(
+                (img.shape[0], int(img.shape[1] / 4), img.shape[2]), dtype=np.uint8
+            )
+            display_img = self.overlay_text(
+                display_img,
+                information_string,
+                color=(255, 0, 0),
+                size=0.9,
+                thickness=4,
+            )
+            img = resize_to_tallest([img, display_img], hstack=True)
+        else:
+            # Add current robot action and human action on the side
+            display_img = 255 * np.ones(
+                (img.shape[0], int(img.shape[1] / 2), img.shape[2]), dtype=np.uint8
+            )
+            robot_action = rospy.get_param(
+                "skill_name_input", f"{str(time.time())},None,None"
+            )
+            robot_action = robot_action.split(",")
+            # Santize the nav name
+            if "nav" in robot_action[1]:
+                robot_action[1] = "nav"
+                robot_action[2] = robot_action[2].strip("|").split(";")[-1]
+            elif "explore" in robot_action[1]:
+                robot_action[2] = (
+                    robot_action[2]
+                    .strip("|")
+                    .split("|")[-1]
+                    .split(";")[-1]
+                    .split(":")[0]
+                )
+            if "None" not in robot_action:
+                robot_action = self.beautify_next_action_str(robot_action)
+            else:
+                robot_action = "Thinking..."
+            information_string = "Robot action: " + robot_action
+
+            # Add human action
+            human_action = rospy.get_param("human_action", "0,None,None,None")
+            human_action = (
+                "None"
+                if "None" in human_action
+                else ",".join(human_action.split(",")[1:])
+            )
+            information_string += f"\nHuman action: {human_action}"
+
+            world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
+            world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
+            information_string += f"\nWorld graph:\n{world_graph_simple_viz}"
+
+            # Add human action
+            display_img = self.overlay_text(
+                display_img,
+                information_string,
+                color=(255, 0, 0),
+                size=0.9,
+                thickness=4,
+            )
+            img = resize_to_tallest([img, display_img], hstack=True)
 
         for topic in refreshed_topics:
             curr_time = time.time()
