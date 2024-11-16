@@ -352,7 +352,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 print(f"Action to publish {action}")
                 if action.get("action", "None") == "pick":
                     setattr(self, "picked_object", action.get("object", "None"))
-                location_str = "unknown"
+                location_str = ["%.1f" % v for v in action["location"]]
+                location_str = "; ".join(location_str)  # type: ignore
                 rospy.set_param(
                     "/human_action",
                     f"{str(time.time())},{action.get('action', 'None')},{action.get('object', getattr(self, 'picked_object', 'None'))},[{location_str}]",
