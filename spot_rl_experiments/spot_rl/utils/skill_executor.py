@@ -328,12 +328,12 @@ class SpotRosSkillExecutor:
                 x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
                 # Get the navigation points
                 nav_pts = get_navigation_points(
-                    view_poses,
-                    bbox_center,
-                    bbox_extent,
-                    [x, y],
-                    False,
-                    "pathplanning.png",
+                    robot_view_pose_data=view_poses,
+                    bbox_centers=bbox_center,
+                    bbox_extents=bbox_extent,
+                    cur_robot_xy=[x, y],
+                    visualize=False,
+                    savefigname="pathplanning.png",
                 )
 
                 # Publish data for Nexus UI
