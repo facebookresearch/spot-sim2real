@@ -205,6 +205,11 @@ class SpotRosSkillExecutor:
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
         rospy.set_param("robot_holding", robot_holding)
+
+        # Set the human action to be None to let skill interruption happens only when skill
+        # is being execute
+        rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             rospy.set_param("skill_in_execution_lock", True)
