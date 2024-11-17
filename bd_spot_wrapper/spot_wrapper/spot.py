@@ -1219,7 +1219,6 @@ class Spot:
 
     def read_home_robot(self):
         """Returns - Tuple of global_T_home & robot_recenter_yaw. Both will be None if Home.txt file doesn't exist"""
-        print("Reading robot pose w.r.t home from home.txt")
         global_T_home = None
         robot_recenter_yaw = None
         if osp.isfile(HOME_TXT):
