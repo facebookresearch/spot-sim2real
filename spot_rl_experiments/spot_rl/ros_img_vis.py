@@ -45,6 +45,10 @@ class VisualizerMixin:
         self.new_video_started = False
         self.named_window = "ROS Spot Images"
 
+        if not TEXT_FOR_LSC_DEMO:
+            self._cur_human_action = "None"
+            self._has_display_since_time = time.time()
+
     def generate_composite(self):
         raise NotImplementedError
 
@@ -221,6 +225,14 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
 
         return beautiful_str
 
+    def beautify_human_action_str(self, msg):
+        msg = msg.split(",")
+        if len(msg) < 2:
+            return "None"
+        else:
+            msg = f"{msg[0]} {msg[1]}"
+            return msg
+
     def generate_composite(self):
         if not any(self.updated.values()):
             # No imgs were refreshed. Skip.
@@ -286,7 +298,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         else:
             # Add current robot action and human action on the side
             display_img = 255 * np.ones(
-                (img.shape[0], int(img.shape[1] / 2), img.shape[2]), dtype=np.uint8
+                (img.shape[0], int(img.shape[1] / 1.5), img.shape[2]), dtype=np.uint8
             )
             robot_action = rospy.get_param(
                 "skill_name_input", f"{str(time.time())},None,None"
@@ -317,7 +329,22 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 if "None" in human_action
                 else ",".join(human_action.split(",")[1:])
             )
-            information_string += f"\nHuman action: {human_action}"
+
+            if human_action != "None":
+                # If there is a human action, we update the string immediately
+                self._cur_human_action = human_action
+                # Set the timer
+                self._has_display_since_time = time.time()
+            elif (
+                human_action == "None"
+                and time.time() - self._has_display_since_time < 10
+            ):
+                # If human action is None, we wait for this many seconds to display things
+                self._cur_human_action = self._cur_human_action
+            else:
+                self._cur_human_action = "None"
+
+            information_string += f"\nHuman action: {self.beautify_human_action_str(self._cur_human_action)}"
 
             world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
             world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
@@ -328,8 +355,8 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 display_img,
                 information_string,
                 color=(255, 0, 0),
-                size=0.9,
-                thickness=4,
+                size=1.2,
+                thickness=3,
             )
             img = resize_to_tallest([img, display_img], hstack=True)
 
