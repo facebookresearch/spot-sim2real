@@ -44,6 +44,7 @@ class VisualizerMixin:
         self.dim = None
         self.new_video_started = False
         self.named_window = "ROS Spot Images"
+        self._click = False
 
         if not TEXT_FOR_LSC_DEMO:
             self._cur_human_action = "None"
@@ -359,6 +360,72 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 thickness=3,
             )
             img = resize_to_tallest([img, display_img], hstack=True)
+
+            # Add human_type_msg button for human intervention
+            human_done_button = {"upper_left": (2900, 800), "bottom_right": (3100, 900)}
+
+            def onMouse(event, x, y, flags, param):
+                if event == cv2.EVENT_LBUTTONDOWN:
+                    if (
+                        human_done_button["upper_left"][0]
+                        < x
+                        < human_done_button["bottom_right"][0]
+                        and human_done_button["upper_left"][1]
+                        < y
+                        < human_done_button["bottom_right"][1]
+                    ):
+                        self._click = True
+
+            cv2.setMouseCallback(self.named_window, onMouse)
+            # add button
+            if self._click:
+                cv2.rectangle(
+                    img,
+                    (
+                        human_done_button["upper_left"][0],
+                        human_done_button["upper_left"][1],
+                    ),
+                    (
+                        human_done_button["bottom_right"][0],
+                        human_done_button["bottom_right"][1],
+                    ),
+                    (0, 0, 255),
+                    -1,
+                )
+                self._click = False
+                rospy.set_param(
+                    "human_type_msg",
+                    f"{time.time()},The entire task is done and human will take care of the rest of the task",
+                )
+            else:
+                cv2.rectangle(
+                    img,
+                    (
+                        human_done_button["upper_left"][0],
+                        human_done_button["upper_left"][1],
+                    ),
+                    (
+                        human_done_button["bottom_right"][0],
+                        human_done_button["bottom_right"][1],
+                    ),
+                    (5, 133, 5),
+                    -1,
+                )
+
+            # Put the text on the button
+            cv2.putText(
+                img,
+                "Human Force Stop",
+                (
+                    human_done_button["upper_left"][0] - 50,
+                    human_done_button["upper_left"][1] - 25,
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (0, 0, 0),
+                3,
+                lineType=cv2.LINE_AA,
+            )
 
         for topic in refreshed_topics:
             curr_time = time.time()
