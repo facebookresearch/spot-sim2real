@@ -613,17 +613,22 @@ def main(
                     if "None" in human_action
                     else ",".join(human_action.split(",")[1:])
                 )
-                human_action_display = f"Human Action : {human_action}"
+                current_state = data_streamer.har_model.current_state
+                human_action_display = (
+                    f"Human action: {human_action}; State: {current_state}"
+                )
+
                 vis_image = cv2.putText(
                     vis_image,
                     human_action_display,
                     (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
+                    0.9,
                     (0, 0, 255),
                     2,
                     cv2.LINE_AA,
                 )
+
                 cv2.imshow("HAR", vis_image)
                 cv2.waitKey(1)
             else:
