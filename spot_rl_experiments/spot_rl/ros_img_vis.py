@@ -299,7 +299,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             img = resize_to_tallest([img, display_img], hstack=True)
         else:
             display_img = 255 * np.ones(
-                (img.shape[0], 1500, img.shape[2]), dtype=np.uint8
+                (img.shape[0], 1750, img.shape[2]), dtype=np.uint8
             )
 
             # Get the LLM generated thought and robot action and result
@@ -315,14 +315,20 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 llm_action = "None"
 
             if llm_action != "None":
-                self._llm_action = llm_action
+                if "Place" in llm_action:
+                    llm_action = llm_action.split(",")
+                    llm_action = llm_action[:-2]
+                    llm_action = ",".join(llm_action)
+                    self._llm_action = llm_action + "]"
+                else:
+                    self._llm_action = llm_action
 
             llm_action_result = rospy.get_param(
                 "skill_name_suc_msg", f"{str(time.time())},{None},{None},{None}"
             )
-            _, _, _, llm_action_msg = llm_action_result.split(",")
+            llm_action_msg = ",".join(llm_action_result.split(",")[3:])
             llm_action_msg = llm_action_msg.replace(",", ",\n")
-            llm_action_msg = llm_action_msg.replace(",", ".\n")
+            llm_action_msg = llm_action_msg.replace(".", ".\n")
             llm_action_msg = llm_action_msg.rstrip()
             information_string = f"{llm_thought}\nRobot action: {llm_action}"
 
@@ -360,7 +366,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
 
             # World graph and the skill result
             display_img = 255 * np.ones(
-                (img.shape[0], 1500, img.shape[2]), dtype=np.uint8
+                (img.shape[0], 1750, img.shape[2]), dtype=np.uint8
             )
             world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
             world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
