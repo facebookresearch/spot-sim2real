@@ -253,7 +253,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             img = resize_to_tallest([img, display_img], hstack=True)
         else:
             display_img = 255 * np.ones(
-                (img.shape[0], 1750, img.shape[2]), dtype=np.uint8
+                (int(img.shape[0] * 1.5), img.shape[1], img.shape[2]), dtype=np.uint8
             )
 
             # Get the LLM generated thought, robot action, skill execution result
@@ -313,33 +313,23 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 self._cur_human_action = "None"
 
             information_string += f"\nHuman action: {self.beautify_human_action_str(self._cur_human_action)}"
+
+            # Get the world graph string
+            world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
+            world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
+
+            # Format the string with world graph string and skill execution result
+            information_string += f"\nWorld graph:\n{world_graph_simple_viz}\nResult of {self._llm_action}: {llm_action_msg}"
+
             # Finally, add the text into the image
             display_img = self.overlay_text(
                 display_img,
                 information_string,
                 color=(255, 0, 0),
-                size=0.9,
+                size=0.8,
                 thickness=3,
             )
-            img = resize_to_tallest([img, display_img], hstack=True)
-
-            # Get World graph and the skill result
-            display_img = 255 * np.ones(
-                (img.shape[0], 1750, img.shape[2]), dtype=np.uint8
-            )
-            # Get the world graph string
-            world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
-            world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
-            # Format the string with world graph string and skill execution result
-            information_string = f"World graph:\n{world_graph_simple_viz}\nResult of {self._llm_action}: {llm_action_msg}"
-            display_img = self.overlay_text(
-                display_img,
-                information_string,
-                color=(255, 0, 0),
-                size=0.9,
-                thickness=3,
-            )
-            img = resize_to_tallest([img, display_img], hstack=True)
+            img = np.concatenate((img, display_img), axis=0)
 
             # Add human_type_msg button for human intervention
             human_done_button = {"upper_left": (4850, 800), "bottom_right": (4950, 900)}
