@@ -29,7 +29,9 @@ PROCESSED_IMG_TOPICS = [
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
 FPS = 30
-TEXT_FOR_LSC_DEMO = False
+TEXT_FOR_LSC_DEMO = (
+    False  # flag to show the navigate/pick/place information on the side of the image
+)
 
 
 class VisualizerMixin:
@@ -179,54 +181,6 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
         self.fps = {topic: deque(maxlen=10) for topic in self.msgs.keys()}
 
-    def pretty_parse_object_or_furniture_str(self, str_name: str):
-        target_str = "Default Name"
-        str_list = str_name.split("_")
-        if len(str_list) == 1:
-            target_str = str_list[0]
-        else:
-            # Check if first element of target_str_list is a number
-            target_str = (
-                " ".join(str_list[1:]) if str_list[0].isdigit() else " ".join(str_list)
-            )
-
-        return target_str
-
-    def beautify_next_action_str(self, msg_list: List[str]):
-        # Element0 if this list is always timestamp, Element1 is skill name and Element2 is skill target
-        assert (
-            len(msg_list) == 3
-        ), f"Invalid {msg_list=}. Cannot have more than 3 elements in this list"
-
-        # Get skill name
-        action_name = msg_list[1]
-        beautiful_str = ""
-
-        if "nav" in action_name or "Nav" in action_name:
-            beautiful_str += f"Navigating to {self.pretty_parse_object_or_furniture_str(msg_list[2])}"
-        elif "explore" in action_name:
-            beautiful_str += (
-                f"Exploring {self.pretty_parse_object_or_furniture_str(msg_list[2])}"
-            )
-        elif "pick" in action_name or "Pick" in action_name:
-            beautiful_str += (
-                f"Picking up {self.pretty_parse_object_or_furniture_str(msg_list[2])}"
-            )
-        elif "place" in action_name or "Place" in action_name:
-            place_inputs = msg_list[2].split(";")
-            object_name = self.pretty_parse_object_or_furniture_str(place_inputs[0])
-            relation = place_inputs[1]
-            receptacle_name = self.pretty_parse_object_or_furniture_str(
-                place_inputs[2].strip()
-            )
-            beautiful_str += f"Placing {object_name} {relation} {receptacle_name}"
-        elif "dock" in action_name or "Dock" in action_name:
-            beautiful_str += "Plan complete!!\n Going to dock"
-        else:
-            beautiful_str += f"{action_name} called for {msg_list[2]}"
-
-        return beautiful_str
-
     def beautify_human_action_str(self, msg):
         msg = msg.split(",")
         if len(msg) < 2:
@@ -302,7 +256,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 (img.shape[0], 1750, img.shape[2]), dtype=np.uint8
             )
 
-            # Get the LLM generated thought and robot action and result
+            # Get the LLM generated thought, robot action, skill execution result
             llm_raw_msg = rospy.get_param("llm_raw_msg", "")
             llm_raw_msg = llm_raw_msg.split("\n")
             if len(llm_raw_msg) == 4:
@@ -314,6 +268,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 llm_thought = "Thought: None"
                 llm_action = "None"
 
+            # Update the current robot action
             if llm_action != "None":
                 if "Place" in llm_action:
                     llm_action = llm_action.split(",")
@@ -323,6 +278,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 else:
                     self._llm_action = llm_action
 
+            # Get the skill execution result
             llm_action_result = rospy.get_param(
                 "skill_name_suc_msg", f"{str(time.time())},{None},{None},{None}"
             )
@@ -332,8 +288,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             llm_action_msg = llm_action_msg.rstrip()
             information_string = f"{llm_thought}\nRobot action: {llm_action}"
 
-            # Add human action
-            human_action = rospy.get_param("human_action", "0,None,None,None")
+            # Get human action
+            human_action = rospy.get_param(
+                "human_action", f"{str(time.time())},None,None,None"
+            )
             human_action = (
                 "None"
                 if "None" in human_action
@@ -349,12 +307,13 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 human_action == "None"
                 and time.time() - self._has_display_since_time < 10
             ):
-                # If human action is None, we wait for this many seconds to display things
+                # If human action is None, we wait for this many seconds to display things for better visualization
                 self._cur_human_action = self._cur_human_action
             else:
                 self._cur_human_action = "None"
 
             information_string += f"\nHuman action: {self.beautify_human_action_str(self._cur_human_action)}"
+            # Finally, add the text into the image
             display_img = self.overlay_text(
                 display_img,
                 information_string,
@@ -364,12 +323,14 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             )
             img = resize_to_tallest([img, display_img], hstack=True)
 
-            # World graph and the skill result
+            # Get World graph and the skill result
             display_img = 255 * np.ones(
                 (img.shape[0], 1750, img.shape[2]), dtype=np.uint8
             )
+            # Get the world graph string
             world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
             world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
+            # Format the string with world graph string and skill execution result
             information_string = f"World graph:\n{world_graph_simple_viz}\nResult of {self._llm_action}: {llm_action_msg}"
             display_img = self.overlay_text(
                 display_img,
@@ -431,7 +392,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             #         -1,
             #     )
 
-            # # Put the text on the button
+            # # Put the text next to the button
             # cv2.putText(
             #     img,
             #     "Human Force Stop",
