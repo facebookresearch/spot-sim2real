@@ -49,6 +49,7 @@ class VisualizerMixin:
         if not TEXT_FOR_LSC_DEMO:
             self._cur_human_action = "None"
             self._has_display_since_time = time.time()
+            self._llm_action = ""
 
     def generate_composite(self):
         raise NotImplementedError
@@ -297,31 +298,33 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             )
             img = resize_to_tallest([img, display_img], hstack=True)
         else:
-            # Add current robot action and human action on the side
             display_img = 255 * np.ones(
-                (img.shape[0], int(img.shape[1] / 1.5), img.shape[2]), dtype=np.uint8
+                (img.shape[0], 1500, img.shape[2]), dtype=np.uint8
             )
-            robot_action = rospy.get_param(
-                "skill_name_input", f"{str(time.time())},None,None"
-            )
-            robot_action = robot_action.split(",")
-            # Santize the nav name
-            if "nav" in robot_action[1]:
-                robot_action[1] = "nav"
-                robot_action[2] = robot_action[2].strip("|").split(";")[-1]
-            elif "explore" in robot_action[1]:
-                robot_action[2] = (
-                    robot_action[2]
-                    .strip("|")
-                    .split("|")[-1]
-                    .split(";")[-1]
-                    .split(":")[0]
-                )
-            if "None" not in robot_action:
-                robot_action = self.beautify_next_action_str(robot_action)
+
+            # Get the LLM generated thought and robot action and result
+            llm_raw_msg = rospy.get_param("llm_raw_msg", "")
+            llm_raw_msg = llm_raw_msg.split("\n")
+            if len(llm_raw_msg) == 4:
+                llm_thought, llm_action, _, _ = llm_raw_msg
+                llm_thought = llm_thought.replace(",", ",\n")
+                llm_thought = llm_thought.replace(".", ".\n")
+                llm_thought = llm_thought.rstrip()
             else:
-                robot_action = "Thinking..."
-            information_string = "Robot action: " + robot_action
+                llm_thought = "Thought: None"
+                llm_action = "None"
+
+            if llm_action != "None":
+                self._llm_action = llm_action
+
+            llm_action_result = rospy.get_param(
+                "skill_name_suc_msg", f"{str(time.time())},{None},{None},{None}"
+            )
+            _, _, _, llm_action_msg = llm_action_result.split(",")
+            llm_action_msg = llm_action_msg.replace(",", ",\n")
+            llm_action_msg = llm_action_msg.replace(",", ".\n")
+            llm_action_msg = llm_action_msg.rstrip()
+            information_string = f"{llm_thought}\nRobot action: {llm_action}"
 
             # Add human action
             human_action = rospy.get_param("human_action", "0,None,None,None")
@@ -346,86 +349,96 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 self._cur_human_action = "None"
 
             information_string += f"\nHuman action: {self.beautify_human_action_str(self._cur_human_action)}"
-
-            world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
-            world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
-            information_string += f"\nWorld graph:\n{world_graph_simple_viz}"
-
-            # Add human action
             display_img = self.overlay_text(
                 display_img,
                 information_string,
                 color=(255, 0, 0),
-                size=1.2,
+                size=0.9,
+                thickness=3,
+            )
+            img = resize_to_tallest([img, display_img], hstack=True)
+
+            # World graph and the skill result
+            display_img = 255 * np.ones(
+                (img.shape[0], 1500, img.shape[2]), dtype=np.uint8
+            )
+            world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
+            world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
+            information_string = f"World graph:\n{world_graph_simple_viz}\nResult of {self._llm_action}: {llm_action_msg}"
+            display_img = self.overlay_text(
+                display_img,
+                information_string,
+                color=(255, 0, 0),
+                size=0.9,
                 thickness=3,
             )
             img = resize_to_tallest([img, display_img], hstack=True)
 
             # Add human_type_msg button for human intervention
-            human_done_button = {"upper_left": (2900, 800), "bottom_right": (3100, 900)}
+            # human_done_button = {"upper_left": (2900, 800), "bottom_right": (3100, 900)}
 
-            def onMouse(event, x, y, flags, param):
-                if event == cv2.EVENT_LBUTTONDOWN:
-                    if (
-                        human_done_button["upper_left"][0]
-                        < x
-                        < human_done_button["bottom_right"][0]
-                        and human_done_button["upper_left"][1]
-                        < y
-                        < human_done_button["bottom_right"][1]
-                    ):
-                        self._click = True
+            # def onMouse(event, x, y, flags, param):
+            #     if event == cv2.EVENT_LBUTTONDOWN:
+            #         if (
+            #             human_done_button["upper_left"][0]
+            #             < x
+            #             < human_done_button["bottom_right"][0]
+            #             and human_done_button["upper_left"][1]
+            #             < y
+            #             < human_done_button["bottom_right"][1]
+            #         ):
+            #             self._click = True
 
-            cv2.setMouseCallback(self.named_window, onMouse)
-            # add button
-            if self._click:
-                cv2.rectangle(
-                    img,
-                    (
-                        human_done_button["upper_left"][0],
-                        human_done_button["upper_left"][1],
-                    ),
-                    (
-                        human_done_button["bottom_right"][0],
-                        human_done_button["bottom_right"][1],
-                    ),
-                    (0, 0, 255),
-                    -1,
-                )
-                self._click = False
-                rospy.set_param(
-                    "human_type_msg",
-                    f"{time.time()},The entire task is done and human will take care of the rest of the task",
-                )
-            else:
-                cv2.rectangle(
-                    img,
-                    (
-                        human_done_button["upper_left"][0],
-                        human_done_button["upper_left"][1],
-                    ),
-                    (
-                        human_done_button["bottom_right"][0],
-                        human_done_button["bottom_right"][1],
-                    ),
-                    (5, 133, 5),
-                    -1,
-                )
+            # cv2.setMouseCallback(self.named_window, onMouse)
+            # # add button
+            # if self._click:
+            #     cv2.rectangle(
+            #         img,
+            #         (
+            #             human_done_button["upper_left"][0],
+            #             human_done_button["upper_left"][1],
+            #         ),
+            #         (
+            #             human_done_button["bottom_right"][0],
+            #             human_done_button["bottom_right"][1],
+            #         ),
+            #         (0, 0, 255),
+            #         -1,
+            #     )
+            #     self._click = False
+            #     rospy.set_param(
+            #         "human_type_msg",
+            #         f"{time.time()},The entire task is done and human will take care of the rest of the task",
+            #     )
+            # else:
+            #     cv2.rectangle(
+            #         img,
+            #         (
+            #             human_done_button["upper_left"][0],
+            #             human_done_button["upper_left"][1],
+            #         ),
+            #         (
+            #             human_done_button["bottom_right"][0],
+            #             human_done_button["bottom_right"][1],
+            #         ),
+            #         (5, 133, 5),
+            #         -1,
+            #     )
 
-            # Put the text on the button
-            cv2.putText(
-                img,
-                "Human Force Stop",
-                (
-                    human_done_button["upper_left"][0] - 50,
-                    human_done_button["upper_left"][1] - 25,
-                ),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 0, 0),
-                3,
-                lineType=cv2.LINE_AA,
-            )
+            # # Put the text on the button
+            # cv2.putText(
+            #     img,
+            #     "Human Force Stop",
+            #     (
+            #         human_done_button["upper_left"][0] - 50,
+            #         human_done_button["upper_left"][1] - 25,
+            #     ),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     1.0,
+            #     (0, 0, 0),
+            #     3,
+            #     lineType=cv2.LINE_AA,
+            # )
 
         for topic in refreshed_topics:
             curr_time = time.time()
