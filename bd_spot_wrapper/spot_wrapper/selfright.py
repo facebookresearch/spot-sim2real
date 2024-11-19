@@ -22,5 +22,5 @@ def main(spot: Spot):
 
 if __name__ == "__main__":
     spot = Spot("BasicSelfRightClient")
-    with spot.get_lease() as lease:
+    with spot.get_lease(hijack=True) as lease:
         main(spot)
