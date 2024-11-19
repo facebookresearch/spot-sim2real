@@ -4,6 +4,7 @@
 
 
 import argparse
+import json
 import os.path as osp
 import subprocess
 import time
@@ -516,6 +517,41 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         #     pass
         rospy.loginfo(f"[{self.name}]: has received images!")
 
+        # Init the world graph
+        self.worldGraphEditsPub = rospy.Publisher(
+            "/world_graph_edits", String, queue_size=10
+        )
+        self.id = 0
+
+    def _add_wg_edit_dict(self, obj_name, xyz_bbox_center):
+        xyz_bbox_center = [
+            float(xyz_bbox_center[0]),
+            float(xyz_bbox_center[1]),
+            float(xyz_bbox_center[2]),
+        ]
+        # Data is stored in hab-llm as (x,y,z) but we want to sent it as x,y,z
+        wg_edit_object = {
+            "object_id": str(self.id) + obj_name.replace(" ", "_"),
+            "object_name": obj_name,
+            "category_tag": "object",
+            "room": None,
+            "bbox_center": xyz_bbox_center,
+            "yaw": 0.0,
+            "bbox_extent": [0.2, 0.2, 0.2],
+            "receptacle": None,
+            "operation": None,
+        }
+        wg_edit_object["room"] = "kitchen"
+        wg_edit_object["operation"] = "add/item"
+        wg_edit_json = {
+            "status": "success",
+            "timestamp": str(time.time()),
+            "object": [wg_edit_object],
+        }
+        self.worldGraphEditsPub.publish(json.dumps(wg_edit_json))
+        self.id += 1
+        return wg_edit_object
+
     def depth_cb(self, msg: Image):
         self.img_msg_depth = msg
 
@@ -561,6 +597,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
             # if default_z is not None:
             #     Z = default_z
             # else:
+            # Z = default_z
             return (None, None) if return_z else None
         point_in_3d = get_3d_point(camera_intrinsics, pixel_uv, Z)
         return (point_in_3d, Z) if return_z else point_in_3d
@@ -591,12 +628,14 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
 
         # Get camera pose of view and the location of the robot
         # These two should be fast and limited delay
+        start_time = time.time()
         imgs = self.spot.get_hand_image(
             force_get_gripper=True
         )  # for getting gripper intrinsics
         # Get the camera intrinsics
         cam_intrinsics = imgs[0].source.pinhole.intrinsics
         hand_rgb, arm_depth = [image_response_to_cv2(img) for img in imgs]
+        print(f"Time taken to get RGBD {time.time() - start_time}")
 
         # Get the vision to hand
         try:
@@ -707,6 +746,8 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
                 print(
                     f"{class_label}: {point_in_global_3d} {x1} {y1} {x2} {y2} {pixel_x} {pixel_y}"
                 )
+                self._add_wg_edit_dict(class_label, point_in_global_3d)
+
             except Exception as e:
                 print(f"Issue of predicting location for {class_label} : {e}")
                 print(traceback.format_exc())
