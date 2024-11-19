@@ -27,7 +27,9 @@ from std_msgs.msg import String
 LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
 
 ENABLE_ARM_SCAN = True
-ENABLE_WAYPOINT_COMPUTE_CACHE = True
+ENABLE_WAYPOINT_COMPUTE_CACHE = (
+    True  # A flag to load the cache file for the navigation waypoint
+)
 waypoint_compute_cache = None
 waypoint_compute_cache_path = osp.join(
     CG_ROOT_PATH, "sg_cache", "map", "waypoint_compute_cache.pkl"
@@ -223,6 +225,11 @@ class SpotRosSkillExecutor:
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
         rospy.set_param("robot_holding", robot_holding)
+        # Set the human action to be None to let skill interruption happens only when skill
+
+        # is being execute
+        rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
+
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             rospy.set_param("skill_in_execution_lock", True)
@@ -357,13 +364,13 @@ class SpotRosSkillExecutor:
                 x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
                 # Get the navigation points
                 nav_pts = get_navigation_points(
-                    view_poses,
-                    bbox_center,
-                    bbox_extent,
-                    [x, y],
-                    waypoint_goal,
-                    False,
-                    "pathplanning.png",
+                    robot_view_pose_data=view_poses,
+                    bbox_centers=bbox_center,
+                    bbox_extents=bbox_extent,
+                    cur_robot_xy=[x, y],
+                    goal_xy_yaw_from_cache=waypoint_goal,
+                    visualize=False,
+                    savefigname="pathplanning.png",
                 )
 
                 # Publish data for Nexus UI

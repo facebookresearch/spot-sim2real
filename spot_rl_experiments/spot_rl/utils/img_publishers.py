@@ -834,7 +834,10 @@ if __name__ == "__main__":
         default="owlvit",
         help="bounding box detector model to use (owlvit or maskrcnn)",
     )
-    multi_object_prompts = "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup,baseball bat,baseball glove,shoes,clock,hat,drill machine"
+    multi_object_prompts = (
+        "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup"
+    )
+    # Additional object: baseball bat,baseball glove,shoes,clock,hat,drill machine
 
     rospy.set_param(
         "multi_class_object_target",

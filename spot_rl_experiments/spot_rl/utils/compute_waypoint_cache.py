@@ -10,6 +10,7 @@ from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
 )
 
 
+# This file computes the view poses and save the cache in the disk
 def main():
     cg_json_path = osp.join(CG_ROOT_PATH, "sg_cache", "cfslam_object_relations.json")
     assert osp.exists(cg_json_path), f"{cg_json_path} doesn't exists please check path"
