@@ -59,6 +59,7 @@ class SpotRosSkillExecutor(SpotSkillExecuterWithBenchmark):
             bbox_center,
             bbox_extent,
             [x, y],
+            None,
             False,
             osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, "nav_receptacle.png"),
         )

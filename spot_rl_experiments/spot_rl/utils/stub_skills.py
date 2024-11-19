@@ -90,6 +90,7 @@ def execute_skills():
                 bbox_center,
                 bbox_extent,
                 [1, 0],
+                None,
                 True,
                 "simpathplanning.png",
             )

@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import os.path as osp
+import pickle
 import threading
 import time
 import traceback
@@ -14,6 +15,7 @@ import numpy as np
 import rospy
 from spot_rl.envs.skill_manager import SpotSkillManager
 from spot_rl.utils.heuristic_nav import scan_arm, scan_base
+from spot_rl.utils.retrieve_robot_poses_from_cg import ROOT_PATH as CG_ROOT_PATH
 from spot_rl.utils.retrieve_robot_poses_from_cg import get_view_poses
 from spot_rl.utils.utils import get_skill_name_and_input_from_ros
 from spot_rl.utils.utils import ros_topics as rt
@@ -25,6 +27,22 @@ from std_msgs.msg import String
 LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
 
 ENABLE_ARM_SCAN = True
+ENABLE_WAYPOINT_COMPUTE_CACHE = True
+waypoint_compute_cache = None
+waypoint_compute_cache_path = osp.join(
+    CG_ROOT_PATH, "sg_cache", "map", "waypoint_compute_cache.pkl"
+)
+
+if not osp.exists(waypoint_compute_cache_path) and ENABLE_WAYPOINT_COMPUTE_CACHE:
+    # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
+    print(
+        "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
+    )
+    ENABLE_WAYPOINT_COMPUTE_CACHE = False
+
+if ENABLE_WAYPOINT_COMPUTE_CACHE:
+    with open(waypoint_compute_cache_path, "rb") as f:
+        waypoint_compute_cache = pickle.load(f)
 
 
 class SpotRosSkillExecutor:
@@ -205,11 +223,6 @@ class SpotRosSkillExecutor:
             self.spotskillmanager.spot.robot_state_client.get_robot_state().manipulator_state.is_gripper_holding_item
         )
         rospy.set_param("robot_holding", robot_holding)
-
-        # Set the human action to be None to let skill interruption happens only when skill
-        # is being execute
-        rospy.set_param("/human_action", f"{str(time.time())},None,None,None")
-
         # Select the skill from the ros buffer and call the skill
         if skill_name == "nav":
             rospy.set_param("skill_in_execution_lock", True)
@@ -303,6 +316,7 @@ class SpotRosSkillExecutor:
 
                 # Get the bbox center and bbox extent
                 bbox_info = skill_input.split(";")  # in the format of x,y,z
+                bbox_info = [bb.strip() for bb in bbox_info]
                 assert (
                     len(bbox_info) >= 6
                 ), f"Wrong size of the bbox info, it should be 6, but got {len(bbox_info)}"
@@ -325,20 +339,31 @@ class SpotRosSkillExecutor:
                 else:
                     rospy.set_param("/viz_pick", query_class_names[0])
                 # Get the view poses
-                view_poses, category_tag = get_view_poses(
-                    bbox_center, bbox_extent, query_class_names, True
-                )
+                waypoint_goal, view_poses = None, None
+                if ENABLE_WAYPOINT_COMPUTE_CACHE and waypoint_compute_cache:
+                    unique_cache_key = ",".join(bbox_info[0:3] + bbox_info[3:6])
+                    if unique_cache_key in waypoint_compute_cache:
+                        # should be tuple ((x, y, deg(yaw)), category_tag)
+                        waypoint_goal, category_tag = waypoint_compute_cache[
+                            unique_cache_key
+                        ]
+
+                if not waypoint_goal:
+                    view_poses, category_tag = get_view_poses(
+                        bbox_center, bbox_extent, query_class_names, True
+                    )
 
                 # Get the robot x, y, yaw
                 x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
                 # Get the navigation points
                 nav_pts = get_navigation_points(
-                    robot_view_pose_data=view_poses,
-                    bbox_centers=bbox_center,
-                    bbox_extents=bbox_extent,
-                    cur_robot_xy=[x, y],
-                    visualize=False,
-                    savefigname="pathplanning.png",
+                    view_poses,
+                    bbox_center,
+                    bbox_extent,
+                    [x, y],
+                    waypoint_goal,
+                    False,
+                    "pathplanning.png",
                 )
 
                 # Publish data for Nexus UI
