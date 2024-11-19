@@ -66,9 +66,7 @@ def load_pretrained_model(
 def load_robopoint_model(model_path):
     setattr(torch.nn.Linear, "reset_parameters", lambda self: None)
     setattr(torch.nn.LayerNorm, "reset_parameters", lambda self: None)
-    model_path = os.path.expanduser(
-        "/spot-sim2real/spot_rl_experiments/weights/semantic_place_ee/robopoint-v1-vicuna-v1.5-13b"
-    )
+    model_path = os.path.expanduser(model_path)
     tokenizer, model, image_processor, context_len = load_pretrained_model(model_path)
     return tokenizer, model, image_processor, context_len
 

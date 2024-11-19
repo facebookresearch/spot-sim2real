@@ -5,10 +5,10 @@ import time
 import cv2
 import numpy as np
 from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
-from spot_rl.utils.pixel_to_3d_conversion_utils import get_3d_point
-from spot_rl.utils.search_table_location import get_arguments, project_3d_to_pixel_uv
 from spot_rl.utils.molmo_pointer import molmo_predict_waypoint
+from spot_rl.utils.pixel_to_3d_conversion_utils import get_3d_point
 from spot_rl.utils.robopoint_pointer import robopoint_predict_waypoint
+from spot_rl.utils.search_table_location import get_arguments, project_3d_to_pixel_uv
 
 
 def get_robot_data(spot, GAZE_ARM_JOINT_ANGLES):
@@ -122,7 +122,7 @@ def vlm_predict_3d_waypoint(
     if visualize:
         cv2.imwrite(f"table_detection_vlm_before_{time.time() * 1000}.png", img_cv2)
     start_time = time.time()
-    vlm_model_path = place_config.waypoint_estimation_model
+    vlm_model_path = place_config.WAYPOINT_ESTIMATION_MODEL
     if "robopoint" in vlm_model_path.lower():
         avg_wpt = robopoint_predict_waypoint(img_cv2, tokenizer, model, image_processor)
     elif "molmo" in vlm_model_path.lower():
@@ -134,7 +134,9 @@ def vlm_predict_3d_waypoint(
         avg_wpt,
         body_T_hand,
         gripper_T_intel,
+        camera_intrinsics_intel,
         height_adjustment_offset,
+        visualize,
     )
 
     return placexyz

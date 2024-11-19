@@ -251,7 +251,7 @@ class SpotSkillManager:
                     use_semantic_place=self.allow_semantic_place,  # TODO: Mostly not needed
                 )
                 start_time = time.time()
-                vlm_model_path = self.place_config.WEIGHTS.WAYPOINT_ESTIMATION_MODEL
+                vlm_model_path = self.place_config.WAYPOINT_ESTIMATION_MODEL
                 if "robopoint" in vlm_model_path.lower():
                     (
                         self.vlm_tokenizer,

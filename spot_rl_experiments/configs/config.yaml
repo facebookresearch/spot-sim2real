@@ -52,13 +52,14 @@ WEIGHTS:
 
   # ASC (weight of ASC will always remain in pytorch)
   MIXER: "weights/final_paper/final_moe_rnn_60_1.0_SD_100_1652120928_ckpt.16_copy.pth"
-
+  
   # Mask-RCNN and Deblurgan for object detection
   MRCNN: "weights/ikea_apricot_large_only_model_0002999.pth"
   MRCNN_50: "weights/ikea_apricot_r50_normal_100_output_model_0003599.pth"
   DEBLURGAN: "weights/fpn_inception.h5"
   SAM: "weights/sam_vit_h_4b8939.pth"
-  WAYPOINT_ESTIMATION_MODEL: "weights/semantic_place_ee/robopoint-v1-vicuna-v1.5-13b"
+
+WAYPOINT_ESTIMATION_MODEL: "/home/achuthan/Desktop/spot-sim2real/spot_rl_experiments/weights/semantic_place_ee/Molmo-7B-D-0924"
 
 DEVICE: "cuda:0"
 USE_REMOTE_SPOT: False
