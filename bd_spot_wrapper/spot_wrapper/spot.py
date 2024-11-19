@@ -1196,7 +1196,8 @@ class Spot:
         global_T_home = None
         robot_recenter_yaw = None
 
-        print("Updating robot pose w.r.t home in home.txt")
+        # Sleep for 5 seconds to ensure that the robot has settled
+        time.sleep(5)
         _, _, yaw = self.get_xy_yaw(use_boot_origin=True)  # vision_T_body
         local_T_global = self._get_local_T_global()
         global_T_home = np.linalg.inv(local_T_global)
@@ -1208,6 +1209,8 @@ class Spot:
             with open(HOME_TXT, "w") as f:
                 f.write(as_string)
             print(f"Wrote: \n{as_string}\nto: {HOME_TXT}")
+            # Sleep for 5 seconds to ensure the file is written
+            time.sleep(5)
         except Exception:
             print(
                 "Encountered exception while persisting global_T_home into home.txt file",
@@ -1216,7 +1219,6 @@ class Spot:
 
     def read_home_robot(self):
         """Returns - Tuple of global_T_home & robot_recenter_yaw. Both will be None if Home.txt file doesn't exist"""
-        print("Reading robot pose w.r.t home from home.txt")
         global_T_home = None
         robot_recenter_yaw = None
         if osp.isfile(HOME_TXT):

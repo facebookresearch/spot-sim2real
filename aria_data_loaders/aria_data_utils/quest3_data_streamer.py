@@ -352,7 +352,8 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 print(f"Action to publish {action}")
                 if action.get("action", "None") == "pick":
                     setattr(self, "picked_object", action.get("object", "None"))
-                location_str = "unknown"
+                location_str = ["%.1f" % v for v in action["location"]]
+                location_str = "; ".join(location_str)  # type: ignore
                 rospy.set_param(
                     "/human_action",
                     f"{str(time.time())},{action.get('action', 'None')},{action.get('object', getattr(self, 'picked_object', 'None'))},[{location_str}]",
@@ -612,17 +613,22 @@ def main(
                     if "None" in human_action
                     else ",".join(human_action.split(",")[1:])
                 )
-                human_action_display = f"Human Action : {human_action}"
+                current_state = data_streamer.har_model.current_state
+                human_action_display = (
+                    f"Human action: {human_action}; State: {current_state}"
+                )
+
                 vis_image = cv2.putText(
                     vis_image,
                     human_action_display,
                     (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1,
+                    0.9,
                     (0, 0, 255),
                     2,
                     cv2.LINE_AA,
                 )
+
                 cv2.imshow("HAR", vis_image)
                 cv2.waitKey(1)
             else:

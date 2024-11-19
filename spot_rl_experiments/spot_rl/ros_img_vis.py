@@ -8,6 +8,7 @@ import os
 import os.path as osp
 import time
 from collections import deque
+from typing import List
 
 import cv2
 import numpy as np
@@ -28,6 +29,9 @@ PROCESSED_IMG_TOPICS = [
 
 FOUR_CC = cv2.VideoWriter_fourcc(*"MP4V")
 FPS = 30
+TEXT_FOR_LSC_DEMO = (
+    False  # flag to show the navigate/pick/place information on the side of the image
+)
 
 
 class VisualizerMixin:
@@ -42,6 +46,12 @@ class VisualizerMixin:
         self.dim = None
         self.new_video_started = False
         self.named_window = "ROS Spot Images"
+        self._click = False
+
+        if not TEXT_FOR_LSC_DEMO:
+            self._cur_human_action = "None"
+            self._has_display_since_time = time.time()
+            self._llm_action = ""
 
     def generate_composite(self):
         raise NotImplementedError
@@ -171,6 +181,14 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
         self.fps = {topic: deque(maxlen=10) for topic in self.msgs.keys()}
 
+    def beautify_human_action_str(self, msg):
+        msg = msg.split(",")
+        if len(msg) < 2:
+            return "None"
+        else:
+            msg = f"{msg[0]} {msg[1]}"
+            return msg
+
     def generate_composite(self):
         if not any(self.updated.values()):
             # No imgs were refreshed. Skip.
@@ -209,25 +227,175 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             print("Cannot np.vstack image, skipping...")
             return
 
-        # Add Pick receptacle, Object, Place receptacle information on the side
-        pck = rospy.get_param("/viz_pick", "None")
-        obj = rospy.get_param("/viz_object", "None")
-        plc = rospy.get_param("/viz_place", "None")
-        information_string = (
-            "Pick from:\n"
-            + pck
-            + "\n\nObject Target:\n"
-            + obj
-            + "\n\nPlace to:\n"
-            + plc
-        )
-        display_img = 255 * np.ones(
-            (img.shape[0], int(img.shape[1] / 4), img.shape[2]), dtype=np.uint8
-        )
-        display_img = self.overlay_text(
-            display_img, information_string, color=(255, 0, 0), size=0.9, thickness=4
-        )
-        img = resize_to_tallest([img, display_img], hstack=True)
+        if TEXT_FOR_LSC_DEMO:
+            # Add Pick receptacle, Object, Place receptacle information on the side
+            pck = rospy.get_param("/viz_pick", "None")
+            obj = rospy.get_param("/viz_object", "None")
+            plc = rospy.get_param("/viz_place", "None")
+            information_string = (
+                "Pick from:\n"
+                + pck
+                + "\n\nObject Target:\n"
+                + obj
+                + "\n\nPlace to:\n"
+                + plc
+            )
+            display_img = 255 * np.ones(
+                (img.shape[0], int(img.shape[1] / 4), img.shape[2]), dtype=np.uint8
+            )
+            display_img = self.overlay_text(
+                display_img,
+                information_string,
+                color=(255, 0, 0),
+                size=0.9,
+                thickness=4,
+            )
+            img = resize_to_tallest([img, display_img], hstack=True)
+        else:
+            display_img = 255 * np.ones(
+                (int(img.shape[0] * 1.5), img.shape[1], img.shape[2]), dtype=np.uint8
+            )
+
+            # Get the LLM generated thought, robot action, skill execution result
+            llm_raw_msg = rospy.get_param("llm_raw_msg", "")
+            llm_raw_msg = llm_raw_msg.split("\n")
+            if len(llm_raw_msg) == 4:
+                llm_thought, llm_action, _, _ = llm_raw_msg
+                llm_thought = llm_thought.replace(",", ",\n")
+                llm_thought = llm_thought.replace(".", ".\n")
+                llm_thought = llm_thought.rstrip()
+            else:
+                llm_thought = "Thought: None"
+                llm_action = "None"
+
+            # Update the current robot action
+            if llm_action != "None":
+                if "Place" in llm_action:
+                    llm_action = llm_action.split(",")
+                    llm_action = llm_action[:-2]
+                    llm_action = ",".join(llm_action)
+                    self._llm_action = llm_action + "]"
+                else:
+                    self._llm_action = llm_action
+
+            # Get the skill execution result
+            llm_action_result = rospy.get_param(
+                "skill_name_suc_msg", f"{str(time.time())},{None},{None},{None}"
+            )
+            llm_action_msg = ",".join(llm_action_result.split(",")[3:])
+            llm_action_msg = llm_action_msg.replace(",", ",\n")
+            llm_action_msg = llm_action_msg.replace(".", ".\n")
+            llm_action_msg = llm_action_msg.rstrip()
+            information_string = f"{llm_thought}\nRobot action: {llm_action}"
+
+            # Get human action
+            human_action = rospy.get_param(
+                "human_action", f"{str(time.time())},None,None,None"
+            )
+            human_action = (
+                "None"
+                if "None" in human_action
+                else ",".join(human_action.split(",")[1:])
+            )
+
+            if human_action != "None":
+                # If there is a human action, we update the string immediately
+                self._cur_human_action = human_action
+                # Set the timer
+                self._has_display_since_time = time.time()
+            elif (
+                human_action == "None"
+                and time.time() - self._has_display_since_time < 10
+            ):
+                # If human action is None, we wait for this many seconds to display things for better visualization
+                self._cur_human_action = self._cur_human_action
+            else:
+                self._cur_human_action = "None"
+
+            information_string += f"\nHuman action: {self.beautify_human_action_str(self._cur_human_action)}"
+
+            # Get the world graph string
+            world_graph_simple_viz = rospy.get_param("world_graph_simple_viz", "")
+            world_graph_simple_viz = world_graph_simple_viz.replace(": ", " on ")
+
+            # Format the string with world graph string and skill execution result
+            information_string += f"\nWorld graph:\n{world_graph_simple_viz}\nResult of {self._llm_action}: {llm_action_msg}"
+
+            # Finally, add the text into the image
+            display_img = self.overlay_text(
+                display_img,
+                information_string,
+                color=(255, 0, 0),
+                size=0.8,
+                thickness=3,
+            )
+            img = np.concatenate((img, display_img), axis=0)
+
+            # Add human_type_msg button for human intervention
+            human_done_button = {"upper_left": (4850, 800), "bottom_right": (4950, 900)}
+
+            def onMouse(event, x, y, flags, param):
+                if event == cv2.EVENT_LBUTTONDOWN:
+                    if (
+                        human_done_button["upper_left"][0]
+                        < x
+                        < human_done_button["bottom_right"][0]
+                        and human_done_button["upper_left"][1]
+                        < y
+                        < human_done_button["bottom_right"][1]
+                    ):
+                        self._click = True
+
+            cv2.setMouseCallback(self.named_window, onMouse)
+            # add button
+            if self._click:
+                cv2.rectangle(
+                    img,
+                    (
+                        human_done_button["upper_left"][0],
+                        human_done_button["upper_left"][1],
+                    ),
+                    (
+                        human_done_button["bottom_right"][0],
+                        human_done_button["bottom_right"][1],
+                    ),
+                    (0, 0, 255),
+                    -1,
+                )
+                self._click = False
+                rospy.set_param(
+                    "human_type_msg",
+                    f"{time.time()},task is done, you do not do anything",
+                )
+            else:
+                cv2.rectangle(
+                    img,
+                    (
+                        human_done_button["upper_left"][0],
+                        human_done_button["upper_left"][1],
+                    ),
+                    (
+                        human_done_button["bottom_right"][0],
+                        human_done_button["bottom_right"][1],
+                    ),
+                    (5, 133, 5),
+                    -1,
+                )
+
+            # Put the text next to the button
+            cv2.putText(
+                img,
+                "Human Force Stop",
+                (
+                    human_done_button["upper_left"][0] - 85,
+                    human_done_button["upper_left"][1] - 15,
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (0, 0, 0),
+                3,
+                lineType=cv2.LINE_AA,
+            )
 
         for topic in refreshed_topics:
             curr_time = time.time()
