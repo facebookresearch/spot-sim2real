@@ -610,6 +610,7 @@ if __name__ == "__main__":
             np.array(bbox_info["bbox_center"]),  # type: ignore
             np.array(bbox_info["bbox_extent"]),  # type: ignore
             [curr_x, curr_y],
+            None,
             VISUALIZE,
             osp.join(PATH_PLANNING_VISUALIZATION_FOLDER, f"{receptacle_name}.png"),
         )

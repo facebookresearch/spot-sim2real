@@ -837,6 +837,7 @@ if __name__ == "__main__":
     multi_object_prompts = (
         "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup"
     )
+    # Additional object: baseball bat,baseball glove,shoes,clock,hat,drill machine
 
     rospy.set_param(
         "multi_class_object_target",
