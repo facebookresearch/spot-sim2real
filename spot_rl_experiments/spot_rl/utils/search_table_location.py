@@ -478,7 +478,7 @@ def detect_place_point_by_pcd_method(
     spot.set_arm_joint_positions(np.deg2rad(gaze_arm_angles), 1)
 
     # Wait for a bit to stabalized the gripper
-    time.sleep(1.5)
+    time.sleep(1.0)
 
     (
         img,
