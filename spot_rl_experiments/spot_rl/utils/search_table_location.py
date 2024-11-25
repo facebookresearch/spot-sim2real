@@ -582,7 +582,7 @@ def detect_place_point_by_pcd_method(
     # convert_point_in_body_to_place_waypoint(point_in_body, spot)
 
     # Static Offset adjustment
-    placexyz[0] += 0.10
+    placexyz[0] += 0.0
     placexyz[2] += height_adjustment_offset
 
     return placexyz, selected_point_in_gripper, edge_point_in_base, img_with_bbox
