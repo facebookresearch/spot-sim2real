@@ -15,7 +15,7 @@ if __name__ == "__main__":
     )
     place_target = "fre_lab_32in_sep"
     spotskillmanager = SpotSkillManager(
-        use_mobile_pick=True, use_semantic_place=True, use_place_ee=True
+        use_mobile_pick=True, use_semantic_place=True, use_place_ee=False
     )
     is_local = False
     if enable_estimation_before_place:

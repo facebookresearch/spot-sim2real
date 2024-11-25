@@ -602,10 +602,10 @@ class SpotSkillManager:
 
             conditional_print(message=message, verbose=self.verbose)
             is_local = True
-            percentile = 0 if visualize else 70
+            percentile = 0 if visualize else 30
             if self.allow_semantic_place and self.use_place_ee:
                 height_adjustment_threshold = 0.1
-                percentile = 0 if visualize else 50
+                percentile = 0 if visualize else 30
             elif self.allow_semantic_place:
                 height_adjustment_threshold = 0.05
             else:
