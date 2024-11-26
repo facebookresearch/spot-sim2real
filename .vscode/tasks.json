@@ -1,0 +1,190 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "roscore",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "$CONDA_PREFIX/bin/roscore"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "img_pub",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 5 && $CONDA_PREFIX/bin/python -m spot_rl.utils.img_publishers --local"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": false
+      },
+      {
+        "label": "propio_pub",
+        "type": "shell",
+        "command": "bash",
+
+        "args": [
+          "-c",
+          "sleep 5 && echo $SPOT_IP && $CONDA_PREFIX/bin/python -m spot_rl.utils.helper_nodes --proprioception"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "tts_sub",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 5 && $CONDA_PREFIX/bin/python -m spot_rl.utils.helper_nodes --text-to-speech"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "spotWorld_static_tf2_pub_to_spot_world",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 5 && rosrun tf2_ros static_transform_publisher 0 0 0 0 0 0 /map /spotWorld"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "spotWorld_static_tf2_pub_to_spot_world_to_marker",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 5 && rosrun tf2_ros static_transform_publisher -0.67314154  0.03823617  0.01069196 0.5016031  -0.49577103  0.50112072 -0.50148124 /spotWorld /marker"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "ros_bridge_server",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 5 && roslaunch rosbridge_server rosbridge_tcp.launch"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "img_vis",
+        "type": "shell",
+        "command": "bash",
+        "args": [
+          "-c",
+          "sleep 5 && spot_rl_ros_img_vis"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "never",
+          "focus": true,
+          "panel": "dedicated",
+          "showReuseMessage": false,
+          "group": "spot",
+          "clear": true
+        },
+        "hide": true
+      },
+      {
+        "label": "Run Spot",
+        "dependsOn": [
+          "roscore",
+          "img_pub",
+          "propio_pub",
+          "tts_sub",
+          "spotWorld_static_tf2_pub_to_spot_world",
+          "spotWorld_static_tf2_pub_to_spot_world_to_marker",
+          "ros_bridge_server",
+          "img_vis"
+        ],
+        "problemMatcher": [],
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": true,
+          "panel": "shared",
+          "group": "spot",
+          "showReuseMessage": false,
+          "clear": true
+        }
+      }
+    ]
+  }
+  
