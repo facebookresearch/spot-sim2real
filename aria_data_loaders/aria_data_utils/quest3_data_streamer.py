@@ -579,9 +579,9 @@ def main(
         outputs = data_streamer.initialize_object_detector(
             outputs=outputs,
             object_labels=[
-                "pineapple plush toy",
-                "pink donut plush toy",
-                "avocado plush toy",
+                # "pineapple plush toy",
+                # "pink donut plush toy",
+                # "avocado plush toy",
                 "cup",
                 "bottle",
                 "can",
