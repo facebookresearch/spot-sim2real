@@ -834,9 +834,8 @@ if __name__ == "__main__":
         default="owlvit",
         help="bounding box detector model to use (owlvit or maskrcnn)",
     )
-    multi_object_prompts = (
-        "pink donut plush toy,pineapple plush toy,avocado plush toy,bottle,can,cup"
-    )
+    # removing avocado plush toy since we are working with pineapple toy for Dec3 demo & it may cause confusions
+    multi_object_prompts = "pink donut plush toy,pineapple plush toy,bottle,can,cup"
     # Additional object: baseball bat,baseball glove,shoes,clock,hat,drill machine
 
     rospy.set_param(
