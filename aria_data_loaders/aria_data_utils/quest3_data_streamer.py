@@ -45,7 +45,7 @@ from perception_and_utils.utils.conversions import (
 from spot_rl.utils.utils import ros_frames as rf
 
 FILTER_DIST = 0.6  # in metres, the QR registration on Quest3 is REALLY bad beyond 0.6m
-NUM_OF_FRAME_OBJECT_DETECTED = 2
+NUM_OF_FRAME_OBJECT_DETECTED = 1
 
 
 class Quest3DataStreamer(HumanSensorDataStreamerInterface):
@@ -579,12 +579,13 @@ def main(
         outputs = data_streamer.initialize_object_detector(
             outputs=outputs,
             object_labels=[
+                # Remove the following objects from the list since they confuse the detection
                 # "pineapple plush toy",
                 # "pink donut plush toy",
                 # "avocado plush toy",
                 "cup",
                 "bottle",
-                "can",
+                # "can",
             ],
         )
         data_streamer.initialize_human_motion_detector()
