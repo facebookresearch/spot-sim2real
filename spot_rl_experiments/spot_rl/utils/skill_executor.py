@@ -104,8 +104,7 @@ class SpotRosSkillExecutor:
                 not in rospy.get_param(
                     "/human_action", f"{str(time.time())},None,None,None"
                 )
-                # allow interruption for pick
-                and skill_name not in ["place"]
+                and skill_name not in ["place", "pick"]
                 and not is_exploring
             ):
                 human_action_str = rospy.get_param("/human_action")
