@@ -332,7 +332,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             img = np.concatenate((img, display_img), axis=0)
 
             # Add human_type_msg button for human intervention
-            human_done_button = {"upper_left": (4850, 800), "bottom_right": (4950, 900)}
+            human_done_button = {
+                "upper_left": (2050, 2300),
+                "bottom_right": (2050 + 100, 2300 + 100),
+            }
 
             def onMouse(event, x, y, flags, param):
                 if event == cv2.EVENT_LBUTTONDOWN:
