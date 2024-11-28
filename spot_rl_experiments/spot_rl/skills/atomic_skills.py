@@ -196,7 +196,7 @@ class Skill:
             # Do not interrupt pick and place skills when human does something
             if (
                 "None" not in human_action
-                and begin_skill_name not in ["place"]  # allow interruption for pick
+                and begin_skill_name not in ["place", "pick"]
                 and not is_exploring
             ):
                 done = True
