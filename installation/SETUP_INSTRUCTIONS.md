@@ -285,10 +285,4 @@ Installing the pre-commit allows you to run automatic pre-commit while running `
 pre-commit install
 ```
 
-### Creating an account on CircleCI
-- Since we have integrated CircleCI tests on this repo, you would need to create and link your CircleCI account
-- You can create your account from this link (https://app.circleci.com/). Once you have created the account, go to "Organization Settings", on the left tab click on "VCS"
-- Finally click on "Manage GitHub Checks". CircleCI will request access to `facebookresearch` org owner.
-`
-
 ### For folks running Aria-Spot codebase, please also refer to the additonal setup steps [mentioned in this readme](/aria_data_loaders/README.md)
