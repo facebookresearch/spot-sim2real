@@ -124,7 +124,13 @@ class SpotLocalRawImagesPublisher(SpotImagePublisher):
         image_responses = self.spot.get_image_responses(
             self.sources[:2], quality=100, await_the_resp=False
         )
-        hand_image_responses = self.spot.get_hand_image()
+
+        try:
+            hand_image_responses = self.spot.get_hand_image()
+        except Exception as e:
+            print(f"Intel RS issue due to {e}, use gripper image")
+            hand_image_responses = self.spot.get_hand_image(force_get_gripper=True)
+
         image_responses = image_responses.result()
         image_responses.extend(hand_image_responses)
 
@@ -544,7 +550,7 @@ class SpotOpenVocObjectDetectorPublisher(SpotProcessedImagesPublisher):
         pixel_uv,
         depth_raw,
         camera_intrinsics,
-        patch_size=40,
+        patch_size=20,
         default_z: float = None,
         return_z=False,
     ):
