@@ -1,0 +1,27 @@
+name: Run pre-commit
+on:
+  pull_request: {}
+  push:
+    branches:
+    - main
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4.1.1
+    - name: Setup python
+      uses: actions/setup-python@v5.0.0
+      with:
+        python-version: '3.9.16'
+    - name: install dependencies
+      run: |-
+        pip install -U pip setuptools pre-commit
+        # Install the hooks now so that they'll be cached
+        pre-commit install-hooks
+    - name: Check Code Style using pre-commit
+      run: |-
+        SKIP=eslint pre-commit run --show-diff-on-failure --all-files
+    #NOTE: use the below to debug with ssh: simply move this "job" just before the crashing job to intercept the workflow
+    #- name: Debugging with tmate
+    #  uses: mxschmitt/action-tmate@v3.18
