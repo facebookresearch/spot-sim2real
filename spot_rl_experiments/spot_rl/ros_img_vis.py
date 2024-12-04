@@ -6,6 +6,7 @@
 import argparse
 import os
 import os.path as osp
+import pickle
 import time
 from collections import deque
 from typing import List
@@ -107,6 +108,8 @@ class VisualizerMixin:
             if key != -1:
                 if ord("r") == key and not currently_saving:
                     self.recording = not self.recording
+                elif ord("s") == key:
+                    self.save_data()
                 elif ord("q") == key:
                     exit()
 
@@ -126,6 +129,11 @@ class VisualizerMixin:
 
         if currently_saving and not self.recording:
             self.save_video()
+
+    def save_data(self):
+        with open("filename.pickle", "wb") as handle:
+            pickle.dump(self.data_logger, handle)
+        print("Data saved!")
 
     def save_video(self):
         if self.video is None:
@@ -180,6 +188,7 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         super().__init__(*args, **kwargs)
         self.last_seen = {topic: time.time() for topic in self.msgs.keys()}
         self.fps = {topic: deque(maxlen=10) for topic in self.msgs.keys()}
+        self.data_logger = []
 
     def beautify_human_action_str(self, msg):
         msg = msg.split(",")
@@ -215,6 +224,9 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
         if raw_msgs[1] is not None:
             for imgs in [raw_imgs, processed_imgs]:
                 imgs[1] = imgs[1][:, 124:-60]
+
+        cur_data_display = {"cur_time": time.time()}
+
         try:
             img = np.vstack(
                 [
@@ -223,8 +235,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
                 ]
             )
             # The normal size of the images is 480x2279x3.
+            cur_data_display["images"] = img
         except Exception:
             print("Cannot np.vstack image, skipping...")
+            cur_data_display["images"] = None
             return
 
         if TEXT_FOR_LSC_DEMO:
@@ -321,6 +335,8 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
             # Format the string with world graph string and skill execution result
             information_string += f"\nWorld graph:\n{world_graph_simple_viz}\nResult of {self._llm_action}: {llm_action_msg}"
 
+            cur_data_display["information_string"] = information_string
+
             # Finally, add the text into the image
             display_img = self.overlay_text(
                 display_img,
@@ -408,6 +424,10 @@ class SpotRosVisualizer(VisualizerMixin, SpotRobotSubscriberMixin):
 
         all_topics = RAW_IMG_TOPICS + PROCESSED_IMG_TOPICS
         print(" ".join([f"{k[1:]}: {np.mean(self.fps[k]):.2f}" for k in all_topics]))
+
+        cur_data_display["the_final_image"] = img
+
+        self.data_logger.append(cur_data_display.copy())
 
         return img
 
