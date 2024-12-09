@@ -199,6 +199,7 @@ class Skill:
                 and begin_skill_name not in ["place", "pick"]
                 and not is_exploring
             ):
+                print(f"{human_action=}  {begin_skill_input=}  {is_exploring=}")
                 done = True
 
             curr_pose = [
@@ -230,6 +231,9 @@ class Skill:
                 cur_skill_name != begin_skill_name
                 or cur_skill_input != begin_skill_input
             ):
+                print(
+                    f"{cur_skill_name=}    {cur_skill_input=}   {begin_skill_name=}    {begin_skill_input=}"
+                )
                 done = True
             self.previous_human_activity = current_human_action
 

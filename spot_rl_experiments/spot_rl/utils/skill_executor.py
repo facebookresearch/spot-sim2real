@@ -214,6 +214,7 @@ class SpotRosSkillExecutor:
         # Get the current skill name
         skill_log = {"success": False, "num_steps": 0}
         skill_name, skill_input = get_skill_name_and_input_from_ros()
+        print(f"{str(time.time())}  {skill_name=}  {skill_input=}")
         final_success = True
         metric_list = []
         # Power on the robot if the robot was in the dock
@@ -497,6 +498,9 @@ class SpotRosSkillExecutor:
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("/viz_object", "None")
             rospy.set_param("skill_in_execution_lock", False)
+            print(
+                f"`````````````````````````````````````````````````````````````````````` DONE WITH PICK : {succeded=}"
+            )
         elif skill_name == "place":
             rospy.set_param("skill_in_execution_lock", True)
             print(f"current skill_name {skill_name} skill_input {skill_input}")
@@ -530,7 +534,9 @@ class SpotRosSkillExecutor:
             if "num_steps" not in skill_log:
                 skill_log["num_steps"] = 0
             self.episode_log["actions"].append({"place": skill_log})
-
+            print(
+                f"`````````````````````````````````````````````````````````````````````` DONE WITH PLACe : {succeded=}"
+            )
             self.reset_skill_name_input(skill_name, succeded, msg)
             rospy.set_param("skill_in_execution_lock", False)
         elif skill_name == "opendrawer":
