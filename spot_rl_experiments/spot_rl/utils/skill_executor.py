@@ -267,12 +267,12 @@ class SpotRosSkillExecutor:
                         "/human_type_msg", f"{str(time.time())},None"
                     )
                     human_type_msg = human_type_msg.split(",")[1]
-                    if is_exploring and ENABLE_ARM_SCAN and human_type_msg == "None":
-                        scan_arm(
-                            self.spotskillmanager.spot,
-                            publisher=self.detection_publisher,
-                            enable_object_detector_during_movement=False,
-                        )
+                    # if is_exploring and ENABLE_ARM_SCAN and human_type_msg == "None":
+                    #     scan_arm(
+                    #         self.spotskillmanager.spot,
+                    #         publisher=self.detection_publisher,
+                    #         enable_object_detector_during_movement=False,
+                    #     )
 
                     if not succeded and not is_exploring:
                         break
@@ -453,12 +453,12 @@ class SpotRosSkillExecutor:
                         "/human_type_msg", f"{str(time.time())},None"
                     )
                     human_type_msg = human_type_msg.split(",")[1]
-                    if ENABLE_ARM_SCAN and human_type_msg == "None":
-                        scan_arm(
-                            self.spotskillmanager.spot,
-                            publisher=self.detection_publisher,
-                            enable_object_detector_during_movement=False,
-                        )
+                    # if ENABLE_ARM_SCAN and human_type_msg == "None":
+                    #     scan_arm(
+                    #         self.spotskillmanager.spot,
+                    #         publisher=self.detection_publisher,
+                    #         enable_object_detector_during_movement=False,
+                    #     )
                     flag = self._use_continuos_dwg_or_stop_add == "continous"
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},{flag}"

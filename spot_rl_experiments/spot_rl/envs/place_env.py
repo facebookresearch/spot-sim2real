@@ -293,6 +293,7 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
             place = self.heuristic_should_place()
 
         if place:
+            self.say("SpotSemanticPlaceEEEnv :: Turning wrist before place")
             self.turn_wrist_place()
 
         self._time_step += 1

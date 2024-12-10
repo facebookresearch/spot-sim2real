@@ -122,6 +122,7 @@ def construct_config_for_semantic_place(file_path=None, opts=[]):
     else:
         config = construct_config(file_path=file_path, opts=opts)
 
+    # config.MAX_EPISODE_STEPS = 10
     # Don't need cameras for Place
     config.USE_HEAD_CAMERA = False
     config.USE_MRCNN = True

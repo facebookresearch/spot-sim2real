@@ -154,6 +154,7 @@ class Skill:
         try:
             observations = self.reset_skill(goal_dict)
         except Exception as e:
+            print("Exeption occured in reset_skill : ", traceback.format_exc())
             raise e
         done = False
 
@@ -164,6 +165,7 @@ class Skill:
         current_human_action = self.env.human_activity_current.copy()  # type: ignore
         is_exploring = rospy.get_param("nav_velocity_scaling", 1.0) != 1.0
 
+        env_done = False
         # Execution Loop
         while not done:
             # The current formate is timestamp, action, object_name, target_receptacle.
@@ -192,7 +194,7 @@ class Skill:
                 self.env.y,  # type: ignore
             ]
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
-
+            env_done = done
             # Do not interrupt pick and place skills when human does something
             if (
                 "None" not in human_action
@@ -200,6 +202,7 @@ class Skill:
                 and not is_exploring
             ):
                 print(f"{human_action=}  {begin_skill_input=}  {is_exploring=}")
+                print("Setting done to True because human agent did an action and I am not in pick or place")
                 done = True
 
             curr_pose = [
@@ -235,6 +238,7 @@ class Skill:
                     f"{cur_skill_name=}    {cur_skill_input=}   {begin_skill_name=}    {begin_skill_input=}"
                 )
                 done = True
+                print("Setting done to True as skill name or input is differnt from the one at the beginning.")
             self.previous_human_activity = current_human_action
 
             # Human types something to interrupt the skill directly
@@ -249,6 +253,7 @@ class Skill:
             except Exception:
                 print("Cannot read from human_type_msg")
 
+        print(f"Env_done : {env_done=}  .. Done : {done=}")
         # Update logged data after finishing execution and get feedback (status & msg)
         return self.update_and_check_status(goal_dict)
 
@@ -954,6 +959,7 @@ class Place(Skill):
         except Exception as e:
             message = f"Error encountered while placing : {e}"
             conditional_print(message=message, verbose=self.verbose)
+            print(traceback.format_exc())
 
         return status, message
 
@@ -1033,8 +1039,8 @@ class Place(Skill):
         self.skill_result_log["time_taken"] = time.time() - self.start_time
         self.skill_result_log["success"] = check_place_success
 
-        # Open gripper to drop the object
-        self.spot.open_gripper()
+        # # Open gripper to drop the object
+        # self.spot.open_gripper()
         # Add sleep as open_gripper() is a non-blocking call
         time.sleep(1)
 
@@ -1105,8 +1111,8 @@ class SemanticPlace(Place):
         self.skill_result_log["time_taken"] = time.time() - self.start_time
         self.skill_result_log["success"] = check_place_success
 
-        # Open gripper to drop the object
-        self.spot.open_gripper()
+        # # Open gripper to drop the object
+        # self.spot.open_gripper()
         # Add sleep as open_gripper() is a non-blocking call
         time.sleep(1)
 
