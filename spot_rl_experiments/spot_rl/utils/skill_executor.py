@@ -7,6 +7,7 @@ import json
 import os
 import os.path as osp
 import pickle
+import sys
 import threading
 import time
 import traceback
@@ -591,21 +592,30 @@ def main():
     parser.add_argument("--useful_parameters", action="store_true")
     _ = parser.parse_args()
 
-    while True:
-        reset_ros_param()
-        # Call the skill manager
-        spotskillmanager = SpotSkillManager(
-            use_mobile_pick=True, use_semantic_place=True, use_place_ee=True
-        )
-        executor = None
+    try:
+        while True:
+            reset_ros_param()
+            # Call the skill manager
+            spotskillmanager = SpotSkillManager(
+                use_mobile_pick=True, use_semantic_place=True, use_place_ee=True
+            )
+            executor = None
+            try:
+                rospy.set_param("skill_in_execution_lock", False)
+                executor = SpotRosSkillExecutor(spotskillmanager)
+                # While loop to run in the background
+                while not rospy.is_shutdown() and not executor.end:
+                    executor.execute_skills()
+            except Exception as e:
+                print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
+    except KeyboardInterrupt:
+        print("Interrupted")
         try:
-            rospy.set_param("skill_in_execution_lock", False)
-            executor = SpotRosSkillExecutor(spotskillmanager)
-            # While loop to run in the background
-            while not rospy.is_shutdown() and not executor.end:
-                executor.execute_skills()
-        except Exception as e:
-            print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
+            print("sys exit")
+            sys.exit(0)
+        except SystemExit:
+            print("os exit")
+            os._exit(0)
 
 
 if __name__ == "__main__":
