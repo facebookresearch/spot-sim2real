@@ -7,6 +7,7 @@ import json
 import os
 import os.path as osp
 import pickle
+import sys
 import threading
 import time
 import traceback
@@ -606,6 +607,7 @@ def main():
                 executor.execute_skills()
         except Exception as e:
             print(f"Ending script: {e}\n Full exception : {traceback.print_exc()}")
+            sys.exit()
 
 
 if __name__ == "__main__":
