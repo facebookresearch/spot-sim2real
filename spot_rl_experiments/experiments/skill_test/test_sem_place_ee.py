@@ -36,7 +36,7 @@ if __name__ == "__main__":
         spotskillmanager.place(
             place_target,
             is_local=is_local,
-            visualize=False,
+            visualize=True,
             enable_waypoint_estimation=enable_estimation_before_place,
         )
         skill_log = spotskillmanager.place_controller.skill_result_log

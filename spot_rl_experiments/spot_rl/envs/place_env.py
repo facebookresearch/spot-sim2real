@@ -311,4 +311,5 @@ class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
             del observations["joint"]
         xyz, rpy = self.spot.get_ee_pos_in_body_frame()
         observations["ee_pose"] = np.concatenate([xyz, rpy])
+        print(observations)
         return observations

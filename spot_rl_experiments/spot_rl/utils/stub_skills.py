@@ -91,7 +91,7 @@ def execute_skills():
                 bbox_extent,
                 [1, 0],
                 None,
-                True,
+                False,
                 "simpathplanning.png",
             )
         reset_skill_msg()
