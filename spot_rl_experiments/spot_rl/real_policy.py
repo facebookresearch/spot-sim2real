@@ -87,7 +87,7 @@ class RealPolicy:
             )
         else:
             if isinstance(checkpoint_path, str):
-                checkpoint = torch.load(checkpoint_path, map_location="cpu")
+                checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
             else:
                 checkpoint = checkpoint_path
 
@@ -546,7 +546,7 @@ class MixerPolicy(RealPolicy):
                 ),
             }
         )
-        checkpoint = torch.load(mixer_checkpoint_path, map_location="cpu")
+        checkpoint = torch.load(mixer_checkpoint_path, map_location="cpu", weights_only=True)
         checkpoint["config"].RL.POLICY["nav_checkpoint_path"] = nav_checkpoint_path
         checkpoint["config"].RL.POLICY["gaze_checkpoint_path"] = gaze_checkpoint_path
         checkpoint["config"].RL.POLICY["place_checkpoint_path"] = place_checkpoint_path
