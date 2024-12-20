@@ -15,7 +15,7 @@ from perception_and_utils.utils.image_utils import (
     centered_object_detection_heuristic,
     check_bbox_intersection,
 )
-from spot_rl.models.owlvit import OwlVit
+from perception_and_utils.perception.models.owlvit import OwlVit
 
 
 class ObjectDetectorWrapper(GenericDetector):
