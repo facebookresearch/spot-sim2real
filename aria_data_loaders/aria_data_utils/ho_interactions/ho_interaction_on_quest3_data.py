@@ -268,6 +268,9 @@ class HumanObjectInteractions():
         if viz_img is None:
             self.logger.warning("No image found in frame")  # This gets over-written.. WASTE!
 
+        if detect_objects:
+            viz_img, detections = self.object_detector.process_frame(data_frame)
+
         if detect_human_action:
             action = {}
             har_output_img, har_output_dict = self.har_model.process_frame(data_frame)
@@ -280,7 +283,6 @@ class HumanObjectInteractions():
                 .numpy()
                 .tolist()
             )
-            viz_img, detections = self.object_detector.process_frame(data_frame)
 
             if har_output_dict.get("action_trigger", None) is not None:
 
@@ -299,7 +301,6 @@ class HumanObjectInteractions():
             if self.finding_object_stage:
                 max_iou = 0.0
                 arg_max_indx = -1
-                print(detections)
                 for det_indx, det in enumerate(detections):
                     print("Object-name:", det[0], "; Score:", det[1], "; Bbox:", det[2])
                     try:
