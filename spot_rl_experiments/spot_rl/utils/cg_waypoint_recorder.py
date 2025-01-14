@@ -6,7 +6,7 @@
 import json
 import os.path as osp
 import sys
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 from spot_rl.utils.generate_place_goal import get_global_place_target
@@ -47,34 +47,6 @@ class JsonHandler:
 
     [
         {
-            "object1": {
-                "id": 1,
-                "object_tag": "dummy_object_1",
-                "bbox_extent": [
-                    0.1,
-                    0.1,
-                    0.1
-                ],
-                "bbox_center": [
-                    3.9,
-                    -4.2,
-                    0.7
-                ],
-                "category_tag": "object",
-                "orginal_class_name": "frog plush toy",
-                "on_top_of": "dummy_furniture_2",
-                "aa_z_rotated_bbox_center": [
-                    5.41788021636613,
-                    4.742881287864651,
-                    -0.35030203068967886
-                ],
-                "aa_z_rotated_bbox_extent": [
-                    0.1,
-                    0.1,
-                    0.1
-                ],
-                "aa_z_rotated_bbox_yaw_degrees": -160.10377552618712
-            },
             "object2": {
                 "id": 2,
                 "object_tag": "dummy_furniture_2",
@@ -171,61 +143,60 @@ class JsonHandler:
             json.dump(cg_json, f, indent=4)
 
 
-# class CGWaypointRecorder:
-#     """
-#     Class to record waypoints and clutter targets for the Spot robot
+class CGWaypointRecorder:
+    """
+        Class to record object & furniture relations (i.e. CG file) for Spot robot (world model)
 
-#     How to use:
-#     1. Create an instance of this class
-#     2. Call the record_nav_target method with the nav_target_name as an argument (str)
-#     3. Call the record_clutter_target method with the clutter_target_name as an argument (str)
-#     4. Call the record_place_target method with the place_target_name as an argument (str)
-#     5. Call the save_yaml method to save the waypoints to the yaml file
-
-
-#     Args:
-#         spot (Spot): Spot robot object
-#         waypoint_file_path (str): path to yaml file to save waypoints to
+        How to use:
+        1. Create an instance of this class
+        # 2. Call the record_nav_target method with the nav_target_name as an argument (str)
+        # 3. Call the record_clutter_target method with the clutter_target_name as an argument (str)
+        # 4. Call the record_place_target method with the place_target_name as an argument (str)
+        # 5. Call the save_yaml method to save the waypoints to the yaml file
 
 
-#     Example:
-#     waypoint_recorder = WaypointRecorder(spot=Spot)
-#     waypoint_recorder.record_nav_target("test_nav_target")
-#     waypoint_recorder.record_clutter_target("test_clutter_target")
-#     waypoint_recorder.record_place_target("test_place_target")
-#     waypoint_recorder.save_yaml()
-#     """
+        Args:
+            spot (Spot): Spot robot object
+            waypoint_file_path (str): path to json file to save waypoints into
 
-#     def __init__(self, spot: Spot, waypoint_file_path: str = WAYPOINT_YAML):
-#         self.spot = spot
 
-#         # Local copy of waypoints.yaml which keeps getting updated as new waypoints are added
-#         self.waypoint_file = waypoint_file_path
-#         self.yaml_handler = YamlHandler()
-#         self.yaml_dict = {}  # type: Dict
+        Example:
+        waypoint_recorder = WaypointRecorder(spot=Spot)
+    #     waypoint_recorder.record_nav_target("test_nav_target")
+    #     waypoint_recorder.record_clutter_target("test_clutter_target")
+    #     waypoint_recorder.record_place_target("test_place_target")
+        waypoint_recorder.save_yaml()
+    #"""
 
-#     def init_yaml(self):
-#         """
-#         Initialize member variable `self.yaml_dict` with the contents of the yaml file as a dict if it is not initialized.
-#         """
-#         if self.yaml_dict == {}:
-#             self.yaml_dict = self.yaml_handler.read_yaml(
-#                 waypoint_file=self.waypoint_file
-#             )
+    def __init__(self, spot: Spot, waypoint_file_path: str = CG_WAYPOINT_YAML):
+        self.spot = spot
 
-#     def save_yaml(self):
-#         """
-#         Save the waypoints (self.yaml_dict) to the yaml file if it is not empty.
-#         It will overwrite the existing yaml file if it exists and will create a new one if it does not exist.
-#         """
-#         if self.yaml_dict == {}:
-#             print("No waypoints to save. Exiting...")
-#             return
+        # Local copy of waypoints.yaml which keeps getting updated as new waypoints are added
+        self.waypoint_file = waypoint_file_path
+        self.json_handler = JsonHandler()
+        self.cg_json = []  # type: List[Dict]
 
-#         self.yaml_handler.write_yaml(self.waypoint_file, self.yaml_dict)
-#         print(
-#             f"Successfully saved(/overwrote) all waypoints to file at {self.waypoint_file}:\n"
-#         )
+    def init_json(self):
+        """
+        Initialize member variable `self.cg_json` with the contents of the json file as a List[Dict] if it is not initialized.
+        """
+        if self.cg_json == []:
+            self.cg_json = self.json_handler.read_json(waypoint_file=self.waypoint_file)
+
+    def save_json(self):
+        """
+        Save the waypoints (self.yaml_dict) to the yaml file if it is not empty.
+        It will overwrite the existing yaml file if it exists and will create a new one if it does not exist.
+        """
+        if self.yaml_dict == {}:
+            print("No waypoints to save. Exiting...")
+            return
+
+        self.yaml_handler.write_yaml(self.waypoint_file, self.yaml_dict)
+        print(
+            f"Successfully saved(/overwrote) all waypoints to file at {self.waypoint_file}:\n"
+        )
+
 
 #     def unmark_clutter(self, clutter_target_name: str):
 #         """
@@ -406,7 +377,7 @@ class JsonHandler:
 if __name__ == "__main__":
     # spot = Spot("WaypointRecorder")
     # main(spot)
-    jh = JsonHandler(CG_WAYPOINT_YAML)
+    jh = JsonHandler()
     cg_data = jh.read_json(CG_WAYPOINT_YAML)
     assert cg_data == []
     print("Init cg data after reading ", cg_data)
