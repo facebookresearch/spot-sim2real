@@ -19,7 +19,7 @@ orig_to_alias = {
     "baselines.go_to_waypoint": "spot_rl_go_to_waypoint",
     "utils.autodock": "spot_rl_autodock",
     "utils.waypoint_recorder": "spot_rl_waypoint_recorder",
-    "utils.cg_waypoint_recorder": "spot_rl_cg_recorder"
+    "utils.cg_waypoint_recorder": "spot_rl_cg_recorder",
     "ros_img_vis": "spot_rl_ros_img_vis",
     "launch/core.sh": "spot_rl_launch_core",
     "launch/local_listener.sh": "spot_rl_launch_listener",

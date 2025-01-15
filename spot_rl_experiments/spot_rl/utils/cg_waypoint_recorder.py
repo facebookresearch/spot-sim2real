@@ -10,28 +10,24 @@ from typing import Dict, List
 
 import numpy as np
 from spot_rl.utils.generate_place_goal import get_global_place_target
+from spot_rl.utils.retrieve_robot_poses_from_cg import ROOT_PATH as CG_ROOT_PATH
 from spot_rl.utils.utils import get_default_parser
 from spot_wrapper.spot import Spot
 
-# TODO: Update the path to the json file
-spot_rl_dir = osp.abspath(__file__)
-for _ in range(3):
-    spot_rl_dir = osp.dirname(spot_rl_dir)
-CG_WAYPOINT_YAML = osp.join(spot_rl_dir, "configs/cfslam_object_relations_mock.json")
+CG_WAYPOINT_JSON = osp.join(
+    CG_ROOT_PATH, "sg_cache", "cfslam_object_relations_mock.json"
+)
 
 
 def parse_arguments(args):
     parser = get_default_parser()
-    parser.add_argument("-c", "--clutter", help="input:string -> clutter target name")
-    parser.add_argument(
-        "-p", "--place-target", help="input:string -> place target name"
-    )
-    parser.add_argument("-n", "--nav-only", help="input:string -> nav target name")
+    parser.add_argument("-af", "--add-furniture", help="input:string -> furniture name")
+    parser.add_argument("-ao", "--add-object", help="input:string -> object name")
     parser.add_argument(
         "-x",
         "--create-file",
         action="store_true",
-        help="input: not needed -> create a new waypoints.yaml file",
+        help="input: not needed -> create a new cg json file",
     )
     args = parser.parse_args(args=args)
 
@@ -47,47 +43,59 @@ class JsonHandler:
 
     [
         {
-            "object2": {
-                "id": 2,
-                "object_tag": "dummy_furniture_2",
-                "bbox_extent": [
-                    0.1,
-                    0.1,
-                    0.1
-                ],
-                "bbox_center": [
-                    3.9,
-                    -4.2,
-                    0.7
-                ],
-                "category_tag": "furniture",
-                "orginal_class_name": "cabinet",
-                "aa_z_rotated_bbox_center": [
-                    5.41788021636613,
-                    4.742881287864651,
-                    -0.35030203068967886
-                ],
-                "aa_z_rotated_bbox_extent": [
-                    0.1,
-                    0.1,
-                    0.1
-                ],
-                "aa_z_rotated_bbox_yaw_degrees": -160.10377552618712
-            },
-            "object_relation": "a on b",
-            "room_region": "living_room",
+            "id": 1,
+            "object_tag": "cabinet",
+            "bbox_extent": [
+                0.1,
+                0.1,
+                0.1
+            ],
+            "bbox_center": [
+                3.9,
+                -4.2,
+                0.7
+            ],
+            "category_tag": "furniture",
+            "orginal_class_name": "cabinet",
+            "robot_pose": [
+                1.0,
+                1.0,
+                -90.0
+            ]
         },
     ]
 
     2. Create an instance of this class
-    3. Read the json file using the read_yaml method as a dict
-    4. Modify the yaml_dict outside of this class object as needed
-    5. Write the yaml_dict yaml_file using the write_yaml method with the created instance
+    3. Read the json file using the read_json method as a dict
+    4. Modify the cg json outside of this class object as needed
+    5. Write the cg json into file using the write_json method with the created instance
 
     Example:
     json_handler = JsonHandler()
-    json_dict = json_handler.read_json(waypoint_file=waypoint_file)
-    json_dict["nav_targets"]["test_receptacle"] = [2.5, 0.0, 0.0]       # Modify the json_dict
+    cg_json = json_handler.read_json(waypoint_file=waypoint_file)
+    cg_json.append(
+        {
+            "id": 1,
+            "object_tag": "cabinet",
+            "bbox_extent": [
+                0.1,
+                0.1,
+                1.3
+            ],
+            "bbox_center": [
+                3.9,
+                -4.2,
+                0.7
+            ],
+            "category_tag": "furniture",
+            "orginal_class_name": "cabinet",
+            "robot_pose": [
+                1.0,
+                1.0,
+                -90.0
+            ]
+        },
+    )   # Modify the json_dict
     json_handler.write_json(waypoint_file=waypoint_file, json_dict=json_dict)
     """
 
@@ -104,7 +112,7 @@ class JsonHandler:
 
     def read_json(self, waypoint_file: str):
         """
-        Read a yaml file and returns a dict
+        Read a json file and returns a dict
 
         Args:
             waypoint_file (str): path to json file
@@ -136,8 +144,8 @@ class JsonHandler:
         If the file does not exist, it will be created.
 
         Args:
-            waypoint_file (str): path to yaml file
-            cg_json (List[dict]): dict to be written to yaml file
+            waypoint_file (str): path to json file
+            cg_json (List[dict]): dict to be written to json file
         """
         with open(waypoint_file, "w+") as f:
             json.dump(cg_json, f, indent=4)
@@ -145,38 +153,37 @@ class JsonHandler:
 
 class CGWaypointRecorder:
     """
-        Class to record object & furniture relations (i.e. CG file) for Spot robot (world model)
+    Class to record object & furniture relations (i.e. CG file) for Spot robot (world model)
 
-        How to use:
-        1. Create an instance of this class
-        # 2. Call the record_nav_target method with the nav_target_name as an argument (str)
-        # 3. Call the record_clutter_target method with the clutter_target_name as an argument (str)
-        # 4. Call the record_place_target method with the place_target_name as an argument (str)
-        # 5. Call the save_yaml method to save the waypoints to the yaml file
+    How to use:
+    1. Create an instance of this class
+    2. Call the add_furniture method with furniture_name as an argument (str)
+    3. Call the save_json method to save the waypoints to the json file
 
 
-        Args:
-            spot (Spot): Spot robot object
-            waypoint_file_path (str): path to json file to save waypoints into
+    Args:
+        spot (Spot): Spot robot object
+        waypoint_file_path (str): path to json file to save waypoints into
 
 
-        Example:
-        waypoint_recorder = WaypointRecorder(spot=Spot)
-    #     waypoint_recorder.record_nav_target("test_nav_target")
-    #     waypoint_recorder.record_clutter_target("test_clutter_target")
-    #     waypoint_recorder.record_place_target("test_place_target")
-        waypoint_recorder.save_yaml()
-    #"""
+    Example:
+    waypoint_recorder = CGWaypointRecorder(spot=Spot, waypoint_file_path=path)
+    waypoint_recorder.add_furniture("test_furniture")
+    waypoint_recorder.save_json()
+    """
 
-    def __init__(self, spot: Spot, waypoint_file_path: str = CG_WAYPOINT_YAML):
+    def __init__(self, spot: Spot, waypoint_file_path: str):
         self.spot = spot
 
-        # Local copy of waypoints.yaml which keeps getting updated as new waypoints are added
+        # Local copy of cg json which keeps getting updated as new waypoints are added
         self.waypoint_file = waypoint_file_path
         self.json_handler = JsonHandler()
         self.cg_json = []  # type: List[Dict]
 
-    def init_json(self):
+        # Initialize cg json
+        self._init_json()
+
+    def _init_json(self):
         """
         Initialize member variable `self.cg_json` with the contents of the json file as a List[Dict] if it is not initialized.
         """
@@ -185,221 +192,118 @@ class CGWaypointRecorder:
 
     def save_json(self):
         """
-        Save the waypoints (self.yaml_dict) to the yaml file if it is not empty.
-        It will overwrite the existing yaml file if it exists and will create a new one if it does not exist.
+        Save the waypoints (self.cg_json) to the json file if it is not empty.
+        It will overwrite the existing json file if it exists and will create a new one if it does not exist.
         """
-        if self.yaml_dict == {}:
+        if self.cg_json == []:
             print("No waypoints to save. Exiting...")
             return
 
-        self.yaml_handler.write_yaml(self.waypoint_file, self.yaml_dict)
+        self.json_handler.write_json(self.waypoint_file, self.cg_json)
         print(
             f"Successfully saved(/overwrote) all waypoints to file at {self.waypoint_file}:\n"
         )
 
+    def add_furniture(self, furniture_name: str):
+        # Get new entity id. [{el0,el1}, {el2,el3}, {el4,el5}, ...]
+        new_entity_id = 2 * len(self.cg_json)
 
-#     def unmark_clutter(self, clutter_target_name: str):
-#         """
-#         INTERNAL METHOD:
-#         Unmark a waypoint as clutter if it is already marked.
+        # Get current nav pose
+        x, y, yaw = self.spot.get_xy_yaw()
+        yaw_deg = np.rad2deg(yaw)
+        robot_pose = [float(x), float(y), float(yaw_deg)]
 
-#         It is used internally by the `record_nav_target` method to unmark a waypoint as clutter if it is already marked.
-#         This is done to avoid cluttering the yaml file with duplicate clutter targets and also to update the waypoints.yaml
-#         file if a previously marked "clutter" is not marked as a "nav_target" anymore.
+        # Get place target as current gripper position
+        place_target = [*get_global_place_target(self.spot)]
 
-#         Args:
-#             clutter_target_name (str): name of the waypoint to be unmarked as clutter
-#         """
-#         # Add clutter list if not present
-#         if "clutter" not in self.yaml_dict:
-#             self.yaml_dict["clutter"] = []
-#         # Remove waypoint from clutter list if it exists
-#         elif clutter_target_name in self.yaml_dict.get("clutter"):
-#             print(f"Unmarking {clutter_target_name} from clutter list")
-#             self.yaml_dict.get("clutter").remove(clutter_target_name)
+        new_furniture_relation = {
+            "object1": {
+                "id": new_entity_id,
+                "object_tag": furniture_name,
+                "bbox_extent": [0.5, 0.5, place_target[2] / 2.0],
+                "bbox_center": [
+                    place_target[0],
+                    place_target[1],
+                    place_target[2] / 2.0,
+                ],
+                "category_tag": "furniture",
+                "orginal_class_name": furniture_name,
+                "robot_pose": robot_pose,
+            },
+            "object2": {
+                "id": new_entity_id + 1,
+                "object_tag": "invalid",
+                "bbox_extent": [0.1, 0.1, 0.1],
+                "bbox_center": place_target,
+                "category_tag": "object",
+                "orginal_class_name": "object",
+                "robot_pose": robot_pose,
+            },
+            "object_relation": "FAIL",
+            "room_region": "living_room",
+        }
 
-#     def mark_clutter(self, clutter_target_name: str):
-#         """
-#         INTERNAL METHOD:
-#         Mark a waypoint as clutter if it is not already marked.
+        self.cg_json.append(new_furniture_relation)
 
-#         It is used internally by the `record_clutter_target` method to mark a waypoint as clutter if it is not already marked.
-
-#         Args:
-#             clutter_target_name (str): name of the waypoint to be marked as clutter
-#         """
-#         # Add clutter list if not present
-#         if "clutter" not in self.yaml_dict:
-#             self.yaml_dict["clutter"] = []
-
-#         # Add waypoint as clutter if it does not exist
-#         if clutter_target_name not in self.yaml_dict.get("clutter"):
-#             print(f"Marking {clutter_target_name} in clutter list")
-#             self.yaml_dict.get("clutter").append(clutter_target_name)
-
-#     def record_nav_target(self, nav_target_name: str):
-#         """
-#         Record a waypoint as a nav target
-
-#         It will also unmark the waypoint as clutter if it is already marked as clutter.
-#         If "nav_targets" does not exist, it will create a new "nav_targets" list initialized with the default "dock" waypoint
-#         and add the new waypoint to it.
-#         If the waypoint already exists, it will overwrite the existing waypoint data.
-
-#         Args:
-#             nav_target_name (str): name of the waypoint to be recorded as a nav target
-#         """
-#         # Initialize yaml_dict
-#         self.init_yaml()
-
-#         # Get current nav pose
-#         x, y, yaw = self.spot.get_xy_yaw()
-#         yaw_deg = np.rad2deg(yaw)
-#         nav_target = [float(x), float(y), float(yaw_deg)]
-
-#         # Unmark waypoint as clutter if it is already marked
-#         self.unmark_clutter(clutter_target_name=nav_target_name)
-
-#         # Add nav_targets list if not present
-#         if "nav_targets" not in self.yaml_dict:
-#             self.yaml_dict["nav_targets"] = {
-#                 "dock": "[1.5, 0.0, 0.0]",
-#             }
-
-#         # Erase existing waypoint data if present
-#         if nav_target_name in self.yaml_dict.get("nav_targets"):
-#             print(
-#                 f"Nav target for {nav_target_name} already exists as follows inside waypoints.yaml and will be overwritten."
-#             )
-#             print(
-#                 f"old waypoint : {self.yaml_dict.get('nav_targets').get(nav_target_name)}"
-#             )
-#             input("Press Enter if you want to continue...")
-
-#         # Add new waypoint data
-#         self.yaml_dict.get("nav_targets").update({nav_target_name: nav_target})
-
-#     def record_clutter_target(self, clutter_target_name: str):
-#         """
-#         Record a waypoint as a clutter target
-
-#         It will initialize the member variable `self.yaml_dict` with appropriate content.
-#         It will mark the waypoint as nav target, thereby also clearing it from the clutter list if it is already marked as clutter
-#         It will mark the waypoint as clutter if not done already.
-#         It will add the waypoint to the "clutter_amounts" list if it does not exist, and will update its value to 1.
-
-#         Args:
-#             clutter_target_name (str): name of the waypoint to be recorded as a clutter target
-#         """
-#         # Initialize yaml_dict
-#         self.init_yaml()
-
-#         self.record_nav_target(clutter_target_name)
-
-#         # Mark waypoint as clutter
-#         self.mark_clutter(clutter_target_name=clutter_target_name)
-
-#         # Add clutter_amounts list if not present
-#         if "clutter_amounts" not in self.yaml_dict:
-#             self.yaml_dict["clutter_amounts"] = {}
-
-#         # Add waypoint as clutter_amounts if it does not exist
-#         if clutter_target_name not in self.yaml_dict.get("clutter_amounts"):
-#             self.yaml_dict["clutter_amounts"].update({clutter_target_name: 1})
-#             print(
-#                 f"Added {clutter_target_name} in 'clutter_amounts' => ({clutter_target_name}:{self.yaml_dict.get('clutter_amounts').get(clutter_target_name)})"
-#             )
-#         else:
-#             print(
-#                 f"{clutter_target_name} already exists in 'clutter_amounts' => ({clutter_target_name}:{self.yaml_dict.get('clutter_amounts').get(clutter_target_name)})"
-#             )
-
-#     def record_place_target(self, place_target_name: str):
-#         """
-#         Record a waypoint as a place target
-
-#         It will initialize the member variable `self.yaml_dict` with appropriate content
-#         It will mark the waypoint as nav target, thereby also clearing it from the clutter list if it is already marked as clutter
-#         It will add the waypoint to "place_targets" list if it does not exist, and will update its value to the current gripper position.
-
-#         Args:
-#             place_target_name (str): name of the waypoint to be recorded as a place target
-#         """
-#         # Initialize yaml_dict
-#         self.init_yaml()
-
-#         self.record_nav_target(place_target_name)
-
-#         # Get place target as current gripper position
-#         place_target = get_global_place_target(self.spot)
-
-#         # Add place_targets list if not present
-#         if "place_targets" not in self.yaml_dict:
-#             self.yaml_dict["place_targets"] = {}
-
-#         # Erase existing waypoint data if present
-#         if place_target_name in self.yaml_dict.get("place_targets"):
-#             print(
-#                 f"Place target for {place_target_name} already exists as follows inside waypoints.yaml and will be overwritten."
-#             )
-#             print(
-#                 f"old waypoint : {self.yaml_dict.get('place_targets').get(place_target_name)}"
-#             )
-
-#         # Add new place target data
-#         self.yaml_dict.get("place_targets").update({place_target_name: [*place_target]})
+    def add_object(self, object_name: str):
+        raise NotImplementedError(
+            "Adding new objects in CG file is not yet supported. Please update bbox location from add_furniture to add this support"
+        )
 
 
-# def main(spot: Spot):
-#     args = parse_arguments(args=sys.argv[1:])
-#     arg_bools = [args.clutter, args.place_target, args.nav_only, args.create_file]
-#     assert (
-#         len([i for i in arg_bools if i]) == 1
-#     ), "Must pass in either -c, -p, -n, or -x as an arg, and not more than one."
+def main(spot: Spot):
+    args = parse_arguments(args=sys.argv[1:])
+    arg_bools = [args.add_furniture, args.add_object, args.create_file]
+    print(arg_bools)
+    assert (
+        len([i for i in arg_bools if i]) == 1
+    ), "Must pass in either -f, -o, or -x as an arg, and not more than one."
 
-#     # Create WaypointRecorder object with default waypoint file
-#     waypoint_recorder = WaypointRecorder(spot=spot)
+    # Create WaypointRecorder object with default waypoint file
+    waypoint_recorder = CGWaypointRecorder(
+        spot=spot, waypoint_file_path=CG_WAYPOINT_JSON
+    )
 
-#     if args.create_file:
-#         waypoint_recorder.init_yaml()
-#     elif args.nav_only:
-#         waypoint_recorder.record_nav_target(args.nav_only)
-#     elif args.clutter:
-#         waypoint_recorder.record_clutter_target(args.clutter)
-#     elif args.place_target:
-#         waypoint_recorder.record_place_target(args.place_target)
-#     else:
-#         raise NotImplementedError
+    if args.create_file:
+        # Initial cg json is created already in constructor of CGWaypointRecorder, skip
+        pass
+    elif args.add_furniture:
+        waypoint_recorder.add_furniture(args.add_furniture)
+    elif args.add_object:
+        waypoint_recorder.add_object(args.add_object)
+    else:
+        raise NotImplementedError
 
-#     waypoint_recorder.save_yaml()
+    waypoint_recorder.save_json()
 
 
 if __name__ == "__main__":
-    # spot = Spot("WaypointRecorder")
-    # main(spot)
-    jh = JsonHandler()
-    cg_data = jh.read_json(CG_WAYPOINT_YAML)
-    assert cg_data == []
-    print("Init cg data after reading ", cg_data)
+    spot = Spot("WaypointRecorder")
+    main(spot)
 
-    cg_data.append(
-        {
-            "object1": {"id": 1},
-            "object2": {"id": 2},
-            "object_relation": "a on b",
-            "room_region": "living_room",
-        }
-    )
-    print("Updated cg dict data:\n", cg_data)
-    jh.write_json(CG_WAYPOINT_YAML, cg_data)
+    # jh = JsonHandler()
+    # cg_data = jh.read_json(CG_WAYPOINT_JSON)
+    # assert cg_data == []
+    # print("Init cg data after reading ", cg_data)
 
-    cg_data = jh.read_json(CG_WAYPOINT_YAML)
-    print("Reading from file after writing: \n", cg_data)
-    assert cg_data == [
-        {
-            "object1": {"id": 1},
-            "object2": {"id": 2},
-            "object_relation": "a on b",
-            "room_region": "living_room",
-        }
-    ]
+    # cg_data.append(
+    #     {
+    #         "object1": {"id": 1},
+    #         "object2": {"id": 2},
+    #         "object_relation": "a on b",
+    #         "room_region": "living_room",
+    #     }
+    # )
+    # print("Updated cg dict data:\n", cg_data)
+    # jh.write_json(CG_WAYPOINT_JSON, cg_data)
+
+    # cg_data = jh.read_json(CG_WAYPOINT_JSON)
+    # print("Reading from file after writing: \n", cg_data)
+    # assert cg_data == [
+    #     {
+    #         "object1": {"id": 1},
+    #         "object2": {"id": 2},
+    #         "object_relation": "a on b",
+    #         "room_region": "living_room",
+    #     }
+    # ]
