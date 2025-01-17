@@ -418,11 +418,16 @@ class SpotRosSkillExecutor:
                     unique_cache_key = query_class_names[0]
                     if unique_cache_key in waypoint_compute_cg:
                         # should be list [(x, y, deg(yaw)] # TODO: Verify this
-                        waypoint_goal = waypoint_compute_cg[unique_cache_key]
-                        waypoint_goal[2] = np.deg2rad(
-                            waypoint_goal[2]
-                        )  # TODO: Check if this can be cleaned.
-                        nav_pts = [waypoint_goal]
+                        waypoint_goal = waypoint_compute_cg[
+                            unique_cache_key
+                        ]  # don't modify waypoint_goal as it, it mutates the OG dict
+                        nav_pts = [
+                            [
+                                waypoint_goal[0],
+                                waypoint_goal[1],
+                                np.deg2rad(waypoint_goal[2]),
+                            ]
+                        ]
                         category_tag = unique_cache_key
 
                 # Publish data for Nexus UI
