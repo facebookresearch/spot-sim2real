@@ -219,7 +219,9 @@ class CGWaypointRecorder:
         new_furniture_relation = {
             "object1": {
                 "id": new_entity_id,
-                "object_tag": furniture_name,
+                "object_tag": furniture_name.replace(
+                    "_", " "
+                ),  # we should not have '_'s inside object_tags
                 "bbox_extent": [0.5, 0.5, place_target[2] / 2.0],
                 "bbox_center": [
                     place_target[0],

@@ -374,15 +374,16 @@ class SpotRosSkillExecutor:
                 bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
 
                 if ":" in bbox_info[6]:
-                    query_class_names = bbox_info[6].split(":")[1]
-                    query_class_names = query_class_names.split("_")
-                    if query_class_names[0].isdigit():
-                        query_class_names = ["_".join(query_class_names[1:])]
-                    else:
-                        query_class_names = ["_".join(query_class_names)]
+                    query_class_names = bbox_info[6].split(":")[1]  # For exploration
                 else:
-                    query_class_names = bbox_info[6:]
-                    query_class_names[0] = query_class_names[0].replace("_", " ")
+                    query_class_names = bbox_info[6]  # For nav with view poses
+
+                # Strip id from query_class_name
+                query_class_names = query_class_names.split("_")
+                if query_class_names[0].isdigit():
+                    query_class_names = [" ".join(query_class_names[1:])]
+                else:
+                    query_class_names = [" ".join(query_class_names)]
 
                 if robot_holding:
                     rospy.set_param("/viz_place", query_class_names[0])
