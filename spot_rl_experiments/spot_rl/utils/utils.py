@@ -45,6 +45,7 @@ PATH_TO_CONFIG_FILE = PATH_TO_CONFIG_FILE = osp.join(
 assert osp.exists(PATH_TO_CONFIG_FILE), "cg_config.yaml wasn't found"
 cg_config = load_config(PATH_TO_CONFIG_FILE)
 ROOT_PATH = cg_config["CG_ROOT_PATH"]
+CG_RELATIONS_PATH = osp.join(ROOT_PATH, "sg_cache", "cfslam_object_relations_mock.json")
 
 
 def get_waypoint_yaml(waypoint_file=WAYPOINTS_YAML):
@@ -178,7 +179,7 @@ def arr2str(arr):
 
 def calculate_height(object_tag):
     default_config = construct_config_for_semantic_place()
-    json_file_path = ROOT_PATH + "/sg_cache/cfslam_object_relations.json"
+    json_file_path = CG_RELATIONS_PATH
     default_height = default_config.HEIGHT_THRESHOLD
 
     if osp.isfile(json_file_path):
