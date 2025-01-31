@@ -194,8 +194,10 @@ class Skill:
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
             # Do not interrupt pick and place skills when human does something
+            # update Jan 30: only do interrupt when robot is in nav and human is doing pick
             if (
                 "None" not in human_action
+                and "place" not in human_action
                 and begin_skill_name not in ["place", "pick"]
                 and not is_exploring
             ):
