@@ -17,7 +17,7 @@ class HARStateMachine(GenericDetector):
 
         # state-machine setup
         self.ALL_STATES = ["holding", "not_holding"]
-        self.FRAME_THRESHOLD = 5  # roughly equal to 1 second with OWL-ViT
+        self.FRAME_THRESHOLD = 2  # roughly equal to 1 second with OWL-ViT
         self._num_hand_frames = 0
         self._num_object_frames = 0
         self.state_machine = {
