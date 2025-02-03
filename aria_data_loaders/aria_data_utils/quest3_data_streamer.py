@@ -581,7 +581,7 @@ def main(
             object_labels=[
                 # Remove the following objects from the list since they confuse the detection
                 # "pineapple plush toy",
-                # "pink donut plush toy",
+                "pink donut plush toy",
                 # "avocado plush toy",
                 "cup",
                 "bottle",
