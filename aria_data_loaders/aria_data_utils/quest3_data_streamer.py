@@ -516,7 +516,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 object_labels + meta_objects,
                 verbose=self.verbose,
                 version=2,
-                score_threshold=0.4,
+                score_threshold=0.35,
             )
         )
         self.object_detector._core_objects = object_labels
@@ -581,7 +581,7 @@ def main(
             object_labels=[
                 # Remove the following objects from the list since they confuse the detection
                 # "pineapple plush toy",
-                # "pink donut plush toy",
+                "pink donut plush toy",
                 # "avocado plush toy",
                 "cup",
                 "bottle",
