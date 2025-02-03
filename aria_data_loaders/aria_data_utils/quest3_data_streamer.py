@@ -516,7 +516,7 @@ class Quest3DataStreamer(HumanSensorDataStreamerInterface):
                 object_labels + meta_objects,
                 verbose=self.verbose,
                 version=2,
-                score_threshold=0.4,
+                score_threshold=0.35,
             )
         )
         self.object_detector._core_objects = object_labels
