@@ -194,8 +194,11 @@ class Skill:
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
             # Do not interrupt pick and place skills when human does something
+            # print(human_action)
+            # breakpoint()
             if (
                 "None" not in human_action
+                and "place" not in human_action
                 and begin_skill_name not in ["place", "pick"]
                 and not is_exploring
             ):
