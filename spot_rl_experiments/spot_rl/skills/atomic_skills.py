@@ -613,7 +613,7 @@ class Pick(Skill):
             success_status_from_user_feedback = map_user_input_to_boolean(user_prompt)
 
         # Get the images from the env and check if the image is being block by the object
-        time.sleep(3.0)
+        time.sleep(1.5)
 
         # Get the hand depth images to test if the gripper is holding something
         hand_image_responses = self.spot.get_hand_image()
