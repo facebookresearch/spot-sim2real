@@ -40,7 +40,7 @@ class SpotPickEnv(SpotBaseEnv):
         self.spot.open_gripper()
 
         # Update target object name as provided in config
-        observations = super().reset(*args, **kwargs)
+        observations = self.get_observations()
         rospy.set_param("is_gripper_blocked", 0)
         self.grasp_attempted = False
         return observations
