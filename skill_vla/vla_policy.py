@@ -10,7 +10,7 @@ from einops import rearrange
 from omegaconf import OmegaConf
 from PIL import Image
 
-third_party_ckpt_root_folder = "r/Users/jtruong/repos/robot-skills"
+third_party_ckpt_root_folder = "/home/tushar/Desktop/spot-vla/robot-skills"
 sys.path.append(third_party_ckpt_root_folder)
 
 
@@ -34,10 +34,13 @@ class VLAPolicy:
         )  # This is to store the actions from action chunk
         self.depoly_one_action = True  # If we want to do MPC style -- only depoly one action from action chunk
         # TODO: expand these to multi-sensors
-        self.vla_target_image = "articulated_agent_arm_rgb"  # Target RGB
+        self.vla_target_image = "arm_rgb"  # Target RGB
         self.vla_target_proprio = "joint"  # Target proprio sensor
         # vla_target_proprio = "ee_pos"  # Target proprio sensor
         # load checkpoint
+        self.config = config
+        self.device = device
+
         (
             self.vla_model,
             self.vla_processor,
@@ -46,8 +49,7 @@ class VLAPolicy:
             config.VLA_CKPT,
             config.VLA_CONFIG_FILE,
         )
-        self.config = config
-        self.device = device
+
         self.reset()
 
     @staticmethod
@@ -56,7 +58,7 @@ class VLAPolicy:
         # Resize the image here
         rgbs_process = torch.zeros((rgbs.shape[0], 3, target_size, target_size))
         for i, rgb in enumerate(rgbs):
-            img = Image.fromarray(rgb.cpu().detach().numpy())
+            img = Image.fromarray(rgb)
             img = img.resize((target_size, target_size))
             img = np.array(img)
             rgb = torch.as_tensor(
@@ -64,6 +66,17 @@ class VLAPolicy:
             )  # torch.Size([3, 224, 224])
             rgbs_process[i] = rgb
         return rgbs_process
+
+    @staticmethod
+    def load_robot_skills_ckpt(path, model):
+        """load the torch checkpoint"""
+        data = torch.load(path, weights_only=True, map_location="cpu")
+        # remove "_orig_mod." prefix if saved model was compiled
+        data["model"] = {
+            k.replace("_orig_mod.", ""): v for k, v in data["model"].items()
+        }
+        model.load_state_dict(data["model"], strict=True)
+        return model
 
     # Load policy
     def load_process_robot_skills_ckpt(
@@ -138,6 +151,7 @@ class VLAPolicy:
             (1, self.vla_config.cond_steps, self.vla_config.proprio_dim)
         )
         self.texts = [self.config.LANGUAGE_INSTRUCTION]
+        self.observation_dict = []
 
     def infer_action_vla_model(
         self,
@@ -150,7 +164,34 @@ class VLAPolicy:
         """Infer action using vla models."""
         self.observation_dict.append(observation)
         # Confirm the number of batches
+        if len(observation[self.vla_target_image].shape) > 3:
+            observation[self.vla_target_image] = np.transpose(
+                observation[self.vla_target_image], (3, 0, 1, 2)
+            )
+        else:
+            observation[self.vla_target_image] = np.expand_dims(
+                observation[self.vla_target_image], axis=0
+            )
+        observation[self.vla_target_proprio] = torch.as_tensor(
+            observation[self.vla_target_proprio]
+        )
         bsz = observation[self.vla_target_image].shape[0]
+
+        self.images = torch.randint(
+            0,
+            256,
+            (
+                1,
+                self.vla_config.cond_steps,
+                3,
+                self.vla_config.image_size,
+                self.vla_config.image_size,
+            ),
+            dtype=torch.uint8,
+        )
+        self.proprio = torch.zeros(
+            (1, self.vla_config.cond_steps, self.vla_config.proprio_dim)
+        )
 
         if len(self.observation_dict) < vla_config.cond_steps:
             store_size = len(self.observation_dict)
@@ -160,7 +201,9 @@ class VLAPolicy:
                     vla_config.image_size,
                 )
                 if self.vla_target_proprio == "ee_pos":
-                    prop_obs = self.observation_dict[-i - 1]["ee_pose"][:, :3]
+                    prop_obs = self.observation_dict[-i - 1][self.vla_target_proprio][
+                        :, :3
+                    ]
                 else:
                     prop_obs = self.observation_dict[-i - 1][self.vla_target_proprio]
                 self.proprio[:, vla_config.cond_steps - i - 1] = prop_obs
@@ -171,7 +214,9 @@ class VLAPolicy:
                     vla_config.image_size,
                 )
                 if self.vla_target_proprio == "ee_pos":
-                    prop_obs = self.observation_dict[-i - 1]["ee_pose"][:, :3]
+                    prop_obs = self.observation_dict[-i - 1][self.vla_target_proprio][
+                        :, :3
+                    ]
                 else:
                     prop_obs = self.observation_dict[-i - 1][self.vla_target_proprio]
 

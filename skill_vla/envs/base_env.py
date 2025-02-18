@@ -8,14 +8,17 @@ import json
 # mypy: ignore-errors
 import os
 import os.path as osp
+import time
+from typing import Any, Dict
 
 import cv2
 import gym
 import numpy as np
+import rospy
 from spot_rl.utils.robot_subscriber import SpotRobotSubscriberMixin
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
-from spot_wrapper.spot import Spot
+from spot_wrapper.spot import Spot, wrap_heading
 
 try:
     import magnum as mn
@@ -69,11 +72,22 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
     ):
         self.detections_buffer = {
             k: FixSizeOrderedDict(maxlen=DETECTIONS_BUFFER_LEN)
-            for k in ["detections", "filtered_depth", "viz"]
+            for k in ["filtered_hand_rgb", "filtered_hand_depth", "viz"]
         }
         super().__init__(spot=spot)
         self.config = config
         self.spot = spot
+        self._max_lin_dist_scale = self.config.MAX_LIN_DIST
+        self._max_ang_dist_scale = self.config.MAX_ANG_DIST
+        self._max_joint_movement_scale = self.config.MAX_JOINT_MOVEMENT
+        self.ctrl_hz = self.config.CTRL_HZ
+        self.max_episode_steps = self.config.MAX_EPISODE_STEPS
+        self.arm_lower_limits = np.deg2rad(self.config.ARM_LOWER_LIMITS)
+        self.arm_upper_limits = np.deg2rad(self.config.ARM_UPPER_LIMITS)
+        self.prev_base_moved = False
+        self.num_steps = 0
+        self.should_end = False
+        self.grasp_success = False
 
     def get_observations(self):
         raise NotImplementedError
@@ -89,6 +103,53 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         except:
             print("Undocking failed: just standing up instead...")
             self.spot.blocking_stand()
+
+    def process_base_action(self, base_action):
+        base_action = rescale_actions(base_action, silence_only=True)
+        if np.count_nonzero(base_action) > 0:
+            # Command velocities using the input action
+            lin_dist, ang_dist = base_action
+
+            # Scale the linear and angular velocities
+            nav_velocity_scaling = rospy.get_param("nav_velocity_scaling", 1.0)
+            lin_dist *= self._max_lin_dist_scale * nav_velocity_scaling
+            ang_dist *= np.deg2rad(self._max_ang_dist_scale * nav_velocity_scaling)
+
+            target_yaw = wrap_heading(self.yaw + ang_dist)
+            # No horizontal velocity
+            ctrl_period = 1 / self.ctrl_hz
+            # Don't even bother moving if it's just for a bit of distance
+            if abs(lin_dist) < 0.05 and abs(ang_dist) < np.deg2rad(3):
+                base_action = None
+                target_yaw = None
+            else:
+                base_action = [lin_dist / ctrl_period, 0, ang_dist / ctrl_period]
+                self.prev_base_moved = True
+        else:
+            base_action = None
+            self.prev_base_moved = False
+        return base_action
+
+    def process_arm_action(self, arm_action):
+        # arm_action = rescale_actions(arm_action, action_thresh=0.000)
+        arm_action *= self._max_joint_movement_scale
+        arm_action = self.current_arm_pose + pad_action(arm_action)
+        arm_action = np.clip(arm_action, self.arm_lower_limits, self.arm_upper_limits)
+        return arm_action
+
+    def pre_step(self, action_dict):
+        # Update the action_dict with grasp and place flags
+        base_action = action_dict.get("base_action", None)
+        if base_action is not None:
+            base_action = self.process_base_action(base_action)
+        arm_action = action_dict.get("arm_action", None)
+        arm_ee_action = action_dict.get("arm_ee_action", None)
+        arm_action = self.process_arm_action(arm_action)
+
+        grasp = action_dict.get("grasp", False)
+        place = action_dict.get("place", False)
+
+        return base_action, arm_action
 
     def post_step(self):
         observations = self.get_observations()
@@ -109,6 +170,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         travel_time_scale=1.0,
     ):
         assert self.reset_ran, ".reset() must be called first!"
+        base_action, arm_action = self.pre_step()
 
         return self.post_step()
 
@@ -128,29 +190,34 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         super().img_callback(topic, msg)
         if topic == rt.HAND_RGB:
             self.detections_buffer["filtered_hand_rgb"][str(msg.header.stamp)] = msg
+        if topic == rt.FILTERED_HAND_DEPTH:
+            self.detections_buffer["filtered_hand_depth"][str(msg.header.stamp)] = msg
 
     def process_images(self, img):
         # Crop out black vertical bars on the left and right edges of aligned depth img
         img = img[:, LEFT_CROP:-RIGHT_CROP]
         img = cv2.resize(img, (NEW_WIDTH, NEW_HEIGHT), interpolation=cv2.INTER_AREA)
-        img = img.reshape([*img.shape, 1])  # unsqueeze
+        # img = img.reshape([*img.shape, 1])  # unsqueeze
         # img = np.float32(img) / 255.0
 
         return img
 
-    def get_gripper_images(self, save_image=False):
-        if self.grasp_attempted:
+    def get_gripper_images(self, key="filtered_hand_rgb", save_image=False):
+        if self.grasp_success:
             # Return blank images if the gripper is being blocked
             blank_img = np.zeros([NEW_HEIGHT, NEW_WIDTH, 1], dtype=np.float32)
             return blank_img, blank_img.copy()
-        arm_rgb = self.msg_to_cv2(self.detections_buffer["filtered_hand_rgb"][-1])
-        arm_rgb = self.process_images(arm_rgb)
+        print('len images: ', len(self.detections_buffer[key]))
+        timestamp, msg = self.detections_buffer[key].popitem(last=True)
+        self.detections_buffer[key][str(timestamp)] = msg
+        arm_img = self.msg_to_cv2(msg)
+        if 'depth' in key:
+            arm_img = self.process_images(arm_img)
+        cv2.imwrite(f"imgs/{key}_before_{int(time.time()*10000)}.png", arm_img)
 
-        return arm_rgb
+        return arm_img
 
     def get_arm_joints(self, joint_black_list=None):
-        """Get the current arm joints. If it is semantic place skills,
-        we will return one addition joints"""
         # Get proprioception inputs
         joint_black_list = (
             self.config.JOINT_BLACKLIST
@@ -167,3 +234,13 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         )
 
         return joints
+
+    def attempt_grasp(self, obj_center_pixel, graspmode="any"):
+        print('trying to grasp!!')
+        self.grasp_success = self.spot.grasp_hand_depth(
+            obj_center_pixel,
+            top_down_grasp=graspmode == "topdown",
+            horizontal_grasp=graspmode == "side",
+            timeout=10,
+        )
+        return
