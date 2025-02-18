@@ -1,0 +1,4 @@
+weights/*
+*.pt
+*.png
+setup.sh

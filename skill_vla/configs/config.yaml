@@ -1,0 +1,27 @@
+VLA_CONFIGS:
+  VLA_CKPT: "/home/tushar/Desktop/spot-vla/spot-sim2real/skill_vla/weights/livingroom_step70000.pt"
+  # VLA_CKPT: "/home/tushar/Desktop/spot-vla/spot-sim2real/skill_vla/weights/bedroom_step10000.pt"
+  VLA_CONFIG_FILE: "/home/tushar/Desktop/spot-vla/spot-sim2real/skill_vla/configs/vla_cfg.yaml"
+  LANGUAGE_INSTRUCTION: "Navigate to the dresser and pick up the avocado plush toy"
+
+DEVICE: "cuda:0"
+
+# Arm params
+# PICK_ARM_JOINT_ANGLES: [0, -160, 100, 0, 90, 0]
+PICK_ARM_JOINT_ANGLES: [0, -120, 60, 0, 88, 0]
+JOINT_BLACKLIST: [3, 5] # joints we can't control "arm0.el0", "arm0.wr1"
+MAX_JOINT_MOVEMENT: 5.0 # radians
+ARM_LOWER_LIMITS: [-45, -180, 0, 0, -90, 0]
+ARM_UPPER_LIMITS: [45, 0, 180, 0, 90, 0]
+
+# Nav params
+MAX_LIN_DIST: 0.1
+MAX_ANG_DIST: 5.73 
+
+# BD params
+ARM_TRAJECTORY_TIME_IN_SECONDS: 2.0
+DISABLE_OBSTACLE_AVOIDANCE: False
+
+# Episode params
+CTRL_HZ: 2.0
+MAX_EPISODE_STEPS: 200

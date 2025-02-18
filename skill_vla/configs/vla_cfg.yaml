@@ -1,0 +1,180 @@
+defaults:
+  - _self_
+hydra:
+  run:
+    dir: ${log_dir}
+_target_: src.agent.train.TrainAgent
+
+log_dir: ${oc.env:VLA_LOG_DIR}/train_lr_${action_lr}_seed_${seed}
+name: ${data.train.dataset_mix}_fremont_livingroom_v2
+device: cuda
+n_nodes: 1
+seed: 42
+pretrained_model_path: ${oc.env:TRANSFORMERS_CACHE}/paligemma-3b-pt-224
+load_pretrained_weights: True
+resume_checkpoint_path:
+train_vlm: True
+action_expert_adaptive_mode:  # adaLN, adaLN-Zero, or None
+use_torch_compile: True
+use_bf16: True
+use_amp: True
+quantize: False
+lora: False
+lora_r: 32
+lora_dropout: 0.0
+debug: False
+tie_action_proprio_weights: False # If to combine proprio and action transformers
+
+data:
+  val:  # stil aplying image randomization
+    split: train[95%:]
+    shuffle_buffer_size: 10000
+  train:
+    dataset_mix: heuristic_expert_pick_joints_base_vel
+    split: train[:95%]
+    data_path: ${oc.env:VLA_DATA_DIR}/heuristic_expert_pick_joints_base_vel_livingroom_v2
+    window_size: ${cond_steps}
+    action_horizon: ${horizon_steps}
+    skip_unlabeled: True
+    load_depth: False
+    load_proprio: True # there is no such field for Spot right now
+    shuffle_buffer_size: 200000
+    num_parallel_calls: 100
+    traj_transform_threads: 10
+    traj_read_threads: 10
+    skip_norm: True
+
+wandb:
+  entity: ${oc.env:VLA_WANDB_ENTITY}
+  project: robot-skills
+  run: ${name}_${action_lr}
+
+log_freq: 16
+n_epochs: 10  # provided ckpts were about 8 epochs
+n_updates: ${eval:'3786400 // ${global_batch_size} * ${n_epochs}'}  # fractal dataset has 3786400 transitions in total, all used
+save_model_freq: 5000
+eval_freq: 2000
+eval_size: 2
+eval_thresholds: [0.05, 0.1, 0.2, 0.3, 0.5]
+
+global_batch_size: 2
+per_device_batch_size: 2
+action_lr: 5e-5
+vlm_lr: 5e-5
+action_lr_scheduler:
+  first_cycle_steps: 10000000 # basically no decaying
+  min_lr: 1e-8
+  warmup_steps: 200 # a bit of warmup
+vlm_lr_scheduler:
+  first_cycle_steps: 10000000
+  min_lr: 1e-8
+  warmup_steps: 200
+action_weight_decay: 0
+vlm_weight_decay: 0
+max_grad_norm: 1.0
+# For the text training loss during training
+use_lm_head: True
+weight_for_text_loss: 1.0
+
+flow_sampling: beta
+num_inference_steps: 10
+final_action_clip_value: 1.0  # data normalized in [-1,1]
+
+# for processing the images
+image_size: 224
+patch_size: 14
+
+cond_steps: 2
+horizon_steps: 4
+action_dim: 7 # For Spot robots joint:  "action_encoding": ActionEncoding.JOINT_POS_BASE_VEL_SPOT
+proprio_dim: 4  # For Spot robots joint: "proprio_encoding": ProprioEncoding.JOINT_SPOT_FULL
+max_seq_len: ${eval:'${image_size} // ${patch_size} * ${image_size} // ${patch_size} * ${cond_steps} + 20'}  # fixed 256 for image + max 20 for text
+tokenizer_padding: max_length # instead of truncating to longest
+max_image_text_tokens: ${max_seq_len}
+
+
+mixture:
+  vlm:   # gemma
+    hidden_size: 2048
+    intermediate_size: 16384
+    use_final_norm: True # This needs to be true in order to get the final emb to compute the text token, if you are trained with the next token prediction loss
+    cache: True
+    use_quantize: ${quantize}
+    use_lora: ${lora}
+    adaptive_mode:  # not applicable for gemma
+  proprio:
+    hidden_size: 1024
+    intermediate_size: 4096
+    use_final_norm: True  # technically no, but sharing weights with action anyway
+    cache: True
+    use_quantize: False
+    use_lora: False
+    adaptive_mode: ${action_expert_adaptive_mode}
+  action:
+    hidden_size: 1024
+    intermediate_size: 4096
+    use_final_norm: True
+    cache: False
+    use_quantize: False
+    use_lora: False
+    adaptive_mode: ${action_expert_adaptive_mode}
+time_hidden_size: 256 # only applicable if using adaptive
+
+# Fixed
+image_token_index: 257152
+vocab_size: 257216
+pad_token_id: 0
+
+
+vision:
+  _target_: src.model.paligemma.siglip.SiglipVisionModel
+  config:
+    hidden_size: 1152 # siglip
+    intermediate_size: 4304
+    num_hidden_layers: 27
+    num_attention_heads: 16
+    num_channels: 3
+    image_size: ${image_size}
+    patch_size: ${patch_size}
+    num_images: ${cond_steps}
+    layer_norm_eps: 1e-6
+    attention_dropout: 0.0
+    num_image_tokens: ${eval:'${image_size} // ${patch_size} * ${image_size} // ${patch_size} * ${cond_steps}'}
+    lora:
+      r: ${lora_r}
+      dropout: ${lora_dropout}
+  use_quantize: ${quantize}
+  use_lora: ${lora}
+
+vision_projector:
+  _target_: src.model.paligemma.siglip.PaliGemmaMultiModalProjector
+  config:
+    vision_config:
+      hidden_size: 1152
+      projection_dim: 2048
+    lora:
+      r: ${lora_r}
+      dropout: ${lora_dropout}
+  use_quantize: ${quantize}
+  use_lora: ${lora}
+
+joint:
+  _target_: src.model.vla.joint_model.JointModel
+  config:
+    action_expert_adaptive_mode: ${action_expert_adaptive_mode}
+    time_hidden_size: ${time_hidden_size}
+    mixture: ${mixture}
+    lora:
+      r: ${lora_r}
+      dropout: ${lora_dropout}
+    #
+    num_hidden_layers: 18
+    num_attention_heads: 8
+    num_key_value_heads: 1
+    head_dim: 256
+    max_position_embeddings: 8192
+    rms_norm_eps: 1e-6
+    rope_theta: 10000.0
+    attention_bias: False
+    attention_dropout: 0.0
+    pad_token_id: ${pad_token_id}
