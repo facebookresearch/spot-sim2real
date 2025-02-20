@@ -82,7 +82,6 @@ def dump_pkl(log_packet_list: List[Dict[str, Any]], folder_prefix: str = "log"):
         print("***************************************************")
         print("INITIATING BREAKPOINT TO AS SAFETY NET TO SAVE DATA")
         print("***************************************************")
-        breakpoint()
 
 
 def convert_depth_to_img(raw_depth):
@@ -166,6 +165,7 @@ class DataLogger:
             "datetime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
             "camera_data": [],
             "vision_T_base": None,
+            "home_T_base": None,
             "base_pose_xyt": None,
             "arm_pose": None,
             "is_gripper_holding_item": None,
@@ -212,6 +212,20 @@ class DataLogger:
         log_packet["vision_T_base"] = self.spot.get_sophus_SE3_spot_a_T_b(
             frame_tree_snapshot=frame_tree_snapshot, a="vision", b="body"
         ).matrix()  # np.ndarray
+
+        # Convert to 4x4 transformation matrix
+        home_T_vision_2d = self.spot.global_T_home.copy()
+        home_T_vision_3d = np.zeros((4, 4))
+        home_T_vision_3d[:3, :3] = home_T_vision_2d[
+            :3, :3
+        ]  # Copy the 3x3 part (rotation)
+        home_T_vision_3d[0, 3] = home_T_vision_2d[0, 2]  # x translation
+        home_T_vision_3d[1, 3] = home_T_vision_2d[1, 2]  # y translation
+        home_T_vision_3d[3, 3] = 1.0  # Homogeneous coordinate
+
+        log_packet["home_T_base"] = (
+            home_T_vision_3d @ log_packet["vision_T_base"]
+        )  # np.ndarray | home_T_vision * vision_T_base = home_T_base
         log_packet["base_pose_xyt"] = np.asarray(
             self.spot.get_xy_yaw()
         )  # robot's x,y,yaw w.r.t "home" frame provided spot_wrapper/home.txt exists

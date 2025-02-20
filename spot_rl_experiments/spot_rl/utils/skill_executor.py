@@ -23,6 +23,8 @@ from spot_rl.utils.utils import ros_topics as rt
 from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
     get_navigation_points,
 )
+from spot_wrapper.data_logger import DataLogger, dump_pkl
+from spot_wrapper.spot import SpotCamIds
 from std_msgs.msg import String
 
 LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
@@ -82,6 +84,14 @@ class SpotRosSkillExecutor:
         self._human_action = (
             self.spotskillmanager.get_env().human_activity_current.copy()
         )
+
+        self.sources = [
+            SpotCamIds.HAND_COLOR,
+            SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        ]
+        self.data_logger = DataLogger(self.spotskillmanager.spot)
+        self.data_logger.setup_logging_sources(self.sources)
+        self.data_logger = None
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -272,7 +282,10 @@ class SpotRosSkillExecutor:
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
                             enable_object_detector_during_movement=False,
+                            data_logger=self.data_logger,
                         )
+                        # self.dump_data()
+                        # print("********** Dumping data")
 
                     if not succeded and not is_exploring:
                         break
@@ -458,7 +471,10 @@ class SpotRosSkillExecutor:
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
                             enable_object_detector_during_movement=False,
+                            data_logger=self.data_logger,
                         )
+                        # self.dump_data()
+                        # print("********** Dumping data")
                     flag = self._use_continuos_dwg_or_stop_add == "continous"
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
@@ -574,6 +590,9 @@ class SpotRosSkillExecutor:
         file_path = osp.join(LOG_PATH, "test.json")
         with open(file_path, "w") as file:
             json.dump(self.episode_log, file, indent=4)
+
+    def dump_data(self):
+        dump_pkl(self.data_logger.log_packet_list)
 
 
 def reset_ros_param():
