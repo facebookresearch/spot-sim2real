@@ -369,7 +369,7 @@ class Navigation(Skill):
             spot.shutdown()
     """
 
-    def __init__(self, spot: Spot, config=None) -> None:
+    def __init__(self, spot: Spot, config=None, data_logger=None) -> None:
         if not config:
             config = construct_config_for_nav()
         super().__init__(spot, config)
@@ -380,7 +380,8 @@ class Navigation(Skill):
         )
         self.policy.reset()
 
-        self.env = SpotNavEnv(self.config, self.spot)
+        self.data_logger = data_logger
+        self.env = SpotNavEnv(self.config, self.spot, self.data_logger)
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""

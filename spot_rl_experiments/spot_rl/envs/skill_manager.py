@@ -48,7 +48,8 @@ from spot_rl.utils.utils import (
     nav_target_from_waypoint,
     place_target_from_waypoint,
 )
-from spot_wrapper.spot import Spot
+from spot_wrapper.data_logger import DataLogger
+from spot_wrapper.spot import Spot, SpotCamIds
 
 #
 # SKILL MANAGER is a collection of ALL SKILLS that spot exposes
@@ -140,6 +141,14 @@ class SpotSkillManager:
             open_close_drawer_config=open_close_drawer_config,
         )
 
+        ### Moved here from skill executor
+        sources = [
+            SpotCamIds.HAND_COLOR,
+            SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        ]
+        self.data_logger = DataLogger(self.spot)
+        self.data_logger.setup_logging_sources(sources)
+
         # Initiate the controllers for nav, gaze, and place
         self.__init_controllers(use_policies=use_policies)
 
@@ -217,8 +226,7 @@ class SpotSkillManager:
 
         # Init nav controller
         self.nav_controller = Navigation(
-            spot=self.spot,
-            config=self.nav_config,
+            spot=self.spot, config=self.nav_config, data_logger=self.data_logger
         )
 
         # Init pick controller

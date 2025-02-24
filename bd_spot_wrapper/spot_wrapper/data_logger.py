@@ -56,7 +56,7 @@ def read_pkl(logfolder_name: str) -> List[Dict[str, Any]]:
     return log_packet_list
 
 
-def dump_pkl(log_packet_list: List[Dict[str, Any]], folder_prefix: str = "log"):
+def dump_pkl(log_packet_list: List[Dict[str, Any]], folder_prefix: str = "goat_log"):
     """Dump the data into a new folder with a file called data.pkl. This is guarded with exception handling & triggers a breakpoint on exception"""
     if len(log_packet_list) == 0:
         print("No data to dump into pkl, exiting")

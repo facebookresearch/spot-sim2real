@@ -669,7 +669,7 @@ def scan_arm(
         )
 
         if data_logger is not None:
-            data_logger.log_data_finite(2)
+            data_logger.log_data_finite(1)
 
         if img_search_args is not None:
             (
