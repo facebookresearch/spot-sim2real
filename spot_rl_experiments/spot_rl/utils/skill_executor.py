@@ -30,23 +30,62 @@ LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
 
 ENABLE_ARM_SCAN = True
 ENABLE_WAYPOINT_COMPUTE_CACHE = (
-    True  # A flag to load the cache file for the navigation waypoint
+    False  # A flag to load the cache file for the navigation waypoint
 )
+ENABLE_WAYPOINT_COMPUTE_CG = (
+    True  # A flag to load the cg file for the navigation waypoint
+)
+
+assert (
+    ENABLE_WAYPOINT_COMPUTE_CG ^ ENABLE_WAYPOINT_COMPUTE_CACHE
+), "Enable either cache or cg for waypoint computation"
+
+
 waypoint_compute_cache = None
-waypoint_compute_cache_path = osp.join(
-    CG_ROOT_PATH, "sg_cache", "map", "waypoint_compute_cache.pkl"
-)
-
-if not osp.exists(waypoint_compute_cache_path) and ENABLE_WAYPOINT_COMPUTE_CACHE:
-    # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
-    print(
-        "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
-    )
-    ENABLE_WAYPOINT_COMPUTE_CACHE = False
-
+waypoint_compute_cg = {}
 if ENABLE_WAYPOINT_COMPUTE_CACHE:
-    with open(waypoint_compute_cache_path, "rb") as f:
-        waypoint_compute_cache = pickle.load(f)
+    waypoint_compute_cache_path = osp.join(
+        CG_ROOT_PATH, "sg_cache", "map", "waypoint_compute_cache.pkl"
+    )
+
+    # Check if cache exists
+    if not osp.exists(waypoint_compute_cache_path):
+        # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
+        print(
+            "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
+        )
+        ENABLE_WAYPOINT_COMPUTE_CACHE = False
+    else:
+        with open(waypoint_compute_cache_path, "rb") as f:
+            waypoint_compute_cache = pickle.load(f)
+elif ENABLE_WAYPOINT_COMPUTE_CG:
+    waypoint_compute_cg_path = osp.join(
+        CG_ROOT_PATH, "sg_cache", "cfslam_object_relations_mock.json"
+    )
+
+    # Check if cache exists
+    if not osp.exists(waypoint_compute_cg_path):
+        # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
+        print(
+            "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
+        )
+        ENABLE_WAYPOINT_COMPUTE_CG = False
+    else:
+        with open(
+            waypoint_compute_cg_path, "rb"
+        ) as f:  # TODO: Test if "rb" works, else revert to "r"
+            cg_relations_data = json.load(f)
+            for cg_relation_node in cg_relations_data:
+                for objectkey in ["object1", "object2"]:
+                    object = cg_relation_node.get(objectkey, None)
+                    if object is None:
+                        continue
+                    bbox_center = np.array(object.get("bbox_center"))
+                    bbox_extent = np.array(object.get("bbox_extent"))
+                    object_tag = object.get("object_tag")
+                    unique_key = object_tag
+                    waypoint_compute_cg[unique_key] = object.get("robot_pose")
+                    print(f"{object_tag} : final waypoint {object.get('robot_pose')}")
 
 
 class SpotRosSkillExecutor:
@@ -335,6 +374,9 @@ class SpotRosSkillExecutor:
                 # Reset Nexus nav UI
                 rospy.set_param("/nexus_nav_highlight", "None;None;None;None")
 
+                # Get the robot x, y, yaw
+                x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
+
                 # Get the bbox center and bbox extent
                 bbox_info = skill_input.split(";")  # in the format of x,y,z
                 bbox_info = [bb.strip() for bb in bbox_info]
@@ -345,15 +387,16 @@ class SpotRosSkillExecutor:
                 bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
 
                 if ":" in bbox_info[6]:
-                    query_class_names = bbox_info[6].split(":")[1]
-                    query_class_names = query_class_names.split("_")
-                    if query_class_names[0].isdigit():
-                        query_class_names = ["_".join(query_class_names[1:])]
-                    else:
-                        query_class_names = ["_".join(query_class_names)]
+                    query_class_names = bbox_info[6].split(":")[1]  # For exploration
                 else:
-                    query_class_names = bbox_info[6:]
-                    query_class_names[0] = query_class_names[0].replace("_", " ")
+                    query_class_names = bbox_info[6]  # For nav with view poses
+
+                # Strip id from query_class_name
+                query_class_names = query_class_names.split("_")
+                if query_class_names[0].isdigit():
+                    query_class_names = [" ".join(query_class_names[1:])]
+                else:
+                    query_class_names = [" ".join(query_class_names)]
 
                 if robot_holding:
                     rospy.set_param("/viz_place", query_class_names[0])
@@ -361,6 +404,7 @@ class SpotRosSkillExecutor:
                     rospy.set_param("/viz_pick", query_class_names[0])
                 # Get the view poses
                 waypoint_goal, view_poses = None, None
+                nav_pts = []
                 if ENABLE_WAYPOINT_COMPUTE_CACHE and waypoint_compute_cache:
                     unique_cache_key = ",".join(bbox_info[0:3] + bbox_info[3:6])
                     if unique_cache_key in waypoint_compute_cache:
@@ -368,24 +412,37 @@ class SpotRosSkillExecutor:
                         waypoint_goal, category_tag = waypoint_compute_cache[
                             unique_cache_key
                         ]
+                    if not waypoint_goal:
+                        view_poses, category_tag = get_view_poses(
+                            bbox_center, bbox_extent, query_class_names, True
+                        )
 
-                if not waypoint_goal:
-                    view_poses, category_tag = get_view_poses(
-                        bbox_center, bbox_extent, query_class_names, True
+                    # Get the navigation points
+                    nav_pts = get_navigation_points(
+                        robot_view_pose_data=view_poses,
+                        bbox_centers=bbox_center,
+                        bbox_extents=bbox_extent,
+                        cur_robot_xy=[x, y],
+                        goal_xy_yaw_from_cache=waypoint_goal,
+                        visualize=False,
+                        savefigname="pathplanning.png",
                     )
 
-                # Get the robot x, y, yaw
-                x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
-                # Get the navigation points
-                nav_pts = get_navigation_points(
-                    robot_view_pose_data=view_poses,
-                    bbox_centers=bbox_center,
-                    bbox_extents=bbox_extent,
-                    cur_robot_xy=[x, y],
-                    goal_xy_yaw_from_cache=waypoint_goal,
-                    visualize=False,
-                    savefigname="pathplanning.png",
-                )
+                elif ENABLE_WAYPOINT_COMPUTE_CG and waypoint_compute_cg:
+                    unique_cache_key = query_class_names[0]
+                    if unique_cache_key in waypoint_compute_cg:
+                        # should be list [(x, y, deg(yaw)] # TODO: Verify this
+                        waypoint_goal = waypoint_compute_cg[
+                            unique_cache_key
+                        ]  # don't modify waypoint_goal as it, it mutates the OG dict
+                        nav_pts = [
+                            [
+                                waypoint_goal[0],
+                                waypoint_goal[1],
+                                np.deg2rad(waypoint_goal[2]),
+                            ]
+                        ]
+                        category_tag = unique_cache_key
 
                 # Publish data for Nexus UI
                 rospy.set_param(
