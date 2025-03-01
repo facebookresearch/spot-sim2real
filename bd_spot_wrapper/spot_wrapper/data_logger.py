@@ -149,7 +149,16 @@ class DataLogger:
                 f"Could not verify sources : {camera_sources}. Will default initiate logger for :{source_list}"
             )
             input("Press Enter to continue or Ctrl+C to terminate.")
-        self.source_list = source_list
+
+        if any("intel" in src for src in source_list):
+            self.source_list = [src for src in source_list if "intel" not in src]
+            self.intel_source_list = [
+                SpotCamIds.INTEL_REALSENSE_COLOR,
+                SpotCamIds.INTEL_REALSENSE_DEPTH,
+            ]
+        else:
+            self.source_list = source_list
+            self.intel_source_list = None
 
         print(f"Initialized logging for sources : {self.source_list}")
 
@@ -205,7 +214,37 @@ class DataLogger:
                     }
                 )
                 if visualize:
+                    i = len(log_packet["camera_data"]) - 1
                     cv2.imshow(camera_source, log_packet["camera_data"][i]["raw_image"])
+
+            if self.intel_source_list:
+                intel_img_responses = self.spot.get_image_responses(
+                    self.intel_source_list
+                )
+                for i, camera_source in enumerate(self.intel_source_list):
+                    gripper_T_intel = (
+                        self.spot.gripper_T_intel
+                        if "intel" in camera_source
+                        else sp_eye4
+                    )
+                    base_T_camera: sp.SE3 = base_T_grippercam * gripper_T_intel
+                    log_packet["camera_data"].append(
+                        {
+                            "src_info": camera_source,
+                            "raw_image": image_response_to_cv2(
+                                intel_img_responses[i], reorient=True
+                            ),  # np.ndarray
+                            "camera_intrinsics": self.spot.get_camera_intrinsics_as_3x3(
+                                img_responses[i].source.pinhole.intrinsics
+                            ),  # np.ndarray
+                            "base_T_camera": base_T_camera.matrix(),  # np.ndarray
+                        }
+                    )
+                    if visualize:
+                        i = len(log_packet["camera_data"]) - 1
+                        cv2.imshow(
+                            camera_source, log_packet["camera_data"][i]["raw_image"]
+                        )
             if visualize:
                 cv2.waitKey(1)
 

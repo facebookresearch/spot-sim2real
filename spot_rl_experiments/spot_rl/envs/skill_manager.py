@@ -145,6 +145,8 @@ class SpotSkillManager:
         sources = [
             SpotCamIds.HAND_COLOR,
             SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+            SpotCamIds.INTEL_REALSENSE_COLOR,
+            SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
         self.data_logger = DataLogger(self.spot)
         self.data_logger.setup_logging_sources(sources)
