@@ -633,6 +633,8 @@ class SpotRosSkillExecutor:
         elif skill_name == "dock":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
+            self.dump_data()
+            print("********** Dumping data")
             self.spotskillmanager.dock()
             self._is_robot_on_dock = True
             rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
