@@ -237,12 +237,14 @@ class SpotSkillManager:
                 spot=self.spot,
                 config=self.pick_config,
                 use_mobile_pick=self._use_mobile_pick,
+                data_logger=self.data_logger,
             )
         else:
             self.gaze_controller = Pick(
                 spot=self.spot,
                 config=self.pick_config,
                 use_mobile_pick=self._use_mobile_pick,
+                data_logger=self.data_logger,
             )
 
         # Init place controller
@@ -253,29 +255,32 @@ class SpotSkillManager:
                     spot=self.spot,
                     config=self.place_config,
                     use_semantic_place=self.allow_semantic_place,  # TODO: Mostly not needed
+                    data_logger=self.data_logger,
                 )
             else:
                 self.place_controller = SemanticPlace(
                     spot=self.spot,
                     config=self.place_config,
+                    data_logger=self.data_logger,
                 )
         else:
             self.place_controller = Place(
                 spot=self.spot,
                 config=self.place_config,
                 use_policies=use_policies,
+                data_logger=self.data_logger,
             )
 
         # Init open-close drawer controller
         self.open_close_drawer_controller = OpenCloseDrawer(
             spot=self.spot,
             config=self.open_close_drawer_config,
+            data_logger=self.data_logger,
         )
 
         # Init semantic pick controller
         self.semantic_gaze_controller = SemanticPick(
-            spot=self.spot,
-            config=self.pick_config,
+            spot=self.spot, config=self.pick_config, data_logger=self.data_logger
         )
 
     def reset(self):

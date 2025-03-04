@@ -57,6 +57,7 @@ from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2, wrap_heading
 from std_msgs.msg import Float32, String
 
@@ -117,6 +118,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         max_joint_movement_key="MAX_JOINT_MOVEMENT",
         max_lin_dist_key="MAX_LIN_DIST",
         max_ang_dist_key="MAX_ANG_DIST",
+        data_logger: DataLogger = None,
     ):
         """
         :param max_joint_movement_key: max allowable displacement of arm joints
@@ -174,6 +176,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self._max_joint_movement_scale = self.config[max_joint_movement_key]
         self._max_lin_dist_scale = self.config[max_lin_dist_key]
         self._max_ang_dist_scale = self.config[max_ang_dist_key]
+
+        # Data logging
+        self.data_logger = data_logger
+        self.last_logged_time = time.time()
 
         # Tracking paramters reset
         rospy.set_param("enable_tracking", False)
@@ -338,6 +344,15 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             print(
                 f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
             )
+
+        # After every 3 seconds, stop to record data
+        if self.data_logger is None:
+            breakpoint()
+        else:
+            if time.time() - self.last_logged_time > 3.0:
+                time.sleep(3)
+                self.data_logger.log_data_finite(1)
+                self.last_logged_time = time.time()
 
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp

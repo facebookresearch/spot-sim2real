@@ -20,7 +20,7 @@ DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 549))
 
 class SpotNavEnv(SpotBaseEnv):
     def __init__(self, config, spot: Spot, data_logger: DataLogger):
-        super().__init__(config, spot)
+        super().__init__(config, spot, data_logger=data_logger)
         self._goal_xy = None
         self._enable_nav_by_hand = False
         self._enable_dynamic_yaw = False
@@ -29,10 +29,6 @@ class SpotNavEnv(SpotBaseEnv):
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
 
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES_EXPLORE)
-
-        # Data logging
-        self.data_logger = data_logger
-        self.last_logged_time = time.time()
 
     def enable_nav_by_hand(self):
         if not self._enable_nav_by_hand:
@@ -172,11 +168,6 @@ class SpotNavEnv(SpotBaseEnv):
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
     def step(self, *args, **kwargs):
-        # After every 3 seconds, stop to record data
-        if time.time() - self.last_logged_time > 3.0:
-            time.sleep(3)
-            self.data_logger.log_data_finite(1)
-            self.last_logged_time = time.time()
 
         observations, reward, done, info = super().step(*args, **kwargs)
 

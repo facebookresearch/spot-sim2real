@@ -12,11 +12,18 @@ import numpy as np
 import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.heuristic_nav import get_3d_point
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot
 
 
 class SpotGazeEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot, use_mobile_pick: bool = False):
+    def __init__(
+        self,
+        config,
+        spot: Spot,
+        data_logger: DataLogger,
+        use_mobile_pick: bool = False,
+    ):
         # Select suitable keys
         max_joint_movement_key = (
             "MAX_JOINT_MOVEMENT_MOBILE_GAZE"
@@ -37,6 +44,7 @@ class SpotGazeEnv(SpotBaseEnv):
             max_joint_movement_key=max_joint_movement_key,
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
+            data_logger=data_logger,
         )
         self.grasp_dist_threshold = self.config.GRASP_DISTANCE_THRESHOLD
         self.target_obj_name = None
@@ -108,10 +116,13 @@ class SpotGazeEnv(SpotBaseEnv):
 
 
 class SpotGazeEEEnv(SpotGazeEnv):
-    def __init__(self, config, spot: Spot, use_mobile_pick: bool = False):
+    def __init__(
+        self, config, spot: Spot, data_logger: DataLogger, use_mobile_pick: bool = False
+    ):
         super().__init__(
             config,
             spot,
+            data_logger=data_logger,
             use_mobile_pick=use_mobile_pick,
         )
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_MOBILE_GAZE
@@ -128,7 +139,7 @@ class SpotGazeEEEnv(SpotGazeEnv):
 
 
 class SpotSemanticGazeEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot):
+    def __init__(self, config, spot: Spot, data_logger: DataLogger):
         # Select suitable keys
         max_joint_movement_key = "MAX_JOINT_MOVEMENT_SEMANTIC_GAZE"
         max_lin_dist_key = "MAX_LIN_DIST_SEMANTIC_GAZE"
@@ -141,6 +152,7 @@ class SpotSemanticGazeEnv(SpotBaseEnv):
             max_joint_movement_key=max_joint_movement_key,
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
+            data_logger=data_logger,
         )
         self.target_obj_name = None
         self.initial_arm_joint_angles = np.deg2rad(config.GAZE_ARM_JOINT_ANGLES)
