@@ -20,7 +20,7 @@ def get_working_spotdata_dir():
     """Helper method to get os dir to store spot data"""
     spotdata_dir = None
     if SPOTDATA_DIR is None:
-        spotdata_dir = os.path.join("~", "Datasets/SpotData/")
+        spotdata_dir = os.path.expanduser("~/Datasets/SpotData/")
         print(
             "Could not find `SPOTDATA_ROOT` environment variable. Please set this variable in bashrc pointing to location where you want to store pointcloud data from Spot."
         )
@@ -160,7 +160,9 @@ class DataLogger:
             self.source_list = source_list
             self.intel_source_list = None
 
-        print(f"Initialized logging for sources : {self.source_list}")
+        print(
+            f"Initialized logging for sources : {self.source_list} | {self.intel_source_list}"
+        )
 
     def update_logging_data(
         self,
@@ -227,7 +229,7 @@ class DataLogger:
                         if "intel" in camera_source
                         else sp_eye4
                     )
-                    base_T_camera: sp.SE3 = base_T_grippercam * gripper_T_intel
+                    base_T_camera_intel: sp.SE3 = base_T_grippercam * gripper_T_intel
                     log_packet["camera_data"].append(
                         {
                             "src_info": camera_source,
@@ -237,7 +239,7 @@ class DataLogger:
                             "camera_intrinsics": self.spot.get_camera_intrinsics_as_3x3(
                                 img_responses[i].source.pinhole.intrinsics
                             ),  # np.ndarray
-                            "base_T_camera": base_T_camera.matrix(),  # np.ndarray
+                            "base_T_camera": base_T_camera_intel.matrix(),  # np.ndarray
                         }
                     )
                     if visualize:
