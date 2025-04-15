@@ -498,7 +498,7 @@ class SpotRosSkillExecutor:
                             # Do dynamic point yaw here for the intermediate points
                             succeded, msg = self.spotskillmanager.nav(x, y)
                         if self.data_logger is not None:
-                            self.data_logger.log_data_finite(1)
+                            self.data_logger.log_data_finite(1, skill_name="nav")
                         skill_log = (
                             self.spotskillmanager.nav_controller.skill_result_log
                         )
@@ -562,9 +562,11 @@ class SpotRosSkillExecutor:
             pick_pass, pick_msg = self.check_pick_condition()
             if pick_pass:
                 succeded, msg = self.spotskillmanager.pick(skill_input)
+                self.dump_data()
             else:
                 succeded = False
                 msg = pick_msg
+                self.dump_data()
             self.check_pick_condition()
             skill_log = self.spotskillmanager.gaze_controller.skill_result_log
             if "num_steps" not in skill_log:
@@ -594,6 +596,7 @@ class SpotRosSkillExecutor:
                     visualize=False,
                     enable_waypoint_estimation=True,
                 )
+                self.dump_data()
                 if succeded:
                     rospy.set_param("is_gripper_blocked", 0)
             else:
@@ -601,6 +604,7 @@ class SpotRosSkillExecutor:
                 succeded, msg = self.spotskillmanager.place(
                     0.6, 0.0, 0.4, is_local=True
                 )
+                self.dump_data()
             self.check_pick_condition()
             skill_log = self.spotskillmanager.place_controller.skill_result_log
             if "num_steps" not in skill_log:

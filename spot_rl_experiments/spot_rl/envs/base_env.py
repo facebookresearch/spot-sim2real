@@ -80,6 +80,8 @@ ORIG_HEIGHT = 480
 WIDTH_SCALE = 0.5
 HEIGHT_SCALE = 0.5
 
+LOGGER_INTERVAL = 2.0  # every x seconds
+
 
 def pad_action(action):
     """Pad action zero for the non-controllable indices of the arm."""
@@ -336,6 +338,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
+        skill_name = action_dict.get("skill_name", "none")
         target_yaw = None
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
@@ -349,9 +352,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         if self.data_logger is None:
             breakpoint()
         else:
-            if time.time() - self.last_logged_time > 3.0:
+            if time.time() - self.last_logged_time > LOGGER_INTERVAL:
                 time.sleep(3)
-                self.data_logger.log_data_finite(1)
+                self.data_logger.log_data_finite(1, skill_name=skill_name)
                 self.last_logged_time = time.time()
 
         if grasp:
