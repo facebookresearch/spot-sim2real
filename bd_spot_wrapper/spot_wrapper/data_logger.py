@@ -170,12 +170,14 @@ class DataLogger:
         visualize: bool = False,
         verbose: bool = False,
         skill_name: str = "none",
+        skill_input: str = "none",
     ):
         """Log robot data and camera info"""
         log_packet = {
             "timestamp": time.time(),
             "datetime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
             "skill_name": skill_name,
+            "skill_input": skill_input,
             "camera_data": [],
             "vision_T_base": None,
             "home_T_base": None,
@@ -289,21 +291,22 @@ class DataLogger:
             print(log_packet)
         return log_packet
 
-    def log_data(self, skill_name="none"):
+    def log_data(self, skill_name="none", skill_input="none"):
         # Log data packet
         log_packet = self.update_logging_data(
             include_image_data=True,
             visualize=True,
             verbose=False,
             skill_name=skill_name,
+            skill_input=skill_input,
         )
         self.log_packet_list.append(log_packet)
 
-    def log_data_indefinite(self, skill_name="none"):
+    def log_data_indefinite(self, skill_name="none", skill_input="none"):
         print("Will start logging data now, hit Ctrl+C to end.")
         try:
             while True:
-                self.log_data(skill_name=skill_name)
+                self.log_data(skill_name=skill_name, skill_input=skill_input)
         except Exception as e:
             print(f"Encountered an exception while logging data indefinitely - {e}")
             raise e
@@ -311,13 +314,15 @@ class DataLogger:
             # Dump data as pkl
             dump_pkl(log_packet_list=self.log_packet_list)
 
-    def log_data_finite(self, n: int = 10, skill_name: str = "none"):
-        time.sleep(0.8)  # stabilise motion lag
+    def log_data_finite(
+        self, n: int = 10, skill_name: str = "none", skill_input: str = "none"
+    ):
+        # time.sleep(0.8)  # stabilise motion lag
 
         print(f"Will start logging data now for {n} steps")
         try:
             for _ in tqdm(range(n)):
-                self.log_data(skill_name=skill_name)
+                self.log_data(skill_name=skill_name, skill_input=skill_input)
         except Exception as e:
             print(f"Encountered an exception while logging data async - {e}")
             raise e

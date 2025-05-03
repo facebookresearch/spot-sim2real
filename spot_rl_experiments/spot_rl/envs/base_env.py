@@ -338,7 +338,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
-        skill_name = action_dict.get("skill_name", "none")
+        skill_name = action_dict.get("skill_name", "Not implemented for this skill")
+        skill_input = action_dict.get("skill_input", "Not implemented for this skill")
+
         target_yaw = None
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
@@ -353,8 +355,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             breakpoint()
         else:
             if time.time() - self.last_logged_time > LOGGER_INTERVAL:
-                time.sleep(3)
-                self.data_logger.log_data_finite(1, skill_name=skill_name)
+                # time.sleep(3)
+                self.data_logger.log_data_finite(
+                    1, skill_name=skill_name, skill_input=skill_input
+                )
                 self.last_logged_time = time.time()
 
         if grasp:

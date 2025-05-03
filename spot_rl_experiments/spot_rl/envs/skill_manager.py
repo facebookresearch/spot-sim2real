@@ -288,7 +288,7 @@ class SpotSkillManager:
         raise NotImplementedError
 
     @multimethod  # type: ignore
-    def nav(self, nav_target: str = None) -> Tuple[bool, str]:  # type: ignore
+    def nav(self, nav_target: str = None, skill_name: str = "nav", skill_input: str = "") -> Tuple[bool, str]:  # type: ignore
         """
         Perform the nav action on the navigation target specified as a known string
 
@@ -322,7 +322,19 @@ class SpotSkillManager:
             return False, msg
 
         nav_x, nav_y, nav_theta = nav_target_tuple
-        status, message = self.nav(nav_x, nav_y, nav_theta, False, should_dock)
+
+        if skill_input == "":
+            skill_input += f"{nav_target}"
+
+        status, message = self.nav(
+            nav_x,
+            nav_y,
+            nav_theta,
+            False,
+            should_dock,
+            skill_name=skill_name,
+            skill_input=skill_input,
+        )
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
@@ -334,6 +346,8 @@ class SpotSkillManager:
         theta: float,
         reset_current_receptacle_name: bool = True,
         should_dock: bool = False,
+        skill_name: str = "nav",
+        skill_input: str = "",
     ) -> Tuple[bool, str]:
         """
         Perform the nav action on the navigation target specified as a metric location
@@ -357,13 +371,21 @@ class SpotSkillManager:
         goal_dict = {
             "nav_target": (x, y, theta),
             "should_dock": should_dock,
+            "skill_name": skill_name,
+            "skill_input": skill_input,
         }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
         return status, message
 
     @multimethod  # type: ignore
-    def nav(self, x: float, y: float) -> Tuple[bool, str]:  # noqa
+    def nav(  # noqa
+        self,
+        x: float,
+        y: float,
+        skill_name: str = "nav",
+        skill_input: str = "",
+    ) -> Tuple[bool, str]:  # noqa
         """
         Perform the nav action on the navigation target with yaw specified as a metric location
         Args:
@@ -377,6 +399,8 @@ class SpotSkillManager:
         goal_dict = {
             "nav_target": (x, y, theta),
             "dynamic_yaw": True,
+            "skill_name": skill_name,
+            "skill_input": skill_input,
         }  # type: Dict[str, Any]
         status, message = self.nav_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
@@ -432,6 +456,8 @@ class SpotSkillManager:
         enable_pose_estimation: bool = False,
         enable_pose_correction: bool = False,
         enable_force_control: bool = False,
+        skill_name: str = "pick",
+        skill_input: str = "",
     ) -> Tuple[bool, str]:
         """
         Perform the pick action on the pick target specified as string
@@ -465,11 +491,15 @@ class SpotSkillManager:
         height = calculate_height(place_target)
         if height > 1.0:
             grasp_mode = "side"
+        if skill_input == "":
+            skill_input += f"{target_obj_name}"
 
         self.gaze_controller.set_grasp_type(grasp_mode)
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
+            "skill_name": skill_name,
+            "skill_input": skill_input,
         }  # type: Dict[str, Any]
         if enable_pose_correction or enable_force_control:
             assert (
@@ -510,7 +540,11 @@ class SpotSkillManager:
         return status, message
 
     def semanticpick(
-        self, target_obj_name: str = None, grasping_type: str = "topdown"
+        self,
+        target_obj_name: str = None,
+        grasping_type: str = "topdown",
+        skill_name: str = "pick",
+        skill_input: str = "",
     ) -> Tuple[bool, str]:
         """
         Perform the semantic pick action on the pick target specified as string
@@ -527,11 +561,14 @@ class SpotSkillManager:
             "topdown",
             "side",
         ], f"Do not support {grasping_type} grasping"
-
+        if skill_input == "":
+            skill_input += f"{target_obj_name}"
         goal_dict = {
             "target_object": target_obj_name,
             "take_user_input": False,
             "grasping_type": grasping_type,
+            "skill_name": skill_name,
+            "skill_input": skill_input,
         }  # type: Dict[str, Any]
         status, message = self.semantic_gaze_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)
@@ -573,7 +610,16 @@ class SpotSkillManager:
             return np.array([0.7, 0.0, 0.4]), np.array([0.5, 0.0, 0.4])
 
     @multimethod  # type: ignore
-    def place(self, place_target: str = None, ee_orientation_at_grasping: np.ndarray = None, is_local: bool = False, visualize: bool = False, enable_waypoint_estimation: bool = False) -> Tuple[bool, str]:  # type: ignore
+    def place(
+        self,
+        place_target: str = None,
+        ee_orientation_at_grasping: np.ndarray = None,
+        is_local: bool = False,
+        visualize: bool = False,
+        enable_waypoint_estimation: bool = False,
+        skill_name: str = "place",
+        skill_input: str = "",
+    ) -> Tuple[bool, str]:  # type: ignore
         """
         Perform the place action on the place target specified as known string
 
@@ -676,6 +722,8 @@ class SpotSkillManager:
             place_z,
             ee_orientation_at_grasping=ee_orientation_at_grasping,
             is_local=is_local,
+            skill_name=skill_name,
+            skill_input=skill_input,
         )
         conditional_print(message=message, verbose=self.verbose)
         return status, message
@@ -751,6 +799,8 @@ class SpotSkillManager:
         z: float,
         is_local: bool = False,
         ee_orientation_at_grasping: np.ndarray = None,
+        skill_name: str = "place",
+        skill_input: str = "",
     ) -> Tuple[bool, str]:
         """
         Perform the place action on the place target specified as metric location
@@ -770,6 +820,8 @@ class SpotSkillManager:
             "place_target": (x, y, z),
             "is_local": is_local,
             "ee_orientation_at_grasping": ee_orientation_at_grasping,
+            "skill_name": skill_name,
+            "skill_input": skill_input,
         }  # type: Dict[str, Any]
         status, message = self.place_controller.execute(goal_dict=goal_dict)
         conditional_print(message=message, verbose=self.verbose)

@@ -194,6 +194,14 @@ class Skill:
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
             ]
+
+            # HACK: Feed skill_name, skill_input from goal_dict into action_dict for logging
+            action_dict["skill_name"] = goal_dict.get(
+                "skill_name", "Not implemented for this skill"
+            )
+            action_dict["skill_input"] = goal_dict.get(
+                "skill_input", "Not implemented for this skill"
+            )
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
             # Do not interrupt pick and place skills when human does something
@@ -479,7 +487,6 @@ class Navigation(Skill):
         action_dict = {
             "arm_action": None,
             "base_action": action,
-            "skill_name": "nav",
         }
 
         return action_dict
@@ -634,13 +641,13 @@ class Pick(Skill):
 
         # Check the openness of the gripper
         # This value is between 0 (close) and 100 (open)
-        # _gripper_open_percentage = (
-        #     self.spot.robot_state_client.get_robot_state().manipulator_state.gripper_open_percentage
-        # )
-        # is_gripper_open_slightly = (
-        #     _gripper_open_percentage
-        #     > self.config.GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING
-        # )
+        _gripper_open_percentage = (
+            self.spot.robot_state_client.get_robot_state().manipulator_state.gripper_open_percentage
+        )
+        is_gripper_open_slightly = (
+            _gripper_open_percentage
+            > self.config.GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING
+        )
 
         print(
             f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {self.config.BLOCK_PERCENTAGE_THRESHOLD}"
@@ -653,7 +660,7 @@ class Pick(Skill):
             self.env.grasp_attempted
             and success_status_from_user_feedback
             and is_object_block_camera
-            # and is_gripper_open_slightly
+            and is_gripper_open_slightly
         )
 
         # Update result log
@@ -688,7 +695,6 @@ class Pick(Skill):
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
                 "grasp_mode": self.grasp_mode,
-                "skill_name": "pick",
             }
         else:
             action_dict = {
@@ -698,7 +704,6 @@ class Pick(Skill):
                 "enable_pose_correction": self.enable_pose_correction,
                 "enable_force_control": self.enable_force_control,
                 "grasp_mode": self.grasp_mode,
-                "skill_name": "pick",
             }
 
         return action_dict
@@ -799,7 +804,6 @@ class SemanticPick(Pick):
         action_dict = {
             "arm_action": action[0:4],
             "base_action": action[4:6],
-            "skill_name": "pick",
         }
         return action_dict
 
@@ -832,7 +836,6 @@ class MobilePickEE(Pick):
             "enable_pose_correction": self.enable_pose_correction,
             "enable_force_control": self.enable_force_control,
             "grasp_mode": self.grasp_mode,
-            "skill_name": "pick",
         }
 
         return action_dict
@@ -1064,7 +1067,6 @@ class Place(Skill):
         action_dict = {
             "arm_action": action,
             "base_action": None,
-            "skill_name": "place",
         }
 
         return action_dict
@@ -1099,7 +1101,6 @@ class SemanticPlace(Place):
             "arm_action": action[:5],
             "base_action": None,
             "grip_action": action[5],
-            "skill_name": "place",
         }
 
         return action_dict
@@ -1158,7 +1159,6 @@ class SemanticPlaceEE(SemanticPlace):
             "arm_ee_action": action[:6],
             "base_action": action[7:9],
             "grip_action": action[6],
-            "skill_name": "place",
         }
 
         return action_dict
@@ -1212,6 +1212,5 @@ class OpenCloseDrawer(Skill):
             "arm_action": action[0:4],
             "base_action": action[5:7],  # None
             "close_gripper": action[4],
-            "skill_name": "open-close",
         }
         return action_dict

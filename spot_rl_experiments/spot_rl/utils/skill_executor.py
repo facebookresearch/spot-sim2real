@@ -309,7 +309,9 @@ class SpotRosSkillExecutor:
                     rospy.set_param(
                         "/nexus_nav_highlight", f"{x};{y};{1.0};{skill_input}"
                     )
-                    succeded, msg = self.spotskillmanager.nav(x, y)
+                    succeded, msg = self.spotskillmanager.nav(
+                        x, y, skill_name=skill_name, skill_input=skill_input
+                    )
 
                     # Nav -> scan behavior
                     human_type_msg = rospy.get_param(
@@ -334,7 +336,11 @@ class SpotRosSkillExecutor:
                     rospy.set_param("/viz_place", skill_input)
                 else:
                     rospy.set_param("/viz_pick", skill_input)
-                succeded, msg = self.spotskillmanager.nav(skill_input)
+                succeded, msg = self.spotskillmanager.nav(
+                    nav_target=skill_input,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
+                )
 
             # Run scan arm if gripper is NOT holding any item
             print(
@@ -481,7 +487,12 @@ class SpotRosSkillExecutor:
                                     backup_success_angle * 2.0,
                                 )
                                 succeded, msg = self.spotskillmanager.nav(
-                                    x, y, yaw, False
+                                    x,
+                                    y,
+                                    yaw,
+                                    False,
+                                    skill_name=skill_name,
+                                    skill_input=skill_input,
                                 )
                                 (
                                     navconfig.SUCCESS_DISTANCE,
@@ -492,13 +503,22 @@ class SpotRosSkillExecutor:
                                 )
                             else:
                                 succeded, msg = self.spotskillmanager.nav(
-                                    x, y, yaw, False
+                                    x,
+                                    y,
+                                    yaw,
+                                    False,
+                                    skill_name=skill_name,
+                                    skill_input=skill_input,
                                 )
                         else:
                             # Do dynamic point yaw here for the intermediate points
-                            succeded, msg = self.spotskillmanager.nav(x, y)
+                            succeded, msg = self.spotskillmanager.nav(
+                                x, y, skill_name=skill_name, skill_input=skill_input
+                            )
                         if self.data_logger is not None:
-                            self.data_logger.log_data_finite(1, skill_name="nav")
+                            self.data_logger.log_data_finite(
+                                1, skill_name="nav", skill_input=skill_input
+                            )
                         skill_log = (
                             self.spotskillmanager.nav_controller.skill_result_log
                         )
@@ -561,7 +581,11 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             pick_pass, pick_msg = self.check_pick_condition()
             if pick_pass:
-                succeded, msg = self.spotskillmanager.pick(skill_input)
+                succeded, msg = self.spotskillmanager.pick(
+                    target_obj_name=skill_input,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
+                )
                 self.dump_data()
             else:
                 succeded = False
@@ -595,6 +619,8 @@ class SpotRosSkillExecutor:
                     is_local=True,
                     visualize=False,
                     enable_waypoint_estimation=True,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
                 )
                 self.dump_data()
                 if succeded:
@@ -602,7 +628,12 @@ class SpotRosSkillExecutor:
             else:
                 # Use the following for the hardcode waypoint for static place
                 succeded, msg = self.spotskillmanager.place(
-                    0.6, 0.0, 0.4, is_local=True
+                    0.6,
+                    0.0,
+                    0.4,
+                    is_local=True,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
                 )
                 self.dump_data()
             self.check_pick_condition()
