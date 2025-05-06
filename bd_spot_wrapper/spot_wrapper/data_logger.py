@@ -160,6 +160,13 @@ class DataLogger:
             self.source_list = source_list
             self.intel_source_list = None
 
+        # Get screen resolution
+        import screeninfo
+
+        screen = screeninfo.get_monitors()[0]
+        self.screen_width, self.screen_height = screen.width, screen.height
+
+        cv2.namedWindow(SpotCamIds.HAND_COLOR, cv2.WINDOW_NORMAL)
         print(
             f"Initialized logging for sources : {self.source_list} | {self.intel_source_list}"
         )
@@ -221,7 +228,13 @@ class DataLogger:
                 )
                 if visualize:
                     i = len(log_packet["camera_data"]) - 1
-                    cv2.imshow(camera_source, log_packet["camera_data"][i]["raw_image"])
+                    image = log_packet["camera_data"][i]["raw_image"]
+                    image = cv2.resize(
+                        image,
+                        (self.screen_width, self.screen_height),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    cv2.imshow(camera_source, image)
 
             if self.intel_source_list:
                 intel_img_responses = self.spot.get_image_responses(
@@ -346,7 +359,7 @@ class DataLogger:
                     cv2.imshow(camera_data["src_info"], updated_depth)
                 else:
                     cv2.imshow(camera_data["src_info"], camera_data["raw_image"])
-            cv2.waitKey(100)
+            cv2.waitKey(1000)
 
         freq = len(log_packet_list) / (
             log_packet_list[-1]["timestamp"] - log_packet_list[0]["timestamp"]

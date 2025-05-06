@@ -620,8 +620,8 @@ def heurisitic_object_search_and_navigation(
 def scan_arm(
     spot: Spot,
     publisher,
-    angle_start=-90,
-    angle_end=90,
+    angle_start=-60,
+    angle_end=60,
     angle_interval=30,
     gaze_arm_angles=None,
     enable_object_detector_during_movement=False,
@@ -655,10 +655,11 @@ def scan_arm(
 
     spot.blocking_set_arm_joint_positions(np.deg2rad(gaze_arm_angles), travel_time=5)
     spot.open_gripper()
-    semicircle_range = np.arange(
-        angle_start, angle_end + angle_interval, angle_interval
-    )
-    for _, angle in enumerate(semicircle_range):
+    forward_arc = np.arange(angle_start, angle_end + angle_interval, angle_interval)
+    # Reverse arc including endpoints
+    reverse_arc = np.arange(angle_end, angle_start - angle_interval, -angle_interval)
+    full_arc = np.concatenate((forward_arc, reverse_arc))
+    for _, angle in enumerate(full_arc):
         print(f"Scanning in {angle} cone")
         angle_time = 1.5
         gaze_arm_angles[0] = angle
