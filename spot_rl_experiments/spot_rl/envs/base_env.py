@@ -352,7 +352,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
 
         # After every 3 seconds, stop to record data
         if self.data_logger is None:
-            breakpoint()
+            pass
         else:
             if time.time() - self.last_logged_time > LOGGER_INTERVAL:
                 # time.sleep(3)

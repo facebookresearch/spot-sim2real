@@ -688,7 +688,10 @@ class SpotRosSkillExecutor:
             json.dump(self.episode_log, file, indent=4)
 
     def dump_data(self):
-        dump_pkl(self.data_logger.log_packet_list)
+        if self.data_logger is not None:
+            dump_pkl(self.data_logger.log_packet_list)
+        else:
+            print("Will not dump data as data-logger is not initialized")
 
 
 def reset_ros_param():
