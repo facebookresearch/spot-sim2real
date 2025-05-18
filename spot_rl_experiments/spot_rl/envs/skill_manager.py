@@ -148,9 +148,9 @@ class SpotSkillManager:
             SpotCamIds.INTEL_REALSENSE_COLOR,
             SpotCamIds.INTEL_REALSENSE_DEPTH,
         ]
-        self.data_logger = DataLogger(self.spot)
-        self.data_logger.setup_logging_sources(sources)
-        # self.data_logger = None
+        # self.data_logger = DataLogger(self.spot)
+        # self.data_logger.setup_logging_sources(sources)
+        self.data_logger = None
 
         # Initiate the controllers for nav, gaze, and place
         self.__init_controllers(use_policies=use_policies)

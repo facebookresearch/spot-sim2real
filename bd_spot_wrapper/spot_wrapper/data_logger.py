@@ -336,7 +336,11 @@ class DataLogger:
         print(f"Log packet includes data for following cameras : {cam_srcs}")
 
         # Iterate over log packets and show images from all camera sources
-        for log_packet in log_packet_list:
+
+        while True:
+            frame = int(input("Which frame ?"))
+            # for log_packet in log_packet_list:
+            log_packet = log_packet_list[frame]
             # Iterate over every camera data and display image
             for camera_data in log_packet["camera_data"]:
                 if "hand_depth_in_hand_color_frame" in camera_data["src_info"]:
@@ -346,7 +350,7 @@ class DataLogger:
                     cv2.imshow(camera_data["src_info"], updated_depth)
                 else:
                     cv2.imshow(camera_data["src_info"], camera_data["raw_image"])
-            cv2.waitKey(100)
+            cv2.waitKey(0)
 
         freq = len(log_packet_list) / (
             log_packet_list[-1]["timestamp"] - log_packet_list[0]["timestamp"]

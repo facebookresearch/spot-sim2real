@@ -4,30 +4,31 @@ import pickle
 import re
 from glob import glob
 from pathlib import Path
-import matplotlib.pyplot as plt
+
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
-
-MAPPING = { 
-    'bed': 1,
-    'white_chair': 13,
-    'white_chair_in_back': 14,
-    'coffee_table': 18,
-    'sofa': 19,
-    'dining_table': 20,
-    'sink': 23,
-    'living_room_console'  : 24,
-    'tv_console'  : 25,
-    'dresser': 26,
-    'kitchen_island': 28,
-    'kitchen_counter': 29,
-    'left_nightstand': 30,
-    'right_nightstand': 31,
-    'office_desk': 32,
-    'ign' : 100
+MAPPING = {
+    "bed": 1,
+    "white_chair": 13,
+    "white_chair_in_back": 14,
+    "coffee_table": 18,
+    "sofa": 19,
+    "dining_table": 20,
+    "sink": 23,
+    "living_room_console": 24,
+    "tv_console": 25,
+    "dresser": 26,
+    "kitchen_island": 28,
+    "kitchen_counter": 29,
+    "left_nightstand": 30,
+    "right_nightstand": 31,
+    "office_desk": 32,
+    "ign": 100,
 }
 REVERSE_MAPPING = {v: k for k, v in MAPPING.items()}
+
 
 def find_matching_folders(mask_root, rgb_root):
     """
@@ -62,9 +63,11 @@ def find_matching_folders(mask_root, rgb_root):
         print(f"  - {k}")
     return {key: (masks[key], rgbs[key]) for key in sorted(common_keys)}
 
+
 def extract_frame_id(mask_filename):
     match = re.search(r"mask_(\d+)_", mask_filename)
     return int(match.group(1)) if match else None
+
 
 def extract_object_name(mask_filename):
     """
@@ -82,15 +85,23 @@ def extract_object_name(mask_filename):
     clean_name = re.sub(r"_\d+$", "", object_with_suffix)
     return clean_name
 
+
 def load_rgb_data(pkl_path):
-    with open(pkl_path, 'rb') as f:
+    with open(pkl_path, "rb") as f:
         full_data = pickle.load(f)  # list of dicts, each with "camera_source"
 
     # Extract hand_color_image per frame
     filtered = {}
     for i, frame in enumerate(full_data):
         sources = frame.get("camera_data", [])
-        hand_image_data = next((d["raw_image"] for d in sources if d.get("src_info") == "hand_color_image"), None)
+        hand_image_data = next(
+            (
+                d["raw_image"]
+                for d in sources
+                if d.get("src_info") == "hand_color_image"
+            ),
+            None,
+        )
         if hand_image_data is not None:
             filtered[i] = hand_image_data
         else:
@@ -99,8 +110,10 @@ def load_rgb_data(pkl_path):
 
     return filtered
 
+
 # Global figure objects so the window persists
 _fig, _ax = None, None
+
 
 def display_images(rgb_img, mask_img):
     global _fig, _ax
@@ -124,6 +137,7 @@ def display_images(rgb_img, mask_img):
         _ax.imshow(combined)
         plt.draw()
         plt.pause(0.001)
+
 
 def prompt_user_input(mode, current_annotation=None, display_object_name=None):
     if mode == "annotate":
@@ -163,18 +177,20 @@ def main(dir1, dir2, output_json="annotations.json", mode="annotate"):
     def sort_key(name):
         match = re.match(r"instruction(\d+[a-z]*)_.*variant_([A-Z])", name)
         if not match:
-            return (9999, 'Z')  # fallback for unexpected formats
+            return (9999, "Z")  # fallback for unexpected formats
         instr_num = match.group(1)
         variant = match.group(2)
         # Convert '3a' to something sortable — e.g., int('3') = 3 and 'a' = small offset
         digits = re.match(r"(\d+)([a-z]?)", instr_num)
         instr_base = int(digits.group(1))
         suffix = digits.group(2)
-        instr_index = instr_base * 10 + (ord(suffix) - ord('a') + 1 if suffix else 0)
+        instr_index = instr_base * 10 + (ord(suffix) - ord("a") + 1 if suffix else 0)
         return (instr_index, variant)
 
     # Sorted list of (key, (mask_dir, pkl_dir)) tuples
-    sorted_folder_pairs = sorted(folder_pairs.items(), key=lambda item: sort_key(item[0]))
+    sorted_folder_pairs = sorted(
+        folder_pairs.items(), key=lambda item: sort_key(item[0])
+    )
 
     skipped_frames = {}
 
@@ -218,10 +234,14 @@ def main(dir1, dir2, output_json="annotations.json", mode="annotate"):
 
             if args.mode == "verify" and frame_key in annotations[base_name]:
                 existing_all = annotations[base_name][frame_key]
-                existing = [item for item in existing_all if item[0] == display_object_name]
+                existing = [
+                    item for item in existing_all if item[0] == display_object_name
+                ]
 
                 if not existing:
-                    add_new = input(f"⚠️ No existing annotation found for object '{display_object_name}' in frame {frame_id}. Add it? (y/n)")
+                    add_new = input(
+                        f"⚠️ No existing annotation found for object '{display_object_name}' in frame {frame_id}. Add it? (y/n)"
+                    )
                     if add_new == "y":
                         if frame_key not in annotations[base_name]:
                             annotations[base_name][frame_key] = []
@@ -230,14 +250,25 @@ def main(dir1, dir2, output_json="annotations.json", mode="annotate"):
                         if response == "skip":
                             skipped_frames.setdefault(base_name, []).append(frame_id)
                             continue
-                        annotations[base_name][frame_key].append((display_object_name, response))
-                        print(f"✅ Saved: Frame {frame_id} → ({display_object_name}, {response})")
+                        annotations[base_name][frame_key].append(
+                            (display_object_name, response)
+                        )
+                        print(
+                            f"✅ Saved: Frame {frame_id} → ({display_object_name}, {response})"
+                        )
                     else:
                         continue
                 else:
                     # There could still be multiple entries with the same object name – usually one, but we handle all
-                    existing_readable = [(obj, REVERSE_MAPPING.get(fid, f"unknown({fid})")) for obj, fid in existing]
-                    result = prompt_user_input("verify", current_annotation=existing_readable, display_object_name=display_object_name)
+                    existing_readable = [
+                        (obj, REVERSE_MAPPING.get(fid, f"unknown({fid})"))
+                        for obj, fid in existing
+                    ]
+                    result = prompt_user_input(
+                        "verify",
+                        current_annotation=existing_readable,
+                        display_object_name=display_object_name,
+                    )
 
                     if result == "confirm":
                         continue  # keep existing annotation
@@ -245,8 +276,12 @@ def main(dir1, dir2, output_json="annotations.json", mode="annotate"):
                         skipped_frames.setdefault(base_name, []).append(frame_id)
                         continue  # do not modify existing
                     else:
-                        annotations[base_name][frame_key] = [(display_object_name, result)]
-                        print(f"🔁 Updated: Frame {frame_id} → ({display_object_name}, {result})")
+                        annotations[base_name][frame_key] = [
+                            (display_object_name, result)
+                        ]
+                        print(
+                            f"🔁 Updated: Frame {frame_id} → ({display_object_name}, {result})"
+                        )
             elif args.mode == "annotate":
                 if frame_key not in annotations[base_name]:
                     annotations[base_name][frame_key] = []
@@ -255,8 +290,12 @@ def main(dir1, dir2, output_json="annotations.json", mode="annotate"):
                 if response == "skip":
                     skipped_frames.setdefault(base_name, []).append(frame_id)
                     continue
-                annotations[base_name][frame_key].append((display_object_name, response))
-                print(f"✅ Saved: Frame {frame_id} → ({display_object_name}, {response})")
+                annotations[base_name][frame_key].append(
+                    (display_object_name, response)
+                )
+                print(
+                    f"✅ Saved: Frame {frame_id} → ({display_object_name}, {response})"
+                )
 
             # # Save after each annotation
             with open(output_json, "w") as f:

@@ -651,15 +651,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             rospy.set_param("is_gripper_blocked", 0)
 
         if enable_force_control:
-            ret = self.spot.grasp_point_in_image_with_IK(
-                point_in_gripper,  # 3D point in gripper camera
-                body_T_cam,  # will convert 3D point in gripper to body
-                gripper_pose_quat,  # quat for gripper
-                solution_angles,
-                10,
-                claw_gripper_control_parameters,
-                visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
-            )
+            # ret = self.spot.grasp_point_in_image_with_IK(
+            #     point_in_gripper,  # 3D point in gripper camera
+            #     body_T_cam,  # will convert 3D point in gripper to body
+            #     gripper_pose_quat,  # quat for gripper
+            #     solution_angles,
+            #     10,
+            #     claw_gripper_control_parameters,
+            #     visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
+            # )
+            raise ValueError("Cannot Do this at this point of time")
         else:
             ret = self.spot.grasp_hand_depth(
                 self.obj_center_pixel,

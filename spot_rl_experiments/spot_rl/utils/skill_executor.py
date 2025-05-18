@@ -36,6 +36,7 @@ ENABLE_WAYPOINT_COMPUTE_CG = (
     True  # A flag to load the cg file for the navigation waypoint
 )
 
+NEW_PLANNER_NEURIPS = True  # HACK for neurips paper
 assert (
     ENABLE_WAYPOINT_COMPUTE_CG ^ ENABLE_WAYPOINT_COMPUTE_CACHE
 ), "Enable either cache or cg for waypoint computation"
@@ -82,7 +83,8 @@ elif ENABLE_WAYPOINT_COMPUTE_CG:
                         continue
                     bbox_center = np.array(object.get("bbox_center"))
                     bbox_extent = np.array(object.get("bbox_extent"))
-                    object_tag = object.get("object_tag")
+                    # object_tag = object.get("object_tag")
+                    object_tag = f'{object.get("object_tag").replace(" ", "_")}_{object.get("id")}'  # HACK: neurips paper
                     unique_key = object_tag
                     waypoint_compute_cg[unique_key] = object.get("robot_pose")
                     print(f"{object_tag} : final waypoint {object.get('robot_pose')}")
@@ -397,13 +399,16 @@ class SpotRosSkillExecutor:
                 else:
                     query_class_names = bbox_info[6]  # For nav with view poses
 
-                # Strip id from query_class_name
-                query_class_names = query_class_names.split("_")
-                if query_class_names[0].isdigit():
-                    query_class_names = [" ".join(query_class_names[1:])]
+                if not NEW_PLANNER_NEURIPS:
+                    # Strip id from query_class_name
+                    query_class_names = query_class_names.split("_")
+                    if query_class_names[0].isdigit():
+                        query_class_names = [" ".join(query_class_names[1:])]
+                    else:
+                        query_class_names = [" ".join(query_class_names)]
                 else:
-                    query_class_names = [" ".join(query_class_names)]
-
+                    # HACK for neurips paper
+                    query_class_names = [query_class_names]
                 if robot_holding:
                     rospy.set_param("/viz_place", query_class_names[0])
                 else:

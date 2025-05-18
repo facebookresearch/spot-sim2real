@@ -1,20 +1,17 @@
 import ast
 import collections
+import json
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 
-def read_object_data(file_path):
+def read_object_data():
     """Read and parse object data from a text file."""
     data = []
-    with open(file_path, "r") as f:
-        for line in f:
-            idx_str, rest = line.strip().split(" ", 1)
-            idx = int(idx_str)
-            label, coord = ast.literal_eval(rest)
-            data.append((idx, label, coord))
-    return data
+    with open("/home/achuthan/Downloads/fremont_furniture.json", "r") as f:
+        furniture_list = json.load(f)
+    return furniture_list
 
 
 def plot_objects_3d(data):
@@ -28,13 +25,13 @@ def plot_objects_3d(data):
     #     lambda: color_cycle[len(label_colors) % len(color_cycle)]
     # )
 
-    for i, (idx, label, (x, y, z)) in enumerate(data):
+    for i, (label, (x, y, z)) in enumerate(data):
         # Assign a unique color per label type
         if label not in label_colors:
             label_colors[label] = color_cycle[len(label_colors) % len(color_cycle)]
 
         ax.scatter(x, y, z, color=label_colors[label], s=40)
-        ax.text(x, y, z, f"{idx}: {label}", fontsize=7)
+        ax.text(x, y, z, f"{i}: {label}", fontsize=7)
 
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
@@ -46,5 +43,5 @@ def plot_objects_3d(data):
 
 
 # === Run ===
-data = read_object_data("priyam_receptacle_ids.txt")
+data = read_object_data()
 plot_objects_3d(data)
