@@ -28,6 +28,7 @@ from spot_rl.utils.pixel_to_3d_conversion_utils import (
     sample_patch_around_point,
 )
 from spot_rl.utils.utils import construct_config
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
 from std_msgs.msg import String
 
@@ -624,6 +625,7 @@ def scan_arm(
     angle_interval=30,
     gaze_arm_angles=None,
     enable_object_detector_during_movement=False,
+    data_logger: DataLogger = None,
 ):
     # Create image search object
     image_search = (
@@ -665,6 +667,10 @@ def scan_arm(
         img_search_args = (
             None if image_search is None else get_arguments_for_image_search(spot)
         )
+
+        if data_logger is not None:
+            data_logger.log_data_finite(1, skill_name="nav")
+
         if img_search_args is not None:
             (
                 object_info_list,

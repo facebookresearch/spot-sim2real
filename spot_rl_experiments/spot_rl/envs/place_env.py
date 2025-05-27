@@ -14,13 +14,14 @@ import rospy
 from spot_rl.envs.base_env import SpotBaseEnv
 from spot_rl.utils.geometry_utils import is_position_within_bounds
 from spot_rl.utils.search_table_location import convert_point_in_body_to_place_waypoint
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot, wrap_heading
 from spot_wrapper.utils import angle_between_quat
 
 
 class SpotPlaceEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot):
-        super().__init__(config, spot)
+    def __init__(self, config, spot: Spot, data_logger: DataLogger):
+        super().__init__(config, spot, data_logger=data_logger)
         self.place_target = None
         self.place_target_is_local = False
 
@@ -69,7 +70,7 @@ class SpotPlaceEnv(SpotBaseEnv):
 class SpotSemanticPlaceEnv(SpotBaseEnv):
     """This is Spot semantic place class"""
 
-    def __init__(self, config, spot: Spot):
+    def __init__(self, config, spot: Spot, data_logger: DataLogger):
         # We set the initial arm joints
         config.INITIAL_ARM_JOINT_ANGLES = copy.deepcopy(
             config.INITIAL_ARM_JOINT_ANGLES_SEMANTIC_PLACE
@@ -81,6 +82,7 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
             spot,
             max_lin_dist_key=max_lin_dist_sem_place,
             max_ang_dist_key=max_ang_dist_sem_place,
+            data_logger=data_logger,
         )
         # Define the place variables
         self.place_target = None
@@ -263,9 +265,15 @@ class SpotSemanticPlaceEnv(SpotBaseEnv):
 class SpotSemanticPlaceEEEnv(SpotSemanticPlaceEnv):
     """This is Spot semantic place class"""
 
-    def __init__(self, config, spot: Spot, use_semantic_place: bool = False):
+    def __init__(
+        self,
+        config,
+        spot: Spot,
+        data_logger: DataLogger,
+        use_semantic_place: bool = False,
+    ):
 
-        super().__init__(config, spot)
+        super().__init__(config, spot, data_logger=data_logger)
 
         # Define End Effector Policy Scale Values
         self.arm_ee_dist_scale = self.config.EE_DIST_SCALE_SEMANTIC_PLACE

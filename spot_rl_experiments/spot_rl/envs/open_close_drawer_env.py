@@ -18,6 +18,7 @@ try:
 except Exception as e:
     print(f"Cannot import sophuspy due to {e}. Import sophus instead")
     import sophus as sp
+
 from bosdyn.client.frame_helpers import GRAV_ALIGNED_BODY_FRAME_NAME
 from bosdyn.client.math_helpers import Quat, SE3Pose
 from spot_rl.envs.base_env import SpotBaseEnv
@@ -27,12 +28,13 @@ from spot_rl.utils.pixel_to_3d_conversion_utils import (
     sample_patch_around_point,
 )
 from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot, image_response_to_cv2, scale_depth_img
 from spot_wrapper.utils import angle_between_quat
 
 
 class SpotOpenCloseDrawerEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot):
+    def __init__(self, config, spot: Spot, data_logger: DataLogger):
         # Select suitable keys
         max_joint_movement_key = "MAX_JOINT_MOVEMENT_OPEN_CLOSE_DRAWER"
         max_lin_dist_key = "MAX_LIN_DIST_OPEN_CLOSE_DRAWER"
@@ -45,6 +47,7 @@ class SpotOpenCloseDrawerEnv(SpotBaseEnv):
             max_joint_movement_key=max_joint_movement_key,
             max_lin_dist_key=max_lin_dist_key,
             max_ang_dist_key=max_ang_dist_key,
+            data_logger=data_logger,
         )
 
         self.ee_gripper_offset = mn.Vector3(config.EE_GRIPPER_OFFSET)

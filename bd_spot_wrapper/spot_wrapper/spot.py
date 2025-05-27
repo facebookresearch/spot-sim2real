@@ -25,7 +25,7 @@ import cv2
 import magnum as mn
 import numpy as np
 import quaternion
-import rospy
+import ros_communication_client as ros
 
 try:
     import sophuspy as sp
@@ -75,20 +75,26 @@ from bosdyn.client.robot_command import (
 )
 from bosdyn.client.robot_state import RobotStateClient
 from bosdyn.util import seconds_to_duration
-from geometry_msgs.msg import Pose, TransformStamped
 from google.protobuf import wrappers_pb2  # type: ignore
-from perception_and_utils.utils.conversions import (
-    bd_SE3Pose_to_ros_Pose,
-    bd_SE3Pose_to_ros_TransformStamped,
-    bd_SE3Pose_to_sophus_SE3,
-)
-from spot_rl.utils.gripper_t_intel_path import GRIPPER_T_INTEL_PATH
-from spot_rl.utils.pixel_to_3d_conversion_utils import project_3d_to_pixel_uv
-from spot_rl.utils.utils import ros_frames as rf
 from spot_wrapper.utils import (
     get_angle_between_forward_and_target,
     get_position_and_vel_values,
 )
+from yacs.config import CfgNode as CN
+
+ROS_FRAMES = osp.join(
+    "/home/achuthan/Desktop/spot-sim2real/spot_rl_experiments/configs/",
+    "ros_frame_names.yaml",
+)
+rf = CN()
+rf.set_new_allowed(True)
+rf.merge_from_file(ROS_FRAMES)
+
+
+GRIPPER_T_INTEL_PATH = osp.join(
+    osp.dirname(osp.abspath(__file__)), "gripper_T_intel.npy"
+)
+
 
 # Get Spot password and IP address
 env_err_msg = (
@@ -212,18 +218,19 @@ class Spot:
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
 
         # Make our intel image client
-        try:
-            self.intelrealsense_image_client = robot.ensure_client(
-                "intel-realsense-image-service"
-            )
-            self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
-            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
+        # try:
+        #     self.intelrealsense_image_client = robot.ensure_client(
+        #         "intel-realsense-image-service"
+        #     )
+        #     self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
+        #     print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
 
-        except Exception:
-            print("There is no intel-realsense-image_service. Using gripper cameras")
-            self.intelrealsense_image_client = None
-            self.gripper_T_intel = None
-            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
+        # except Exception:
+        print("There is no intel-realsense-image_service. Using gripper cameras")
+        self.intelrealsense_image_client = None
+        self.gripper_T_intel = None
+        print(f"{GRIPPER_T_INTEL_PATH=}")
+        print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
 
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
@@ -248,7 +255,7 @@ class Spot:
         Spot's gripper camera or intelrealsense camera (jaw camera). 0 for using Spot's gripper camera,
         and 1 for using intelrealsense camera (jaw camera).
         """
-        return rospy.get_param("is_gripper_blocked", default=0) == 1
+        return ros.Param.get_param("is_gripper_blocked", 0) == 1
 
     def get_lease(self, hijack=False):
         # Make sure a lease for this client isn't already active
@@ -646,97 +653,97 @@ class Spot:
         self.set_base_velocity(x_vel=0, y_vel=0, ang_vel=0, vel_time=0.8)
         return msg
 
-    def grasp_point_in_image_with_IK(
-        self,
-        point_in_gripper: np.ndarray,
-        body_T_cam: mn.Matrix4,
-        gripper_pose_quat: List[float] = None,
-        solution_angles: np.ndarray = np.zeros((3,)),
-        timeout=10,
-        claw_gripper_control_parameters: List[Tuple] = [],
-        visualize: Tuple[Any, np.ndarray] = None,
-    ):
-        """This is an alternative (grasp_point_in_image) to grasp the object in the image, which uses IK to move the arm to the point in the image."""
+    # def grasp_point_in_image_with_IK(
+    #     self,
+    #     point_in_gripper: np.ndarray,
+    #     body_T_cam: mn.Matrix4,
+    #     gripper_pose_quat: List[float] = None,
+    #     solution_angles: np.ndarray = np.zeros((3,)),
+    #     timeout=10,
+    #     claw_gripper_control_parameters: List[Tuple] = [],
+    #     visualize: Tuple[Any, np.ndarray] = None,
+    # ):
+    #     """This is an alternative (grasp_point_in_image) to grasp the object in the image, which uses IK to move the arm to the point in the image."""
 
-        point_in_body = np.array(
-            body_T_cam.transform_point(mn.Vector3(*point_in_gripper))
-        )
-        print(f"Point in body {point_in_body}")
+    #     point_in_body = np.array(
+    #         body_T_cam.transform_point(mn.Vector3(*point_in_gripper))
+    #     )
+    #     print(f"Point in body {point_in_body}")
 
-        bx, by, byaw = self.get_xy_yaw(False)
-        current_gripper_pose = self.get_ee_quaternion_in_body_frame(
-            frame_name=GRAV_ALIGNED_BODY_FRAME_NAME
-        ).view((np.double, 4))
-        up_thresh = 0.2
-        point_in_body_uppeest = point_in_body.copy()
-        point_in_body_uppeest[-1] += up_thresh
-        is_point_reachable_without_mobility = self.query_IK_reachability_of_gripper(
-            SE3Pose(*point_in_body, Quat(*gripper_pose_quat))
-        )
-        if not is_point_reachable_without_mobility:
-            point_in_body_uppeest[0] += 0.05
+    #     bx, by, byaw = self.get_xy_yaw(False)
+    #     current_gripper_pose = self.get_ee_quaternion_in_body_frame(
+    #         frame_name=GRAV_ALIGNED_BODY_FRAME_NAME
+    #     ).view((np.double, 4))
+    #     up_thresh = 0.2
+    #     point_in_body_uppeest = point_in_body.copy()
+    #     point_in_body_uppeest[-1] += up_thresh
+    #     is_point_reachable_without_mobility = self.query_IK_reachability_of_gripper(
+    #         SE3Pose(*point_in_body, Quat(*gripper_pose_quat))
+    #     )
+    #     if not is_point_reachable_without_mobility:
+    #         point_in_body_uppeest[0] += 0.05
 
-        status = self.move_arm_to_point_with_body_follow(
-            [point_in_body_uppeest],
-            [gripper_pose_quat],
-            allow_body_follow=not is_point_reachable_without_mobility,
-        )
+    #     status = self.move_arm_to_point_with_body_follow(
+    #         [point_in_body_uppeest],
+    #         [gripper_pose_quat],
+    #         allow_body_follow=not is_point_reachable_without_mobility,
+    #     )
 
-        pos = self.get_ee_pos_in_body_frame(GRAV_ALIGNED_BODY_FRAME_NAME)[0]
-        pos[-1] -= up_thresh - 0.1
-        current_gripper_pose = self.get_ee_quaternion_in_body_frame(
-            GRAV_ALIGNED_BODY_FRAME_NAME
-        ).view((np.double, 4))
-        status = self.move_arm_to_point_with_body_follow(
-            [pos], [current_gripper_pose], allow_body_follow=False
-        )
+    #     pos = self.get_ee_pos_in_body_frame(GRAV_ALIGNED_BODY_FRAME_NAME)[0]
+    #     pos[-1] -= up_thresh - 0.1
+    #     current_gripper_pose = self.get_ee_quaternion_in_body_frame(
+    #         GRAV_ALIGNED_BODY_FRAME_NAME
+    #     ).view((np.double, 4))
+    #     status = self.move_arm_to_point_with_body_follow(
+    #         [pos], [current_gripper_pose], allow_body_follow=False
+    #     )
 
-        if visualize is not None:
-            intrinsics, predicted_pixel, rgb_image = visualize
-            pixel_uv = project_3d_to_pixel_uv(
-                np.array(
-                    body_T_cam.inverted().transform_point(mn.Vector3(*point_in_body))
-                ).reshape(1, 3),
-                intrinsics,
-            )[0].tolist()
-            pixel_uv = list(map(int, pixel_uv))
-            predicted_pixel = list(map(int, predicted_pixel))
-            rgb_image = cv2.circle(rgb_image, pixel_uv, 2, (0, 255, 0), 2)
-            rgb_image = cv2.circle(rgb_image, predicted_pixel, 2, (0, 0, 255), 2)
-            cv2.imwrite("grasp_point.png", rgb_image)
+    #     if visualize is not None:
+    #         intrinsics, predicted_pixel, rgb_image = visualize
+    #         pixel_uv = project_3d_to_pixel_uv(
+    #             np.array(
+    #                 body_T_cam.inverted().transform_point(mn.Vector3(*point_in_body))
+    #             ).reshape(1, 3),
+    #             intrinsics,
+    #         )[0].tolist()
+    #         pixel_uv = list(map(int, pixel_uv))
+    #         predicted_pixel = list(map(int, predicted_pixel))
+    #         rgb_image = cv2.circle(rgb_image, pixel_uv, 2, (0, 255, 0), 2)
+    #         rgb_image = cv2.circle(rgb_image, predicted_pixel, 2, (0, 0, 255), 2)
+    #         cv2.imwrite("grasp_point.png", rgb_image)
 
-        print(f"Grasp reached to object ? {status}")
+    #     print(f"Grasp reached to object ? {status}")
 
-        n: int = len(claw_gripper_control_parameters)
-        claw_gripper_command = None
+    #     n: int = len(claw_gripper_control_parameters)
+    #     claw_gripper_command = None
 
-        # Force control the gripper to ensure that the robot does not crush the object
-        for claw_index, (claw_gripper_angle, max_torque) in enumerate(
-            claw_gripper_control_parameters
-        ):
-            claw_gripper_command = (
-                RobotCommandBuilder.claw_gripper_open_fraction_command(
-                    claw_gripper_angle,
-                    claw_gripper_command,
-                    disable_force_on_contact=claw_index != n - 1,
-                    max_torque=max_torque,
-                )
-            )
-        self.command_client.robot_command(claw_gripper_command)
-        nbx, nby, nbyaw = self.get_xy_yaw()
+    #     # Force control the gripper to ensure that the robot does not crush the object
+    #     for claw_index, (claw_gripper_angle, max_torque) in enumerate(
+    #         claw_gripper_control_parameters
+    #     ):
+    #         claw_gripper_command = (
+    #             RobotCommandBuilder.claw_gripper_open_fraction_command(
+    #                 claw_gripper_angle,
+    #                 claw_gripper_command,
+    #                 disable_force_on_contact=claw_index != n - 1,
+    #                 max_torque=max_torque,
+    #             )
+    #         )
+    #     self.command_client.robot_command(claw_gripper_command)
+    #     nbx, nby, nbyaw = self.get_xy_yaw()
 
-        current_position_of_gripper_in_body = self.get_ee_pos_in_body_frame()[0]
-        current_position_of_gripper_in_body[-1] += 0.1
+    #     current_position_of_gripper_in_body = self.get_ee_pos_in_body_frame()[0]
+    #     current_position_of_gripper_in_body[-1] += 0.1
 
-        roll, pitch, yaw = np.deg2rad(solution_angles).tolist()
-        quat = geometry.EulerZXY(yaw=yaw, roll=roll, pitch=pitch).to_quaternion()
+    #     roll, pitch, yaw = np.deg2rad(solution_angles).tolist()
+    #     quat = geometry.EulerZXY(yaw=yaw, roll=roll, pitch=pitch).to_quaternion()
 
-        self.move_arm_to_point_with_body_follow(
-            [current_position_of_gripper_in_body] * 3,
-            [current_gripper_pose, [1.0, 0.0, 0.0, 0.0], quat],
-            1,
-        )
-        return status
+    #     self.move_arm_to_point_with_body_follow(
+    #         [current_position_of_gripper_in_body] * 3,
+    #         [current_gripper_pose, [1.0, 0.0, 0.0, 0.0], quat],
+    #         1,
+    #     )
+    #     return status
 
     def grasp_point_in_image(
         self,
@@ -1436,37 +1443,37 @@ class Spot:
         intrinsics = np.array([[fx, 0, ppx], [0, fy, ppy], [0, 0, 1]])
         return intrinsics
 
-    def get_ros_TransformStamped_vision_T_body(
-        self, frame_tree_snapshot
-    ) -> TransformStamped:
-        """
-        Generates vision_T_body transform as a ROS TransformStamped message from the FrameTreeSnapshot
+    # def get_ros_TransformStamped_vision_T_body(
+    #     self, frame_tree_snapshot
+    # ) -> TransformStamped:
+    #     """
+    #     Generates vision_T_body transform as a ROS TransformStamped message from the FrameTreeSnapshot
 
-        Args:
-            frame_tree_snapshot (FrameTreeSnapshot): FrameTreeSnapshot from which to extract the vision_T_body transform
+    #     Args:
+    #         frame_tree_snapshot (FrameTreeSnapshot): FrameTreeSnapshot from which to extract the vision_T_body transform
 
-        Returns:
-            ros_TransformStamped_vision_T_body (TransformStamped): ROS TransformStamped message containing the vision_T_body transform
-        """
-        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
-        ros_TransformStamped_vision_T_body = bd_SE3Pose_to_ros_TransformStamped(
-            bd_se3=vision_tform_body, parent_frame=rf.SPOT_WORLD, child_frame=rf.SPOT
-        )
-        return ros_TransformStamped_vision_T_body
+    #     Returns:
+    #         ros_TransformStamped_vision_T_body (TransformStamped): ROS TransformStamped message containing the vision_T_body transform
+    #     """
+    #     vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+    #     ros_TransformStamped_vision_T_body = bd_SE3Pose_to_ros_TransformStamped(
+    #         bd_se3=vision_tform_body, parent_frame=rf.SPOT_WORLD, child_frame=rf.SPOT
+    #     )
+    #     return ros_TransformStamped_vision_T_body
 
-    def get_ros_Pose_vision_T_body(self, frame_tree_snapshot) -> Pose:
-        """
-        Generates vision_T_body transform as a ROS Pose message from the FrameTreeSnapshot
+    # def get_ros_Pose_vision_T_body(self, frame_tree_snapshot) -> Pose:
+    #     """
+    #     Generates vision_T_body transform as a ROS Pose message from the FrameTreeSnapshot
 
-        Args:
-            frame_tree_snapshot (FrameTreeSnapshot): FrameTreeSnapshot from which to extract the vision_T_body transform
+    #     Args:
+    #         frame_tree_snapshot (FrameTreeSnapshot): FrameTreeSnapshot from which to extract the vision_T_body transform
 
-        Returns:
-            ros_Pose_vision_T_body (Pose): ROS Pose message containing the vision_T_body transform
-        """
-        vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
-        ros_Pose_vision_T_body = bd_SE3Pose_to_ros_Pose(bd_se3=vision_tform_body)
-        return ros_Pose_vision_T_body
+    #     Returns:
+    #         ros_Pose_vision_T_body (Pose): ROS Pose message containing the vision_T_body transform
+    #     """
+    #     vision_tform_body = get_vision_tform_body(frame_tree_snapshot)
+    #     ros_Pose_vision_T_body = bd_SE3Pose_to_ros_Pose(bd_se3=vision_tform_body)
+    #     return ros_Pose_vision_T_body
 
     def get_magnum_Matrix4_spot_a_T_b(self, a: str, b: str, tree=None) -> mn.Matrix4:
         """

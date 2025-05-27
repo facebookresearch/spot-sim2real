@@ -98,7 +98,12 @@ def raise_error(sig, frame):
     raise RuntimeError
 
 
-def rotate(datalogger: DataLogger, n_intervals: int = 16, n_captures: int = 2) -> List:
+def rotate(
+    datalogger: DataLogger,
+    n_intervals: int = 16,
+    n_captures: int = 2,
+    skill_name: str = "none",
+) -> List:
     x0, y0, theta0 = spot.get_xy_yaw()
     for i in range(n_intervals):
         datalogger.spot.set_base_position(
@@ -160,7 +165,7 @@ def main(spot: Spot, initial_arm_state: int = 1):
                 break
 
             elif pressed_key == "r":
-                rotate(datalogger=datalogger)
+                rotate(datalogger=datalogger, skill_name="teleop")
 
             elif pressed_key == "l":
                 if enable_logger_during_teleop:
@@ -223,7 +228,7 @@ def main(spot: Spot, initial_arm_state: int = 1):
 
                 # Log data
                 if enable_logger_during_teleop:
-                    datalogger.log_data_finite(2)
+                    datalogger.log_data_finite(2, skill_name="teleop")
 
             if not key_not_applicable:
                 last_execution = time.time()

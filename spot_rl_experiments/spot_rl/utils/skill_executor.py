@@ -23,29 +23,71 @@ from spot_rl.utils.utils import ros_topics as rt
 from spot_rl.utils.waypoint_estimation_based_on_robot_poses_from_cg import (
     get_navigation_points,
 )
+from spot_wrapper.data_logger import DataLogger, dump_pkl
 from std_msgs.msg import String
 
 LOG_PATH = "../../spot_rl_experiments/experiments/skill_test/logs/"
 
 ENABLE_ARM_SCAN = True
 ENABLE_WAYPOINT_COMPUTE_CACHE = (
-    True  # A flag to load the cache file for the navigation waypoint
+    False  # A flag to load the cache file for the navigation waypoint
 )
+ENABLE_WAYPOINT_COMPUTE_CG = (
+    True  # A flag to load the cg file for the navigation waypoint
+)
+
+NEW_PLANNER_NEURIPS = True  # HACK for neurips paper
+assert (
+    ENABLE_WAYPOINT_COMPUTE_CG ^ ENABLE_WAYPOINT_COMPUTE_CACHE
+), "Enable either cache or cg for waypoint computation"
+
+
 waypoint_compute_cache = None
-waypoint_compute_cache_path = osp.join(
-    CG_ROOT_PATH, "sg_cache", "map", "waypoint_compute_cache.pkl"
-)
-
-if not osp.exists(waypoint_compute_cache_path) and ENABLE_WAYPOINT_COMPUTE_CACHE:
-    # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
-    print(
-        "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
-    )
-    ENABLE_WAYPOINT_COMPUTE_CACHE = False
-
+waypoint_compute_cg = {}
 if ENABLE_WAYPOINT_COMPUTE_CACHE:
-    with open(waypoint_compute_cache_path, "rb") as f:
-        waypoint_compute_cache = pickle.load(f)
+    waypoint_compute_cache_path = osp.join(
+        CG_ROOT_PATH, "sg_cache", "map", "waypoint_compute_cache.pkl"
+    )
+
+    # Check if cache exists
+    if not osp.exists(waypoint_compute_cache_path):
+        # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
+        print(
+            "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
+        )
+        ENABLE_WAYPOINT_COMPUTE_CACHE = False
+    else:
+        with open(waypoint_compute_cache_path, "rb") as f:
+            waypoint_compute_cache = pickle.load(f)
+elif ENABLE_WAYPOINT_COMPUTE_CG:
+    waypoint_compute_cg_path = osp.join(
+        CG_ROOT_PATH, "sg_cache", "cfslam_object_relations_mock.json"
+    )
+
+    # Check if cache exists
+    if not osp.exists(waypoint_compute_cg_path):
+        # Compute cache doesn't exists so ignore it always, run compute_waypoint_cache.py
+        print(
+            "Waypoint compute cache not created, please run compute_waypoint_cache.py if you want to run waypoint calculation code faster"
+        )
+        ENABLE_WAYPOINT_COMPUTE_CG = False
+    else:
+        with open(
+            waypoint_compute_cg_path, "rb"
+        ) as f:  # TODO: Test if "rb" works, else revert to "r"
+            cg_relations_data = json.load(f)
+            for cg_relation_node in cg_relations_data:
+                for objectkey in ["object1", "object2"]:
+                    object = cg_relation_node.get(objectkey, None)
+                    if object is None:
+                        continue
+                    bbox_center = np.array(object.get("bbox_center"))
+                    bbox_extent = np.array(object.get("bbox_extent"))
+                    # object_tag = object.get("object_tag")
+                    object_tag = f'{object.get("object_tag").replace(" ", "_")}_{object.get("id")}'  # HACK: neurips paper
+                    unique_key = object_tag
+                    waypoint_compute_cg[unique_key] = object.get("robot_pose")
+                    print(f"{object_tag} : final waypoint {object.get('robot_pose')}")
 
 
 class SpotRosSkillExecutor:
@@ -82,6 +124,15 @@ class SpotRosSkillExecutor:
         self._human_action = (
             self.spotskillmanager.get_env().human_activity_current.copy()
         )
+
+        ### Moved this to skill manager
+        # self.sources = [
+        #     SpotCamIds.HAND_COLOR,
+        #     SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        # ]
+        # self.data_logger = DataLogger(self.spotskillmanager.spot)
+        # self.data_logger.setup_logging_sources(self.sources)
+        self.data_logger = self.spotskillmanager.data_logger
 
     def reset_skill_msg(self):
         """Reset the skill message. The format is skill name, success flag, and message string.
@@ -260,8 +311,19 @@ class SpotRosSkillExecutor:
                     rospy.set_param(
                         "/nexus_nav_highlight", f"{x};{y};{1.0};{skill_input}"
                     )
-                    succeded, msg = self.spotskillmanager.nav(x, y)
+                    navconfig = self.spotskillmanager.nav_controller.env.config
+                    backup_success_distance = (
+                        navconfig.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
+                    )
 
+                    # FIXME: Hack for NeurIPS 2025
+                    navconfig.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV = 1.6
+                    succeded, msg = self.spotskillmanager.nav(
+                        x, y, skill_name=skill_name, skill_input=skill_input
+                    )
+                    navconfig.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV = (
+                        backup_success_distance
+                    )
                     # Nav -> scan behavior
                     human_type_msg = rospy.get_param(
                         "/human_type_msg", f"{str(time.time())},None"
@@ -272,7 +334,10 @@ class SpotRosSkillExecutor:
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
                             enable_object_detector_during_movement=False,
+                            data_logger=self.data_logger,
                         )
+                        # self.dump_data()
+                        # print("********** Dumping data")
 
                     if not succeded and not is_exploring:
                         break
@@ -282,8 +347,11 @@ class SpotRosSkillExecutor:
                     rospy.set_param("/viz_place", skill_input)
                 else:
                     rospy.set_param("/viz_pick", skill_input)
-                succeded, msg = self.spotskillmanager.nav(skill_input)
-
+                succeded, msg = self.spotskillmanager.nav(
+                    nav_target=skill_input,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
+                )
             # Run scan arm if gripper is NOT holding any item
             print(
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"
@@ -322,6 +390,9 @@ class SpotRosSkillExecutor:
                 # Reset Nexus nav UI
                 rospy.set_param("/nexus_nav_highlight", "None;None;None;None")
 
+                # Get the robot x, y, yaw
+                x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
+
                 # Get the bbox center and bbox extent
                 bbox_info = skill_input.split(";")  # in the format of x,y,z
                 bbox_info = [bb.strip() for bb in bbox_info]
@@ -332,22 +403,27 @@ class SpotRosSkillExecutor:
                 bbox_extent = np.array([float(v) for v in bbox_info[3:6]])
 
                 if ":" in bbox_info[6]:
-                    query_class_names = bbox_info[6].split(":")[1]
+                    query_class_names = bbox_info[6].split(":")[1]  # For exploration
+                else:
+                    query_class_names = bbox_info[6]  # For nav with view poses
+
+                if not NEW_PLANNER_NEURIPS:
+                    # Strip id from query_class_name
                     query_class_names = query_class_names.split("_")
                     if query_class_names[0].isdigit():
-                        query_class_names = ["_".join(query_class_names[1:])]
+                        query_class_names = [" ".join(query_class_names[1:])]
                     else:
-                        query_class_names = ["_".join(query_class_names)]
+                        query_class_names = [" ".join(query_class_names)]
                 else:
-                    query_class_names = bbox_info[6:]
-                    query_class_names[0] = query_class_names[0].replace("_", " ")
-
+                    # HACK for neurips paper
+                    query_class_names = [query_class_names]
                 if robot_holding:
                     rospy.set_param("/viz_place", query_class_names[0])
                 else:
                     rospy.set_param("/viz_pick", query_class_names[0])
                 # Get the view poses
                 waypoint_goal, view_poses = None, None
+                nav_pts = []
                 if ENABLE_WAYPOINT_COMPUTE_CACHE and waypoint_compute_cache:
                     unique_cache_key = ",".join(bbox_info[0:3] + bbox_info[3:6])
                     if unique_cache_key in waypoint_compute_cache:
@@ -355,24 +431,37 @@ class SpotRosSkillExecutor:
                         waypoint_goal, category_tag = waypoint_compute_cache[
                             unique_cache_key
                         ]
+                    if not waypoint_goal:
+                        view_poses, category_tag = get_view_poses(
+                            bbox_center, bbox_extent, query_class_names, True
+                        )
 
-                if not waypoint_goal:
-                    view_poses, category_tag = get_view_poses(
-                        bbox_center, bbox_extent, query_class_names, True
+                    # Get the navigation points
+                    nav_pts = get_navigation_points(
+                        robot_view_pose_data=view_poses,
+                        bbox_centers=bbox_center,
+                        bbox_extents=bbox_extent,
+                        cur_robot_xy=[x, y],
+                        goal_xy_yaw_from_cache=waypoint_goal,
+                        visualize=False,
+                        savefigname="pathplanning.png",
                     )
 
-                # Get the robot x, y, yaw
-                x, y, _ = self.spotskillmanager.spot.get_xy_yaw()
-                # Get the navigation points
-                nav_pts = get_navigation_points(
-                    robot_view_pose_data=view_poses,
-                    bbox_centers=bbox_center,
-                    bbox_extents=bbox_extent,
-                    cur_robot_xy=[x, y],
-                    goal_xy_yaw_from_cache=waypoint_goal,
-                    visualize=False,
-                    savefigname="pathplanning.png",
-                )
+                elif ENABLE_WAYPOINT_COMPUTE_CG and waypoint_compute_cg:
+                    unique_cache_key = query_class_names[0]
+                    if unique_cache_key in waypoint_compute_cg:
+                        # should be list [(x, y, deg(yaw)] # TODO: Verify this
+                        waypoint_goal = waypoint_compute_cg[
+                            unique_cache_key
+                        ]  # don't modify waypoint_goal as it, it mutates the OG dict
+                        nav_pts = [
+                            [
+                                waypoint_goal[0],
+                                waypoint_goal[1],
+                                np.deg2rad(waypoint_goal[2]),
+                            ]
+                        ]
+                        category_tag = unique_cache_key
 
                 # Publish data for Nexus UI
                 rospy.set_param(
@@ -411,7 +500,12 @@ class SpotRosSkillExecutor:
                                     backup_success_angle * 2.0,
                                 )
                                 succeded, msg = self.spotskillmanager.nav(
-                                    x, y, yaw, False
+                                    x,
+                                    y,
+                                    yaw,
+                                    False,
+                                    skill_name=skill_name,
+                                    skill_input=skill_input,
                                 )
                                 (
                                     navconfig.SUCCESS_DISTANCE,
@@ -422,11 +516,22 @@ class SpotRosSkillExecutor:
                                 )
                             else:
                                 succeded, msg = self.spotskillmanager.nav(
-                                    x, y, yaw, False
+                                    x,
+                                    y,
+                                    yaw,
+                                    False,
+                                    skill_name=skill_name,
+                                    skill_input=skill_input,
                                 )
                         else:
                             # Do dynamic point yaw here for the intermediate points
-                            succeded, msg = self.spotskillmanager.nav(x, y)
+                            succeded, msg = self.spotskillmanager.nav(
+                                x, y, skill_name=skill_name, skill_input=skill_input
+                            )
+                        if self.data_logger is not None:
+                            self.data_logger.log_data_finite(
+                                1, skill_name="nav", skill_input=skill_input
+                            )
                         skill_log = (
                             self.spotskillmanager.nav_controller.skill_result_log
                         )
@@ -458,7 +563,10 @@ class SpotRosSkillExecutor:
                             self.spotskillmanager.spot,
                             publisher=self.detection_publisher,
                             enable_object_detector_during_movement=False,
+                            data_logger=self.data_logger,
                         )
+                        self.dump_data()
+                        print("********** Dumping data")
                     flag = self._use_continuos_dwg_or_stop_add == "continous"
                     rospy.set_param(
                         "/enable_dwg_object_addition", f"{str(time.time())},{flag}"
@@ -486,10 +594,16 @@ class SpotRosSkillExecutor:
             self.reset_skill_msg()
             pick_pass, pick_msg = self.check_pick_condition()
             if pick_pass:
-                succeded, msg = self.spotskillmanager.pick(skill_input)
+                succeded, msg = self.spotskillmanager.pick(
+                    target_obj_name=skill_input,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
+                )
+                self.dump_data()
             else:
                 succeded = False
                 msg = pick_msg
+                self.dump_data()
             self.check_pick_condition()
             skill_log = self.spotskillmanager.gaze_controller.skill_result_log
             if "num_steps" not in skill_log:
@@ -518,14 +632,23 @@ class SpotRosSkillExecutor:
                     is_local=True,
                     visualize=False,
                     enable_waypoint_estimation=True,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
                 )
+                self.dump_data()
                 if succeded:
                     rospy.set_param("is_gripper_blocked", 0)
             else:
                 # Use the following for the hardcode waypoint for static place
                 succeded, msg = self.spotskillmanager.place(
-                    0.6, 0.0, 0.4, is_local=True
+                    0.6,
+                    0.0,
+                    0.4,
+                    is_local=True,
+                    skill_name=skill_name,
+                    skill_input=skill_input,
                 )
+                self.dump_data()
             self.check_pick_condition()
             skill_log = self.spotskillmanager.place_controller.skill_result_log
             if "num_steps" not in skill_log:
@@ -558,6 +681,8 @@ class SpotRosSkillExecutor:
         elif skill_name == "dock":
             print(f"current skill_name {skill_name} skill_input {skill_input}")
             self.reset_skill_msg()
+            self.dump_data()
+            print("********** Dumping data")
             self.spotskillmanager.dock()
             self._is_robot_on_dock = True
             rospy.set_param("/skill_name_input", f"{str(time.time())},None,None")
@@ -574,6 +699,12 @@ class SpotRosSkillExecutor:
         file_path = osp.join(LOG_PATH, "test.json")
         with open(file_path, "w") as file:
             json.dump(self.episode_log, file, indent=4)
+
+    def dump_data(self):
+        if self.data_logger is not None:
+            dump_pkl(self.data_logger.log_packet_list)
+        else:
+            print("Will not dump data as data-logger is not initialized")
 
 
 def reset_ros_param():

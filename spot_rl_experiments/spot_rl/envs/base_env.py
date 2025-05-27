@@ -57,6 +57,7 @@ from spot_rl.utils.rospy_light_detection import detect_with_rospy_subscriber
 from spot_rl.utils.segmentation_service import segment_with_socket
 from spot_rl.utils.utils import FixSizeOrderedDict, arr2str, object_id_to_object_name
 from spot_rl.utils.utils import ros_topics as rt
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot, SpotCamIds, image_response_to_cv2, wrap_heading
 from std_msgs.msg import Float32, String
 
@@ -78,6 +79,8 @@ ORIG_WIDTH = 640
 ORIG_HEIGHT = 480
 WIDTH_SCALE = 0.5
 HEIGHT_SCALE = 0.5
+
+LOGGER_INTERVAL = 2.0  # every x seconds
 
 
 def pad_action(action):
@@ -117,6 +120,7 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         max_joint_movement_key="MAX_JOINT_MOVEMENT",
         max_lin_dist_key="MAX_LIN_DIST",
         max_ang_dist_key="MAX_ANG_DIST",
+        data_logger: DataLogger = None,
     ):
         """
         :param max_joint_movement_key: max allowable displacement of arm joints
@@ -174,6 +178,10 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         self._max_joint_movement_scale = self.config[max_joint_movement_key]
         self._max_lin_dist_scale = self.config[max_lin_dist_key]
         self._max_ang_dist_scale = self.config[max_ang_dist_key]
+
+        # Data logging
+        self.data_logger = data_logger
+        self.last_logged_time = time.time()
 
         # Tracking paramters reset
         rospy.set_param("enable_tracking", False)
@@ -330,6 +338,9 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
         grasp = action_dict.get("grasp", False)
         place = action_dict.get("place", False)
 
+        skill_name = action_dict.get("skill_name", "Not implemented for this skill")
+        skill_input = action_dict.get("skill_input", "Not implemented for this skill")
+
         target_yaw = None
         if disable_oa is None:
             disable_oa = self.config.DISABLE_OBSTACLE_AVOIDANCE
@@ -338,6 +349,17 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             print(
                 f"raw_base_ac: {arr2str(base_action)}\traw_arm_ac: {arr2str(arm_action)}"
             )
+
+        # After every 3 seconds, stop to record data
+        if self.data_logger is None:
+            pass
+        else:
+            if time.time() - self.last_logged_time > LOGGER_INTERVAL:
+                # time.sleep(3)
+                self.data_logger.log_data_finite(
+                    1, skill_name=skill_name, skill_input=skill_input
+                )
+                self.last_logged_time = time.time()
 
         if grasp:
             # Briefly pause and get latest gripper image to ensure precise grasp
@@ -629,15 +651,16 @@ class SpotBaseEnv(SpotRobotSubscriberMixin, gym.Env):
             rospy.set_param("is_gripper_blocked", 0)
 
         if enable_force_control:
-            ret = self.spot.grasp_point_in_image_with_IK(
-                point_in_gripper,  # 3D point in gripper camera
-                body_T_cam,  # will convert 3D point in gripper to body
-                gripper_pose_quat,  # quat for gripper
-                solution_angles,
-                10,
-                claw_gripper_control_parameters,
-                visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
-            )
+            # ret = self.spot.grasp_point_in_image_with_IK(
+            #     point_in_gripper,  # 3D point in gripper camera
+            #     body_T_cam,  # will convert 3D point in gripper to body
+            #     gripper_pose_quat,  # quat for gripper
+            #     solution_angles,
+            #     10,
+            #     claw_gripper_control_parameters,
+            #     visualize=(intrinsics, self.obj_center_pixel, image_responses[0]),
+            # )
+            raise ValueError("Cannot Do this at this point of time")
         else:
             ret = self.spot.grasp_hand_depth(
                 self.obj_center_pixel,

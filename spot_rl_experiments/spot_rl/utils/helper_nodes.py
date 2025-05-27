@@ -78,18 +78,18 @@ class SpotRosProprioceptionPublisher:
 
         if time.time() - self.last_publish > 1 / 10:
             self.pub.publish(msg)
-            self.static_tf_broadcaster.sendTransform(
-                self.spot.get_ros_TransformStamped_vision_T_body(
-                    robot_kinematic_snapshot_tree
-                )
-            )
-            pose = self.spot.get_ros_Pose_vision_T_body(robot_kinematic_snapshot_tree)
-            msg = Odometry()
-            msg.pose.pose = pose
-            msg.header.stamp = rospy.Time.now()
-            msg.child_frame_id = rf.SPOT
-            msg.header.frame_id = rf.SPOT_WORLD
-            self.odom_broadcaster.publish(msg)
+            # self.static_tf_broadcaster.sendTransform(
+            #     self.spot.get_ros_TransformStamped_vision_T_body(
+            #         robot_kinematic_snapshot_tree
+            #     )
+            # )
+            # pose = self.spot.get_ros_Pose_vision_T_body(robot_kinematic_snapshot_tree)
+            # msg = Odometry()
+            # msg.pose.pose = pose
+            # msg.header.stamp = rospy.Time.now()
+            # msg.child_frame_id = rf.SPOT
+            # msg.header.frame_id = rf.SPOT_WORLD
+            # self.odom_broadcaster.publish(msg)
 
             self.publish_ee_trajectory()
 

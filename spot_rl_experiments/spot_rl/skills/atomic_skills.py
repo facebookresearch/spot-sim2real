@@ -74,7 +74,7 @@ class Skill:
 
     """
 
-    def __init__(self, spot: Spot, config=None) -> None:
+    def __init__(self, spot: Spot, config=None, data_logger=None) -> None:
         self.spot = spot
         self.config = config
         self.verbose = True
@@ -83,6 +83,9 @@ class Skill:
         self.skill_result_log = {}  # type: Dict[str, Any]
         self.start_time = None  # type: float
         self.reset_logger()
+
+        # Spot DataLogger (different from above logger)
+        self.data_logger = data_logger
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """
@@ -191,6 +194,14 @@ class Skill:
                 self.env.x,  # type: ignore
                 self.env.y,  # type: ignore
             ]
+
+            # HACK: Feed skill_name, skill_input from goal_dict into action_dict for logging
+            action_dict["skill_name"] = goal_dict.get(
+                "skill_name", "Not implemented for this skill"
+            )
+            action_dict["skill_input"] = goal_dict.get(
+                "skill_input", "Not implemented for this skill"
+            )
             observations, _, done, info = self.env.step(action_dict=action_dict)  # type: ignore
 
             # Do not interrupt pick and place skills when human does something
@@ -369,10 +380,10 @@ class Navigation(Skill):
             spot.shutdown()
     """
 
-    def __init__(self, spot: Spot, config=None) -> None:
+    def __init__(self, spot: Spot, config=None, data_logger=None) -> None:
         if not config:
             config = construct_config_for_nav()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         # Setup
         self.policy = NavPolicy(
@@ -380,7 +391,7 @@ class Navigation(Skill):
         )
         self.policy.reset()
 
-        self.env = SpotNavEnv(self.config, self.spot)
+        self.env = SpotNavEnv(self.config, self.spot, self.data_logger)
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""
@@ -518,10 +529,12 @@ class Pick(Skill):
             spot.shutdown(should_dock=True)
     """
 
-    def __init__(self, spot, config=None, use_mobile_pick=False) -> None:
+    def __init__(
+        self, spot, config=None, use_mobile_pick=False, data_logger=None
+    ) -> None:
         if not config:
             config = construct_config_for_gaze()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         # Setup
         self._use_mobile_pick = use_mobile_pick
@@ -542,7 +555,7 @@ class Pick(Skill):
         self.enable_pose_correction: bool = False
         self.enable_force_control: bool = False
 
-        self.env = SpotGazeEnv(self.config, spot, use_mobile_pick)
+        self.env = SpotGazeEnv(self.config, spot, data_logger, use_mobile_pick)
 
     def set_pose_estimation_flags(
         self,
@@ -639,9 +652,9 @@ class Pick(Skill):
         print(
             f"is_object_block_camera: {is_object_block_camera} with ratio {block_ratio} and threshold {self.config.BLOCK_PERCENTAGE_THRESHOLD}"
         )
-        print(
-            f"is_gripper_open_slightly: {is_gripper_open_slightly} with gripper open {_gripper_open_percentage}% and threshold {self.config.GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING}"
-        )
+        # print(
+        #     f"is_gripper_open_slightly: {is_gripper_open_slightly} with gripper open {_gripper_open_percentage}% and threshold {self.config.GRIPPER_OPEN_PERCENTAGE_THRESHOLD_FOR_GRASPING}"
+        # )
 
         check_pick_success = (
             self.env.grasp_attempted
@@ -733,10 +746,10 @@ class SemanticPick(Pick):
             spot.shutdown(should_dock=True)
     """
 
-    def __init__(self, spot, config=None) -> None:
+    def __init__(self, spot, config=None, data_logger=None) -> None:
         if not config:
             config = construct_config_for_gaze()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         self.policy = SemanticGazePolicy(
             self.config.WEIGHTS.SEMANTIC_GAZE,
@@ -746,7 +759,7 @@ class SemanticPick(Pick):
 
         self.policy.reset()
 
-        self.env = SpotSemanticGazeEnv(self.config, spot)
+        self.env = SpotSemanticGazeEnv(self.config, spot, data_logger)
 
     def reset_skill(self, goal_dict: Dict[str, Any]) -> Any:
         """Refer to class Skill for documentation"""
@@ -800,10 +813,10 @@ class MobilePickEE(Pick):
     Semantic place ee controller is used to execute place for given place targets
     """
 
-    def __init__(self, spot: Spot, config, use_mobile_pick=True):
+    def __init__(self, spot: Spot, config, use_mobile_pick=True, data_logger=None):
         if not config:
             config = construct_config_for_gaze()
-        super().__init__(spot, config, use_mobile_pick=True)
+        super().__init__(spot, config, data_logger, use_mobile_pick)
 
         self.policy = MobileGazeEEPolicy(
             self.config.WEIGHTS.MOBILE_GAZE,
@@ -812,7 +825,7 @@ class MobilePickEE(Pick):
         )
         self.policy.reset()
 
-        self.env = SpotGazeEEEnv(config, spot, use_mobile_pick)
+        self.env = SpotGazeEEEnv(config, spot, data_logger, use_mobile_pick)
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""
@@ -866,10 +879,12 @@ class Place(Skill):
             spot.shutdown(should_dock=True)
     """
 
-    def __init__(self, spot: Spot, config=None, use_policies=True) -> None:
+    def __init__(
+        self, spot: Spot, config=None, use_policies=True, data_logger=None
+    ) -> None:
         if not config:
             config = construct_config_for_place()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         # Setup
         self.policy = None
@@ -880,7 +895,7 @@ class Place(Skill):
             )
             self.policy.reset()
 
-        self.env = SpotPlaceEnv(config, spot)
+        self.env = SpotPlaceEnv(config, spot, data_logger=data_logger)
 
     def sanity_check(self, goal_dict: Dict[str, Any]):
         """Refer to class Skill for documentation"""
@@ -1062,17 +1077,17 @@ class SemanticPlace(Place):
     Semantic place controller is used to execute place for given place targets
     """
 
-    def __init__(self, spot: Spot, config):
+    def __init__(self, spot: Spot, config, data_logger=None):
         if not config:
             config = construct_config_for_semantic_place()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         self.policy = SemanticPlacePolicy(
             config.WEIGHTS.SEMANTIC_PLACE, device=config.DEVICE, config=config
         )
         self.policy.reset()
 
-        self.env = SpotSemanticPlaceEnv(config, spot)
+        self.env = SpotSemanticPlaceEnv(config, spot, data_logger=data_logger)
 
     def execute_rl_loop(self, goal_dict: Dict[str, Any]) -> Tuple[bool, str]:
         # Set the robot inital pose
@@ -1124,17 +1139,19 @@ class SemanticPlaceEE(SemanticPlace):
     Semantic place ee controller is used to execute place for given place targets
     """
 
-    def __init__(self, spot: Spot, config, use_semantic_place=False):
+    def __init__(self, spot: Spot, config, use_semantic_place=False, data_logger=None):
         if not config:
             config = construct_config_for_semantic_place()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         self.policy = SemanticPlaceEEPolicy(
             config.WEIGHTS.SEMANTIC_PLACE_EE, device=config.DEVICE, config=config
         )
         self.policy.reset()
 
-        self.env = SpotSemanticPlaceEEEnv(config, spot, use_semantic_place)
+        self.env = SpotSemanticPlaceEEEnv(
+            config, spot, use_semantic_place=use_semantic_place, data_logger=data_logger
+        )
 
     def split_action(self, action: np.ndarray) -> Dict[str, Any]:
         """Refer to class Skill for documentation"""
@@ -1152,10 +1169,10 @@ class OpenCloseDrawer(Skill):
     Open close drawer controller is used to execute open/close drawers
     """
 
-    def __init__(self, spot, config=None) -> None:
+    def __init__(self, spot, config=None, data_logger=None) -> None:
         if not config:
             config = construct_config_for_open_close_drawer()
-        super().__init__(spot, config)
+        super().__init__(spot, config, data_logger)
 
         # Setup
         self.policy = OpenCloseDrawerPolicy(
@@ -1165,7 +1182,7 @@ class OpenCloseDrawer(Skill):
         )
         self.policy.reset()
 
-        self.env = SpotOpenCloseDrawerEnv(self.config, spot)
+        self.env = SpotOpenCloseDrawerEnv(self.config, spot, data_logger=data_logger)
 
     def reset_skill(self, goal_dict: Dict[str, Any]) -> Any:
         """Refer to class Skill for documentation"""

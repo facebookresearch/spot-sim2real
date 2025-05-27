@@ -4,6 +4,7 @@
 
 
 import os
+import time
 
 import magnum as mn
 import numpy as np
@@ -11,17 +12,19 @@ import rospy
 from bosdyn.client.frame_helpers import get_a_tform_b
 from bosdyn.client.math_helpers import quat_to_eulerZYX
 from spot_rl.envs.base_env import SpotBaseEnv
+from spot_wrapper.data_logger import DataLogger
 from spot_wrapper.spot import Spot, wrap_heading
 
 DOCK_ID = int(os.environ.get("SPOT_DOCK_ID", 549))
 
 
 class SpotNavEnv(SpotBaseEnv):
-    def __init__(self, config, spot: Spot):
-        super().__init__(config, spot)
+    def __init__(self, config, spot: Spot, data_logger: DataLogger):
+        super().__init__(config, spot, data_logger=data_logger)
         self._goal_xy = None
         self._enable_nav_by_hand = False
-        self._enable_dynamic_yaw = False
+        # FIXME: This is hardcoded because I could not find where to set it from
+        self._enable_dynamic_yaw = True
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
@@ -166,6 +169,7 @@ class SpotNavEnv(SpotBaseEnv):
         return self.get_nav_observation(self._goal_xy, self.goal_heading)
 
     def step(self, *args, **kwargs):
+
         observations, reward, done, info = super().step(*args, **kwargs)
 
         # Check if we need to dock the robot
