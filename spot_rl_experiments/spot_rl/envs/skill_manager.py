@@ -127,9 +127,7 @@ class SpotSkillManager:
 
         # Process the meta parameters
         self._use_mobile_pick = use_mobile_pick
-        self.allow_semantic_place = (
-            use_semantic_place and self.spot.is_intel_service_available()
-        )
+        self.allow_semantic_place = False
         self.use_pick_ee = use_pick_ee
         self.use_place_ee = use_place_ee
 
@@ -142,12 +140,12 @@ class SpotSkillManager:
         )
 
         ### Moved here from skill executor
-        sources = [
-            SpotCamIds.HAND_COLOR,
-            SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
-            SpotCamIds.INTEL_REALSENSE_COLOR,
-            SpotCamIds.INTEL_REALSENSE_DEPTH,
-        ]
+        # sources = [
+        #     SpotCamIds.HAND_COLOR,
+        #     SpotCamIds.HAND_DEPTH_IN_HAND_COLOR_FRAME,
+        #     SpotCamIds.INTEL_REALSENSE_COLOR,
+        #     SpotCamIds.INTEL_REALSENSE_DEPTH,
+        # ]
         # self.data_logger = DataLogger(self.spot)
         # self.data_logger.setup_logging_sources(sources)
         self.data_logger = None

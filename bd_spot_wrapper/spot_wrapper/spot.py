@@ -218,18 +218,19 @@ class Spot:
         self.image_client = robot.ensure_client(ImageClient.default_service_name)
 
         # Make our intel image client
-        try:
-            self.intelrealsense_image_client = robot.ensure_client(
-                "intel-realsense-image-service"
-            )
-            self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
-            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
+        # try:
+        #     self.intelrealsense_image_client = robot.ensure_client(
+        #         "intel-realsense-image-service"
+        #     )
+        #     self.gripper_T_intel: sp.SE3 = sp.SE3(np.load(GRIPPER_T_INTEL_PATH))
+        #     print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel.matrix()}")
 
-        except Exception:
-            print("There is no intel-realsense-image_service. Using gripper cameras")
-            self.intelrealsense_image_client = None
-            self.gripper_T_intel = None
-            print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
+        # except Exception:
+        print("There is no intel-realsense-image_service. Using gripper cameras")
+        self.intelrealsense_image_client = None
+        self.gripper_T_intel = None
+        print(f"{GRIPPER_T_INTEL_PATH=}")
+        print(f"Loaded gripper_T_intel (sp.SE3) as {self.gripper_T_intel}")
 
         self.manipulation_api_client = robot.ensure_client(
             ManipulationApiClient.default_service_name
@@ -254,7 +255,7 @@ class Spot:
         Spot's gripper camera or intelrealsense camera (jaw camera). 0 for using Spot's gripper camera,
         and 1 for using intelrealsense camera (jaw camera).
         """
-        return ros.Param.set_param("is_gripper_blocked", default=0) == 1
+        return ros.Param.get_param("is_gripper_blocked", 0) == 1
 
     def get_lease(self, hijack=False):
         # Make sure a lease for this client isn't already active

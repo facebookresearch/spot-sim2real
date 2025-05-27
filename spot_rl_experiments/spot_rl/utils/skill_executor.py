@@ -311,10 +311,19 @@ class SpotRosSkillExecutor:
                     rospy.set_param(
                         "/nexus_nav_highlight", f"{x};{y};{1.0};{skill_input}"
                     )
+                    navconfig = self.spotskillmanager.nav_controller.env.config
+                    backup_success_distance = (
+                        navconfig.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV
+                    )
+
+                    # FIXME: Hack for NeurIPS 2025
+                    navconfig.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV = 1.6
                     succeded, msg = self.spotskillmanager.nav(
                         x, y, skill_name=skill_name, skill_input=skill_input
                     )
-
+                    navconfig.SUCCESS_DISTANCE_FOR_DYNAMIC_YAW_NAV = (
+                        backup_success_distance
+                    )
                     # Nav -> scan behavior
                     human_type_msg = rospy.get_param(
                         "/human_type_msg", f"{str(time.time())},None"
@@ -343,7 +352,6 @@ class SpotRosSkillExecutor:
                     skill_name=skill_name,
                     skill_input=skill_input,
                 )
-
             # Run scan arm if gripper is NOT holding any item
             print(
                 f"Navigation finished, succeded={succeded} , robot_holding={robot_holding}"

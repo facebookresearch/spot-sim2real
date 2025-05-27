@@ -23,7 +23,8 @@ class SpotNavEnv(SpotBaseEnv):
         super().__init__(config, spot, data_logger=data_logger)
         self._goal_xy = None
         self._enable_nav_by_hand = False
-        self._enable_dynamic_yaw = False
+        # FIXME: This is hardcoded because I could not find where to set it from
+        self._enable_dynamic_yaw = True
         self.goal_heading = None
         self.succ_distance = config.SUCCESS_DISTANCE
         self.succ_angle = np.deg2rad(config.SUCCESS_ANGLE_DIST)
